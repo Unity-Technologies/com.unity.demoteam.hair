@@ -1,0 +1,8 @@
+65536 strands, 128 particles along each strand, 4M total particles (overkill)
+
+solving strands in parallel
+20 solver iterations (overkill)
+solver iterations			20
+gauss-seidel naive ~190ms/frame
+gauss-seidel combined 80ms/frame
+

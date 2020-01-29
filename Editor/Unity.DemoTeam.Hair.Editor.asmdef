@@ -1,0 +1,18 @@
+{
+    "name": "Unity.DemoTeam.Hair.Editor",
+    "references": [
+        "GUID:f9dedde5eec30c2468e14d8a7b14626e",
+        "GUID:78bd2ddd6e276394a9615c203e574844"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
