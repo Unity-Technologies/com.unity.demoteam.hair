@@ -1,0 +1,116 @@
+﻿#pragma kernel KVolumeClear
+#pragma kernel KVolumeDensity
+#pragma kernel KVolumeGradient
+
+StructuredBuffer<float4> _ParticlePosition;
+
+float3 _VolumeSize;
+float3 _VolumeWorldMin;
+float3 _VolumeWorldMax;
+/*
+    _VolumeSize = (3, 3, 3)
+
+              +---+---+---+
+         +---+---+---+  q |
+    +---+---+---+    | ---+
+    |   |   |   | ---+    |
+    +---+---+---+    | ---+
+	|   |   |   | ---+    |
+	+---+---+---+    | ---+
+	| p |   |   | ---+
+	+---+---+---+
+
+	_VolumeWorldMin = p
+	_VolumeWorldMax = q
+*/
+
+RWTexture3D<uint> _VolumeDensity;
+RWTexture3D<float3> _VolumeGradient;
+
+uint3 ParticleVolumeIndex(uint i)
+{
+	float3 worldPos = _ParticlePosition[i].xyz;
+	float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
+
+	float3 localPos = worldPosClamped * (_VolumeSize / (_VolumeWorldMax - _VolumeWorldMin));
+	float3 localPosQuantized = round(localPos);
+
+	return localPosQuantized;
+}
+
+[numthreads(16, 1, 1)]
+void KVolumeClear(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	_VolumeDensity[worldIdx] = 0;
+}
+
+[numthreads(16, 1, 1)]
+void KVolumeDensity(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	InterlockedAdd(_VolumeDensity[ParticleVolumeIndex(worldIdx.x)], 1);
+}
+
+#define GRADIENT_NUM_X 4
+#define GRADIENT_NUM_Y 4
+#define GRADIENT_NUM_Z 4
+
+groupshared uint gs_density[GRADIENT_NUM_X * GRADIENT_NUM_Y * GRADIENT_NUM_Z];
+
+[numthreads(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z)]
+void KVolumeGradient(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	gs_density[threadIdx] = _VolumeDensity[worldIdx];
+
+	GroupMemoryBarrierWithGroupSync();
+
+	if (localIdx.x < GRADIENT_NUM_X - 1 &&
+		localIdx.y < GRADIENT_NUM_Y - 1 &&
+		localIdx.z < GRADIENT_NUM_Z - 1)
+	{
+		const uint threadIdxStrideX = 1;
+		const uint threadIdxStrideY = 1 * GRADIENT_NUM_X;
+		const uint threadIdxStrideZ = 1 * GRADIENT_NUM_X * GRADIENT_NUM_Y;
+		/*
+		SV_GroupIndex =
+			SV_GroupThreadID.z*dimx*dimy +
+			SV_GroupThreadID.y*dimx +
+			SV_GroupThreadID.x
+		*/
+
+		float3 diff = float3(
+			gs_density[threadIdx + threadIdxStrideX] - gs_density[threadIdx],
+			gs_density[threadIdx + threadIdxStrideY] - gs_density[threadIdx],
+			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx]
+			);
+
+		_VolumeGradient[worldIdx] = normalize(diff);
+	}
+	else
+	{
+		_VolumeGradient[worldIdx] = 0;
+	}
+}

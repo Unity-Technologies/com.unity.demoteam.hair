@@ -17,9 +17,9 @@ namespace Unity.DemoTeam.Hair
 		[VisibleIf("type", Type.Torus)]
 		public float outerRadius;
 
-		public struct BoundaryCapsule { public Vector3 positionA; public Vector3 positionB; public float radius; public float __pad; };
+		public struct BoundaryCapsule { public Vector3 positionA; public float radius; public Vector3 positionB; public float __pad; };
 		public struct BoundarySphere { public Vector3 position; public float radius; };
-		public struct BoundaryTorus { public Vector3 position; public Vector3 axis; public float radiusA; public float radiusB; }
+		public struct BoundaryTorus { public Vector3 position; public float radiusA; public Vector3 axis; public float radiusB; }
 
 		private static Vector3 Abs(in Vector3 v)
 		{

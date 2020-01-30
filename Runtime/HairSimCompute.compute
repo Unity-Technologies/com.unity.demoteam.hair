@@ -3,6 +3,7 @@
 #pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64
 #pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
+#pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
 #pragma kernel KUpdateVelocity							THREAD_GROUP_SIZE=64
 
 #define LAYOUT_INTERLEAVED 1
@@ -40,14 +41,14 @@ uint _BoundaryCapsuleCount;
 uint _BoundarySphereCount;
 uint _BoundaryTorusCount;
 
-struct BoundaryCapsule { float3 positionA; float3 positionB; float radius; float __pad; };
+struct BoundaryCapsule { float3 positionA; float radius; float3 positionB; float __pad; };
 struct BoundarySphere { float3 position; float radius; };
-struct BoundaryTorus { float3 position; float3 axis; float radiusA; float radiusB; };
+struct BoundaryTorus { float3 position; float radiusA; float3 axis; float radiusB; };
 
-cbuffer CBufferShapes
-{
-	BoundaryCapsule capsules[MAX_BOUNDARIES];
-};
+//cbuffer CBufferShapes
+//{
+//	BoundaryCapsule capsules[MAX_BOUNDARIES];
+//};
 
 StructuredBuffer<BoundaryCapsule> _BoundaryCapsule;
 StructuredBuffer<BoundarySphere> _BoundarySphere;
@@ -249,21 +250,6 @@ void ApplyTriangleBendingConstraint(const float stiffness, const float w0, const
 		v  += stiffness * dv;
 		b1 += stiffness * d1;
 	}
-}
-
-void ApplyStraightenConstraint(const float stiffness, const float w0, const float w2, inout float3 p0, in float3 p1, inout float3 p2)
-{
-	float3 n0 = normalize(p1 - p0);
-	float3 n1 = normalize(p2 - p1);
-
-	float3 n = normalize(w2 * n0 + w0 * n1);
-	float3 r = n * _StrandParticleInterval;
-
-	float3 d0 = (p1 - r) - p0;
-	float3 d2 = (p1 + r) - p2;
-
-	p0 += w0 * stiffness * d0;
-	p2 += w2 * stiffness * d2;
 }
 
 //---------
@@ -673,6 +659,7 @@ void KSolveConstraints_Jacobi(
 					{
 						ApplyTriangleBendingConstraintDelta(1.0, 1.0, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop1, sum, nop2); count++;
 					}
+
 					if (threadIdx < THREAD_GROUP_SIZE - 2)
 					{
 						ApplyTriangleBendingConstraintDelta(1.0, 1.0, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop1, nop2); count++;
@@ -692,7 +679,6 @@ void KSolveConstraints_Jacobi(
 			gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;
 		}
 	}
-
 	GroupMemoryBarrierWithGroupSync();
 
 	// derive velocity from effective change in position

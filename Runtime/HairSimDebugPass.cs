@@ -27,6 +27,10 @@ namespace Unity.DemoTeam.Hair
 					{
 						hairSim.Step(cmd, dtMax);// Mathf.Clamp(Time.deltaTime, dtMin, dtMax));
 					}
+					using (new ProfilingSample(cmd, "HairSim.Voxelize (GPU)"))
+					{
+						hairSim.Voxelize(cmd);
+					}
 					using (new ProfilingSample(cmd, "HairSim.Draw (GPU)"))
 					{
 						hairSim.Draw(cmd);

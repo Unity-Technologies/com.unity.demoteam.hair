@@ -997,9 +997,11 @@ MonoBehaviour:
   debug:
     drawParticles: 1
     drawStrands: 1
+    drawDensity: 0
   solver:
     method: 0
     iterations: 20
+    inference: 1
     stiffness: 1
     damping: 0.9
     gravity: 1
@@ -1009,6 +1011,7 @@ MonoBehaviour:
   boundaries:
   - {fileID: 0}
   compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
+  computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
 --- !u!4 &1011175221
 Transform:
@@ -1275,26 +1278,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   configuration:
     style: 2
-    strandCount: 4096
-    strandParticleCount: 32
+    strandCount: 64
+    strandParticleCount: 64
     strandLength: 1
   debug:
-    drawParticles: 1
+    drawParticles: 0
     drawStrands: 1
+    drawDensity: 0
   solver:
     method: 2
     iterations: 50
+    inference: 1
     stiffness: 1
     damping: 0
     gravity: 1
     bendingCurvature: 0
     bendingRestRadius: 0
-    dampingFTL: 0.85
+    dampingFTL: 0.8
   boundaries:
   - {fileID: 917071516}
   - {fileID: 1101634076}
   - {fileID: 240268941}
   compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
+  computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
 --- !u!4 &1851342450
 Transform:
@@ -1303,14 +1309,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1851342448}
-  m_LocalRotation: {x: 0.5678459, y: 0.34627932, z: 0.21716991, w: 0.71447814}
+  m_LocalRotation: {x: 0.5917063, y: 0.60776776, z: -0.06845053, w: 0.5251824}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 917071512}
   m_Father: {fileID: 0}
   m_RootOrder: 3
-  m_LocalEulerAnglesHint: {x: 41.378002, y: -638.838, z: 69.664}
+  m_LocalEulerAnglesHint: {x: 44.806004, y: -1311.775, z: 65.839005}
 --- !u!1 &2032921483
 GameObject:
   m_ObjectHideFlags: 0
@@ -1348,9 +1354,11 @@ MonoBehaviour:
   debug:
     drawParticles: 1
     drawStrands: 1
+    drawDensity: 0
   solver:
     method: 0
     iterations: 1
+    inference: 1
     stiffness: 1
     damping: 0.9
     gravity: 1
@@ -1361,6 +1369,7 @@ MonoBehaviour:
   - {fileID: 81391774}
   - {fileID: 1258472763}
   compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
+  computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
 --- !u!4 &2032921485
 Transform:
