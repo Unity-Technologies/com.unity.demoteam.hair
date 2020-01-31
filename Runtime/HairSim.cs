@@ -37,7 +37,7 @@ namespace Unity.DemoTeam.Hair
 		const int MAX_STRAND_PARTICLES = 128;
 		const int MAX_BOUNDARIES = 8;
 
-		const int VOLUME_SIZE = 16;
+		const int VOLUME_CELLS = 128;
 
 		public static class UniformIDs
 		{
@@ -56,6 +56,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _Stiffness = Shader.PropertyToID("_Stiffness");
 			public static int _Damping = Shader.PropertyToID("_Damping");
 			public static int _Gravity = Shader.PropertyToID("_Gravity");
+			public static int _Repulsion = Shader.PropertyToID("_Repulsion");
 
 			public static int _BendingCurvature = Shader.PropertyToID("_BendingCurvature");
 			public static int _BendingRestRadius = Shader.PropertyToID("_BendingRestRadius");
@@ -82,7 +83,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _BoundaryTorus = Shader.PropertyToID("_BoundaryTorus");
 
 			// volume params
-			public static int _VolumeSize = Shader.PropertyToID("_VolumeSize");
+			public static int _VolumeCells = Shader.PropertyToID("_VolumeCells");
 			public static int _VolumeWorldMin = Shader.PropertyToID("_VolumeWorldMin");
 			public static int _VolumeWorldMax = Shader.PropertyToID("_VolumeWorldMax");
 
@@ -151,6 +152,8 @@ namespace Unity.DemoTeam.Hair
 			public float damping;
 			[Range(-1.0f, 1.0f)]
 			public float gravity;
+			[Range(0.0f, 5.0f)]
+			public float repulsion;
 
 			[Range(0.0f, 1.0f)]
 			public float bendingCurvature;
@@ -168,6 +171,7 @@ namespace Unity.DemoTeam.Hair
 				stiffness = 0.0f,
 				damping = 0.0f,
 				gravity = 1.0f,
+				repulsion = 0.0f,
 
 				bendingCurvature = 0.0f,
 				bendingRestRadius = 0.0f,
@@ -181,13 +185,15 @@ namespace Unity.DemoTeam.Hair
 			public bool drawParticles;
 			public bool drawStrands;
 			public bool drawDensity;
+			public bool drawGradient;
 
 			public static readonly DebugConfiguration none = new DebugConfiguration();
 			public static readonly DebugConfiguration basic = new DebugConfiguration()
 			{
-				drawParticles = true,
+				drawParticles = false,
 				drawStrands = true,
 				drawDensity = false,
+				drawGradient = false,
 			};
 		}
 
@@ -352,13 +358,13 @@ namespace Unity.DemoTeam.Hair
 
 		private void CreateVolumes()
 		{
-			CreateVolume(ref volumeDensity, "VolumeDensity", VOLUME_SIZE, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
-			CreateVolume(ref volumeGradient, "VolumeGradient", VOLUME_SIZE, RenderTextureFormat.ARGBFloat);
+			CreateVolume(ref volumeDensity, "VolumeDensity", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
+			CreateVolume(ref volumeGradient, "VolumeGradient", VOLUME_CELLS, RenderTextureFormat.ARGBFloat);
 		}
 
-		private void CreateVolume(ref RenderTexture volume, string name, int width, RenderTextureFormat format = RenderTextureFormat.Default)
+		private void CreateVolume(ref RenderTexture volume, string name, int cells, RenderTextureFormat format = RenderTextureFormat.Default)
 		{
-			if (volume != null && volume.width == width)
+			if (volume != null && volume.width == cells && volume.format == format)
 				return;
 
 			if (volume != null)
@@ -367,9 +373,9 @@ namespace Unity.DemoTeam.Hair
 			RenderTextureDescriptor volumeDesc = new RenderTextureDescriptor()
 			{
 				dimension = TextureDimension.Tex3D,
-				width = width,
-				height = width,
-				volumeDepth = width,
+				width = cells,
+				height = cells,
+				volumeDepth = cells,
 				colorFormat = format,
 				enableRandomWrite = true,
 				msaaSamples = 1,
@@ -378,8 +384,9 @@ namespace Unity.DemoTeam.Hair
 			volume = new RenderTexture(volumeDesc);
 			volume.hideFlags = HideFlags.HideAndDontSave;
 			volume.name = name;
+			volume.Create();
 
-			Debug.Log("volume " + volume.name + " -> enableRandomWrite = " + volume.enableRandomWrite + ", volumeDepth = " + volume.volumeDepth);
+			//Debug.Log("volume " + volume.name + " -> enableRandomWrite = " + volume.enableRandomWrite + ", volumeDepth = " + volume.volumeDepth);
 		}
 
 		private void ReleaseVolume(ref RenderTexture volume)
@@ -494,6 +501,11 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			return -1;
+		}
+
+		private Vector3 GetVolumeExtent()
+		{
+			return (1.5f + computeParams.strandLength) * Vector3.one;
 		}
 
 		public void Init(CommandBuffer cmd, in Configuration conf)
@@ -683,6 +695,7 @@ namespace Unity.DemoTeam.Hair
 				cmd.SetComputeFloatParam(compute, UniformIDs._Stiffness, solver.stiffness);
 				cmd.SetComputeFloatParam(compute, UniformIDs._Damping, solver.damping);
 				cmd.SetComputeFloatParam(compute, UniformIDs._Gravity, solver.gravity * -Vector3.Magnitude(Physics.gravity));
+				cmd.SetComputeFloatParam(compute, UniformIDs._Repulsion, solver.repulsion);
 
 				cmd.SetComputeFloatParam(compute, UniformIDs._BendingCurvature, solver.bendingCurvature);
 				cmd.SetComputeFloatParam(compute, UniformIDs._BendingRestRadius, solver.bendingRestRadius);
@@ -737,19 +750,19 @@ namespace Unity.DemoTeam.Hair
 				if (!computeParams.Equals(configuration))
 					return;
 
-				Vector3 volumeWorldMin = this.transform.position - 1.0f * computeParams.strandLength * Vector3.one;
-				Vector3 volumeWorldMax = this.transform.position + 1.0f * computeParams.strandLength * Vector3.one;
+				Vector3 volumeWorldMin = this.transform.position - GetVolumeExtent();
+				Vector3 volumeWorldMax = this.transform.position + GetVolumeExtent();
 
-				cmd.SetComputeVectorParam(computeVolume, UniformIDs._VolumeSize, VOLUME_SIZE * Vector3.one);
+				cmd.SetComputeVectorParam(computeVolume, UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
 				cmd.SetComputeVectorParam(computeVolume, UniformIDs._VolumeWorldMin, volumeWorldMin);
 				cmd.SetComputeVectorParam(computeVolume, UniformIDs._VolumeWorldMax, volumeWorldMax);
 
 				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeClear (GPU)"))
 				{
-					int clearThreadCountX = 16;
-					int clearThreadGroupsX = VOLUME_SIZE / clearThreadCountX;
-					int clearThreadGroupsY = 1;
-					int clearThreadGroupsZ = 1;
+					int clearThreadCountXYZ = 8;
+					int clearThreadGroupsX = VOLUME_CELLS / clearThreadCountXYZ;
+					int clearThreadGroupsY = VOLUME_CELLS / clearThreadCountXYZ;
+					int clearThreadGroupsZ = VOLUME_CELLS / clearThreadCountXYZ;
 
 					SetKernelBufferParams(cmd, computeVolume, kernelVolumeClear);
 					cmd.DispatchCompute(computeVolume, kernelVolumeClear,
@@ -760,7 +773,7 @@ namespace Unity.DemoTeam.Hair
 
 				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeDensity (GPU)"))
 				{
-					int densityThreadCountX = 16;
+					int densityThreadCountX = 64;
 					int densityThreadGroupsX = particlePosition.count / densityThreadCountX;
 					int densityThreadGroupsY = 1;
 					int densityThreadGroupsZ = 1;
@@ -772,19 +785,19 @@ namespace Unity.DemoTeam.Hair
 						densityThreadGroupsZ);
 				}
 
-				//using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeGradient (GPU)"))
-				//{
-				//	var gradientThreadCountXYZ = 4;
-				//	int gradientThreadGroupsX = VOLUME_SIZE / gradientThreadCountXYZ;
-				//	int gradientThreadGroupsY = VOLUME_SIZE / gradientThreadCountXYZ;
-				//	int gradientThreadGroupsZ = VOLUME_SIZE / gradientThreadCountXYZ;
+				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeGradient (GPU)"))
+				{
+					var gradientThreadCountXYZ = 4;
+					int gradientThreadGroupsX = VOLUME_CELLS / gradientThreadCountXYZ;
+					int gradientThreadGroupsY = VOLUME_CELLS / gradientThreadCountXYZ;
+					int gradientThreadGroupsZ = VOLUME_CELLS / gradientThreadCountXYZ;
 
-				//	SetKernelBufferParams(cmd, computeVolume, kernelVolumeGradient);
-				//	cmd.DispatchCompute(computeVolume, kernelVolumeGradient,
-				//		gradientThreadGroupsX,
-				//		gradientThreadGroupsY,
-				//		gradientThreadGroupsZ);
-				//}
+					SetKernelBufferParams(cmd, computeVolume, kernelVolumeGradient);
+					cmd.DispatchCompute(computeVolume, kernelVolumeGradient,
+						gradientThreadGroupsX,
+						gradientThreadGroupsY,
+						gradientThreadGroupsZ);
+				}
 			}
 		}
 
@@ -797,13 +810,13 @@ namespace Unity.DemoTeam.Hair
 				if (!computeParams.Equals(configuration))
 					return;
 
-				if (!debug.drawParticles && !debug.drawStrands && !debug.drawDensity)
+				if (!debug.drawParticles && !debug.drawStrands && !debug.drawDensity && !debug.drawGradient)
 					return;
 
-				Vector3 volumeWorldMin = this.transform.position - 1.0f * computeParams.strandLength * Vector3.one;
-				Vector3 volumeWorldMax = this.transform.position + 1.0f * computeParams.strandLength * Vector3.one;
+				Vector3 volumeWorldMin = this.transform.position - GetVolumeExtent();
+				Vector3 volumeWorldMax = this.transform.position + GetVolumeExtent();
 
-				cmd.SetGlobalVector(UniformIDs._VolumeSize, VOLUME_SIZE * Vector3.one);
+				cmd.SetGlobalVector(UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
 				cmd.SetGlobalVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
 				cmd.SetGlobalVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
 
@@ -831,7 +844,13 @@ namespace Unity.DemoTeam.Hair
 				if (debug.drawDensity)
 				{
 					cmd.SetGlobalColor(UniformIDs._DebugColor, Color.green);
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 1, MeshTopology.Points, 1, VOLUME_SIZE * VOLUME_SIZE * VOLUME_SIZE);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 1, MeshTopology.Points, 1, VOLUME_CELLS * VOLUME_CELLS * VOLUME_CELLS);
+				}
+
+				if (debug.drawGradient)
+				{
+					cmd.SetGlobalColor(UniformIDs._DebugColor, Color.cyan);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 2, MeshTopology.Lines, 2, VOLUME_CELLS * VOLUME_CELLS * VOLUME_CELLS);
 				}
 			}
 		}
@@ -866,6 +885,15 @@ namespace Unity.DemoTeam.Hair
 
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensity, volumeDensity);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeGradient, volumeGradient);
+		}
+
+		private void OnDrawGizmos()
+		{
+			if (debug.drawDensity || debug.drawGradient)
+			{
+				Gizmos.color = Color.Lerp(Color.black, Color.clear, 0.5f);
+				Gizmos.DrawWireCube(this.transform.position, 2.0f * GetVolumeExtent());
+			}
 		}
 	}
 }

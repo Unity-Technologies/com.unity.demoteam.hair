@@ -16,7 +16,10 @@ namespace Unity.DemoTeam.Hair
 		protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResults)
 		{
 			const float dtMin = 1.0f / 120.0f;
-			const float dtMax = 1.0f / 60.0f;
+			const float dtMax = 1.0f / 30.0f;
+
+			float dt = Mathf.Clamp(Time.deltaTime, dtMin, dtMax);
+			dt = 1.0f / 60.0f;
 
 			Profiler.BeginSample("HairSimDebugPass");
 			foreach (HairSim hairSim in HairSim.instances)
@@ -25,7 +28,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					using (new ProfilingSample(cmd, "HairSim.Step (GPU)"))
 					{
-						hairSim.Step(cmd, dtMax);// Mathf.Clamp(Time.deltaTime, dtMin, dtMax));
+						hairSim.Step(cmd, dt);
 					}
 					using (new ProfilingSample(cmd, "HairSim.Voxelize (GPU)"))
 					{

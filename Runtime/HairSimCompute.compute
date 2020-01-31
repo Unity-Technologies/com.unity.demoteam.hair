@@ -23,6 +23,7 @@ float _Inference;
 float _Stiffness;
 float _Damping;
 float _Gravity;
+float _Repulsion;
 float _BendingCurvature;
 float _BendingRestRadius;
 float _DampingFTL;
@@ -37,6 +38,37 @@ RWStructuredBuffer<float4> _ParticleVelocity;
 StructuredBuffer<float4> _ParticlePositionPrev;
 StructuredBuffer<float4> _ParticleVelocityPrev;
 
+//--------
+// volume
+
+float3 _VolumeCells;
+float3 _VolumeWorldMin;
+float3 _VolumeWorldMax;
+
+Texture3D<int> _VolumeDensity;
+Texture3D<float3> _VolumeGradient;
+
+uint3 ParticleVolumeIndex(uint i)
+{
+	float3 worldPos = _ParticlePosition[i].xyz;
+	float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
+
+	float3 localPos = (worldPosClamped - _VolumeWorldMin) * (_VolumeCells / (_VolumeWorldMax - _VolumeWorldMin));
+	float3 localPosQuantized = round(localPos);
+
+	return localPosQuantized;
+}
+
+float3 ParticleVolumeForce(uint i)
+{
+	uint3 volumeIdx = ParticleVolumeIndex(i);
+	float3 volumeGradient = _VolumeGradient[volumeIdx];
+	return volumeGradient * _Repulsion;
+}
+
+//------------
+// boundaries
+
 uint _BoundaryCapsuleCount;
 uint _BoundarySphereCount;
 uint _BoundaryTorusCount;
@@ -44,11 +76,6 @@ uint _BoundaryTorusCount;
 struct BoundaryCapsule { float3 positionA; float radius; float3 positionB; float __pad; };
 struct BoundarySphere { float3 position; float radius; };
 struct BoundaryTorus { float3 position; float radiusA; float3 axis; float radiusB; };
-
-//cbuffer CBufferShapes
-//{
-//	BoundaryCapsule capsules[MAX_BOUNDARIES];
-//};
 
 StructuredBuffer<BoundaryCapsule> _BoundaryCapsule;
 StructuredBuffer<BoundarySphere> _BoundarySphere;
@@ -61,9 +88,6 @@ StructuredBuffer<BoundaryTorus> _BoundaryTorus;
 //	BoundarySphere _BoundarySphere[MAX_BOUNDARIES];
 //	BoundaryTorus _BoundaryTorus[MAX_BOUNDARIES];
 //};
-
-//------------
-// boundaries
 
 float BoundaryDistance(in float3 p)
 {
@@ -270,8 +294,9 @@ void KUpdatePosition(
 	{
 		// update position
 		const float4 x0 = _ParticlePositionPrev[i];
-		const float4 v0 = _ParticleVelocityPrev[i] * pow(max(1e-4, 1.0 - _Damping), _DT);
-		_ParticlePosition[i] = x0 + _DT * (v0 + _DT * float4(0.0, _Gravity, 0.0, 0.0));
+		const float4 v0 = _ParticleVelocityPrev[i];
+		const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
+		_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
 	}
 }
 
@@ -311,8 +336,9 @@ void KSolveConstraints_GaussSeidelReference(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float4 x0 = _ParticlePositionPrev[i];
-			const float4 v0 = _ParticleVelocityPrev[i] * pow(max(1e-4, 1.0 - _Damping), _DT);
-			_ParticlePosition[i] = x0 + _DT * (v0 + _DT * float4(0.0, _Gravity, 0.0, 0.0));
+			const float4 v0 = _ParticleVelocityPrev[i];
+			const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
+			_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
 		}
 	}
 
@@ -466,8 +492,9 @@ void KSolveConstraints_GaussSeidel(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float4 x0 = _ParticlePositionPrev[i];
-			const float4 v0 = _ParticleVelocityPrev[i] * pow(max(1e-4, 1.0 - _Damping), _DT);
-			_ParticlePosition[i] = x0 + _DT * (v0 + _DT * float4(0.0, _Gravity, 0.0, 0.0));
+			const float4 v0 = _ParticleVelocityPrev[i];
+			const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
+			_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
 		}
 	}
 
@@ -582,12 +609,13 @@ void KSolveConstraints_Jacobi(
 
 	// update position
 	const float3 x0 = _ParticlePositionPrev[i].xyz;
-	const float3 v0 = _ParticleVelocityPrev[i].xyz * pow(max(1e-4, 1.0 - _Damping), _DT);
+	const float3 v0 = _ParticleVelocityPrev[i].xyz;
+	const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeForce(i);
 	{
 		if (threadIdx == 0)
 			gs_x[threadIdx] = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
 		else
-			gs_x[threadIdx] = x0 + _DT * (v0 + _DT * float3(0.0, _Gravity, 0.0));
+			gs_x[threadIdx] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
 	}
 
 	// solve constraints by Jacobi iteration
