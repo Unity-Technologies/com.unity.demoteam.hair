@@ -8,20 +8,20 @@ float3 _VolumeCells;
 float3 _VolumeWorldMin;
 float3 _VolumeWorldMax;
 /*
-    _VolumeCells = (3, 3, 3)
+    _VolumeCells = (4, 4, 4)
 
-              +---+---+---+
-         +---+---+---+  q |
+              +---+---+---Q
+         +---+---+---+    |
     +---+---+---+    | ---+
     |   |   |   | ---+    |
     +---+---+---+    | ---+
     |   |   |   | ---+    |
     +---+---+---+    | ---+
-    | p |   |   | ---+
-    +---+---+---+
+    |   |   |   | ---+
+    P---+---+---+
 
-    _VolumeWorldMin = p
-    _VolumeWorldMax = q
+    _VolumeWorldMin = P
+    _VolumeWorldMax = Q
 */
 
 RWTexture3D<int> _VolumeDensity;
@@ -31,7 +31,7 @@ float3 ParticleVolumePosition(uint i)
 {
 	float3 worldPos = _ParticlePosition[i].xyz;
 	float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
-	float3 localPos = (worldPosClamped - _VolumeWorldMin) * (_VolumeCells / (_VolumeWorldMax - _VolumeWorldMin));
+	float3 localPos = (worldPosClamped - _VolumeWorldMin) * ((_VolumeCells - 1) / (_VolumeWorldMax - _VolumeWorldMin));
 	return localPos;
 }
 

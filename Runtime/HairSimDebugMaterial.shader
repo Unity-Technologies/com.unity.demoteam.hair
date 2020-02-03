@@ -68,7 +68,7 @@
 
 	float3 VolumeCellSize()
 	{
-		return (_VolumeWorldMax - _VolumeWorldMin) / _VolumeCells;
+		return (_VolumeWorldMax - _VolumeWorldMin) / (_VolumeCells - 1);
 	}
 
 	float3 VolumeIndexWorldPos(uint3 volumeIdx)
@@ -197,7 +197,7 @@
 			float4 DebugFrag_Slice(DebugVaryings input) : SV_Target
 			{
 				float3 uvw = input.color.xyz;
-				float3 localPos = uvw * _VolumeCells;
+				float3 localPos = uvw * (_VolumeCells - 1);
 				float3 localPosQuantized = round(localPos);
 
 				uint3 volumeIdx = localPosQuantized;

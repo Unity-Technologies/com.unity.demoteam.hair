@@ -54,7 +54,7 @@ float3 ParticleVolumePosition(uint i)
 {
 	float3 worldPos = _ParticlePosition[i].xyz;
 	float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
-	float3 localPos = (worldPosClamped - _VolumeWorldMin) * (_VolumeCells / (_VolumeWorldMax - _VolumeWorldMin));
+	float3 localPos = (worldPosClamped - _VolumeWorldMin) * ((_VolumeCells - 1) / (_VolumeWorldMax - _VolumeWorldMin));
 	return localPos;
 }
 
