@@ -93,6 +93,8 @@ namespace Unity.DemoTeam.Hair
 
 			// debug params
 			public static int _DebugColor = Shader.PropertyToID("_DebugColor");
+			public static int _DebugSliceOffset = Shader.PropertyToID("_DebugSliceOffset");
+			public static int _DebugSliceDivider = Shader.PropertyToID("_DebugSliceDivider");
 		}
 
 		[Serializable]
@@ -186,6 +188,11 @@ namespace Unity.DemoTeam.Hair
 			public bool drawStrands;
 			public bool drawDensity;
 			public bool drawGradient;
+			public bool drawSlice;
+			[Range(0.0f, 1.0f)]
+			public float drawSliceOffset;
+			[Range(0.0f, 1.0f)]
+			public float drawSliceDivider;
 
 			public static readonly DebugConfiguration none = new DebugConfiguration();
 			public static readonly DebugConfiguration basic = new DebugConfiguration()
@@ -194,6 +201,9 @@ namespace Unity.DemoTeam.Hair
 				drawStrands = true,
 				drawDensity = false,
 				drawGradient = false,
+				drawSlice = false,
+				drawSliceOffset = 0.5f,
+				drawSliceDivider = 0.5f,
 			};
 		}
 
@@ -503,6 +513,14 @@ namespace Unity.DemoTeam.Hair
 			return -1;
 		}
 
+		[Range(0.0f, 0.2f)]
+		public float offset;//TODO remove
+
+		private Vector3 GetVolumeCenter()
+		{
+			return this.transform.position + offset * Vector3.right;
+		}
+
 		private Vector3 GetVolumeExtent()
 		{
 			return (1.5f + computeParams.strandLength) * Vector3.one;
@@ -750,8 +768,8 @@ namespace Unity.DemoTeam.Hair
 				if (!computeParams.Equals(configuration))
 					return;
 
-				Vector3 volumeWorldMin = this.transform.position - GetVolumeExtent();
-				Vector3 volumeWorldMax = this.transform.position + GetVolumeExtent();
+				Vector3 volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
+				Vector3 volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
 
 				cmd.SetComputeVectorParam(computeVolume, UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
 				cmd.SetComputeVectorParam(computeVolume, UniformIDs._VolumeWorldMin, volumeWorldMin);
@@ -810,11 +828,11 @@ namespace Unity.DemoTeam.Hair
 				if (!computeParams.Equals(configuration))
 					return;
 
-				if (!debug.drawParticles && !debug.drawStrands && !debug.drawDensity && !debug.drawGradient)
+				if (!debug.drawParticles && !debug.drawStrands && !debug.drawDensity && !debug.drawGradient && !debug.drawSlice)
 					return;
 
-				Vector3 volumeWorldMin = this.transform.position - GetVolumeExtent();
-				Vector3 volumeWorldMax = this.transform.position + GetVolumeExtent();
+				Vector3 volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
+				Vector3 volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
 
 				cmd.SetGlobalVector(UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
 				cmd.SetGlobalVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
@@ -851,6 +869,13 @@ namespace Unity.DemoTeam.Hair
 				{
 					cmd.SetGlobalColor(UniformIDs._DebugColor, Color.cyan);
 					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 2, MeshTopology.Lines, 2, VOLUME_CELLS * VOLUME_CELLS * VOLUME_CELLS);
+				}
+
+				if (debug.drawSlice)
+				{
+					cmd.SetGlobalFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffset);
+					cmd.SetGlobalFloat(UniformIDs._DebugSliceDivider, debug.drawSliceDivider);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1);
 				}
 			}
 		}
@@ -889,10 +914,10 @@ namespace Unity.DemoTeam.Hair
 
 		private void OnDrawGizmos()
 		{
-			if (debug.drawDensity || debug.drawGradient)
+			if (debug.drawDensity || debug.drawGradient || debug.drawSlice)
 			{
 				Gizmos.color = Color.Lerp(Color.black, Color.clear, 0.5f);
-				Gizmos.DrawWireCube(this.transform.position, 2.0f * GetVolumeExtent());
+				Gizmos.DrawWireCube(GetVolumeCenter(), 2.0f * GetVolumeExtent());
 			}
 		}
 	}

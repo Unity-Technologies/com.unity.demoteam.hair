@@ -46,24 +46,36 @@ float3 _VolumeWorldMin;
 float3 _VolumeWorldMax;
 
 Texture3D<int> _VolumeDensity;
+SamplerState sampler_VolumeDensity;
 Texture3D<float3> _VolumeGradient;
+SamplerState sampler_VolumeGradient;
 
-uint3 ParticleVolumeIndex(uint i)
+float3 ParticleVolumePosition(uint i)
 {
 	float3 worldPos = _ParticlePosition[i].xyz;
 	float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
-
 	float3 localPos = (worldPosClamped - _VolumeWorldMin) * (_VolumeCells / (_VolumeWorldMax - _VolumeWorldMin));
-	float3 localPosQuantized = round(localPos);
+	return localPos;
+}
 
+uint3 ParticleVolumeIndex(uint i)
+{
+	float3 localPos = ParticleVolumePosition(i);
+	float3 localPosQuantized = round(localPos);
 	return localPosQuantized;
 }
 
 float3 ParticleVolumeForce(uint i)
 {
+#if 1
+	float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
+	float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, volumeUVW, 0);
+	return volumeGradient * _Repulsion;
+#else
 	uint3 volumeIdx = ParticleVolumeIndex(i);
 	float3 volumeGradient = _VolumeGradient[volumeIdx];
 	return volumeGradient * _Repulsion;
+#endif
 }
 
 //------------

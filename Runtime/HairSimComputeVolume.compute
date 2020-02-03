@@ -27,24 +27,19 @@ float3 _VolumeWorldMax;
 RWTexture3D<int> _VolumeDensity;
 RWTexture3D<float3> _VolumeGradient;
 
-uint3 ParticleVolumeIndex(uint i)
-{
-	float3 worldPos = _ParticlePosition[i].xyz;
-	float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
-
-	float3 localPos = (worldPosClamped - _VolumeWorldMin) * (_VolumeCells / (_VolumeWorldMax - _VolumeWorldMin));
-	float3 localPosQuantized = round(localPos);
-
-	return localPosQuantized;
-}
-
 float3 ParticleVolumePosition(uint i)
 {
 	float3 worldPos = _ParticlePosition[i].xyz;
 	float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
-
 	float3 localPos = (worldPosClamped - _VolumeWorldMin) * (_VolumeCells / (_VolumeWorldMax - _VolumeWorldMin));
 	return localPos;
+}
+
+uint3 ParticleVolumeIndex(uint i)
+{
+	float3 localPos = ParticleVolumePosition(i);
+	float3 localPosQuantized = round(localPos);
+	return localPosQuantized;
 }
 
 #define CLEAR_WIDTH 8
@@ -66,8 +61,8 @@ void KVolumeClear(
 	_VolumeDensity[worldIdx] = 0;
 }
 
-#define SIMPLE 1
-#define SCALE 255.0
+#define SIMPLE 0
+#define DENSITY_SCALE 255.0
 
 [numthreads(64, 1, 1)]
 void KVolumeDensity(
@@ -89,21 +84,23 @@ void KVolumeDensity(
 	float3 volumePos = ParticleVolumePosition(worldIdx.x);
 	float3 volumePosFloor = floor(volumePos);
 
-	const float k = SCALE;
-	const uint2 h = uint2(1, 0);
+	uint3 cellIdx0 = volumePosFloor;
+	float3 cellPos = volumePos - volumePosFloor;
+	
+	float3 w0 = 1.0 - cellPos;
+	float3 w1 = cellPos;
 
-	uint3 index0 = volumePosFloor;
-	uint3 w0 = k * (volumePos - volumePosFloor);
-	uint3 w1 = k - w0;
+	float k = DENSITY_SCALE;
+	uint2 h = uint2(1, 0);
 
-	InterlockedAdd(_VolumeDensity[index0 + h.yyy], (int)(h.yyy ? w1 : w0));
-	InterlockedAdd(_VolumeDensity[index0 + h.xyy], (int)(h.xyy ? w1 : w0));
-	InterlockedAdd(_VolumeDensity[index0 + h.yxy], (int)(h.yxy ? w1 : w0));
-	InterlockedAdd(_VolumeDensity[index0 + h.xxy], (int)(h.xxy ? w1 : w0));
-	InterlockedAdd(_VolumeDensity[index0 + h.yyx], (int)(h.yyx ? w1 : w0));
-	InterlockedAdd(_VolumeDensity[index0 + h.xyx], (int)(h.xyx ? w1 : w0));
-	InterlockedAdd(_VolumeDensity[index0 + h.yxx], (int)(h.yxx ? w1 : w0));
-	InterlockedAdd(_VolumeDensity[index0 + h.xxx], (int)(h.xxx ? w1 : w0));
+	InterlockedAdd(_VolumeDensity[cellIdx0 + h.yyy], k * (w0.x * w0.y * w0.z));
+	InterlockedAdd(_VolumeDensity[cellIdx0 + h.xyy], k * (w1.x * w0.y * w0.z));
+	InterlockedAdd(_VolumeDensity[cellIdx0 + h.yxy], k * (w0.x * w1.y * w0.z));
+	InterlockedAdd(_VolumeDensity[cellIdx0 + h.xxy], k * (w1.x * w1.y * w0.z));
+	InterlockedAdd(_VolumeDensity[cellIdx0 + h.yyx], k * (w0.x * w0.y * w1.z));
+	InterlockedAdd(_VolumeDensity[cellIdx0 + h.xyx], k * (w1.x * w0.y * w1.z));
+	InterlockedAdd(_VolumeDensity[cellIdx0 + h.yxx], k * (w0.x * w1.y * w1.z));
+	InterlockedAdd(_VolumeDensity[cellIdx0 + h.xxx], k * (w1.x * w1.y * w1.z));
 
 #endif
 }
@@ -148,9 +145,9 @@ void KVolumeGradient(
 	const uint3 localUpperIdx = uint3(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z) - 1;
 
 #if SIMPLE
-	const float scale = 1.0;
+	const float k = 1.0 / 2.0;
 #else
-	const float scale = SCALE;
+	const float k = 1.0 / (2.0 * DENSITY_SCALE);
 #endif
 
 	if (any(localIdx == localLowerIdx))
@@ -159,7 +156,7 @@ void KVolumeGradient(
 			gs_density[threadIdx + threadIdxStrideX] - _VolumeDensity[worldIdx - worldIdxStrideX],
 			gs_density[threadIdx + threadIdxStrideY] - _VolumeDensity[worldIdx - worldIdxStrideY],
 			gs_density[threadIdx + threadIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
-			) / (2.0f * scale);
+			) * k;
 
 		_VolumeGradient[worldIdx] = -(diff);
 	}
@@ -169,7 +166,7 @@ void KVolumeGradient(
 			_VolumeDensity[worldIdx + worldIdxStrideX] - gs_density[threadIdx - threadIdxStrideX],
 			_VolumeDensity[worldIdx + worldIdxStrideY] - gs_density[threadIdx - threadIdxStrideY],
 			_VolumeDensity[worldIdx + worldIdxStrideZ] - gs_density[threadIdx - threadIdxStrideZ]
-			) / (2.0f * scale);
+			) * k;
 
 		_VolumeGradient[worldIdx] = -(diff);
 	}
@@ -179,14 +176,14 @@ void KVolumeGradient(
 			gs_density[threadIdx + threadIdxStrideX] - gs_density[threadIdx - threadIdxStrideX],
 			gs_density[threadIdx + threadIdxStrideY] - gs_density[threadIdx - threadIdxStrideY],
 			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx - threadIdxStrideZ]
-			) / (2.0f * scale);
+			) * k;
 
 		_VolumeGradient[worldIdx] = -(diff);
 	}
 }
 
 [numthreads(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z)]
-void KVolumeGradientFDiff(
+void KVolumeGradientForwardDiff(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -203,6 +200,12 @@ void KVolumeGradientFDiff(
 	const uint3 localLowerIdx = 0;
 	const uint3 localUpperIdx = uint3(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z) - 1;
 
+#if SIMPLE
+	const float k = 1.0;
+#else
+	const float k = 1.0 / DENSITY_SCALE;
+#endif
+
 	if (any(localIdx == localUpperIdx))
 	{
 		const uint3 worldIdxStrideX = uint3(1, 0, 0);
@@ -213,7 +216,7 @@ void KVolumeGradientFDiff(
 			_VolumeDensity[worldIdx + worldIdxStrideX] - gs_density[threadIdx],
 			_VolumeDensity[worldIdx + worldIdxStrideY] - gs_density[threadIdx],
 			_VolumeDensity[worldIdx + worldIdxStrideZ] - gs_density[threadIdx]
-			);
+			) * k;
 
 		_VolumeGradient[worldIdx] = -(diff);
 	}
@@ -233,7 +236,7 @@ void KVolumeGradientFDiff(
 			gs_density[threadIdx + threadIdxStrideX] - gs_density[threadIdx],
 			gs_density[threadIdx + threadIdxStrideY] - gs_density[threadIdx],
 			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx]
-			);
+			) * k;
 
 		_VolumeGradient[worldIdx] = -(diff);
 	}
