@@ -2,7 +2,9 @@
 #pragma kernel KVolumeDensity
 #pragma kernel KVolumeGradient
 
-#include "HairSimComputeConfig.hlsl"
+//#include "HairSimComputeConfig.hlsl"
+#define DENSITY_SCALE 4096.0
+#define DENSITY_TRILINEAR 1
 
 StructuredBuffer<float4> _ParticlePosition;
 StructuredBuffer<float4> _ParticleVelocity;
@@ -73,14 +75,14 @@ void KVolumeClear(
 void InterlockedAddTrilinear(RWTexture3D<int> volume, uint3 idx0, float value, float3 w0, float3 w1)
 {
 	const uint2 h = uint2(1, 0);
-	InterlockedAdd(volume[idx0 + h.yyy], value * (w0.x * w0.y * w0.z));
-	InterlockedAdd(volume[idx0 + h.xyy], value * (w1.x * w0.y * w0.z));
-	InterlockedAdd(volume[idx0 + h.yxy], value * (w0.x * w1.y * w0.z));
-	InterlockedAdd(volume[idx0 + h.xxy], value * (w1.x * w1.y * w0.z));
-	InterlockedAdd(volume[idx0 + h.yyx], value * (w0.x * w0.y * w1.z));
-	InterlockedAdd(volume[idx0 + h.xyx], value * (w1.x * w0.y * w1.z));
-	InterlockedAdd(volume[idx0 + h.yxx], value * (w0.x * w1.y * w1.z));
-	InterlockedAdd(volume[idx0 + h.xxx], value * (w1.x * w1.y * w1.z));
+	InterlockedAdd(volume[idx0 + h.yyy], (int)(value * w0.x * w0.y * w0.z));
+	InterlockedAdd(volume[idx0 + h.xyy], (int)(value * w1.x * w0.y * w0.z));
+	InterlockedAdd(volume[idx0 + h.yxy], (int)(value * w0.x * w1.y * w0.z));
+	InterlockedAdd(volume[idx0 + h.xxy], (int)(value * w1.x * w1.y * w0.z));
+	InterlockedAdd(volume[idx0 + h.yyx], (int)(value * w0.x * w0.y * w1.z));
+	InterlockedAdd(volume[idx0 + h.xyx], (int)(value * w1.x * w0.y * w1.z));
+	InterlockedAdd(volume[idx0 + h.yxx], (int)(value * w0.x * w1.y * w1.z));
+	InterlockedAdd(volume[idx0 + h.xxx], (int)(value * w1.x * w1.y * w1.z));
 }
 
 [numthreads(64, 1, 1)]
@@ -95,6 +97,8 @@ void KVolumeDensity(
 	// SV_GroupIndex        thread offset within execution group
 {
 #if DENSITY_TRILINEAR
+
+	float3 velocity = _ParticleVelocity[worldIdx.x].xyz;
 	float3 volumePos = ParticleVolumePosition(worldIdx.x);
 	float3 volumePosFloor = floor(volumePos);
 
@@ -104,62 +108,23 @@ void KVolumeDensity(
 	float3 w0 = 1.0 - cellPos;
 	float3 w1 = cellPos;
 
-	float k = DENSITY_SCALE;
-	uint2 h = uint2(1, 0);
-
-	InterlockedAdd(_VolumeDensity[cellIdx0 + h.yyy], k * (w0.x * w0.y * w0.z));
-	InterlockedAdd(_VolumeDensity[cellIdx0 + h.xyy], k * (w1.x * w0.y * w0.z));
-	InterlockedAdd(_VolumeDensity[cellIdx0 + h.yxy], k * (w0.x * w1.y * w0.z));
-	InterlockedAdd(_VolumeDensity[cellIdx0 + h.xxy], k * (w1.x * w1.y * w0.z));
-	InterlockedAdd(_VolumeDensity[cellIdx0 + h.yyx], k * (w0.x * w0.y * w1.z));
-	InterlockedAdd(_VolumeDensity[cellIdx0 + h.xyx], k * (w1.x * w0.y * w1.z));
-	InterlockedAdd(_VolumeDensity[cellIdx0 + h.yxx], k * (w0.x * w1.y * w1.z));
-	InterlockedAdd(_VolumeDensity[cellIdx0 + h.xxx], k * (w1.x * w1.y * w1.z));
-
-	uint3 volumeIdx = ParticleVolumeIndex(worldIdx.x);
-	int3 velocity = _ParticleVelocity[worldIdx.x].xyz * DENSITY_SCALE;
-
-	InterlockedAdd(_VolumeVelocityX[cellIdx0 + h.yyy], velocity.x * (w0.x * w0.y * w0.z));
-	InterlockedAdd(_VolumeVelocityX[cellIdx0 + h.xyy], velocity.x * (w1.x * w0.y * w0.z));
-	InterlockedAdd(_VolumeVelocityX[cellIdx0 + h.yxy], velocity.x * (w0.x * w1.y * w0.z));
-	InterlockedAdd(_VolumeVelocityX[cellIdx0 + h.xxy], velocity.x * (w1.x * w1.y * w0.z));
-	InterlockedAdd(_VolumeVelocityX[cellIdx0 + h.yyx], velocity.x * (w0.x * w0.y * w1.z));
-	InterlockedAdd(_VolumeVelocityX[cellIdx0 + h.xyx], velocity.x * (w1.x * w0.y * w1.z));
-	InterlockedAdd(_VolumeVelocityX[cellIdx0 + h.yxx], velocity.x * (w0.x * w1.y * w1.z));
-	InterlockedAdd(_VolumeVelocityX[cellIdx0 + h.xxx], velocity.x * (w1.x * w1.y * w1.z));
-
-	InterlockedAdd(_VolumeVelocityY[cellIdx0 + h.yyy], velocity.y * (w0.x * w0.y * w0.z));
-	InterlockedAdd(_VolumeVelocityY[cellIdx0 + h.xyy], velocity.y * (w1.x * w0.y * w0.z));
-	InterlockedAdd(_VolumeVelocityY[cellIdx0 + h.yxy], velocity.y * (w0.x * w1.y * w0.z));
-	InterlockedAdd(_VolumeVelocityY[cellIdx0 + h.xxy], velocity.y * (w1.x * w1.y * w0.z));
-	InterlockedAdd(_VolumeVelocityY[cellIdx0 + h.yyx], velocity.y * (w0.x * w0.y * w1.z));
-	InterlockedAdd(_VolumeVelocityY[cellIdx0 + h.xyx], velocity.y * (w1.x * w0.y * w1.z));
-	InterlockedAdd(_VolumeVelocityY[cellIdx0 + h.yxx], velocity.y * (w0.x * w1.y * w1.z));
-	InterlockedAdd(_VolumeVelocityY[cellIdx0 + h.xxx], velocity.y * (w1.x * w1.y * w1.z));
-
-	InterlockedAdd(_VolumeVelocityZ[cellIdx0 + h.yyy], velocity.z * (w0.x * w0.y * w0.z));
-	InterlockedAdd(_VolumeVelocityZ[cellIdx0 + h.xyy], velocity.z * (w1.x * w0.y * w0.z));
-	InterlockedAdd(_VolumeVelocityZ[cellIdx0 + h.yxy], velocity.z * (w0.x * w1.y * w0.z));
-	InterlockedAdd(_VolumeVelocityZ[cellIdx0 + h.xxy], velocity.z * (w1.x * w1.y * w0.z));
-	InterlockedAdd(_VolumeVelocityZ[cellIdx0 + h.yyx], velocity.z * (w0.x * w0.y * w1.z));
-	InterlockedAdd(_VolumeVelocityZ[cellIdx0 + h.xyx], velocity.z * (w1.x * w0.y * w1.z));
-	InterlockedAdd(_VolumeVelocityZ[cellIdx0 + h.yxx], velocity.z * (w0.x * w1.y * w1.z));
-	InterlockedAdd(_VolumeVelocityZ[cellIdx0 + h.xxx], velocity.z * (w1.x * w1.y * w1.z));
+	InterlockedAddTrilinear(_VolumeDensity, cellIdx0, DENSITY_SCALE, w0, w1);
+	InterlockedAddTrilinear(_VolumeVelocityX, cellIdx0, DENSITY_SCALE * velocity.x, w0, w1);
+	InterlockedAddTrilinear(_VolumeVelocityY, cellIdx0, DENSITY_SCALE * velocity.y, w0, w1);
+	InterlockedAddTrilinear(_VolumeVelocityZ, cellIdx0, DENSITY_SCALE * velocity.z, w0, w1);
 
 #else
 
-	InterlockedAdd(_VolumeDensity[ParticleVolumeIndex(worldIdx.x)], 1);
-
+	float3 velocity = _ParticleVelocity[worldIdx.x].xyz;
 	uint3 volumeIdx = ParticleVolumeIndex(worldIdx.x);
-	int3 velocity = _ParticleVelocity[worldIdx.x].xyz * DENSITY_SCALE;
-	InterlockedAdd(_VolumeVelocityX[volumeIdx], velocity.x);
-	InterlockedAdd(_VolumeVelocityY[volumeIdx], velocity.y);
-	InterlockedAdd(_VolumeVelocityZ[volumeIdx], velocity.z);
+
+	InterlockedAdd(_VolumeDensity[volumeIdx], DENSITY_SCALE);
+	InterlockedAdd(_VolumeVelocityX[volumeIdx], (int)(DENSITY_SCALE * velocity.x));
+	InterlockedAdd(_VolumeVelocityY[volumeIdx], (int)(DENSITY_SCALE * velocity.y));
+	InterlockedAdd(_VolumeVelocityZ[volumeIdx], (int)(DENSITY_SCALE * velocity.z));
 
 #endif
 }
-
-
 
 #define GRADIENT_WIDTH 4
 #define GRADIENT_NUM_X GRADIENT_WIDTH
@@ -200,11 +165,7 @@ void KVolumeGradient(
 	const uint3 localLowerIdx = 0;
 	const uint3 localUpperIdx = uint3(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z) - 1;
 
-#if DENSITY_TRILINEAR
 	const float k = 1.0 / (2.0 * DENSITY_SCALE);
-#else
-	const float k = 1.0 / 2.0;
-#endif
 
 	if (any(localIdx == localLowerIdx))
 	{
@@ -256,11 +217,7 @@ void KVolumeGradientForwardDiff(
 	const uint3 localLowerIdx = 0;
 	const uint3 localUpperIdx = uint3(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z) - 1;
 
-#if DENSITY_TRILINEAR
 	const float k = 1.0 / DENSITY_SCALE;
-#else
-	const float k = 1.0;
-#endif
 
 	if (any(localIdx == localUpperIdx))
 	{

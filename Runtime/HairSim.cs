@@ -35,7 +35,7 @@ namespace Unity.DemoTeam.Hair
 
 		const int MAX_STRANDS = 64000;
 		const int MAX_STRAND_PARTICLES = 128;
-		const int MAX_BOUNDARIES = 8;
+		const int MAX_BOUNDARIES = 6;
 
 		const int VOLUME_CELLS = 128;
 
@@ -99,6 +99,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _DebugColor = Shader.PropertyToID("_DebugColor");
 			public static int _DebugSliceOffset = Shader.PropertyToID("_DebugSliceOffset");
 			public static int _DebugSliceDivider = Shader.PropertyToID("_DebugSliceDivider");
+			public static int _DebugSliceTexture = Shader.PropertyToID("_DebugSliceTexture");
 		}
 
 		[Serializable]
@@ -378,10 +379,10 @@ namespace Unity.DemoTeam.Hair
 
 		private void CreateVolumes()
 		{
-			CreateVolume(ref volumeDensity, "VolumeDensity", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
-			CreateVolume(ref volumeVelocityX, "VolumeVelocityX", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
-			CreateVolume(ref volumeVelocityY, "VolumeVelocityY", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
-			CreateVolume(ref volumeVelocityZ, "VolumeVelocityZ", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
+			CreateVolume(ref volumeDensity, "VolumeDensity", VOLUME_CELLS, RenderTextureFormat.RInt);
+			CreateVolume(ref volumeVelocityX, "VolumeVelocityX", VOLUME_CELLS, RenderTextureFormat.RInt);
+			CreateVolume(ref volumeVelocityY, "VolumeVelocityY", VOLUME_CELLS, RenderTextureFormat.RInt);
+			CreateVolume(ref volumeVelocityZ, "VolumeVelocityZ", VOLUME_CELLS, RenderTextureFormat.RInt);
 			CreateVolume(ref volumeGradient, "VolumeGradient", VOLUME_CELLS, RenderTextureFormat.ARGBFloat);
 		}
 
@@ -836,7 +837,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public void Draw(CommandBuffer cmd)
+		public void Draw(CommandBuffer cmd, RTHandle colorRT, RTHandle depthStencilRT, RTHandle motionVectorRT)
 		{
 			using (ProfilerMarkers.Draw.Auto())
 			{
@@ -859,7 +860,7 @@ namespace Unity.DemoTeam.Hair
 				cmd.SetGlobalInt(UniformIDs._StrandParticleCount, computeParams.strandParticleCount);
 
 				cmd.SetGlobalBuffer(UniformIDs._ParticlePosition, particlePosition);
-				cmd.SetGlobalBuffer(UniformIDs._ParticleVelocity, particleVelocity);
+				cmd.SetGlobalBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
 
 				cmd.SetGlobalTexture(UniformIDs._VolumeDensity, volumeDensity);
 				cmd.SetGlobalTexture(UniformIDs._VolumeVelocityX, volumeVelocityX);
@@ -896,6 +897,13 @@ namespace Unity.DemoTeam.Hair
 					cmd.SetGlobalFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffset);
 					cmd.SetGlobalFloat(UniformIDs._DebugSliceDivider, debug.drawSliceDivider);
 					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1);
+				}
+
+				if (debug.drawStrands)// motion vectors
+				{
+					CoreUtils.SetRenderTarget(cmd, motionVectorRT, depthStencilRT);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 4, MeshTopology.LineStrip, computeParams.strandParticleCount, computeParams.strandCount);
+					CoreUtils.SetRenderTarget(cmd, colorRT, depthStencilRT);
 				}
 			}
 		}

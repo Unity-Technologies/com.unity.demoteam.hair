@@ -2,13 +2,17 @@
 {
 	CGINCLUDE
 
-	#include "HairSimComputeConfig.hlsl"
+	#pragma target 5.0
+	
+	//#include "HairSimComputeConfig.hlsl"
+	#define LAYOUT_INTERLEAVED 1
+	#define DENSITY_SCALE 4096.0
 
 	uint _StrandCount;
 	uint _StrandParticleCount;
 
-	StructuredBuffer<float3> _ParticlePosition;
-	StructuredBuffer<float3> _ParticleVelocity;
+	StructuredBuffer<float4> _ParticlePosition;
+	StructuredBuffer<float4> _ParticlePositionPrev;
 
 	float4 _DebugColor;
 	float _DebugSliceOffset;
@@ -25,37 +29,21 @@
 	Texture3D<float3> _VolumeGradient;
 	SamplerState sampler_VolumeGradient;
 
+	float4x4 _ViewProjMatrix;
+	float4x4 _PrevViewProjMatrix;
+	float4x4 _NonJitteredViewProjMatrix;
+	float2 _CameraMotionVectorsScale;
+
 	struct DebugVaryings
 	{
 		float4 positionCS : SV_POSITION;
 		float4 color : TEXCOORD0;
+		float4 extra : TEXCOORD1;
 	};
 
 	float4 DebugFrag(DebugVaryings input) : SV_Target
 	{
 		return input.color;
-	}
-
-	float3 ColorizeCycle(uint index, const uint count)
-	{
-		const float k = 1.0 / (count - 1);
-		float t = k * index;
-
-		// source: https://www.shadertoy.com/view/4ttfRn
-		float3 c = 3.0 * float3(abs(t - 0.5), t.xx) - float3(1.5, 1.0, 2.0);
-		return 1.0 - c * c;
-	}
-
-	float3 ColorizeRamp(uint index, const uint count)
-	{
-		index = min(index, count - 1);
-
-		const float k = 1.0 / (count - 1);
-		float t = 0.5 - 0.5 * k * index;// 0.5 * (1.0 - (k * index));
-
-		// source: https://www.shadertoy.com/view/4ttfRn
-		float3 c = 2.0 * t - float3(0.0, 1.0, 2.0);
-		return 1.0 - c * c;
 	}
 
 	uint3 InstanceVolumeIndex(uint instanceID)
@@ -75,6 +63,47 @@
 	float3 VolumeIndexWorldPos(uint3 volumeIdx)
 	{
 		return _VolumeWorldMin + volumeIdx * VolumeCellSize();
+	}
+
+	float3 ColorizeCycle(uint index, const uint count)
+	{
+		const float k = 1.0 / (count - 1);
+		float t = k * index;
+
+		// source: https://www.shadertoy.com/view/4ttfRn
+		float3 c = 3.0 * float3(abs(t - 0.5), t.xx) - float3(1.5, 1.0, 2.0);
+		return 1.0 - c * c;
+	}
+
+	float3 ColorizeRepeat(uint index, const uint count)
+	{
+		index = min(index, count - 1);
+
+		const float k = 1.0 / (count - 1);
+		float t = 0.5 - 0.5 * k * index;// 0.5 * (1.0 - (k * index));
+
+		// source: https://www.shadertoy.com/view/4ttfRn
+		float3 c = 2.0 * t - float3(0.0, 1.0, 2.0);
+		return 1.0 - c * c;
+	}
+
+	float3 ColorizeDensity(int d)
+	{
+		return d.xxxx / DENSITY_SCALE;
+	}
+
+	float3 ColorizeGradient(float3 n)
+	{
+		float d = dot(n, n);
+		if (d > 1e-4)
+			return 0.5 + 0.5 * (n * rsqrt(d));
+		else
+			return 0.0;
+	}
+
+	float3 ColorizeVelocity(float3 v)
+	{
+		return abs(v);
 	}
 
 	ENDCG
@@ -105,11 +134,12 @@
 				const uint strandParticleStride = 1;
 #endif
 
-				float3 worldPos = _ParticlePosition[strandParticleBegin + strandParticleStride * vertexID];
+				float3 worldPos = _ParticlePosition[strandParticleBegin + strandParticleStride * vertexID].xyz;
 
 				DebugVaryings output;
-				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
+				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
 				output.color = float4(ColorizeCycle(instanceID, _StrandCount), 1.0);//_DebugColor;
+				output.extra = 0;
 				return output;
 			}
 
@@ -136,7 +166,8 @@
 
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
-				output.color = float4(ColorizeRamp(volumeDensity, 32 * DENSITY_SCALE), 1);
+				output.color = float4(ColorizeRepeat(volumeDensity, 32 * DENSITY_SCALE), 1.0);
+				output.extra = 0;
 				return output;
 			}
 
@@ -162,7 +193,8 @@
 
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
-				output.color = float4(ColorizeRamp(1 - vertexID, 2), 1.0);
+				output.color = float4(ColorizeRepeat(1 - vertexID, 2), 1.0);
+				output.extra = 0;
 				return output;
 			}
 
@@ -192,26 +224,8 @@
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
 				output.color = float4(uvw, 1);
+				output.extra = 0;
 				return output;
-			}
-
-			float3 ColorizeDensity(int d)
-			{
-				return d.xxxx / DENSITY_SCALE;
-			}
-
-			float3 ColorizeGradient(float3 n)
-			{
-				float d = dot(n, n);
-				if (d > 1e-4)
-					return 0.5 + 0.5 * (n * rsqrt(d));
-				else
-					return 0.0;
-			}
-
-			float3 ColorizeVelocity(float3 v)
-			{
-				return abs(v);
 			}
 
 			float4 DebugFrag_Slice(DebugVaryings input) : SV_Target
@@ -230,11 +244,57 @@
 
 				float x = uvw.x + _DebugSliceDivider;
 				if (x < 1.0)
-					return float4(ColorizeDensity(volumeDensity), 1);
+					return float4(ColorizeDensity(volumeDensity), 1.0);
 				else if (x < 2.0)
-					return float4(ColorizeGradient(volumeGradient), 1);
+					return float4(ColorizeGradient(volumeGradient), 1.0);
 				else
-					return float4(ColorizeVelocity(volumeVelocity), 1);
+					return float4(ColorizeVelocity(volumeVelocity), 1.0);
+			}
+
+			ENDCG
+		}
+
+		Pass// 4 == STRANDS MOTION
+		{
+			Cull Off
+			ZTest Equal
+			ZWrite Off
+			Offset 0, -1
+
+			CGPROGRAM
+
+			#pragma vertex DebugVert
+			#pragma fragment DebugFrag_Motion
+
+			DebugVaryings DebugVert(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+			{
+#if LAYOUT_INTERLEAVED
+				const uint strandParticleBegin = instanceID;
+				const uint strandParticleStride = _StrandCount;
+#else
+				const uint strandParticleBegin = instanceID * _StrandParticleCount;
+				const uint strandParticleStride = 1;
+#endif
+
+				uint i = strandParticleBegin + strandParticleStride * vertexID;
+				float4 worldPos1 = float4(_ParticlePosition[i].xyz - _WorldSpaceCameraPos, 1.0);
+				float4 worldPos0 = float4(_ParticlePositionPrev[i].xyz - _WorldSpaceCameraPos, 1.0);
+
+				float4 clipPos1 = mul(_NonJitteredViewProjMatrix, worldPos1);
+				float4 clipPos0 = mul(_PrevViewProjMatrix, worldPos0);
+
+				DebugVaryings output;
+				output.positionCS = mul(_ViewProjMatrix, worldPos1);
+				output.color = clipPos1;
+				output.extra = clipPos0;
+				return output;
+			}
+
+			float4 DebugFrag_Motion(DebugVaryings input) : SV_Target
+			{
+				float2 ndc1 = input.color.xy / input.color.w;
+				float2 ndc0 = input.extra.xy / input.extra.w;
+				return float4(_CameraMotionVectorsScale * 0.5 * (ndc1 - ndc0), 0, 0);
 			}
 
 			ENDCG

@@ -2,15 +2,38 @@
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
+using System.Reflection;
 
 namespace Unity.DemoTeam.Hair
 {
 	public class HairSimDebugPass : CustomPass
 	{
+		private RTHandle motionVectorsRT;
+		private void FindMotionVectorsRT()
+		{
+			var fieldInfo_m_SharedRTManager = typeof(HDRenderPipeline).GetField("m_SharedRTManager", BindingFlags.NonPublic | BindingFlags.Instance);
+			if (fieldInfo_m_SharedRTManager != null)
+			{
+				//Debug.Log("FindMotionVectorsRT : " + fieldInfo_m_SharedRTManager);
+				var m_SharedRTManager = fieldInfo_m_SharedRTManager.GetValue(RenderPipelineManager.currentPipeline as HDRenderPipeline);
+				if (m_SharedRTManager != null)
+				{
+					var fieldInfo_m_MotionVectorsRT = m_SharedRTManager.GetType().GetField("m_MotionVectorsRT", BindingFlags.NonPublic | BindingFlags.Instance);
+					if (fieldInfo_m_MotionVectorsRT != null)
+					{
+						//Debug.Log("FindMotionVectorsRT : " + fieldInfo_m_MotionVectorsRT);
+						motionVectorsRT = fieldInfo_m_MotionVectorsRT.GetValue(m_SharedRTManager) as RTHandle;
+					}
+				}
+			}
+		}
+
 		protected override void Setup(ScriptableRenderContext renderContext, CommandBuffer cmd)
 		{
 			base.Setup(renderContext, cmd);
 			base.name = "HairSimDebugPass";
+
+			FindMotionVectorsRT();
 		}
 
 		protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResults)
@@ -36,7 +59,10 @@ namespace Unity.DemoTeam.Hair
 					}
 					using (new ProfilingSample(cmd, "HairSim.Draw (GPU)"))
 					{
-						hairSim.Draw(cmd);
+						RTHandle cameraColor;
+						RTHandle cameraDepth;
+						GetCameraBuffers(out cameraColor, out cameraDepth);
+						hairSim.Draw(cmd, cameraColor, cameraDepth, motionVectorsRT);
 					}
 				}
 			}
