@@ -6,9 +6,7 @@
 #pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
 #pragma kernel KUpdateVelocity							THREAD_GROUP_SIZE=64
 
-#define LAYOUT_INTERLEAVED 1
-
-#define MAX_BOUNDARIES 8
+#include "HairSimComputeConfig.hlsl"
 
 float4x4 _LocalToWorld;
 float4x4 _LocalToWorldInvT;
@@ -24,6 +22,8 @@ float _Stiffness;
 float _Damping;
 float _Gravity;
 float _Repulsion;
+float _Friction;
+
 float _BendingCurvature;
 float _BendingRestRadius;
 float _DampingFTL;
@@ -46,7 +46,9 @@ float3 _VolumeWorldMin;
 float3 _VolumeWorldMax;
 
 Texture3D<int> _VolumeDensity;
-SamplerState sampler_VolumeDensity;
+Texture3D<int> _VolumeVelocityX;
+Texture3D<int> _VolumeVelocityY;
+Texture3D<int> _VolumeVelocityZ;
 Texture3D<float3> _VolumeGradient;
 SamplerState sampler_VolumeGradient;
 
@@ -76,6 +78,19 @@ float3 ParticleVolumeForce(uint i)
 	float3 volumeGradient = _VolumeGradient[volumeIdx];
 	return volumeGradient * _Repulsion;
 #endif
+}
+
+float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
+{
+	uint3 volumeIdx = ParticleVolumeIndex(i);
+	int volumeDensity = 1 + _VolumeDensity[volumeIdx];
+
+	float3 volumeVelocity = float3(
+		_VolumeVelocityX[volumeIdx],
+		_VolumeVelocityY[volumeIdx],
+		_VolumeVelocityZ[volumeIdx]) / (float)(1 + volumeDensity);
+		
+	return (volumeVelocity - velocity) * friction;
 }
 
 //------------
@@ -621,7 +636,7 @@ void KSolveConstraints_Jacobi(
 
 	// update position
 	const float3 x0 = _ParticlePositionPrev[i].xyz;
-	const float3 v0 = _ParticleVelocityPrev[i].xyz;
+	const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
 	const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeForce(i);
 	{
 		if (threadIdx == 0)
@@ -643,12 +658,12 @@ void KSolveConstraints_Jacobi(
 			float3 d = 0;
 			ApplyCollisionConstraintDelta(gs_x[threadIdx], d); n++;
 
-			/*
+			///*
 			{
 				ApplyLRAConstraintDelta(threadIdx * _StrandParticleInterval, gs_x[0], gs_x[threadIdx], d); n++;
 			}//*/
 
-			/*
+			///*
 			{
 				float3 nop = 0;
 				float3 sum = 0;
@@ -712,7 +727,7 @@ void KSolveConstraints_Jacobi(
 
 			//TODO divide the delta early to reduce averaging of FTL constraint?
 			float3 d_pre_ftl = d;
-			ApplyFTLConstraintDelta(gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
+			//ApplyFTLConstraintDelta(gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
 
 			float inv_n = _Inference / n;
 			gs_d[threadIdx - 1] += (d - d_pre_ftl) * inv_n;
@@ -724,7 +739,7 @@ void KSolveConstraints_Jacobi(
 	// derive velocity from effective change in position
 	{
 		_ParticlePosition[i].xyz = gs_x[threadIdx];
-		_ParticleVelocity[i].xyz = (gs_x[threadIdx] - x0 - _DampingFTL * gs_d[threadIdx]) / _DT;
+		_ParticleVelocity[i].xyz = (gs_x[threadIdx] - x0/* - _DampingFTL * gs_d[threadIdx]*/) / _DT;
 	}
 }
 

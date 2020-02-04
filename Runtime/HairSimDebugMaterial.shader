@@ -2,8 +2,7 @@
 {
 	CGINCLUDE
 
-	#define LAYOUT_INTERLEAVED 1
-	#define DENSITY_SCALE 255.0
+	#include "HairSimComputeConfig.hlsl"
 
 	uint _StrandCount;
 	uint _StrandParticleCount;
@@ -20,7 +19,9 @@
 	float3 _VolumeWorldMax;
 
 	Texture3D<int> _VolumeDensity;
-	SamplerState sampler_VolumeDensity;
+	Texture3D<int> _VolumeVelocityX;
+	Texture3D<int> _VolumeVelocityY;
+	Texture3D<int> _VolumeVelocityZ;
 	Texture3D<float3> _VolumeGradient;
 	SamplerState sampler_VolumeGradient;
 
@@ -194,6 +195,25 @@
 				return output;
 			}
 
+			float3 ColorizeDensity(int d)
+			{
+				return d.xxxx / DENSITY_SCALE;
+			}
+
+			float3 ColorizeGradient(float3 n)
+			{
+				float d = dot(n, n);
+				if (d > 1e-4)
+					return 0.5 + 0.5 * (n * rsqrt(d));
+				else
+					return 0.0;
+			}
+
+			float3 ColorizeVelocity(float3 v)
+			{
+				return abs(v);
+			}
+
 			float4 DebugFrag_Slice(DebugVaryings input) : SV_Target
 			{
 				float3 uvw = input.color.xyz;
@@ -203,14 +223,18 @@
 				uint3 volumeIdx = localPosQuantized;
 				int volumeDensity = _VolumeDensity[volumeIdx];
 				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, uvw, 0);
+				float3 volumeVelocity = float3(
+					_VolumeVelocityX[volumeIdx],
+					_VolumeVelocityY[volumeIdx],
+					_VolumeVelocityZ[volumeIdx]) / (float)volumeDensity;
 
-				if (uvw.x > _DebugSliceDivider)
-					return volumeDensity.xxxx / (DENSITY_SCALE * DENSITY_SCALE);
+				float x = uvw.x + _DebugSliceDivider;
+				if (x < 1.0)
+					return float4(ColorizeDensity(volumeDensity), 1);
+				else if (x < 2.0)
+					return float4(ColorizeGradient(volumeGradient), 1);
 				else
-					return float4(0.5 + 0.5 * normalize(volumeGradient), 1.0);
-
-				//float4 color = float4(ColorizeRamp(volumeDensity, 32 * DENSITY_SCALE), 1);
-				//return color;
+					return float4(ColorizeVelocity(volumeVelocity), 1);
 			}
 
 			ENDCG

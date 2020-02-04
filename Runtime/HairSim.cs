@@ -57,6 +57,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _Damping = Shader.PropertyToID("_Damping");
 			public static int _Gravity = Shader.PropertyToID("_Gravity");
 			public static int _Repulsion = Shader.PropertyToID("_Repulsion");
+			public static int _Friction = Shader.PropertyToID("_Friction");
 
 			public static int _BendingCurvature = Shader.PropertyToID("_BendingCurvature");
 			public static int _BendingRestRadius = Shader.PropertyToID("_BendingRestRadius");
@@ -89,6 +90,9 @@ namespace Unity.DemoTeam.Hair
 
 			// volume buffers
 			public static int _VolumeDensity = Shader.PropertyToID("_VolumeDensity");
+			public static int _VolumeVelocityX = Shader.PropertyToID("_VolumeVelocityX");
+			public static int _VolumeVelocityY = Shader.PropertyToID("_VolumeVelocityY");
+			public static int _VolumeVelocityZ = Shader.PropertyToID("_VolumeVelocityZ");
 			public static int _VolumeGradient = Shader.PropertyToID("_VolumeGradient");
 
 			// debug params
@@ -156,6 +160,8 @@ namespace Unity.DemoTeam.Hair
 			public float gravity;
 			[Range(0.0f, 5.0f)]
 			public float repulsion;
+			[Range(0.0f, 1.0f)]
+			public float friction;
 
 			[Range(0.0f, 1.0f)]
 			public float bendingCurvature;
@@ -174,6 +180,7 @@ namespace Unity.DemoTeam.Hair
 				damping = 0.0f,
 				gravity = 1.0f,
 				repulsion = 0.0f,
+				friction = 0.0f,
 
 				bendingCurvature = 0.0f,
 				bendingRestRadius = 0.0f,
@@ -191,7 +198,7 @@ namespace Unity.DemoTeam.Hair
 			public bool drawSlice;
 			[Range(0.0f, 1.0f)]
 			public float drawSliceOffset;
-			[Range(0.0f, 1.0f)]
+			[Range(0.0f, 2.0f)]
 			public float drawSliceDivider;
 
 			public static readonly DebugConfiguration none = new DebugConfiguration();
@@ -245,6 +252,9 @@ namespace Unity.DemoTeam.Hair
 		private ComputeBuffer boundaryTorus;
 
 		private RenderTexture volumeDensity;
+		private RenderTexture volumeVelocityX;
+		private RenderTexture volumeVelocityY;
+		private RenderTexture volumeVelocityZ;
 		private RenderTexture volumeGradient;
 
 		private int stepFrame = -1;
@@ -369,6 +379,9 @@ namespace Unity.DemoTeam.Hair
 		private void CreateVolumes()
 		{
 			CreateVolume(ref volumeDensity, "VolumeDensity", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
+			CreateVolume(ref volumeVelocityX, "VolumeVelocityX", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
+			CreateVolume(ref volumeVelocityY, "VolumeVelocityY", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
+			CreateVolume(ref volumeVelocityZ, "VolumeVelocityZ", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO replace with graphicsformat.r8_uint etc.
 			CreateVolume(ref volumeGradient, "VolumeGradient", VOLUME_CELLS, RenderTextureFormat.ARGBFloat);
 		}
 
@@ -411,6 +424,9 @@ namespace Unity.DemoTeam.Hair
 		private void ReleaseVolumes()
 		{
 			ReleaseVolume(ref volumeDensity);
+			ReleaseVolume(ref volumeVelocityX);
+			ReleaseVolume(ref volumeVelocityY);
+			ReleaseVolume(ref volumeVelocityZ);
 			ReleaseVolume(ref volumeGradient);
 		}
 
@@ -714,6 +730,7 @@ namespace Unity.DemoTeam.Hair
 				cmd.SetComputeFloatParam(compute, UniformIDs._Damping, solver.damping);
 				cmd.SetComputeFloatParam(compute, UniformIDs._Gravity, solver.gravity * -Vector3.Magnitude(Physics.gravity));
 				cmd.SetComputeFloatParam(compute, UniformIDs._Repulsion, solver.repulsion);
+				cmd.SetComputeFloatParam(compute, UniformIDs._Friction, solver.friction);
 
 				cmd.SetComputeFloatParam(compute, UniformIDs._BendingCurvature, solver.bendingCurvature);
 				cmd.SetComputeFloatParam(compute, UniformIDs._BendingRestRadius, solver.bendingRestRadius);
@@ -845,6 +862,9 @@ namespace Unity.DemoTeam.Hair
 				cmd.SetGlobalBuffer(UniformIDs._ParticleVelocity, particleVelocity);
 
 				cmd.SetGlobalTexture(UniformIDs._VolumeDensity, volumeDensity);
+				cmd.SetGlobalTexture(UniformIDs._VolumeVelocityX, volumeVelocityX);
+				cmd.SetGlobalTexture(UniformIDs._VolumeVelocityY, volumeVelocityY);
+				cmd.SetGlobalTexture(UniformIDs._VolumeVelocityZ, volumeVelocityZ);
 				cmd.SetGlobalTexture(UniformIDs._VolumeGradient, volumeGradient);
 
 				if (debug.drawStrands)
@@ -909,6 +929,9 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryTorus, boundaryTorus);
 
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensity, volumeDensity);
+			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeVelocityX, volumeVelocityX);
+			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeVelocityY, volumeVelocityY);
+			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeVelocityZ, volumeVelocityZ);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeGradient, volumeGradient);
 		}
 
