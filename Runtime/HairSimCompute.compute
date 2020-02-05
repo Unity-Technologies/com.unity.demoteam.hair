@@ -9,7 +9,7 @@
 //#include "HairSimComputeConfig.hlsl"
 #define LAYOUT_INTERLEAVED 1
 #define MAX_BOUNDARIES 6
-#define DENSITY_SCALE 4096.0
+#define DENSITY_SCALE 8192.0
 
 float4x4 _LocalToWorld;
 float4x4 _LocalToWorldInvT;
@@ -52,6 +52,7 @@ Texture3D<int> _VolumeDensity;
 Texture3D<int> _VolumeVelocityX;
 Texture3D<int> _VolumeVelocityY;
 Texture3D<int> _VolumeVelocityZ;
+Texture3D<float3> _VolumeVelocity;
 Texture3D<float3> _VolumeGradient;
 SamplerState sampler_VolumeGradient;
 
@@ -85,8 +86,13 @@ float3 ParticleVolumeForce(uint i)
 
 float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
+#if 1
+	float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
+	float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeGradient, volumeUVW, 0);
+	return (volumeVelocity - velocity) * friction;
+#else
 	uint3 volumeIdx = ParticleVolumeIndex(i);
-	int volumeDensity = 1 + _VolumeDensity[volumeIdx];
+	int volumeDensity = _VolumeDensity[volumeIdx];
 
 	float3 volumeVelocity = float3(
 		_VolumeVelocityX[volumeIdx],
@@ -94,6 +100,7 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 		_VolumeVelocityZ[volumeIdx]) / (float)(1 + volumeDensity);
 		
 	return (volumeVelocity - velocity) * friction;
+#endif
 }
 
 //------------

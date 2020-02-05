@@ -6,7 +6,7 @@
 	
 	//#include "HairSimComputeConfig.hlsl"
 	#define LAYOUT_INTERLEAVED 1
-	#define DENSITY_SCALE 4096.0
+	#define DENSITY_SCALE 8192.0
 
 	uint _StrandCount;
 	uint _StrandParticleCount;
@@ -26,6 +26,7 @@
 	Texture3D<int> _VolumeVelocityX;
 	Texture3D<int> _VolumeVelocityY;
 	Texture3D<int> _VolumeVelocityZ;
+	Texture3D<float3> _VolumeVelocity;
 	Texture3D<float3> _VolumeGradient;
 	SamplerState sampler_VolumeGradient;
 
@@ -237,10 +238,11 @@
 				uint3 volumeIdx = localPosQuantized;
 				int volumeDensity = _VolumeDensity[volumeIdx];
 				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, uvw, 0);
-				float3 volumeVelocity = float3(
-					_VolumeVelocityX[volumeIdx],
-					_VolumeVelocityY[volumeIdx],
-					_VolumeVelocityZ[volumeIdx]) / (float)volumeDensity;
+				float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeGradient, uvw, 0);
+				//float3 volumeVelocity = float3(
+				//	_VolumeVelocityX[volumeIdx],
+				//	_VolumeVelocityY[volumeIdx],
+				//	_VolumeVelocityZ[volumeIdx]) / (float)(1 + volumeDensity);
 
 				float x = uvw.x + _DebugSliceDivider;
 				if (x < 1.0)

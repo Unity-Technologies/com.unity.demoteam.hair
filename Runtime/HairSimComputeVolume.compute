@@ -1,23 +1,22 @@
 ﻿#pragma kernel KVolumeClear
 #pragma kernel KVolumeDensity
-//#pragma kernel KVolumeVelocityX
-//#pragma kernel KVolumeVelocityY
-//#pragma kernel KVolumeVelocityZ
+#pragma kernel KVolumeVelocityX
+#pragma kernel KVolumeVelocityY
+#pragma kernel KVolumeVelocityZ
+#pragma kernel KVolumeVelocity
 #pragma kernel KVolumeGradient
 
 //#include "HairSimComputeConfig.hlsl"
-#define DENSITY_SCALE 4096.0
+#define DENSITY_SCALE 8192.0
 #define DENSITY_TRILINEAR 1
 
-#define PARTICLE_GROUP_WIDTH 64
-#define PARTICLE_NUM_X PARTICLE_GROUP_WIDTH
+#define PARTICLE_NUM_X 64
 #define PARTICLE_NUM_Y 1
 #define PARTICLE_NUM_Z 1
 
-#define VOLUME_GROUP_WIDTH 4
-#define VOLUME_NUM_X VOLUME_GROUP_WIDTH
-#define VOLUME_NUM_Y VOLUME_GROUP_WIDTH
-#define VOLUME_NUM_Z VOLUME_GROUP_WIDTH
+#define VOLUME_NUM_X 4
+#define VOLUME_NUM_Y 4
+#define VOLUME_NUM_Z 4
 
 StructuredBuffer<float4> _ParticlePosition;
 StructuredBuffer<float4> _ParticleVelocity;
@@ -46,6 +45,7 @@ RWTexture3D<int> _VolumeDensity;
 RWTexture3D<int> _VolumeVelocityX;
 RWTexture3D<int> _VolumeVelocityY;
 RWTexture3D<int> _VolumeVelocityZ;
+RWTexture3D<float3> _VolumeVelocity;
 RWTexture3D<float3> _VolumeGradient;
 
 float3 ParticleVolumePosition(uint i)
@@ -63,12 +63,7 @@ uint3 ParticleVolumeIndex(uint i)
 	return localPosQuantized;
 }
 
-#define CLEAR_WIDTH 4
-#define CLEAR_NUM_X CLEAR_WIDTH
-#define CLEAR_NUM_Y CLEAR_WIDTH
-#define CLEAR_NUM_Z CLEAR_WIDTH
-
-[numthreads(CLEAR_NUM_X, CLEAR_NUM_Y, CLEAR_NUM_Z)]
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeClear(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
@@ -98,7 +93,7 @@ void InterlockedAddTrilinear(RWTexture3D<int> volume, uint3 idx0, float value, f
 	InterlockedAdd(volume[idx0 + h.xxx], (int)(value * w1.x * w1.y * w1.z));
 }
 
-void AddParticleContribution(uint i, float value, RWTexture3D<int> volume)
+void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> volume)
 {
 #if DENSITY_TRILINEAR
 
@@ -111,17 +106,16 @@ void AddParticleContribution(uint i, float value, RWTexture3D<int> volume)
 	float3 w0 = 1.0 - cellPos;
 	float3 w1 = cellPos;
 
-	InterlockedAddTrilinear(_VolumeDensity, cellIdx0, DENSITY_SCALE * value, w0, w1);
+	InterlockedAddTrilinear(volume, cellIdx0, DENSITY_SCALE * value, w0, w1);
 
 #else
 
-	InterlockedAdd(_VolumeDensity[ParticleVolumeIndex(i)], DENSITY_SCALE);
+	InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE);
 
 #endif
 }
 
-//TODO optimize!
-[numthreads(64, 1, 1)]
+[numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
 void KVolumeDensity(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
@@ -132,44 +126,71 @@ void KVolumeDensity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-#if DENSITY_TRILINEAR
-
-	float3 velocity = _ParticleVelocity[worldIdx.x].xyz;
-	float3 volumePos = ParticleVolumePosition(worldIdx.x);
-	float3 volumePosFloor = floor(volumePos);
-
-	uint3 cellIdx0 = volumePosFloor;
-	float3 cellPos = volumePos - volumePosFloor;
-	
-	float3 w0 = 1.0 - cellPos;
-	float3 w1 = cellPos;
-
-	InterlockedAddTrilinear(_VolumeDensity, cellIdx0, DENSITY_SCALE, w0, w1);
-	InterlockedAddTrilinear(_VolumeVelocityX, cellIdx0, DENSITY_SCALE * velocity.x, w0, w1);
-	InterlockedAddTrilinear(_VolumeVelocityY, cellIdx0, DENSITY_SCALE * velocity.y, w0, w1);
-	InterlockedAddTrilinear(_VolumeVelocityZ, cellIdx0, DENSITY_SCALE * velocity.z, w0, w1);
-
-#else
-
-	float3 velocity = _ParticleVelocity[worldIdx.x].xyz;
-	uint3 volumeIdx = ParticleVolumeIndex(worldIdx.x);
-
-	InterlockedAdd(_VolumeDensity[volumeIdx], DENSITY_SCALE);
-	InterlockedAdd(_VolumeVelocityX[volumeIdx], (int)(DENSITY_SCALE * velocity.x));
-	InterlockedAdd(_VolumeVelocityY[volumeIdx], (int)(DENSITY_SCALE * velocity.y));
-	InterlockedAdd(_VolumeVelocityZ[volumeIdx], (int)(DENSITY_SCALE * velocity.z));
-
-#endif
+	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
 }
 
-#define GRADIENT_WIDTH 4
-#define GRADIENT_NUM_X GRADIENT_WIDTH
-#define GRADIENT_NUM_Y GRADIENT_WIDTH
-#define GRADIENT_NUM_Z GRADIENT_WIDTH
+[numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
+void KVolumeVelocityX(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
+}
 
-groupshared int gs_density[GRADIENT_NUM_X * GRADIENT_NUM_Y * GRADIENT_NUM_Z];
+[numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
+void KVolumeVelocityY(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
+}
 
-[numthreads(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z)]
+[numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
+void KVolumeVelocityZ(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
+}
+
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
+void KVolumeVelocity(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	_VolumeVelocity[worldIdx] = float3(
+		_VolumeVelocityX[worldIdx],
+		_VolumeVelocityY[worldIdx],
+		_VolumeVelocityZ[worldIdx]) / (float)(1 + _VolumeDensity[worldIdx]);
+}
+
+groupshared int gs_density[VOLUME_NUM_X * VOLUME_NUM_Y * VOLUME_NUM_Z];
+
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeGradient(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
@@ -185,8 +206,8 @@ void KVolumeGradient(
 	GroupMemoryBarrierWithGroupSync();
 
 	const uint threadIdxStrideX = 1;
-	const uint threadIdxStrideY = GRADIENT_NUM_X;
-	const uint threadIdxStrideZ = GRADIENT_NUM_X * GRADIENT_NUM_Y;
+	const uint threadIdxStrideY = VOLUME_NUM_X;
+	const uint threadIdxStrideZ = VOLUME_NUM_X * VOLUME_NUM_Y;
 	/*
 	SV_GroupIndex =
 		SV_GroupThreadID.z*dimx*dimy +
@@ -199,7 +220,7 @@ void KVolumeGradient(
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
 	const uint3 localLowerIdx = 0;
-	const uint3 localUpperIdx = uint3(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z) - 1;
+	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
 
 	const float k = 1.0 / (2.0 * DENSITY_SCALE);
 
@@ -235,7 +256,7 @@ void KVolumeGradient(
 	}
 }
 
-[numthreads(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z)]
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeGradientForwardDiff(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
@@ -251,7 +272,7 @@ void KVolumeGradientForwardDiff(
 	GroupMemoryBarrierWithGroupSync();
 
 	const uint3 localLowerIdx = 0;
-	const uint3 localUpperIdx = uint3(GRADIENT_NUM_X, GRADIENT_NUM_Y, GRADIENT_NUM_Z) - 1;
+	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
 
 	const float k = 1.0 / DENSITY_SCALE;
 
@@ -272,8 +293,8 @@ void KVolumeGradientForwardDiff(
 	else
 	{
 		const uint threadIdxStrideX = 1;
-		const uint threadIdxStrideY = GRADIENT_NUM_X;
-		const uint threadIdxStrideZ = GRADIENT_NUM_X * GRADIENT_NUM_Y;
+		const uint threadIdxStrideY = VOLUME_NUM_X;
+		const uint threadIdxStrideZ = VOLUME_NUM_X * VOLUME_NUM_Y;
 		/*
 		SV_GroupIndex =
 			SV_GroupThreadID.z*dimx*dimy +

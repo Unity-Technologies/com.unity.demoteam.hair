@@ -976,7 +976,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1011175220
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -991,7 +991,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   configuration:
     style: 1
-    strandCount: 256
+    strandCount: 384
     strandParticleCount: 8
     strandLength: 0.75
   debug:
@@ -1003,8 +1003,8 @@ MonoBehaviour:
     drawSliceOffset: 0.5
     drawSliceDivider: 0.5
   solver:
-    method: 0
-    iterations: 20
+    method: 1
+    iterations: 10
     inference: 1
     stiffness: 1
     damping: 0.9
@@ -1285,7 +1285,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   configuration:
     style: 2
-    strandCount: 64
+    strandCount: 16000
     strandParticleCount: 64
     strandLength: 1
   debug:
@@ -1323,14 +1323,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1851342448}
-  m_LocalRotation: {x: 0.5917063, y: 0.60776776, z: -0.06845053, w: 0.5251824}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0.6084966, y: 0.2830439, z: 0.20094103, w: 0.71361107}
+  m_LocalPosition: {x: 0.032, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 917071512}
   m_Father: {fileID: 0}
   m_RootOrder: 3
-  m_LocalEulerAnglesHint: {x: 44.806004, y: -1311.775, z: 65.839005}
+  m_LocalEulerAnglesHint: {x: 49.000004, y: 81.3, z: 74.193}
 --- !u!1 &2032921483
 GameObject:
   m_ObjectHideFlags: 0
@@ -1347,7 +1347,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &2032921484
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1362,7 +1362,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   configuration:
     style: 0
-    strandCount: 128
+    strandCount: 1024
     strandParticleCount: 16
     strandLength: 0.5
   debug:
@@ -1375,7 +1375,7 @@ MonoBehaviour:
     drawSliceDivider: 0.5
   solver:
     method: 0
-    iterations: 1
+    iterations: 2
     inference: 1
     stiffness: 1
     damping: 0.9
