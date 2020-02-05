@@ -1,10 +1,23 @@
 ﻿#pragma kernel KVolumeClear
 #pragma kernel KVolumeDensity
+//#pragma kernel KVolumeVelocityX
+//#pragma kernel KVolumeVelocityY
+//#pragma kernel KVolumeVelocityZ
 #pragma kernel KVolumeGradient
 
 //#include "HairSimComputeConfig.hlsl"
 #define DENSITY_SCALE 4096.0
 #define DENSITY_TRILINEAR 1
+
+#define PARTICLE_GROUP_WIDTH 64
+#define PARTICLE_NUM_X PARTICLE_GROUP_WIDTH
+#define PARTICLE_NUM_Y 1
+#define PARTICLE_NUM_Z 1
+
+#define VOLUME_GROUP_WIDTH 4
+#define VOLUME_NUM_X VOLUME_GROUP_WIDTH
+#define VOLUME_NUM_Y VOLUME_GROUP_WIDTH
+#define VOLUME_NUM_Z VOLUME_GROUP_WIDTH
 
 StructuredBuffer<float4> _ParticlePosition;
 StructuredBuffer<float4> _ParticleVelocity;
@@ -50,7 +63,7 @@ uint3 ParticleVolumeIndex(uint i)
 	return localPosQuantized;
 }
 
-#define CLEAR_WIDTH 8
+#define CLEAR_WIDTH 4
 #define CLEAR_NUM_X CLEAR_WIDTH
 #define CLEAR_NUM_Y CLEAR_WIDTH
 #define CLEAR_NUM_Z CLEAR_WIDTH
@@ -85,6 +98,29 @@ void InterlockedAddTrilinear(RWTexture3D<int> volume, uint3 idx0, float value, f
 	InterlockedAdd(volume[idx0 + h.xxx], (int)(value * w1.x * w1.y * w1.z));
 }
 
+void AddParticleContribution(uint i, float value, RWTexture3D<int> volume)
+{
+#if DENSITY_TRILINEAR
+
+	float3 volumePos = ParticleVolumePosition(i);
+	float3 volumePosFloor = floor(volumePos);
+
+	uint3 cellIdx0 = volumePosFloor;
+	float3 cellPos = volumePos - volumePosFloor;
+
+	float3 w0 = 1.0 - cellPos;
+	float3 w1 = cellPos;
+
+	InterlockedAddTrilinear(_VolumeDensity, cellIdx0, DENSITY_SCALE * value, w0, w1);
+
+#else
+
+	InterlockedAdd(_VolumeDensity[ParticleVolumeIndex(i)], DENSITY_SCALE);
+
+#endif
+}
+
+//TODO optimize!
 [numthreads(64, 1, 1)]
 void KVolumeDensity(
 	uint3 groupIdx : SV_GroupID,

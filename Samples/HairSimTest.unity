@@ -307,7 +307,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 88329051}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.25, z: -1.5}
+  m_LocalPosition: {x: 0, y: -0.25, z: -3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -998,6 +998,10 @@ MonoBehaviour:
     drawParticles: 1
     drawStrands: 1
     drawDensity: 0
+    drawGradient: 0
+    drawSlice: 0
+    drawSliceOffset: 0.5
+    drawSliceDivider: 0.5
   solver:
     method: 0
     iterations: 20
@@ -1005,6 +1009,8 @@ MonoBehaviour:
     stiffness: 1
     damping: 0.9
     gravity: 1
+    repulsion: 0
+    friction: 0
     bendingCurvature: 0
     bendingRestRadius: 0.001
     dampingFTL: 0.8
@@ -1013,6 +1019,7 @@ MonoBehaviour:
   compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
+  offset: 0
 --- !u!4 &1011175221
 Transform:
   m_ObjectHideFlags: 0
@@ -1285,6 +1292,10 @@ MonoBehaviour:
     drawParticles: 0
     drawStrands: 1
     drawDensity: 0
+    drawGradient: 0
+    drawSlice: 0
+    drawSliceOffset: 0.5
+    drawSliceDivider: 0.5
   solver:
     method: 2
     iterations: 50
@@ -1292,6 +1303,8 @@ MonoBehaviour:
     stiffness: 1
     damping: 0
     gravity: 1
+    repulsion: 0
+    friction: 0
     bendingCurvature: 0
     bendingRestRadius: 0
     dampingFTL: 0.8
@@ -1302,6 +1315,7 @@ MonoBehaviour:
   compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
+  offset: 0
 --- !u!4 &1851342450
 Transform:
   m_ObjectHideFlags: 0
@@ -1355,6 +1369,10 @@ MonoBehaviour:
     drawParticles: 1
     drawStrands: 1
     drawDensity: 0
+    drawGradient: 0
+    drawSlice: 0
+    drawSliceOffset: 0.5
+    drawSliceDivider: 0.5
   solver:
     method: 0
     iterations: 1
@@ -1362,6 +1380,8 @@ MonoBehaviour:
     stiffness: 1
     damping: 0.9
     gravity: 1
+    repulsion: 0
+    friction: 0
     bendingCurvature: 0
     bendingRestRadius: 1
     dampingFTL: 0.8
@@ -1371,6 +1391,7 @@ MonoBehaviour:
   compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
+  offset: 0
 --- !u!4 &2032921485
 Transform:
   m_ObjectHideFlags: 0

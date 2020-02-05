@@ -75,7 +75,7 @@ float3 ParticleVolumeForce(uint i)
 #if 1
 	float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
 	float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, volumeUVW, 0);
-	return volumeGradient * 5.0;
+	return volumeGradient * _Repulsion;
 #else
 	uint3 volumeIdx = ParticleVolumeIndex(i);
 	float3 volumeGradient = _VolumeGradient[volumeIdx];
@@ -85,7 +85,6 @@ float3 ParticleVolumeForce(uint i)
 
 float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
-	return 0;
 	uint3 volumeIdx = ParticleVolumeIndex(i);
 	int volumeDensity = 1 + _VolumeDensity[volumeIdx];
 
@@ -367,7 +366,7 @@ void KSolveConstraints_GaussSeidelReference(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float4 x0 = _ParticlePositionPrev[i];
-			const float4 v0 = _ParticleVelocityPrev[i];
+			const float4 v0 = _ParticleVelocityPrev[i] + float4(ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction), 0.0);
 			const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
 			_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
 		}
@@ -523,7 +522,7 @@ void KSolveConstraints_GaussSeidel(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float4 x0 = _ParticlePositionPrev[i];
-			const float4 v0 = _ParticleVelocityPrev[i];
+			const float4 v0 = _ParticleVelocityPrev[i] + float4(ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction), 0.0);
 			const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
 			_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
 		}
@@ -640,7 +639,7 @@ void KSolveConstraints_Jacobi(
 
 	// update position
 	const float3 x0 = _ParticlePositionPrev[i].xyz;
-	const float3 v0 = _ParticleVelocityPrev[i].xyz;// +ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
+	const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
 	const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeForce(i);
 	{
 		if (threadIdx == 0)

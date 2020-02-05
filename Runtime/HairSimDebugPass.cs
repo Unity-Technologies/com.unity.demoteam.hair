@@ -8,6 +8,8 @@ namespace Unity.DemoTeam.Hair
 {
 	public class HairSimDebugPass : CustomPass
 	{
+		private int lastSimulationFrame = -1;
+
 		private RTHandle motionVectorsRT;
 		private void FindMotionVectorsRT()
 		{
@@ -38,25 +40,34 @@ namespace Unity.DemoTeam.Hair
 
 		protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResults)
 		{
-			const float dtMin = 1.0f / 120.0f;
-			const float dtMax = 1.0f / 30.0f;
+			int frame = Time.renderedFrameCount;
+			if (frame != lastSimulationFrame)
+			{
+				const float dtMin = 1.0f / 120.0f;
+				const float dtMax = 1.0f / 30.0f;
 
-			float dt = Mathf.Clamp(Time.deltaTime, dtMin, dtMax);
-			dt = 1.0f / 60.0f;
+				float dt = Mathf.Clamp(Time.deltaTime, dtMin, dtMax);
+				dt = 1.0f / 60.0f;
+
+				foreach (HairSim hairSim in HairSim.instances)
+				{
+					if (hairSim != null && hairSim.isActiveAndEnabled)
+					{
+						using (new ProfilingSample(cmd, "HairSim.Step (GPU)"))
+							hairSim.Step(cmd, dt);
+						using (new ProfilingSample(cmd, "HairSim.Voxelize (GPU)"))
+							hairSim.Voxelize(cmd);
+					}
+				}
+
+				lastSimulationFrame = frame;
+			}
 
 			Profiler.BeginSample("HairSimDebugPass");
 			foreach (HairSim hairSim in HairSim.instances)
 			{
 				if (hairSim != null && hairSim.isActiveAndEnabled)
 				{
-					using (new ProfilingSample(cmd, "HairSim.Step (GPU)"))
-					{
-						hairSim.Step(cmd, dt);
-					}
-					using (new ProfilingSample(cmd, "HairSim.Voxelize (GPU)"))
-					{
-						hairSim.Voxelize(cmd);
-					}
 					using (new ProfilingSample(cmd, "HairSim.Draw (GPU)"))
 					{
 						RTHandle cameraColor;

@@ -225,6 +225,7 @@ namespace Unity.DemoTeam.Hair
 
 		[NonSerialized] public Configuration computeParams = Configuration.none;
 		[HideInInspector] public Material debugMaterial;
+		private MaterialPropertyBlock debugMaterialPB;
 
 		private int kernelUpdatePosition;
 		private int kernelSolveConstraints_GaussSeidelReference;
@@ -406,6 +407,7 @@ namespace Unity.DemoTeam.Hair
 			};
 
 			volume = new RenderTexture(volumeDesc);
+			volume.filterMode = FilterMode.Trilinear;
 			volume.hideFlags = HideFlags.HideAndDontSave;
 			volume.name = name;
 			volume.Create();
@@ -540,7 +542,7 @@ namespace Unity.DemoTeam.Hair
 
 		private Vector3 GetVolumeExtent()
 		{
-			return (1.5f + computeParams.strandLength) * Vector3.one;
+			return (0.5f + 1.2f * computeParams.strandLength) * Vector3.one;
 		}
 
 		public void Init(CommandBuffer cmd, in Configuration conf)
@@ -741,6 +743,13 @@ namespace Unity.DemoTeam.Hair
 				cmd.SetComputeIntParam(compute, UniformIDs._BoundarySphereCount, boundarySphereCount);
 				cmd.SetComputeIntParam(compute, UniformIDs._BoundaryTorusCount, boundaryTorusCount);
 
+				Vector3 volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
+				Vector3 volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
+
+				cmd.SetComputeVectorParam(compute, UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
+				cmd.SetComputeVectorParam(compute, UniformIDs._VolumeWorldMin, volumeWorldMin);
+				cmd.SetComputeVectorParam(compute, UniformIDs._VolumeWorldMax, volumeWorldMax);
+
 				//int particleThreadGroupsX = particlePosition.count / THREAD_GROUP_SIZE;
 				//int particleThreadGroupsY = 1;
 				//int particleThreadGroupsZ = 1;
@@ -795,7 +804,7 @@ namespace Unity.DemoTeam.Hair
 
 				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeClear (GPU)"))
 				{
-					int clearThreadCountXYZ = 8;
+					int clearThreadCountXYZ = 4;
 					int clearThreadGroupsX = VOLUME_CELLS / clearThreadCountXYZ;
 					int clearThreadGroupsY = VOLUME_CELLS / clearThreadCountXYZ;
 					int clearThreadGroupsZ = VOLUME_CELLS / clearThreadCountXYZ;
@@ -849,54 +858,57 @@ namespace Unity.DemoTeam.Hair
 				if (!debug.drawParticles && !debug.drawStrands && !debug.drawDensity && !debug.drawGradient && !debug.drawSlice)
 					return;
 
+				if (debugMaterialPB == null)
+					debugMaterialPB = new MaterialPropertyBlock();
+
 				Vector3 volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
 				Vector3 volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
 
-				cmd.SetGlobalVector(UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
-				cmd.SetGlobalVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
-				cmd.SetGlobalVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
+				debugMaterialPB.SetVector(UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
+				debugMaterialPB.SetVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
+				debugMaterialPB.SetVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
 
-				cmd.SetGlobalInt(UniformIDs._StrandCount, computeParams.strandCount);
-				cmd.SetGlobalInt(UniformIDs._StrandParticleCount, computeParams.strandParticleCount);
+				debugMaterialPB.SetInt(UniformIDs._StrandCount, computeParams.strandCount);
+				debugMaterialPB.SetInt(UniformIDs._StrandParticleCount, computeParams.strandParticleCount);
 
-				cmd.SetGlobalBuffer(UniformIDs._ParticlePosition, particlePosition);
-				cmd.SetGlobalBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
+				debugMaterialPB.SetBuffer(UniformIDs._ParticlePosition, particlePosition);
+				debugMaterialPB.SetBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
 
-				cmd.SetGlobalTexture(UniformIDs._VolumeDensity, volumeDensity);
-				cmd.SetGlobalTexture(UniformIDs._VolumeVelocityX, volumeVelocityX);
-				cmd.SetGlobalTexture(UniformIDs._VolumeVelocityY, volumeVelocityY);
-				cmd.SetGlobalTexture(UniformIDs._VolumeVelocityZ, volumeVelocityZ);
-				cmd.SetGlobalTexture(UniformIDs._VolumeGradient, volumeGradient);
+				debugMaterialPB.SetTexture(UniformIDs._VolumeDensity, volumeDensity);
+				debugMaterialPB.SetTexture(UniformIDs._VolumeVelocityX, volumeVelocityX);
+				debugMaterialPB.SetTexture(UniformIDs._VolumeVelocityY, volumeVelocityY);
+				debugMaterialPB.SetTexture(UniformIDs._VolumeVelocityZ, volumeVelocityZ);
+				debugMaterialPB.SetTexture(UniformIDs._VolumeGradient, volumeGradient);
 
 				if (debug.drawStrands)
 				{
-					cmd.SetGlobalColor(UniformIDs._DebugColor, Color.red);
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 0, MeshTopology.LineStrip, computeParams.strandParticleCount, computeParams.strandCount);
+					debugMaterialPB.SetColor(UniformIDs._DebugColor, Color.red);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 0, MeshTopology.LineStrip, computeParams.strandParticleCount, computeParams.strandCount, debugMaterialPB);
 				}
 
 				if (debug.drawParticles)
 				{
-					cmd.SetGlobalColor(UniformIDs._DebugColor, Color.green);
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 0, MeshTopology.Points, computeParams.strandParticleCount, computeParams.strandCount);
+					debugMaterialPB.SetColor(UniformIDs._DebugColor, Color.green);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 0, MeshTopology.Points, computeParams.strandParticleCount, computeParams.strandCount, debugMaterialPB);
 				}
 
 				if (debug.drawDensity)
 				{
-					cmd.SetGlobalColor(UniformIDs._DebugColor, Color.green);
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 1, MeshTopology.Points, 1, VOLUME_CELLS * VOLUME_CELLS * VOLUME_CELLS);
+					debugMaterialPB.SetColor(UniformIDs._DebugColor, Color.green);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 1, MeshTopology.Points, 1, VOLUME_CELLS * VOLUME_CELLS * VOLUME_CELLS, debugMaterialPB);
 				}
 
 				if (debug.drawGradient)
 				{
-					cmd.SetGlobalColor(UniformIDs._DebugColor, Color.cyan);
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 2, MeshTopology.Lines, 2, VOLUME_CELLS * VOLUME_CELLS * VOLUME_CELLS);
+					debugMaterialPB.SetColor(UniformIDs._DebugColor, Color.cyan);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 2, MeshTopology.Lines, 2, VOLUME_CELLS * VOLUME_CELLS * VOLUME_CELLS, debugMaterialPB);
 				}
 
 				if (debug.drawSlice)
 				{
-					cmd.SetGlobalFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffset);
-					cmd.SetGlobalFloat(UniformIDs._DebugSliceDivider, debug.drawSliceDivider);
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1);
+					debugMaterialPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffset);
+					debugMaterialPB.SetFloat(UniformIDs._DebugSliceDivider, debug.drawSliceDivider);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1, debugMaterialPB);
 				}
 
 				if (debug.drawStrands)// motion vectors
