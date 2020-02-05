@@ -744,6 +744,7 @@ void KSolveConstraints_Jacobi(
 			gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;
 		}
 	}
+
 	GroupMemoryBarrierWithGroupSync();
 
 	// derive velocity from effective change in position

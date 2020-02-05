@@ -42,7 +42,7 @@ float3 _VolumeWorldMax;
 */
 
 RWTexture3D<int> _VolumeDensity;
-RWTexture3D<int> _VolumeVelocityX;
+RWTexture3D<int> _VolumeVelocityX;// this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 RWTexture3D<int> _VolumeVelocityY;
 RWTexture3D<int> _VolumeVelocityZ;
 RWTexture3D<float3> _VolumeVelocity;
@@ -96,7 +96,6 @@ void InterlockedAddTrilinear(RWTexture3D<int> volume, uint3 idx0, float value, f
 void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> volume)
 {
 #if DENSITY_TRILINEAR
-
 	float3 volumePos = ParticleVolumePosition(i);
 	float3 volumePosFloor = floor(volumePos);
 
@@ -107,11 +106,8 @@ void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> vo
 	float3 w1 = cellPos;
 
 	InterlockedAddTrilinear(volume, cellIdx0, DENSITY_SCALE * value, w0, w1);
-
 #else
-
 	InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE);
-
 #endif
 }
 

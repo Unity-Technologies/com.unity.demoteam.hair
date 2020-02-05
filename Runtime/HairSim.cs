@@ -1,9 +1,13 @@
 ﻿#define LAYOUT_INTERLEAVED
+//#define REDUCE_PRECISION// depends on int16_t being supported in hlsl
 
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+#if REDUCE_PRECISION
+using UnityEngine.Experimental.Rendering;
+#endif
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
@@ -386,17 +390,34 @@ namespace Unity.DemoTeam.Hair
 
 		private void CreateVolumes()
 		{
-			CreateVolume(ref volumeDensity, "VolumeDensity", VOLUME_CELLS, RenderTextureFormat.RInt);
+#if REDUCE_PRECISION
+			CreateVolume(ref volumeDensity, "VolumeDensity", VOLUME_CELLS, GraphicsFormat.R16_SInt);//TODO switch to R16_SInt
+			CreateVolume(ref volumeVelocityX, "VolumeVelocityX", VOLUME_CELLS, GraphicsFormat.R16_SInt);
+			CreateVolume(ref volumeVelocityY, "VolumeVelocityY", VOLUME_CELLS, GraphicsFormat.R16_SInt);
+			CreateVolume(ref volumeVelocityZ, "VolumeVelocityZ", VOLUME_CELLS, GraphicsFormat.R16_SInt);
+			CreateVolume(ref volumeVelocity, "VolumeVelocity", VOLUME_CELLS, GraphicsFormat.R32G32B32A32_SFloat);
+			CreateVolume(ref volumeGradient, "VolumeGradient", VOLUME_CELLS, GraphicsFormat.R32G32B32A32_SFloat);
+#else
+			CreateVolume(ref volumeDensity, "VolumeDensity", VOLUME_CELLS, RenderTextureFormat.RInt);//TODO switch to R16_SInt
 			CreateVolume(ref volumeVelocityX, "VolumeVelocityX", VOLUME_CELLS, RenderTextureFormat.RInt);
 			CreateVolume(ref volumeVelocityY, "VolumeVelocityY", VOLUME_CELLS, RenderTextureFormat.RInt);
 			CreateVolume(ref volumeVelocityZ, "VolumeVelocityZ", VOLUME_CELLS, RenderTextureFormat.RInt);
 			CreateVolume(ref volumeVelocity, "VolumeVelocity", VOLUME_CELLS, RenderTextureFormat.ARGBFloat);
 			CreateVolume(ref volumeGradient, "VolumeGradient", VOLUME_CELLS, RenderTextureFormat.ARGBFloat);
+#endif
 		}
 
+#if REDUCE_PRECISION
+		private void CreateVolume(ref RenderTexture volume, string name, int cells, GraphicsFormat format = GraphicsFormat.R32G32B32A32_SFloat)
+#else
 		private void CreateVolume(ref RenderTexture volume, string name, int cells, RenderTextureFormat format = RenderTextureFormat.Default)
+#endif
 		{
+#if REDUCE_PRECISION
+			if (volume != null && volume.width == cells && volume.graphicsFormat == format)
+#else
 			if (volume != null && volume.width == cells && volume.format == format)
+#endif
 				return;
 
 			if (volume != null)
@@ -408,7 +429,11 @@ namespace Unity.DemoTeam.Hair
 				width = cells,
 				height = cells,
 				volumeDepth = cells,
+#if REDUCE_PRECISION
+				graphicsFormat = format,
+#else
 				colorFormat = format,
+#endif
 				enableRandomWrite = true,
 				msaaSamples = 1,
 			};
@@ -650,36 +675,6 @@ namespace Unity.DemoTeam.Hair
 
 				SwapBuffers(ref particlePosition, ref particlePositionPrev);
 				SwapBuffers(ref particleVelocity, ref particleVelocityPrev);
-
-				//---------------------
-				// update strand roots
-
-				/*
-				//TODO just pass transform to shader instead
-				using (NativeArray<StrandRoot> tmpRoots = GetStrandRoots(computeParams))
-				using (NativeArray<Vector4> tmpRootsPos = new NativeArray<Vector4>(computeParams.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (NativeArray<Vector4> tmpRootsTan = new NativeArray<Vector4>(computeParams.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				{
-					unsafe
-					{
-						StrandRoot* srcRoots = (StrandRoot*)tmpRoots.GetUnsafePtr();
-						Vector3* srcRootsPos = &srcRoots[0].localPos;
-						Vector3* srcRootsTan = &srcRoots[0].localTan;
-
-						Vector4* ptrRootsPos = (Vector4*)tmpRootsPos.GetUnsafePtr();
-						Vector4* ptrRootsTan = (Vector4*)tmpRootsTan.GetUnsafePtr();
-
-						int dstStride = sizeof(Vector4);
-						int srcStride = sizeof(StrandRoot);
-
-						UnsafeUtility.MemCpyStride(ptrRootsPos, dstStride, srcRootsPos, srcStride, sizeof(Vector3), computeParams.strandCount);
-						UnsafeUtility.MemCpyStride(ptrRootsTan, dstStride, srcRootsTan, srcStride, sizeof(Vector3), computeParams.strandCount);
-					}
-
-					rootPosition.SetData(tmpRootsPos);
-					rootTangent.SetData(tmpRootsTan);
-				}
-				*/
 
 				//-------------------
 				// update boundaries
