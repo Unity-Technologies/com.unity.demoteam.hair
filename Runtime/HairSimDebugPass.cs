@@ -40,8 +40,8 @@ namespace Unity.DemoTeam.Hair
 
 		protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResults)
 		{
-			int frame = Time.renderedFrameCount;
-			if (frame != lastSimulationFrame)
+			//int frame = Time.renderedFrameCount;
+			//if (frame != lastSimulationFrame)
 			{
 				const float dtMin = 1.0f / 120.0f;
 				const float dtMax = 1.0f / 30.0f;
@@ -56,11 +56,11 @@ namespace Unity.DemoTeam.Hair
 						using (new ProfilingSample(cmd, "HairSim.Step (GPU)"))
 							hairSim.Step(cmd, dt);
 						using (new ProfilingSample(cmd, "HairSim.Voxelize (GPU)"))
-							hairSim.Voxelize(cmd);
+							hairSim.Voxelize(cmd, hdCamera);
 					}
 				}
 
-				lastSimulationFrame = frame;
+				//lastSimulationFrame = frame;
 			}
 
 			Profiler.BeginSample("HairSimDebugPass");

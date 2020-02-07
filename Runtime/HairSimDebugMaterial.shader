@@ -21,12 +21,13 @@
 	float3 _VolumeCells;
 	float3 _VolumeWorldMin;
 	float3 _VolumeWorldMax;
+	bool _VolumeSplatCompute;
 
 	Texture3D<int> _VolumeDensity;
 	Texture3D<int> _VolumeVelocityX;
 	Texture3D<int> _VolumeVelocityY;
 	Texture3D<int> _VolumeVelocityZ;
-	Texture3D<float3> _VolumeVelocity;
+	Texture3D<float4> _VolumeVelocity;
 	Texture3D<float3> _VolumeGradient;
 	SamplerState sampler_VolumeGradient;
 
@@ -69,16 +70,16 @@
 	float3 ColorizeCycle(uint index, const uint count)
 	{
 		const float k = 1.0 / (count - 1);
-		float t = k * index;
+		float t = k * (index % count);
 
 		// source: https://www.shadertoy.com/view/4ttfRn
 		float3 c = 3.0 * float3(abs(t - 0.5), t.xx) - float3(1.5, 1.0, 2.0);
 		return 1.0 - c * c;
 	}
 
-	float3 ColorizeRepeat(uint index, const uint count)
+	float3 ColorizeRamp(uint index, const uint count)
 	{
-		index = min(index, count - 1);
+		index = min(index % count, count - 1);
 
 		const float k = 1.0 / (count - 1);
 		float t = 0.5 - 0.5 * k * index;// 0.5 * (1.0 - (k * index));
@@ -88,9 +89,9 @@
 		return 1.0 - c * c;
 	}
 
-	float3 ColorizeDensity(int d)
+	float3 ColorizeDensity(float d)
 	{
-		return d.xxxx / DENSITY_SCALE;
+		return saturate(d.xxx);
 	}
 
 	float3 ColorizeGradient(float3 n)
@@ -167,7 +168,7 @@
 
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
-				output.color = float4(ColorizeRepeat(volumeDensity, 32 * DENSITY_SCALE), 1.0);
+				output.color = float4(ColorizeRamp(volumeDensity, 32 * DENSITY_SCALE), 1.0);
 				output.extra = 0;
 				return output;
 			}
@@ -194,7 +195,7 @@
 
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
-				output.color = float4(ColorizeRepeat(1 - vertexID, 2), 1.0);
+				output.color = float4(ColorizeRamp(1 - vertexID, 2), 1.0);
 				output.extra = 0;
 				return output;
 			}
@@ -211,14 +212,15 @@
 
 			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
 			{
-				float3 uvw = 0;
-				switch (vertexID)
-				{
-				case 0: uvw = float3(0, 0, _DebugSliceOffset); break;
-				case 1: uvw = float3(1, 0, _DebugSliceOffset); break;
-				case 2: uvw = float3(1, 1, _DebugSliceOffset); break;
-				case 3: uvw = float3(0, 1, _DebugSliceOffset); break;
-				}
+				float3 uvw = float3(((vertexID >> 1) ^ vertexID) & 1, vertexID >> 1, _DebugSliceOffset);
+				//float3 uvw = 0;
+				//switch (vertexID)
+				//{
+				//case 0: uvw = float3(0, 0, _DebugSliceOffset); break;
+				//case 1: uvw = float3(1, 0, _DebugSliceOffset); break;
+				//case 2: uvw = float3(1, 1, _DebugSliceOffset); break;
+				//case 3: uvw = float3(0, 1, _DebugSliceOffset); break;
+				//}
 
 				float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvw);
 
@@ -238,19 +240,37 @@
 				uint3 volumeIdx = localPosQuantized;
 				int volumeDensity = _VolumeDensity[volumeIdx];
 				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, uvw, 0);
-				float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeGradient, uvw, 0);
+				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeGradient, uvw, 0);
 				//float3 volumeVelocity = float3(
 				//	_VolumeVelocityX[volumeIdx],
 				//	_VolumeVelocityY[volumeIdx],
 				//	_VolumeVelocityZ[volumeIdx]) / (float)(1 + volumeDensity);
 
+				float2 gridDist = abs(localPos - localPosQuantized);
+				float2 gridWidth = fwidth(localPos);
+				if (any(gridDist < gridWidth))
+				{
+					uint i = volumeIdx.z % 3;
+					return 0.2 * float4(i == 0, i == 1, i == 2, 1);
+				}
+
 				float x = uvw.x + _DebugSliceDivider;
 				if (x < 1.0)
-					return float4(ColorizeDensity(volumeDensity), 1.0);
+				{
+					if (_VolumeSplatCompute)
+						return float4(ColorizeDensity(volumeDensity / DENSITY_SCALE), 1.0);
+					else
+						return float4(ColorizeDensity(_VolumeVelocity[volumeIdx].w), 1.0);
+				}
 				else if (x < 2.0)
 					return float4(ColorizeGradient(volumeGradient), 1.0);
 				else
-					return float4(ColorizeVelocity(volumeVelocity), 1.0);
+				{
+					if (_VolumeSplatCompute)
+						return float4(ColorizeVelocity(volumeVelocity.xyz), 1.0);
+					else
+						return float4(ColorizeVelocity(volumeVelocity.xyz / volumeVelocity.w), 1.0);
+				}
 			}
 
 			ENDCG
@@ -258,10 +278,8 @@
 
 		Pass// 4 == STRANDS MOTION
 		{
-			Cull Off
 			ZTest Equal
 			ZWrite Off
-			Offset 0, -1
 
 			CGPROGRAM
 

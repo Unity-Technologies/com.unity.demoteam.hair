@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.HighDefinition;
 #if REDUCE_PRECISION
 using UnityEngine.Experimental.Rendering;
 #endif
@@ -41,7 +42,7 @@ namespace Unity.DemoTeam.Hair
 		const int MAX_STRAND_PARTICLES = 128;
 		const int MAX_BOUNDARIES = 6;
 
-		const int VOLUME_CELLS = 128;
+		const int VOLUME_CELLS = 31;
 
 		public static class UniformIDs
 		{
@@ -227,6 +228,8 @@ namespace Unity.DemoTeam.Hair
 
 		[HideInInspector] public ComputeShader compute;
 		[HideInInspector] public ComputeShader computeVolume;
+		[HideInInspector] public Material computeVolumeRaster;
+		private MaterialPropertyBlock computeVolumeRasterPB;
 
 		[NonSerialized] public Configuration computeParams = Configuration.none;
 		[HideInInspector] public Material debugMaterial;
@@ -564,17 +567,18 @@ namespace Unity.DemoTeam.Hair
 			return -1;
 		}
 
-		[Range(0.0f, 0.2f)]
-		public float offset;//TODO remove
+		[Range(0.0f, 0.2f)] public float offsetX;//TODO remove
+		[Range(0.0f, 0.2f)] public float offsetY;//TODO remove
+		public bool volumeSplatCompute;
 
 		private Vector3 GetVolumeCenter()
 		{
-			return this.transform.position + offset * Vector3.right;
+			return this.transform.position + offsetX * Vector3.right + offsetY * Vector3.up;
 		}
 
 		private Vector3 GetVolumeExtent()
 		{
-			return (0.75f + 1.2f * computeParams.strandLength) * Vector3.one;
+			return (0.75f + 1.2f * computeParams.strandLength/* * Vector3.Magnitude(this.transform.localScale)*/) * Vector3.one;
 		}
 
 		public void Init(CommandBuffer cmd, in Configuration conf)
@@ -778,7 +782,7 @@ namespace Unity.DemoTeam.Hair
 					strandThreadGroupsX = computeParams.strandCount;
 				}
 
-				SetKernelBufferParams(cmd, compute, kernelSolveConstraints);
+				SetComputeKernelParams(cmd, compute, kernelSolveConstraints);
 				cmd.DispatchCompute(compute, kernelSolveConstraints,
 					strandThreadGroupsX,
 					strandThreadGroupsY,
@@ -792,7 +796,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public void Voxelize(CommandBuffer cmd)
+		public void Voxelize(CommandBuffer cmd, HDCamera hdCamera)
 		{
 			using (ProfilerMarkers.Voxelize.Auto())
 			{
@@ -820,55 +824,71 @@ namespace Unity.DemoTeam.Hair
 
 				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeClear (GPU)"))
 				{
-					SetKernelBufferParams(cmd, computeVolume, kernelVolumeClear);
+					SetComputeKernelParams(cmd, computeVolume, kernelVolumeClear);
 					cmd.DispatchCompute(computeVolume, kernelVolumeClear,
 						volumeThreadGroupsX,
 						volumeThreadGroupsY,
 						volumeThreadGroupsZ);
 				}
 
-				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeDensity (GPU)"))
+				if (volumeSplatCompute)
 				{
-					SetKernelBufferParams(cmd, computeVolume, kernelVolumeDensity);
-					cmd.DispatchCompute(computeVolume, kernelVolumeDensity,
-						particleThreadGroupsX,
-						particleThreadGroupsY,
-						particleThreadGroupsZ);
+					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeRasterizeCompute (GPU)"))
+					{
+						using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeDensity (GPU)"))
+						{
+							SetComputeKernelParams(cmd, computeVolume, kernelVolumeDensity);
+							cmd.DispatchCompute(computeVolume, kernelVolumeDensity,
+								particleThreadGroupsX,
+								particleThreadGroupsY,
+								particleThreadGroupsZ);
+						}
+
+						using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocityXYZ (GPU)"))
+						{
+							SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityX);
+							cmd.DispatchCompute(computeVolume, kernelVolumeVelocityX,
+								particleThreadGroupsX,
+								particleThreadGroupsY,
+								particleThreadGroupsZ);
+
+							SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityY);
+							cmd.DispatchCompute(computeVolume, kernelVolumeVelocityY,
+								particleThreadGroupsX,
+								particleThreadGroupsY,
+								particleThreadGroupsZ);
+
+							SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityZ);
+							cmd.DispatchCompute(computeVolume, kernelVolumeVelocityZ,
+								particleThreadGroupsX,
+								particleThreadGroupsY,
+								particleThreadGroupsZ);
+						}
+
+						using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocity (GPU)"))
+						{
+							SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocity);
+							cmd.DispatchCompute(computeVolume, kernelVolumeVelocity,
+								volumeThreadGroupsX,
+								volumeThreadGroupsY,
+								volumeThreadGroupsZ);
+						}
+					}
 				}
-
-				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocityXYZ (GPU)"))
+				else
 				{
-					SetKernelBufferParams(cmd, computeVolume, kernelVolumeVelocityX);
-					cmd.DispatchCompute(computeVolume, kernelVolumeVelocityX,
-						particleThreadGroupsX,
-						particleThreadGroupsY,
-						particleThreadGroupsZ);
-
-					SetKernelBufferParams(cmd, computeVolume, kernelVolumeVelocityY);
-					cmd.DispatchCompute(computeVolume, kernelVolumeVelocityY,
-						particleThreadGroupsX,
-						particleThreadGroupsY,
-						particleThreadGroupsZ);
-
-					SetKernelBufferParams(cmd, computeVolume, kernelVolumeVelocityZ);
-					cmd.DispatchCompute(computeVolume, kernelVolumeVelocityZ,
-						particleThreadGroupsX,
-						particleThreadGroupsY,
-						particleThreadGroupsZ);
-				}
-
-				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocity (GPU)"))
-				{
-					SetKernelBufferParams(cmd, computeVolume, kernelVolumeVelocity);
-					cmd.DispatchCompute(computeVolume, kernelVolumeVelocity,
-						volumeThreadGroupsX,
-						volumeThreadGroupsY,
-						volumeThreadGroupsZ);
+					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeRasterize (GPU)"))
+					{
+						SetRenderMaterialParams(ref computeVolumeRasterPB);
+						Color colorZero = Color.black; colorZero.a = 0.0f;
+						CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color, clearColor: colorZero);
+						cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, computeParams.strandCount * computeParams.strandParticleCount, 1, computeVolumeRasterPB);
+					}
 				}
 
 				using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeGradient (GPU)"))
 				{
-					SetKernelBufferParams(cmd, computeVolume, kernelVolumeGradient);
+					SetComputeKernelParams(cmd, computeVolume, kernelVolumeGradient);
 					cmd.DispatchCompute(computeVolume, kernelVolumeGradient,
 						volumeThreadGroupsX,
 						volumeThreadGroupsY,
@@ -889,28 +909,9 @@ namespace Unity.DemoTeam.Hair
 				if (!debug.drawParticles && !debug.drawStrands && !debug.drawDensity && !debug.drawGradient && !debug.drawSlice)
 					return;
 
-				if (debugMaterialPB == null)
-					debugMaterialPB = new MaterialPropertyBlock();
+				SetRenderMaterialParams(ref debugMaterialPB);
 
-				Vector3 volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
-				Vector3 volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
-
-				debugMaterialPB.SetVector(UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
-				debugMaterialPB.SetVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
-				debugMaterialPB.SetVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
-
-				debugMaterialPB.SetInt(UniformIDs._StrandCount, computeParams.strandCount);
-				debugMaterialPB.SetInt(UniformIDs._StrandParticleCount, computeParams.strandParticleCount);
-
-				debugMaterialPB.SetBuffer(UniformIDs._ParticlePosition, particlePosition);
-				debugMaterialPB.SetBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
-
-				debugMaterialPB.SetTexture(UniformIDs._VolumeDensity, volumeDensity);
-				debugMaterialPB.SetTexture(UniformIDs._VolumeVelocityX, volumeVelocityX);
-				debugMaterialPB.SetTexture(UniformIDs._VolumeVelocityY, volumeVelocityY);
-				debugMaterialPB.SetTexture(UniformIDs._VolumeVelocityZ, volumeVelocityZ);
-				debugMaterialPB.SetTexture(UniformIDs._VolumeVelocity, volumeVelocity);
-				debugMaterialPB.SetTexture(UniformIDs._VolumeGradient, volumeGradient);
+				CoreUtils.SetRenderTarget(cmd, colorRT, depthStencilRT);
 
 				if (debug.drawStrands)
 				{
@@ -947,7 +948,6 @@ namespace Unity.DemoTeam.Hair
 				{
 					CoreUtils.SetRenderTarget(cmd, motionVectorRT, depthStencilRT);
 					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 4, MeshTopology.LineStrip, computeParams.strandParticleCount, computeParams.strandCount, debugMaterialPB);
-					CoreUtils.SetRenderTarget(cmd, colorRT, depthStencilRT);
 				}
 			}
 		}
@@ -964,7 +964,38 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void SetKernelBufferParams(CommandBuffer cmd, ComputeShader cs, int kernel)
+		void SetRenderMaterialParams(ref MaterialPropertyBlock mpb)
+		{
+			if (mpb == null)
+				mpb = new MaterialPropertyBlock();
+
+			mpb.SetInt(UniformIDs._StrandCount, computeParams.strandCount);
+			mpb.SetInt(UniformIDs._StrandParticleCount, computeParams.strandParticleCount);
+
+			Vector3 volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
+			Vector3 volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
+
+			mpb.SetVector(UniformIDs._VolumeCells, VOLUME_CELLS * Vector3.one);
+			mpb.SetVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
+			mpb.SetVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
+
+			mpb.SetBuffer(UniformIDs._ParticlePosition, particlePosition);
+			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
+
+			mpb.SetBuffer(UniformIDs._ParticleVelocity, particleVelocity);
+			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, particleVelocityPrev);
+
+			mpb.SetTexture(UniformIDs._VolumeDensity, volumeDensity);
+			mpb.SetTexture(UniformIDs._VolumeVelocityX, volumeVelocityX);
+			mpb.SetTexture(UniformIDs._VolumeVelocityY, volumeVelocityY);
+			mpb.SetTexture(UniformIDs._VolumeVelocityZ, volumeVelocityZ);
+			mpb.SetTexture(UniformIDs._VolumeVelocity, volumeVelocity);
+			mpb.SetTexture(UniformIDs._VolumeGradient, volumeGradient);
+
+			mpb.SetFloat("_VolumeSplatCompute", volumeSplatCompute ? 1.0f : 0.0f);
+		}
+
+		void SetComputeKernelParams(CommandBuffer cmd, ComputeShader cs, int kernel)
 		{
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, rootPosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootTangent, rootTangent);

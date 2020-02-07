@@ -56,6 +56,15 @@ Texture3D<float3> _VolumeVelocity;
 Texture3D<float3> _VolumeGradient;
 SamplerState sampler_VolumeGradient;
 
+float3 NormalizeElseZero(float3 n)
+{
+	float d = dot(n, n);
+	if (d > 0.0)
+		return n * rsqrt(d);
+	else
+		return 0;
+}
+
 float3 ParticleVolumePosition(uint i)
 {
 	float3 worldPos = _ParticlePosition[i].xyz;
@@ -92,13 +101,7 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 	return (volumeVelocity - velocity) * friction;
 #else
 	uint3 volumeIdx = ParticleVolumeIndex(i);
-	int volumeDensity = _VolumeDensity[volumeIdx];
-
-	float3 volumeVelocity = float3(
-		_VolumeVelocityX[volumeIdx],
-		_VolumeVelocityY[volumeIdx],
-		_VolumeVelocityZ[volumeIdx]) / (float)(1 + volumeDensity);
-		
+	float3 volumeVelocity = _VolumeVelocity[volumeIdx];
 	return (volumeVelocity - velocity) * friction;
 #endif
 }

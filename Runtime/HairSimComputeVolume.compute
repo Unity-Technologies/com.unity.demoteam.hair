@@ -51,8 +51,8 @@ RWTexture3D<float3> _VolumeGradient;
 float3 ParticleVolumePosition(uint i)
 {
 	float3 worldPos = _ParticlePosition[i].xyz;
-	float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
-	float3 localPos = (worldPosClamped - _VolumeWorldMin) * ((_VolumeCells - 1) / (_VolumeWorldMax - _VolumeWorldMin));
+	float3 localUVW = (worldPos - _VolumeWorldMin) / (_VolumeWorldMax - _VolumeWorldMin);
+	float3 localPos = (_VolumeCells - 1) * saturate(localUVW);
 	return localPos;
 }
 
@@ -102,12 +102,16 @@ void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> vo
 	uint3 cellIdx0 = volumePosFloor;
 	float3 cellPos = volumePos - volumePosFloor;
 
-	float3 w0 = 1.0 - cellPos;
-	float3 w1 = cellPos;
+	float3 w0 = 1;// 1.0 - cellPos;
+	float3 w1 = 1;//cellPos;
 
 	InterlockedAddTrilinear(volume, cellIdx0, DENSITY_SCALE * value, w0, w1);
+	//InterlockedAddTrilinear(volume, 0, DENSITY_SCALE * value, w0, w1);
 #else
-	InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE);
+	//InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE);
+	//uint3 volumeIdx = uint3(1, 1, 1);
+	uint3 volumeIdx = ParticleVolumeIndex(i);
+	InterlockedAdd(volume[volumeIdx], DENSITY_SCALE);
 #endif
 }
 
