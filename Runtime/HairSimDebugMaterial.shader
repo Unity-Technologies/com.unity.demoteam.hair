@@ -29,6 +29,7 @@
 	Texture3D<int> _VolumeVelocityZ;
 	Texture3D<float4> _VolumeVelocity;
 	Texture3D<float3> _VolumeGradient;
+	SamplerState sampler_VolumeVelocity;
 	SamplerState sampler_VolumeGradient;
 
 	float4x4 _ViewProjMatrix;
@@ -86,25 +87,6 @@
 		// source: https://www.shadertoy.com/view/4ttfRn
 		float3 c = 2.0 * t - float3(0.0, 1.0, 2.0);
 		return 1.0 - c * c;
-	}
-
-	float3 ColorizeDensity(float d)
-	{
-		return saturate(d.xxx);
-	}
-
-	float3 ColorizeGradient(float3 n)
-	{
-		float d = dot(n, n);
-		if (d > 1e-4)
-			return 0.5 + 0.5 * (n * rsqrt(d));
-		else
-			return 0.0;
-	}
-
-	float3 ColorizeVelocity(float3 v)
-	{
-		return abs(v);
 	}
 
 	ENDCG
@@ -217,6 +199,25 @@
 				return output;
 			}
 
+			float3 ColorizeDensity(float d)
+			{
+				return saturate(d.xxx);
+			}
+
+			float3 ColorizeGradient(float3 n)
+			{
+				float d = dot(n, n);
+				if (d > 1e-4)
+					return 0.5 + 0.5 * (n * rsqrt(d));
+				else
+					return 0.0;
+			}
+
+			float3 ColorizeVelocity(float3 v)
+			{
+				return abs(v);
+			}
+
 			float4 DebugFrag_Slice(DebugVaryings input) : SV_Target
 			{
 				float3 uvw = input.color.xyz;
@@ -224,29 +225,29 @@
 				float3 localPosQuantized = round(localPos);
 
 				uint3 volumeIdx = localPosQuantized;
-				int volumeDensity = _VolumeDensity[volumeIdx];
+				float volumeDensity = _VolumeDensity[volumeIdx] / DENSITY_SCALE;
+				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, uvw, 0);
 				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, uvw, 0);
-				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeGradient, uvw, 0);
 				//float3 volumeVelocity = float3(
 				//	_VolumeVelocityX[volumeIdx],
 				//	_VolumeVelocityY[volumeIdx],
 				//	_VolumeVelocityZ[volumeIdx]) / (float)(1 + volumeDensity);
 
-				float2 gridDist = abs(localPos - localPosQuantized);
-				float2 gridWidth = fwidth(localPos);
-				if (any(gridDist < gridWidth))
+				if (true)//_VolumeSliceGrid)
 				{
-					uint i = volumeIdx.z % 3;
-					return 0.05 * float4(i == 0, i == 1, i == 2, 1);
+					float2 gridDist = abs(localPos - localPosQuantized);
+					float2 gridWidth = fwidth(localPos);
+					if (any(gridDist < gridWidth))
+					{
+						uint i = volumeIdx.z % 3;
+						return 0.05 * float4(i == 0, i == 1, i == 2, 1);
+					}
 				}
 
 				float x = uvw.x + _DebugSliceDivider;
 				if (x < 1.0)
 				{
-					if (_VolumeSplatCompute)
-						return float4(ColorizeDensity(volumeDensity / DENSITY_SCALE), 1.0);
-					else
-						return float4(ColorizeDensity(_VolumeVelocity[volumeIdx].w), 1.0);
+					return float4(ColorizeDensity(volumeDensity), 1.0);
 				}
 				else if (x < 2.0)
 				{
@@ -254,10 +255,7 @@
 				}
 				else
 				{
-					if (_VolumeSplatCompute)
-						return float4(ColorizeVelocity(volumeVelocity.xyz), 1.0);
-					else
-						return float4(ColorizeVelocity(volumeVelocity.xyz / volumeVelocity.w), 1.0);
+					return float4(ColorizeVelocity(volumeVelocity.xyz), 1.0);
 				}
 			}
 

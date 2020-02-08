@@ -4,6 +4,7 @@
 #pragma kernel KVolumeVelocityY
 #pragma kernel KVolumeVelocityZ
 #pragma kernel KVolumeVelocity
+#pragma kernel KVolumeVelocityDensity
 #pragma kernel KVolumeGradient
 
 //#include "HairSimComputeConfig.hlsl"
@@ -45,7 +46,7 @@ RWTexture3D<int> _VolumeDensity;
 RWTexture3D<int> _VolumeVelocityX;// this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 RWTexture3D<int> _VolumeVelocityY;
 RWTexture3D<int> _VolumeVelocityZ;
-RWTexture3D<float3> _VolumeVelocity;
+RWTexture3D<float4> _VolumeVelocity;
 RWTexture3D<float3> _VolumeGradient;
 
 float3 ParticleVolumePosition(uint i)
@@ -178,10 +179,26 @@ void KVolumeVelocity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	_VolumeVelocity[worldIdx] = float3(
+	_VolumeVelocity[worldIdx] = float4(
 		_VolumeVelocityX[worldIdx],
 		_VolumeVelocityY[worldIdx],
-		_VolumeVelocityZ[worldIdx]) / (float)(1 + _VolumeDensity[worldIdx]);
+		_VolumeVelocityZ[worldIdx], 0) / (float)max(1, _VolumeDensity[worldIdx]);
+}
+
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
+void KVolumeVelocityDensity(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	float4 volumeSplat = _VolumeVelocity[worldIdx];
+	_VolumeDensity[worldIdx] = volumeSplat.w * DENSITY_SCALE;
+	_VolumeVelocity[worldIdx] = volumeSplat / max(1e-4, volumeSplat.w);
 }
 
 groupshared int gs_density[VOLUME_NUM_X * VOLUME_NUM_Y * VOLUME_NUM_Z];

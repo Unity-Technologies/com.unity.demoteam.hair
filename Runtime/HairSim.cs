@@ -249,6 +249,7 @@ namespace Unity.DemoTeam.Hair
 		private int kernelVolumeVelocityY;
 		private int kernelVolumeVelocityZ;
 		private int kernelVolumeVelocity;
+		private int kernelVolumeVelocityDensity;
 		private int kernelVolumeGradient;
 
 		private ComputeBuffer rootPosition;
@@ -569,7 +570,7 @@ namespace Unity.DemoTeam.Hair
 
 		[Range(-1.0f, 1.0f)] public float offsetX;//TODO remove
 		[Range(-1.0f, 1.0f)] public float offsetY;//TODO remove
-		public bool volumeSplatCompute;
+		public bool volumeSplatCompute = true;
 
 		private Vector3 GetVolumeCenter()
 		{
@@ -655,6 +656,7 @@ namespace Unity.DemoTeam.Hair
 				kernelVolumeVelocityY = computeVolume.FindKernel("KVolumeVelocityY");
 				kernelVolumeVelocityZ = computeVolume.FindKernel("KVolumeVelocityZ");
 				kernelVolumeVelocity = computeVolume.FindKernel("KVolumeVelocity");
+				kernelVolumeVelocityDensity = computeVolume.FindKernel("KVolumeVelocityDensity");
 				kernelVolumeGradient = computeVolume.FindKernel("KVolumeGradient");
 
 				computeParams = conf;
@@ -833,55 +835,61 @@ namespace Unity.DemoTeam.Hair
 
 				if (volumeSplatCompute)
 				{
-					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeRasterizeCompute (GPU)"))
+					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeDensity (GPU)"))
 					{
-						using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeDensity (GPU)"))
-						{
-							SetComputeKernelParams(cmd, computeVolume, kernelVolumeDensity);
-							cmd.DispatchCompute(computeVolume, kernelVolumeDensity,
-								particleThreadGroupsX,
-								particleThreadGroupsY,
-								particleThreadGroupsZ);
-						}
+						SetComputeKernelParams(cmd, computeVolume, kernelVolumeDensity);
+						cmd.DispatchCompute(computeVolume, kernelVolumeDensity,
+							particleThreadGroupsX,
+							particleThreadGroupsY,
+							particleThreadGroupsZ);
+					}
 
-						using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocityXYZ (GPU)"))
-						{
-							SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityX);
-							cmd.DispatchCompute(computeVolume, kernelVolumeVelocityX,
-								particleThreadGroupsX,
-								particleThreadGroupsY,
-								particleThreadGroupsZ);
+					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocityXYZ (GPU)"))
+					{
+						SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityX);
+						cmd.DispatchCompute(computeVolume, kernelVolumeVelocityX,
+							particleThreadGroupsX,
+							particleThreadGroupsY,
+							particleThreadGroupsZ);
 
-							SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityY);
-							cmd.DispatchCompute(computeVolume, kernelVolumeVelocityY,
-								particleThreadGroupsX,
-								particleThreadGroupsY,
-								particleThreadGroupsZ);
+						SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityY);
+						cmd.DispatchCompute(computeVolume, kernelVolumeVelocityY,
+							particleThreadGroupsX,
+							particleThreadGroupsY,
+							particleThreadGroupsZ);
 
-							SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityZ);
-							cmd.DispatchCompute(computeVolume, kernelVolumeVelocityZ,
-								particleThreadGroupsX,
-								particleThreadGroupsY,
-								particleThreadGroupsZ);
-						}
+						SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityZ);
+						cmd.DispatchCompute(computeVolume, kernelVolumeVelocityZ,
+							particleThreadGroupsX,
+							particleThreadGroupsY,
+							particleThreadGroupsZ);
+					}
 
-						using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocity (GPU)"))
-						{
-							SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocity);
-							cmd.DispatchCompute(computeVolume, kernelVolumeVelocity,
-								volumeThreadGroupsX,
-								volumeThreadGroupsY,
-								volumeThreadGroupsZ);
-						}
+					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocity (GPU)"))
+					{
+						SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocity);
+						cmd.DispatchCompute(computeVolume, kernelVolumeVelocity,
+							volumeThreadGroupsX,
+							volumeThreadGroupsY,
+							volumeThreadGroupsZ);
 					}
 				}
 				else
 				{
-					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeRasterize (GPU)"))
+					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeSplatParticles (GPU)"))
 					{
 						SetRenderMaterialParams(ref computeVolumeRasterPB);
 						CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color);
 						cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, computeParams.strandCount * computeParams.strandParticleCount, 1, computeVolumeRasterPB);
+					}
+
+					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocityDensity (GPU)"))
+					{
+						SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocityDensity);
+						cmd.DispatchCompute(computeVolume, kernelVolumeVelocityDensity,
+							volumeThreadGroupsX,
+							volumeThreadGroupsX,
+							volumeThreadGroupsX);
 					}
 				}
 
