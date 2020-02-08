@@ -40,7 +40,6 @@
 	{
 		float4 positionCS : SV_POSITION;
 		float4 color : TEXCOORD0;
-		float4 extra : TEXCOORD1;
 	};
 
 	float4 DebugFrag(DebugVaryings input) : SV_Target
@@ -141,7 +140,6 @@
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
 				output.color = float4(ColorizeCycle(instanceID, _StrandCount), 1.0);//_DebugColor;
-				output.extra = 0;
 				return output;
 			}
 
@@ -169,7 +167,6 @@
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
 				output.color = float4(ColorizeRamp(volumeDensity, 32 * DENSITY_SCALE), 1.0);
-				output.extra = 0;
 				return output;
 			}
 
@@ -196,7 +193,6 @@
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
 				output.color = float4(ColorizeRamp(1 - vertexID, 2), 1.0);
-				output.extra = 0;
 				return output;
 			}
 
@@ -213,21 +209,11 @@
 			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
 			{
 				float3 uvw = float3(((vertexID >> 1) ^ vertexID) & 1, vertexID >> 1, _DebugSliceOffset);
-				//float3 uvw = 0;
-				//switch (vertexID)
-				//{
-				//case 0: uvw = float3(0, 0, _DebugSliceOffset); break;
-				//case 1: uvw = float3(1, 0, _DebugSliceOffset); break;
-				//case 2: uvw = float3(1, 1, _DebugSliceOffset); break;
-				//case 3: uvw = float3(0, 1, _DebugSliceOffset); break;
-				//}
-
 				float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvw);
 
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
 				output.color = float4(uvw, 1);
-				output.extra = 0;
 				return output;
 			}
 
@@ -251,7 +237,7 @@
 				if (any(gridDist < gridWidth))
 				{
 					uint i = volumeIdx.z % 3;
-					return 0.2 * float4(i == 0, i == 1, i == 2, 1);
+					return 0.05 * float4(i == 0, i == 1, i == 2, 1);
 				}
 
 				float x = uvw.x + _DebugSliceDivider;
@@ -263,13 +249,15 @@
 						return float4(ColorizeDensity(_VolumeVelocity[volumeIdx].w), 1.0);
 				}
 				else if (x < 2.0)
+				{
 					return float4(ColorizeGradient(volumeGradient), 1.0);
+				}
 				else
 				{
 					if (_VolumeSplatCompute)
 						return float4(ColorizeVelocity(volumeVelocity.xyz), 1.0);
 					else
-						return float4(_VolumeVelocity[volumeIdx].xyz, 1.0);
+						return float4(ColorizeVelocity(volumeVelocity.xyz / volumeVelocity.w), 1.0);
 				}
 			}
 
@@ -284,7 +272,7 @@
 			CGPROGRAM
 
 			#pragma vertex DebugVert
-			#pragma fragment DebugFrag_Motion
+			#pragma fragment DebugFrag
 
 			DebugVaryings DebugVert(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 			{
@@ -303,18 +291,13 @@
 				float4 clipPos1 = mul(_NonJitteredViewProjMatrix, worldPos1);
 				float4 clipPos0 = mul(_PrevViewProjMatrix, worldPos0);
 
+				float2 ndc1 = clipPos1.xy / clipPos1.w;
+				float2 ndc0 = clipPos0.xy / clipPos0.w;
+
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, worldPos1);
-				output.color = clipPos1;
-				output.extra = clipPos0;
+				output.color = float4(_CameraMotionVectorsScale * 0.5 * (ndc1 - ndc0), 0, 0);
 				return output;
-			}
-
-			float4 DebugFrag_Motion(DebugVaryings input) : SV_Target
-			{
-				float2 ndc1 = input.color.xy / input.color.w;
-				float2 ndc0 = input.extra.xy / input.extra.w;
-				return float4(_CameraMotionVectorsScale * 0.5 * (ndc1 - ndc0), 0, 0);
 			}
 
 			ENDCG

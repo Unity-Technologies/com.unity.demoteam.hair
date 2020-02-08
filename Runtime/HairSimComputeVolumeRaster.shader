@@ -27,8 +27,8 @@
 	{
 		float4 volumePos : SV_POSITION;
 		uint volumeSlice : SV_RenderTargetArrayIndex;
-		float4 cellValue : TEXCOORD0;// xyz = velocity, w = density
-		float2 cellOffset : TEXCOORD1;
+		float2 valuePos : TEXCOORD0;
+		float4 value : TEXCOORD1;// xyz = velocity, w = density
 	};
 
 	float3 ParticleVolumePosition(uint i)
@@ -39,78 +39,78 @@
 		return localPos;
 	}
 
-	void MakeVertex(inout TriangleStream<SliceVaryings> outStream, float2 uv, float4 value, float2 offset, uint slice)
+	void AddVertex(inout TriangleStream<SliceVaryings> outStream, float2 pos, float4 value, float2 valuePos, uint slice)
 	{
 		SliceVaryings output;
-		output.volumePos = float4(2.0 * float2(uv.x, 1.0 - uv.y) - 1.0, 0.0, 1.0);
+		output.volumePos = float4(pos, 0.0, 1.0);
 		output.volumeSlice = slice;
-		output.cellValue = value;
-		output.cellOffset = offset;
+		output.valuePos = valuePos;
+		output.value = value;
 		outStream.Append(output);
 	}
 
-	Varyings Vert(uint vertexID : SV_VertexID)
+	uint Vert(uint vertexID : SV_VertexID) : TEXCOORD0
 	{
-		Varyings output;
-		output.i = vertexID + 128;
-		return output;
+		return vertexID;
 	}
 
 	[maxvertexcount(8)]
-	void Geom(point Varyings input[1], inout TriangleStream<SliceVaryings> outStream)
+	void Geom(point uint input[1] : TEXCOORD0, inout TriangleStream<SliceVaryings> outStream)
 	{
-		const float2 volumeCellSize = 1.0 / (_VolumeCells.xy - 1);
-		const float3 volumePos = ParticleVolumePosition(input[0].i);
+		const float3 volumePos = ParticleVolumePosition(input[0]);
 		const float3 volumePosFloor = floor(volumePos);
 
 		/*
 
-		+-------------------+
-		|                .´
-		|    +---------+
-		|    |         |
-		|    |    p    |
-		|    |         |
-		|    +---------+
-		| .´
-		+
+		1-------------------2
+		|                .´ |
+		|    G---------G    |
+		|    |  x      |    |
+		|    |    C    |    |
+		|    |         |    |
+		|    G---------G    |
+		| .´                |
+		3-------------------4
+
+		# = triangle vertices
+		G = grid vertices
+		C = cell center
+		x = particle
 
 		*/
 
-		const float2 pos0 = (volumePosFloor.xy - 0.5);
-		const float2 pos1 = (volumePosFloor.xy + 1.5);
+		const float2 cellSize = 1.0 / (_VolumeCells.xy - 1);
+		const float2 pos0 = float2(cellSize.xy * (volumePosFloor.xy - 0.5));
+		const float3 posH = float3(cellSize.xy * 2.0, 0.0);
 
-		//const float2 volumePosDelta = volumePos - volumePosFloor;
-
-		const float2 p0 = pos0 - 0.375;
-		const float2 p1 = pos1 - 0.375;
+		const float2 ndc0 = 2.0 * float2(pos0.x, 1.0 - pos0.y) - 1.0;
+		const float3 ndcH = 2.0 * float3(posH.x, -posH.y, 0.0);
 
 		const uint slice0 = volumePosFloor.z;
 		const uint slice1 = slice0 + 1;
 
-		const float2 uv0 = pos0 * volumeCellSize.xy;
-		const float2 uv1 = pos1 * volumeCellSize.xy;
-		const float3 uvS = float3(uv1 - uv0, 0.0);
+		const float4 value = float4(_ParticleVelocity[input[0]].xyz, 1.0);
 
-		const float4 value = float4(_ParticleVelocity[input[0].i].xyz, 1.0);
+		const float w1 = volumePos.z - volumePosFloor.z;
+		const float w0 = 1.0 - w1;
 
-		MakeVertex(outStream, uv0 + uvS.zz, 1.0, float2(p0.x, p0.y) - volumePos.xy, slice0);
-		MakeVertex(outStream, uv0 + uvS.xz, 1.0, float2(p1.x, p0.y) - volumePos.xy, slice0);
-		MakeVertex(outStream, uv0 + uvS.zy, 1.0, float2(p0.x, p1.y) - volumePos.xy, slice0);
-		MakeVertex(outStream, uv0 + uvS.xy, 1.0, float2(p1.x, p1.y) - volumePos.xy, slice0);
+		AddVertex(outStream, ndc0 + ndcH.zz, value * w0, volumePos.xy, slice0);
+		AddVertex(outStream, ndc0 + ndcH.xz, value * w0, volumePos.xy, slice0);
+		AddVertex(outStream, ndc0 + ndcH.zy, value * w0, volumePos.xy, slice0);
+		AddVertex(outStream, ndc0 + ndcH.xy, value * w0, volumePos.xy, slice0);
 		outStream.RestartStrip();
 
-		//MakeVertex(outStream, uv0 + uvS.zz, value, float3(w0.x, w0.y, w0.z), slice1);
-		//MakeVertex(outStream, uv0 + uvS.xz, value, float3(w1.x, w0.y, w0.z), slice1);
-		//MakeVertex(outStream, uv0 + uvS.zy, value, float3(w0.x, w1.y, w0.z), slice1);
-		//MakeVertex(outStream, uv0 + uvS.xy, value, float3(w1.x, w1.y, w0.z), slice1);
-		//outStream.RestartStrip();
+		AddVertex(outStream, ndc0 + ndcH.zz, value * w1, volumePos.xy, slice1);
+		AddVertex(outStream, ndc0 + ndcH.xz, value * w1, volumePos.xy, slice1);
+		AddVertex(outStream, ndc0 + ndcH.zy, value * w1, volumePos.xy, slice1);
+		AddVertex(outStream, ndc0 + ndcH.xy, value * w1, volumePos.xy, slice1);
+		outStream.RestartStrip();
 	}
 
 	float4 Frag(SliceVaryings input) : SV_Target
 	{
-		float2 d = 1.0 - saturate(abs(input.cellOffset));
-		return d.x * d.y;
+		float2 d = 1.0 - saturate(abs(input.valuePos - input.volumePos.xy + 0.5));
+		return d.x * d.y * input.value;
 	}
 
 	ENDCG

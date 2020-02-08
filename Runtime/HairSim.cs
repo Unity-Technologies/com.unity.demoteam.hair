@@ -567,8 +567,8 @@ namespace Unity.DemoTeam.Hair
 			return -1;
 		}
 
-		[Range(-1.2f, 1.2f)] public float offsetX;//TODO remove
-		[Range(-1.2f, 1.2f)] public float offsetY;//TODO remove
+		[Range(-1.0f, 1.0f)] public float offsetX;//TODO remove
+		[Range(-1.0f, 1.0f)] public float offsetY;//TODO remove
 		public bool volumeSplatCompute;
 
 		private Vector3 GetVolumeCenter()
@@ -578,7 +578,7 @@ namespace Unity.DemoTeam.Hair
 
 		private Vector3 GetVolumeExtent()
 		{
-			return (0.75f + 1.2f * computeParams.strandLength/* * Vector3.Magnitude(this.transform.localScale)*/) * Vector3.one;
+			return (0.75f + 1.2f * computeParams.strandLength) * Vector3.one;
 		}
 
 		public void Init(CommandBuffer cmd, in Configuration conf)
@@ -880,9 +880,8 @@ namespace Unity.DemoTeam.Hair
 					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeRasterize (GPU)"))
 					{
 						SetRenderMaterialParams(ref computeVolumeRasterPB);
-						Color colorZero = Color.black; colorZero.a = 0.0f;
-						CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color, clearColor: colorZero);
-						cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, 1/*computeParams.strandCount * computeParams.strandParticleCount*/, 1, computeVolumeRasterPB);
+						CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color);
+						cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, computeParams.strandCount * computeParams.strandParticleCount, 1, computeVolumeRasterPB);
 					}
 				}
 
@@ -914,7 +913,6 @@ namespace Unity.DemoTeam.Hair
 					return;
 
 				SetRenderMaterialParams(ref debugMaterialPB);
-
 				CoreUtils.SetRenderTarget(cmd, colorRT, depthStencilRT);
 
 				if (debug.drawStrands)

@@ -106,12 +106,8 @@ void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> vo
 	float3 w1 = cellPos;
 
 	InterlockedAddTrilinear(volume, cellIdx0, DENSITY_SCALE * value, w0, w1);
-	//InterlockedAddTrilinear(volume, 0, DENSITY_SCALE * value, w0, w1);
 #else
-	//InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE);
-	//uint3 volumeIdx = uint3(1, 1, 1);
-	uint3 volumeIdx = ParticleVolumeIndex(i);
-	InterlockedAdd(volume[volumeIdx], DENSITY_SCALE);
+	InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE);
 #endif
 }
 
@@ -126,8 +122,7 @@ void KVolumeDensity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	if (worldIdx.x == 128)
-		InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
+	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
