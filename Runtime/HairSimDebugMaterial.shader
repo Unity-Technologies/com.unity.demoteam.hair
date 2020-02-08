@@ -269,7 +269,7 @@
 					if (_VolumeSplatCompute)
 						return float4(ColorizeVelocity(volumeVelocity.xyz), 1.0);
 					else
-						return float4(ColorizeVelocity(volumeVelocity.xyz / volumeVelocity.w), 1.0);
+						return float4(_VolumeVelocity[volumeIdx].xyz, 1.0);
 				}
 			}
 

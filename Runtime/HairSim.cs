@@ -567,8 +567,8 @@ namespace Unity.DemoTeam.Hair
 			return -1;
 		}
 
-		[Range(0.0f, 0.2f)] public float offsetX;//TODO remove
-		[Range(0.0f, 0.2f)] public float offsetY;//TODO remove
+		[Range(-1.2f, 1.2f)] public float offsetX;//TODO remove
+		[Range(-1.2f, 1.2f)] public float offsetY;//TODO remove
 		public bool volumeSplatCompute;
 
 		private Vector3 GetVolumeCenter()
@@ -882,7 +882,7 @@ namespace Unity.DemoTeam.Hair
 						SetRenderMaterialParams(ref computeVolumeRasterPB);
 						Color colorZero = Color.black; colorZero.a = 0.0f;
 						CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color, clearColor: colorZero);
-						cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, computeParams.strandCount * computeParams.strandParticleCount, 1, computeVolumeRasterPB);
+						cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, 1/*computeParams.strandCount * computeParams.strandParticleCount*/, 1, computeVolumeRasterPB);
 					}
 				}
 
@@ -906,7 +906,11 @@ namespace Unity.DemoTeam.Hair
 				if (!computeParams.Equals(configuration))
 					return;
 
-				if (!debug.drawParticles && !debug.drawStrands && !debug.drawDensity && !debug.drawGradient && !debug.drawSlice)
+				if (!debug.drawParticles &&
+					!debug.drawStrands &&
+					!debug.drawDensity &&
+					!debug.drawGradient &&
+					!debug.drawSlice)
 					return;
 
 				SetRenderMaterialParams(ref debugMaterialPB);
