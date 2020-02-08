@@ -42,7 +42,7 @@ namespace Unity.DemoTeam.Hair
 		const int MAX_STRAND_PARTICLES = 128;
 		const int MAX_BOUNDARIES = 6;
 
-		const int VOLUME_CELLS = 31;
+		const int VOLUME_CELLS = 128;
 
 		public static class UniformIDs
 		{
