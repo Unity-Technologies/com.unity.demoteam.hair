@@ -18,17 +18,12 @@
 	float3 _VolumeWorldMin;
 	float3 _VolumeWorldMax;
 
-	struct Varyings
-	{
-		uint i : TEXCOORD0;
-	};
-
-	struct SliceVaryings
+	struct VaryingsGeom
 	{
 		float4 volumePos : SV_POSITION;
 		uint volumeSlice : SV_RenderTargetArrayIndex;
-		float2 valuePos : TEXCOORD0;
-		float4 value : TEXCOORD1;// xyz = velocity, w = density
+		nointerpolation float2 valuePos : TEXCOORD0;
+		nointerpolation float4 value : TEXCOORD1;// xyz = velocity, w = density
 	};
 
 	float3 ParticleVolumePosition(uint i)
@@ -39,9 +34,9 @@
 		return localPos;
 	}
 
-	void AddVertex(inout TriangleStream<SliceVaryings> outStream, float2 pos, float4 value, float2 valuePos, uint slice)
+	void AddVertex(inout TriangleStream<VaryingsGeom> outStream, float2 pos, float4 value, float2 valuePos, uint slice)
 	{
-		SliceVaryings output;
+		VaryingsGeom output;
 		output.volumePos = float4(pos, 0.0, 1.0);
 		output.volumeSlice = slice;
 		output.valuePos = valuePos;
@@ -55,9 +50,9 @@
 	}
 
 	[maxvertexcount(8)]
-	void Geom(point uint input[1] : TEXCOORD0, inout TriangleStream<SliceVaryings> outStream)
+	void Geom(point uint vertexID[1] : TEXCOORD0, inout TriangleStream<VaryingsGeom> outStream)
 	{
-		const float3 volumePos = ParticleVolumePosition(input[0]);
+		const float3 volumePos = ParticleVolumePosition(vertexID[0]);
 		const float3 volumePosFloor = floor(volumePos);
 
 		/*
@@ -89,7 +84,7 @@
 		const uint slice0 = volumePosFloor.z;
 		const uint slice1 = slice0 + 1;
 
-		const float4 value = float4(_ParticleVelocity[input[0]].xyz, 1.0);
+		const float4 value = float4(_ParticleVelocity[vertexID[0]].xyz, 1.0);
 
 		const float w1 = volumePos.z - volumePosFloor.z;
 		const float w0 = 1.0 - w1;
@@ -107,7 +102,7 @@
 		outStream.RestartStrip();
 	}
 
-	float4 Frag(SliceVaryings input) : SV_Target
+	float4 Frag(VaryingsGeom input) : SV_Target
 	{
 		float2 d = 1.0 - saturate(abs(input.valuePos - input.volumePos.xy + 0.5));
 		return d.x * d.y * input.value;
