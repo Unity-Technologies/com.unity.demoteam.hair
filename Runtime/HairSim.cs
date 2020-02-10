@@ -549,21 +549,22 @@ namespace Unity.DemoTeam.Hair
 					var xorshift = new Unity.Mathematics.Random(257);
 
 					float strandSpan = 1.0f;
-					float strandInterval = strandSpan / (conf.strandCount - 2);
+					float strandInterval = strandSpan / conf.strandCount;
+					float strandIntervalNoise = 0.5f;
 
 					unsafe
 					{
 						var strandRootsPtr = (StrandRoot*)strandRoots.GetUnsafePtr();
 						var strandRoot = new StrandRoot()
 						{
-							localPos = ( + 0.5f * strandInterval) * Vector3.right,
 							localTan = Vector3.down,
 						};
 						for (int j = 0; j != conf.strandCount; j++)
 						{
-							var localPos = (0.5f + j + xorshift.NextFloat(-0.5f, 0.5f)) * strandInterval - 0.5f * strandSpan;
-							strandRootsPtr[j] = strandRoot;
+							var localNoise = strandIntervalNoise * xorshift.NextFloat(-1.0f, 1.0f);
+							var localPos = -0.5f * strandSpan + (j + 0.5f + 0.5f * localNoise) * strandInterval;
 							strandRoot.localPos = new Vector3(localPos, 0.0f, 0.0f);
+							strandRootsPtr[j] = strandRoot;
 						}
 					}
 				}
