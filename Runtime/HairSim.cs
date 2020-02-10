@@ -103,9 +103,9 @@ namespace Unity.DemoTeam.Hair
 
 			// debug params
 			public static int _DebugColor = Shader.PropertyToID("_DebugColor");
+			public static int _DebugSliceAxis = Shader.PropertyToID("_DebugSliceAxis");
 			public static int _DebugSliceOffset = Shader.PropertyToID("_DebugSliceOffset");
 			public static int _DebugSliceDivider = Shader.PropertyToID("_DebugSliceDivider");
-			public static int _DebugSliceTexture = Shader.PropertyToID("_DebugSliceTexture");
 		}
 
 		[Serializable]
@@ -116,6 +116,7 @@ namespace Unity.DemoTeam.Hair
 				Curtain,
 				Brush,
 				Cap,
+				StratifiedCurtain,
 			}
 
 			public Style style;
@@ -142,6 +143,36 @@ namespace Unity.DemoTeam.Hair
 						(strandParticleCount == other.strandParticleCount) &&
 						(strandLength == other.strandLength);
 			}
+		}
+
+		[Serializable, GenerateHLSL]
+		public struct VolumeConfiguration
+		{
+			public enum Method : uint
+			{
+				Compute,
+				RasterGS,
+				RasterVS,
+			}
+
+			public enum Filtering : uint
+			{
+				None,
+				Trilinear,
+			}
+
+			[Range(1, 128)]
+			public uint volumeCells;
+			public Method volumeMethod;
+			public Filtering volumeFiltering;
+
+			public static readonly VolumeConfiguration none = new VolumeConfiguration();
+			public static readonly VolumeConfiguration basic = new VolumeConfiguration()
+			{
+				volumeCells = 64,
+				volumeMethod = Method.Compute,
+				volumeFiltering = Filtering.Trilinear,
+			};
 		}
 
 		[Serializable]
@@ -202,9 +233,15 @@ namespace Unity.DemoTeam.Hair
 			public bool drawStrands;
 			public bool drawDensity;
 			public bool drawGradient;
-			public bool drawSlice;
+			public bool drawSliceX;
+			public bool drawSliceY;
+			public bool drawSliceZ;
 			[Range(0.0f, 1.0f)]
-			public float drawSliceOffset;
+			public float drawSliceOffsetX;
+			[Range(0.0f, 1.0f)]
+			public float drawSliceOffsetY;
+			[Range(0.0f, 1.0f)]
+			public float drawSliceOffsetZ;
 			[Range(0.0f, 2.0f)]
 			public float drawSliceDivider;
 
@@ -215,15 +252,21 @@ namespace Unity.DemoTeam.Hair
 				drawStrands = true,
 				drawDensity = false,
 				drawGradient = false,
-				drawSlice = false,
-				drawSliceOffset = 0.5f,
+				drawSliceX = false,
+				drawSliceY = false,
+				drawSliceZ = false,
+				drawSliceOffsetX = 0.5f,
+				drawSliceOffsetY = 0.5f,
+				drawSliceOffsetZ = 0.5f,
 				drawSliceDivider = 0.5f,
 			};
 		}
 
 		public Configuration configuration = Configuration.basic;
+		public VolumeConfiguration volume;
 		public DebugConfiguration debug = DebugConfiguration.basic;
 		public SolverConfiguration solver = SolverConfiguration.basic;
+
 		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(MAX_BOUNDARIES);
 
 		[HideInInspector] public ComputeShader compute;
@@ -501,6 +544,29 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 				}
+				else if (conf.style == Configuration.Style.StratifiedCurtain)
+				{
+					var xorshift = new Unity.Mathematics.Random(257);
+
+					float strandSpan = 1.0f;
+					float strandInterval = strandSpan / (conf.strandCount - 2);
+
+					unsafe
+					{
+						var strandRootsPtr = (StrandRoot*)strandRoots.GetUnsafePtr();
+						var strandRoot = new StrandRoot()
+						{
+							localPos = ( + 0.5f * strandInterval) * Vector3.right,
+							localTan = Vector3.down,
+						};
+						for (int j = 0; j != conf.strandCount; j++)
+						{
+							var localPos = (0.5f + j + xorshift.NextFloat(-0.5f, 0.5f)) * strandInterval - 0.5f * strandSpan;
+							strandRootsPtr[j] = strandRoot;
+							strandRoot.localPos = new Vector3(localPos, 0.0f, 0.0f);
+						}
+					}
+				}
 				else if (conf.style == Configuration.Style.Brush)
 				{
 					var localExt = 0.5f * Vector3.one;
@@ -571,6 +637,7 @@ namespace Unity.DemoTeam.Hair
 		[Range(-1.0f, 1.0f)] public float offsetX;//TODO remove
 		[Range(-1.0f, 1.0f)] public float offsetY;//TODO remove
 		public bool volumeSplatCompute = true;
+		public bool volumeSplatRasterGeom = true;
 
 		private Vector3 GetVolumeCenter()
 		{
@@ -880,7 +947,11 @@ namespace Unity.DemoTeam.Hair
 					{
 						SetRenderMaterialParams(ref computeVolumeRasterPB);
 						CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color);
-						cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, computeParams.strandCount * computeParams.strandParticleCount, 1, computeVolumeRasterPB);
+
+						if (volumeSplatRasterGeom)
+							cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, computeParams.strandCount * computeParams.strandParticleCount, 1, computeVolumeRasterPB);
+						else
+							cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 1, MeshTopology.Quads, 8 * computeParams.strandCount * computeParams.strandParticleCount, 1, computeVolumeRasterPB);
 					}
 
 					using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocityDensity (GPU)"))
@@ -917,7 +988,9 @@ namespace Unity.DemoTeam.Hair
 					!debug.drawStrands &&
 					!debug.drawDensity &&
 					!debug.drawGradient &&
-					!debug.drawSlice)
+					!debug.drawSliceX &&
+					!debug.drawSliceY &&
+					!debug.drawSliceZ)
 					return;
 
 				SetRenderMaterialParams(ref debugMaterialPB);
@@ -947,11 +1020,28 @@ namespace Unity.DemoTeam.Hair
 					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 2, MeshTopology.Lines, 2, VOLUME_CELLS * VOLUME_CELLS * VOLUME_CELLS, debugMaterialPB);
 				}
 
-				if (debug.drawSlice)
+				if (debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)
 				{
-					debugMaterialPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffset);
 					debugMaterialPB.SetFloat(UniformIDs._DebugSliceDivider, debug.drawSliceDivider);
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1, debugMaterialPB);
+
+					if (debug.drawSliceX)
+					{
+						debugMaterialPB.SetInt(UniformIDs._DebugSliceAxis, 0);
+						debugMaterialPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetX);
+						cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1, debugMaterialPB);
+					}
+					if (debug.drawSliceY)
+					{
+						debugMaterialPB.SetInt(UniformIDs._DebugSliceAxis, 1);
+						debugMaterialPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetY);
+						cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1, debugMaterialPB);
+					}
+					if (debug.drawSliceZ)
+					{
+						debugMaterialPB.SetInt(UniformIDs._DebugSliceAxis, 2);
+						debugMaterialPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetZ);
+						cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1, debugMaterialPB);
+					}
 				}
 
 				if (debug.drawStrands)// motion vectors
@@ -1031,7 +1121,7 @@ namespace Unity.DemoTeam.Hair
 
 		private void OnDrawGizmos()
 		{
-			if (debug.drawDensity || debug.drawGradient || debug.drawSlice)
+			if (debug.drawDensity || debug.drawGradient || debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)
 			{
 				Gizmos.color = Color.Lerp(Color.black, Color.clear, 0.5f);
 				Gizmos.DrawWireCube(GetVolumeCenter(), 2.0f * GetVolumeExtent());

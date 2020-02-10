@@ -15,6 +15,7 @@
 	StructuredBuffer<float4> _ParticlePositionPrev;
 
 	float4 _DebugColor;
+	uint _DebugSliceAxis;
 	float _DebugSliceOffset;
 	float _DebugSliceDivider;
 
@@ -188,17 +189,6 @@
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag_Slice
 
-			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
-			{
-				float3 uvw = float3(((vertexID >> 1) ^ vertexID) & 1, vertexID >> 1, _DebugSliceOffset);
-				float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvw);
-
-				DebugVaryings output;
-				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
-				output.color = float4(uvw, 1);
-				return output;
-			}
-
 			float3 ColorizeDensity(float d)
 			{
 				return saturate(d.xxx);
@@ -218,6 +208,20 @@
 				return abs(v);
 			}
 
+			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
+			{
+				float3 uvw = float3(((vertexID >> 1) ^ vertexID) & 1, vertexID >> 1, _DebugSliceOffset);
+				float3 uvwWorld = (_DebugSliceAxis == 0) ? uvw.zxy : (_DebugSliceAxis == 1 ? uvw.xzy : uvw.xyz);
+				float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvwWorld);
+
+				uvw = uvwWorld;
+
+				DebugVaryings output;
+				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
+				output.color = float4(uvw, 1);
+				return output;
+			}
+
 			float4 DebugFrag_Slice(DebugVaryings input) : SV_Target
 			{
 				float3 uvw = input.color.xyz;
@@ -228,19 +232,15 @@
 				float volumeDensity = _VolumeDensity[volumeIdx] / DENSITY_SCALE;
 				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, uvw, 0);
 				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, uvw, 0);
-				//float3 volumeVelocity = float3(
-				//	_VolumeVelocityX[volumeIdx],
-				//	_VolumeVelocityY[volumeIdx],
-				//	_VolumeVelocityZ[volumeIdx]) / (float)(1 + volumeDensity);
 
 				if (true)//_VolumeSliceGrid)
 				{
-					float2 gridDist = abs(localPos - localPosQuantized);
-					float2 gridWidth = fwidth(localPos);
+					float3 gridDist = abs(localPos - localPosQuantized);
+					float3 gridWidth = fwidth(localPos);
 					if (any(gridDist < gridWidth))
 					{
-						uint i = volumeIdx.z % 3;
-						return 0.05 * float4(i == 0, i == 1, i == 2, 1);
+						uint i = volumeIdx[_DebugSliceAxis] % 3;
+						return 0.2 * float4(i == 0, i == 1, i == 2, 1);
 					}
 				}
 

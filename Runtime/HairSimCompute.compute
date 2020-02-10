@@ -54,6 +54,7 @@ Texture3D<int> _VolumeVelocityY;
 Texture3D<int> _VolumeVelocityZ;
 Texture3D<float3> _VolumeVelocity;
 Texture3D<float3> _VolumeGradient;
+SamplerState sampler_VolumeVelocity;
 SamplerState sampler_VolumeGradient;
 
 float3 NormalizeElseZero(float3 n)
@@ -97,7 +98,7 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
 #if 1
 	float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
-	float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeGradient, volumeUVW, 0);
+	float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, volumeUVW, 0);
 	return (volumeVelocity - velocity) * friction;
 #else
 	uint3 volumeIdx = ParticleVolumeIndex(i);
