@@ -113,7 +113,7 @@ void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> vo
 
 	InterlockedAddTrilinear(volume, cellIdx0, DENSITY_SCALE * value, w0, w1);
 #else
-	InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE);
+	InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE * value);
 #endif
 }
 
@@ -129,6 +129,12 @@ void KVolumeDensity(
 	// SV_GroupIndex        thread offset within execution group
 {
 	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
+#define MERGED
+#ifdef MERGED
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
+#endif
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
@@ -142,7 +148,9 @@ void KVolumeVelocityX(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+#ifndef MERGED
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
+#endif
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
@@ -156,7 +164,9 @@ void KVolumeVelocityY(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+#ifndef MERGED
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
+#endif
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
@@ -170,7 +180,9 @@ void KVolumeVelocityZ(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+#ifndef MERGED
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
+#endif
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -240,10 +252,10 @@ void KVolumeGradient(
 	const uint3 localLowerIdx = 0;
 	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
 
+	const float k = 1.0 / (2.0 * DENSITY_SCALE);
+
 	const bool lowerBoundary = any(localIdx == localLowerIdx);
 	const bool upperBoundary = any(localIdx == localUpperIdx);
-
-	const float k = 1.0 / (2.0 * DENSITY_SCALE);
 
 	if (lowerBoundary || upperBoundary)
 	{

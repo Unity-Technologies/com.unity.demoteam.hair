@@ -146,14 +146,13 @@ namespace Unity.DemoTeam.Hair
 			{
 				None,
 				Compute,
-				Compute16b,
+				ComputeSplit,
 				Rasterization,
 				RasterizationNoGS,
 			}
 
 			public enum SplatFilter : uint
 			{
-				Nearest,
 				Trilinear,
 			}
 
@@ -658,7 +657,7 @@ namespace Unity.DemoTeam.Hair
 							int strandParticleBegin = j;
 							int strandParticleStride = strands.strandCount;
 #else
-							int strandParticleBegin = j * conf.strandParticleCount;
+							int strandParticleBegin = j * strands.strandParticleCount;
 							int strandParticleStride = 1;
 #endif
 							int strandParticleEnd = strandParticleBegin + strandParticleStride * strands.strandParticleCount;
@@ -887,7 +886,7 @@ namespace Unity.DemoTeam.Hair
 						}
 						break;
 
-					case VolumeConfiguration.SplatMethod.Compute16b:
+					case VolumeConfiguration.SplatMethod.ComputeSplit:
 						{
 							//TODO
 						}
