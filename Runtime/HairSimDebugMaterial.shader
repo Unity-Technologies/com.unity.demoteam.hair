@@ -47,6 +47,13 @@
 		return input.color;
 	}
 
+	float3 ParticleVolumeUVW(uint i)
+	{
+		float3 worldPos = _ParticlePosition[i].xyz;
+		float3 localUVW = (worldPos - _VolumeWorldMin) / (_VolumeWorldMax - _VolumeWorldMin);
+		return saturate(localUVW);
+	}
+
 	uint3 StridedVolumeIndex(uint index)
 	{
 		uint3 cellCount = _VolumeCells;
@@ -116,11 +123,15 @@
 				const uint strandParticleStride = 1;
 #endif
 
-				float3 worldPos = _ParticlePosition[strandParticleBegin + strandParticleStride * vertexID].xyz;
+				uint i = strandParticleBegin + strandParticleStride * vertexID;
+				float3 worldPos = _ParticlePosition[i].xyz;
+
+				float volumeDensity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, ParticleVolumeUVW(i), 0).w;
+				float volumeOcclusion = 1.0;// saturate(1.0 - volumeDensity / 100.0);
 
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
-				output.color = float4(ColorizeCycle(instanceID, _StrandCount), 1.0);
+				output.color = lerp(volumeOcclusion, 1.0, 0.5) * float4(ColorizeCycle(instanceID, _StrandCount), 1.0);
 				return output;
 			}
 

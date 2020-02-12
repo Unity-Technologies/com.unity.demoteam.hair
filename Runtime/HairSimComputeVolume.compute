@@ -19,6 +19,8 @@
 #define VOLUME_NUM_Y 4
 #define VOLUME_NUM_Z 4
 
+float _DT;
+
 StructuredBuffer<float4> _ParticlePosition;
 StructuredBuffer<float4> _ParticleVelocity;
 
@@ -132,6 +134,10 @@ void KVolumeDensity(
 {
 	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
 #ifdef MERGED
+	//TODO remapping
+	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
+	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
+	
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
@@ -198,9 +204,11 @@ void KVolumeVelocity(
 	// SV_GroupIndex        thread offset within execution group
 {
 	_VolumeVelocity[worldIdx] = float4(
-		_VolumeVelocityX[worldIdx],
-		_VolumeVelocityY[worldIdx],
-		_VolumeVelocityZ[worldIdx], 0) / (float)max(1, _VolumeDensity[worldIdx]);
+		float3(
+			_VolumeVelocityX[worldIdx],
+			_VolumeVelocityY[worldIdx],
+			_VolumeVelocityZ[worldIdx]) / (float)max(1, _VolumeDensity[worldIdx]),
+		_VolumeDensity[worldIdx] / DENSITY_SCALE);
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -216,7 +224,7 @@ void KVolumeVelocityDensity(
 {
 	float4 volumeSplat = _VolumeVelocity[worldIdx];
 	_VolumeDensity[worldIdx] = volumeSplat.w * DENSITY_SCALE;
-	_VolumeVelocity[worldIdx] = volumeSplat / max(1e-4, volumeSplat.w);
+	_VolumeVelocity[worldIdx] = float4(volumeSplat.xyz / max(1e-4, volumeSplat.w), volumeSplat.w);
 }
 
 groupshared int gs_density[VOLUME_NUM_X * VOLUME_NUM_Y * VOLUME_NUM_Z];
