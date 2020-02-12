@@ -1017,9 +1017,8 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetVector(UniformIDs._VolumeWorldMax, GetVolumeCenter() + GetVolumeExtent());
 
 			mpb.SetBuffer(UniformIDs._ParticlePosition, particlePosition);
-			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
-
 			mpb.SetBuffer(UniformIDs._ParticleVelocity, particleVelocity);
+			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
 			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, particleVelocityPrev);
 
 			mpb.SetTexture(UniformIDs._VolumeDensity, volumeDensity);
