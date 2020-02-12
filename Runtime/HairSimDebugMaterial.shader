@@ -14,7 +14,6 @@
 	StructuredBuffer<float4> _ParticlePosition;
 	StructuredBuffer<float4> _ParticlePositionPrev;
 
-	float4 _DebugColor;
 	uint _DebugSliceAxis;
 	float _DebugSliceOffset;
 	float _DebugSliceDivider;
@@ -22,7 +21,6 @@
 	float3 _VolumeCells;
 	float3 _VolumeWorldMin;
 	float3 _VolumeWorldMax;
-	bool _VolumeSplatCompute;
 
 	Texture3D<int> _VolumeDensity;
 	Texture3D<int> _VolumeVelocityX;
@@ -122,7 +120,7 @@
 
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
-				output.color = float4(ColorizeCycle(instanceID, _StrandCount), 1.0);//_DebugColor;
+				output.color = float4(ColorizeCycle(instanceID, _StrandCount), 1.0);
 				return output;
 			}
 
@@ -184,6 +182,8 @@
 
 		Pass// 3 == SLICE
 		{
+			Blend SrcAlpha OneMinusSrcAlpha
+
 			CGPROGRAM
 
 			#pragma vertex DebugVert
@@ -233,30 +233,27 @@
 				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, uvw, 0);
 				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, uvw, 0);
 
-				if (true)//_VolumeSliceGrid)
+				const float opacity = 0.9;
+
+				if (true)
 				{
 					float3 gridDist = abs(localPos - localPosQuantized);
 					float3 gridWidth = fwidth(localPos);
-					if (any(gridDist < gridWidth))
+					if (any(gridDist < gridWidth * 0.5))
 					{
 						uint i = volumeIdx[_DebugSliceAxis] % 3;
-						return 0.2 * float4(i == 0, i == 1, i == 2, 1);
+						return float4(0.2 * float3(i == 0, i == 1, i == 2), opacity);
+						//return float4(0.2 * ColorizeRamp(volumeIdx[_DebugSliceAxis], _VolumeCells[_DebugSliceAxis]), opacity);
 					}
 				}
 
 				float x = uvw.x + _DebugSliceDivider;
 				if (x < 1.0)
-				{
-					return float4(ColorizeDensity(volumeDensity), 1.0);
-				}
+					return float4(ColorizeDensity(volumeDensity), opacity);
 				else if (x < 2.0)
-				{
-					return float4(ColorizeGradient(volumeGradient), 1.0);
-				}
+					return float4(ColorizeGradient(volumeGradient), opacity);
 				else
-				{
-					return float4(ColorizeVelocity(volumeVelocity.xyz), 1.0);
-				}
+					return float4(ColorizeVelocity(volumeVelocity.xyz), opacity);
 			}
 
 			ENDCG

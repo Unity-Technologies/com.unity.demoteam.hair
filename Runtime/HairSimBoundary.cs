@@ -13,13 +13,26 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		public Type type = Type.Sphere;
-
 		[VisibleIf("type", Type.Torus)]
 		public float outerRadius;
 
-		public struct BoundaryCapsule { public Vector3 positionA; public float radius; public Vector3 positionB; public float __pad; };
-		public struct BoundarySphere { public Vector3 position; public float radius; };
-		public struct BoundaryTorus { public Vector3 position; public float radiusA; public Vector3 axis; public float radiusB; }
+		public struct BoundaryCapsule { public Vector3 centerA; public float radius; public Vector3 centerB; public float __pad__; };
+		public struct BoundarySphere { public Vector3 center; public float radius; };
+		public struct BoundaryTorus { public Vector3 center; public float radiusA; public Vector3 axis; public float radiusB; }
+		public struct BoundaryPack
+		{
+			//	shape	|	capsule		sphere		torus
+			//	----------------------------------------------
+			//	float3	|	centerA		center		center
+			//	float	|	radius		radius		radiusA
+			//	float3	|	centerB		__pad__		axis
+			//	float	|	__pad__		__pad__		radiusB
+
+			public Vector3 pA;
+			public float tA;
+			public Vector3 pB;
+			public float tB;
+		}
 
 		private static Vector3 Abs(in Vector3 v)
 		{
@@ -52,8 +65,8 @@ namespace Unity.DemoTeam.Hair
 
 			return new BoundaryCapsule()
 			{
-				positionA = pos - dir * extent,
-				positionB = pos + dir * extent,
+				centerA = pos - dir * extent,
+				centerB = pos + dir * extent,
 				radius = radius,
 			};
 		}
@@ -62,7 +75,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			return new BoundarySphere()
 			{
-				position = this.transform.position,
+				center = this.transform.position,
 				radius = 0.5f * ComponentMax(Abs(this.transform.localScale)),
 			};
 		}
@@ -71,10 +84,54 @@ namespace Unity.DemoTeam.Hair
 		{
 			return new BoundaryTorus()
 			{
-				position = this.transform.position,
+				center = this.transform.position,
 				axis = this.transform.up,
-				//radiusA = this.radius,
-				//radiusB = this.innerRadius,
+				radiusA = 0.5f * ComponentMax(Abs(this.transform.localScale)),
+				radiusB = this.outerRadius,
+			};
+		}
+
+		public static BoundaryPack Pack(in BoundaryCapsule capsule)
+		{
+			return new BoundaryPack()
+			{
+				pA = capsule.centerA,
+				pB = capsule.centerB,
+				tA = capsule.radius,
+			};
+		}
+
+		public static BoundaryPack Pack(in BoundarySphere sphere)
+		{
+			return new BoundaryPack()
+			{
+				pA = sphere.center,
+				tA = sphere.radius,
+				pB = Vector3.positiveInfinity,
+				tB = 0.0f,
+			};
+		}
+
+		// TODO support this?
+		//public static BoundaryPack Pack(in BoundarySphere sphereA, in BoundarySphere sphereB)
+		//{
+		//	return new BoundaryPack()
+		//	{
+		//		pA = sphereA.center,
+		//		tA = sphereA.radius,
+		//		pB = sphereB.center,
+		//		tB = sphereB.radius,
+		//	};
+		//}
+
+		public static BoundaryPack Pack(in BoundaryTorus torus)
+		{
+			return new BoundaryPack()
+			{
+				pA = torus.center,
+				pB = torus.axis,
+				tA = torus.radiusA,
+				tB = torus.radiusB,
 			};
 		}
 	}

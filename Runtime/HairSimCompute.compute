@@ -1,6 +1,7 @@
 ﻿#pragma kernel KUpdatePosition							THREAD_GROUP_SIZE=64
 #pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64
 #pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64
+#pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
 #pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
 #pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
@@ -8,7 +9,7 @@
 
 //#include "HairSimComputeConfig.hlsl"
 #define LAYOUT_INTERLEAVED 1
-#define MAX_BOUNDARIES 6
+#define MAX_BOUNDARIES 8
 #define DENSITY_SCALE 8192.0
 
 float4x4 _LocalToWorld;
@@ -34,12 +35,12 @@ float _DampingFTL;
 StructuredBuffer<float4> _RootPosition;
 StructuredBuffer<float4> _RootTangent;
 
-RWStructuredBuffer<float4> _ParticlePosition;
-RWStructuredBuffer<float4> _ParticlePositionTemp;
-RWStructuredBuffer<float4> _ParticleVelocity;
-
 StructuredBuffer<float4> _ParticlePositionPrev;
 StructuredBuffer<float4> _ParticleVelocityPrev;
+
+RWStructuredBuffer<float4> _ParticlePosition;
+RWStructuredBuffer<float4> _ParticlePositionCorr;
+RWStructuredBuffer<float4> _ParticleVelocity;
 
 //--------
 // volume
@@ -110,71 +111,124 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 //------------
 // boundaries
 
+struct BoundaryCapsule { float3 centerA; float radius; float3 centerB; float __pad__; };
+struct BoundarySphere { float3 center; float radius; };
+struct BoundaryTorus { float3 center; float radiusA; float3 axis; float radiusB; };
+struct BoundaryPack
+{
+	//	shape	|	capsule		sphere		torus
+	//	----------------------------------------------
+	//	float3	|	centerA		center		center
+	//	float	|	radius		radius		radiusA
+	//	float3	|	centerB		__pad__		axis
+	//	float	|	__pad__		__pad__		radiusB
+
+	float3 pA;
+	float tA;
+	float3 pB;
+	float tB;
+};
+
+StructuredBuffer<BoundaryCapsule> _BoundaryCapsule;
+StructuredBuffer<BoundarySphere> _BoundarySphere;
+StructuredBuffer<BoundaryTorus> _BoundaryTorus; 
+StructuredBuffer<BoundaryPack> _BoundaryPack;
+
 uint _BoundaryCapsuleCount;
 uint _BoundarySphereCount;
 uint _BoundaryTorusCount;
 
-struct BoundaryCapsule { float3 positionA; float radius; float3 positionB; float __pad; };
-struct BoundarySphere { float3 position; float radius; };
-struct BoundaryTorus { float3 position; float radiusA; float3 axis; float radiusB; };
-
-StructuredBuffer<BoundaryCapsule> _BoundaryCapsule;
-StructuredBuffer<BoundarySphere> _BoundarySphere;
-StructuredBuffer<BoundaryTorus> _BoundaryTorus;
-
-//TODO
-//cbuffer BoundaryCBuf
-//{
-//	BoundaryCapsule _BoundaryCapsule[MAX_BOUNDARIES];
-//	BoundarySphere _BoundarySphere[MAX_BOUNDARIES];
-//	BoundaryTorus _BoundaryTorus[MAX_BOUNDARIES];
-//};
-
 float BoundaryDistance(in float3 p)
 {
-	float d = 1e+4;
+	float d = 1e+7;
 
-	// capsule
+#if 1
+	// capsules
 	{
-		for (uint k = 0; k != _BoundaryCapsuleCount; k++)
+		for (uint i = 0; i != _BoundaryCapsuleCount; i++)
 		{
-			BoundaryCapsule capsule = _BoundaryCapsule[k];
+			BoundaryCapsule capsule = _BoundaryCapsule[i];
 
-			float3 pa = p - capsule.positionA;
-			float3 ba = capsule.positionB - capsule.positionA;
+			float3 pa = p - capsule.centerA;
+			float3 ba = capsule.centerB - capsule.centerA;
 
 			float h = clamp(dot(pa, ba) / dot(ba, ba), 0, 1);
 			float r = capsule.radius;
-			
+
 			d = min(d, length(pa - ba * h) - r);
 		}
 	}
 
-	// sphere
+	// spheres
 	{
-		for (uint k = 0; k != _BoundarySphereCount; k++)
+		for (uint i = 0; i != _BoundarySphereCount; i++)
 		{
-			BoundarySphere sphere = _BoundarySphere[k];
+			BoundarySphere sphere = _BoundarySphere[i];
 
-			float3 a = _BoundarySphere[k].position;
-			float r = _BoundarySphere[k].radius;
+			float3 a = sphere.center;
+			float r = sphere.radius;
 
 			d = min(d, length(a - p) - r);
 		}
 	}
 
-	// torus
+	// tori
 	{
-		//TODO
+		for (uint i = 0; i != _BoundaryTorusCount; i++)
+		{
+			BoundaryTorus torus = _BoundaryTorus[i];
+			//TODO
+		}
 	}
-	
+#else
+	uint i = 0;
+	uint j = 0;
+
+	// capsules
+	{
+		for (j += _BoundaryCapsuleCount; i < j; i++)
+		{
+			BoundaryPack capsulePack = _BoundaryPack[i];
+
+			float3 pa = p - capsulePack.pA;
+			float3 ba = capsulePack.pB - capsulePack.pA;
+
+			float h = clamp(dot(pa, ba) / dot(ba, ba), 0, 1);
+			float r = capsulePack.tA;
+
+			d = min(d, length(pa - ba * h) - r);
+		}
+	}
+
+	// spheres
+	{
+		for (j += _BoundarySphereCount; i < j; i++)
+		{
+			BoundaryPack spherePack = _BoundaryPack[i];
+
+			float3 a = spherePack.pA;
+			float r = spherePack.tA;
+
+			d = min(d, length(a - p) - r);
+		}
+	}
+
+	// tori
+	{
+		for (j += _BoundaryTorusCount; i < j; i++)
+		{
+			BoundaryPack torusPack = _BoundaryPack[i];
+			//TODO
+		}
+	}
+#endif
+
 	return d;
 }
 
 float3 BoundaryNormal(in float3 p, in float d)
 {
-	const float eps = 1e-4;
-	const float2 h = float2(eps, 0.0);
+	const float2 h = float2(1e-4, 0.0);
 	return normalize(float3(
 		BoundaryDistance(p - h.xyy) - d,
 		BoundaryDistance(p - h.yxy) - d,
@@ -366,7 +420,7 @@ void KSolveConstraints_GaussSeidelReference(
 	{
 		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 		{
-			_ParticlePositionTemp[i] = 0;
+			_ParticlePositionCorr[i] = 0;
 		}
 	}
 
@@ -481,7 +535,7 @@ void KSolveConstraints_GaussSeidelReference(
 				ApplyFTLConstraint(p0, p1, d1);
 				
 				_ParticlePosition[i].xyz = p1;
-				_ParticlePositionTemp[i - strandParticleStride].xyz += d1;
+				_ParticlePositionCorr[i - strandParticleStride].xyz += d1;
 
 				p0 = p1;
 			}
@@ -492,7 +546,7 @@ void KSolveConstraints_GaussSeidelReference(
 	{
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
-			_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionTemp[i]) / _DT;
+			_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionCorr[i]) / _DT;
 		}
 	}
 }
@@ -522,7 +576,7 @@ void KSolveConstraints_GaussSeidel(
 	{
 		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 		{
-			_ParticlePositionTemp[i] = 0;
+			_ParticlePositionCorr[i] = 0;
 		}
 	}
 
@@ -593,7 +647,7 @@ void KSolveConstraints_GaussSeidel(
 			ApplyFTLConstraint(r0, p0, d0);
 
 			_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
-			_ParticlePositionTemp[i - strandParticleStride * 3].xyz += d0;
+			_ParticlePositionCorr[i - strandParticleStride * 3].xyz += d0;
 		}
 
 		float3 d1 = 0;
@@ -602,16 +656,16 @@ void KSolveConstraints_GaussSeidel(
 		ApplyFTLConstraint(p1, p2, d2);
 
 		_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
-		_ParticlePositionTemp[strandParticleEnd - strandParticleStride * 3].xyz += d1;
+		_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz += d1;
 		_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
-		_ParticlePositionTemp[strandParticleEnd - strandParticleStride * 2].xyz += d2;
+		_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz += d2;
 	}
 
 	// derive velocity from effective change in position
 	{
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
-			_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionTemp[i]) / _DT;
+			_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionCorr[i]) / _DT;
 		}
 	}
 }
@@ -677,7 +731,7 @@ void KSolveConstraints_Jacobi(
 				ApplyLRAConstraintDelta(threadIdx * _StrandParticleInterval, gs_x[0], gs_x[threadIdx], d); n++;
 			}//*/
 
-			/*
+			///*
 			{
 				float3 nop = 0;
 				float3 sum = 0;
