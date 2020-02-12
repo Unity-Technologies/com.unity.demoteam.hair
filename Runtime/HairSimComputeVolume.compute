@@ -117,6 +117,8 @@ void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> vo
 #endif
 }
 
+#define MERGED
+
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
 void KVolumeDensity(
 	uint3 groupIdx : SV_GroupID,
@@ -129,7 +131,6 @@ void KVolumeDensity(
 	// SV_GroupIndex        thread offset within execution group
 {
 	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
-#define MERGED
 #ifdef MERGED
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
