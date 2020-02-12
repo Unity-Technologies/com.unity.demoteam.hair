@@ -133,7 +133,7 @@ namespace Unity.DemoTeam.Hair
 			public static readonly StrandConfiguration basic = new StrandConfiguration()
 			{
 				style = Style.Curtain,
-				strandCount = 128,
+				strandCount = 1024,
 				strandParticleCount = 32,
 				strandLength = 0.5f,
 			};
@@ -602,7 +602,7 @@ namespace Unity.DemoTeam.Hair
 			return (0.75f + 1.2f * strands.strandLength) * Vector3.one;
 		}
 
-		private int GetVolumeTotalCells()
+		private int GetVolumeCellCount()
 		{
 			return volume.volumeResolution * volume.volumeResolution * volume.volumeResolution;
 		}
@@ -964,12 +964,12 @@ namespace Unity.DemoTeam.Hair
 
 				if (debug.drawDensity)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 1, MeshTopology.Points, 1, GetVolumeTotalCells(), debugMaterialPB);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 1, MeshTopology.Points, GetVolumeCellCount(), 1, debugMaterialPB);
 				}
 
 				if (debug.drawGradient)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 2, MeshTopology.Lines, 2, GetVolumeTotalCells(), debugMaterialPB);
+					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 2, MeshTopology.Lines, GetVolumeCellCount() * 2, 1, debugMaterialPB);
 				}
 
 				if (debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)

@@ -55,6 +55,11 @@ float3 ParticleVolumePosition(uint i)
 	float3 localUVW = (worldPos - _VolumeWorldMin) / (_VolumeWorldMax - _VolumeWorldMin);
 	float3 localPos = (_VolumeCells - 1) * saturate(localUVW);
 	return localPos;
+
+	//float3 worldPos = _ParticlePosition[i].xyz;
+	//float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
+	//float3 localPos = (worldPosClamped - _VolumeWorldMin) * ((_VolumeCells - 1) / (_VolumeWorldMax - _VolumeWorldMin));
+	//return localPos;
 }
 
 uint3 ParticleVolumeIndex(uint i)

@@ -47,12 +47,12 @@
 		return input.color;
 	}
 
-	uint3 InstanceVolumeIndex(uint instanceID)
+	uint3 StridedVolumeIndex(uint index)
 	{
 		uint3 cellCount = _VolumeCells;
-		uint volumeIdxX = instanceID % cellCount.x;
-		uint volumeIdxY = (instanceID / cellCount.x) % cellCount.y;
-		uint volumeIdxZ = (instanceID / (cellCount.x * cellCount.y));
+		uint volumeIdxX = index % cellCount.x;
+		uint volumeIdxY = (index / cellCount.x) % cellCount.y;
+		uint volumeIdxZ = (index / (cellCount.x * cellCount.y));
 		return uint3(volumeIdxX, volumeIdxY, volumeIdxZ);
 	}
 
@@ -134,15 +134,15 @@
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag
 
-			DebugVaryings DebugVert(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
 			{
-				uint3 volumeIdx = InstanceVolumeIndex(instanceID);
+				uint3 volumeIdx = StridedVolumeIndex(vertexID);
 				int volumeDensity = _VolumeDensity[volumeIdx];
 
 				float3 worldPos = VolumeIndexWorldPos(volumeIdx);
 				if (volumeDensity == 0)
 				{
-					worldPos += 1e7;// push it far away
+					worldPos += 1e7;// just push far away
 				}
 
 				DebugVaryings output;
@@ -161,12 +161,12 @@
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag
 
-			DebugVaryings DebugVert(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
 			{
-				uint3 volumeIdx = InstanceVolumeIndex(instanceID);
+				uint3 volumeIdx = StridedVolumeIndex(vertexID >> 1);
 
 				float3 worldPos = VolumeIndexWorldPos(volumeIdx);
-				if (vertexID == 1)
+				if (vertexID & 1)
 				{
 					worldPos += _VolumeGradient[volumeIdx] * 0.002;
 				}

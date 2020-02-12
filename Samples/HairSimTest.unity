@@ -976,7 +976,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1011175220
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -989,19 +989,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2b6d23d090c06245aca3124e153206f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  configuration:
+  strands:
     style: 1
-    strandCount: 384
-    strandParticleCount: 8
-    strandLength: 0.75
+    strandCount: 512
+    strandParticleCount: 7
+    strandLength: 0.5
+  volume:
+    volumeSplatMethod: 1
+    volumeSplatFilter: 1
+    volumeResolution: 64
+    volumeOffsetX: 0
+    volumeOffsetY: 0
   debug:
-    drawParticles: 1
+    drawParticles: 0
     drawStrands: 1
     drawDensity: 0
     drawGradient: 0
-    drawSlice: 0
-    drawSliceOffset: 0.5
-    drawSliceDivider: 0.5
+    drawSliceX: 0
+    drawSliceY: 0
+    drawSliceZ: 0
+    drawSliceOffsetX: 0.526
+    drawSliceOffsetY: 0.4
+    drawSliceOffsetZ: 0.571
+    drawSliceDivider: 0
   solver:
     method: 1
     iterations: 10
@@ -1013,16 +1023,12 @@ MonoBehaviour:
     friction: 0
     bendingCurvature: 0
     bendingRestRadius: 0.001
-    dampingFTL: 0.8
-  boundaries:
-  - {fileID: 0}
+    dampingFTL: 0.85
+  boundaries: []
   compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   computeVolumeRaster: {fileID: 2100000, guid: aa93a0a214a570e49a50b0fd77420457, type: 2}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
-  offsetX: 0
-  offsetY: 0
-  volumeSplatCompute: 0
 --- !u!4 &1011175221
 Transform:
   m_ObjectHideFlags: 0
@@ -1273,7 +1279,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1851342449
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1286,31 +1292,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2b6d23d090c06245aca3124e153206f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  configuration:
+  strands:
     style: 2
-    strandCount: 16000
-    strandParticleCount: 64
+    strandCount: 8192
+    strandParticleCount: 16
     strandLength: 1
+  volume:
+    volumeSplatMethod: 1
+    volumeSplatFilter: 1
+    volumeResolution: 64
+    volumeOffsetX: 0
+    volumeOffsetY: 0
   debug:
     drawParticles: 0
     drawStrands: 1
     drawDensity: 0
     drawGradient: 0
-    drawSlice: 0
-    drawSliceOffset: 0.5
-    drawSliceDivider: 0.5
+    drawSliceX: 0
+    drawSliceY: 1
+    drawSliceZ: 0
+    drawSliceOffsetX: 0.888
+    drawSliceOffsetY: 0.259
+    drawSliceOffsetZ: 0.445
+    drawSliceDivider: 0
   solver:
     method: 2
     iterations: 50
-    inference: 1
+    inference: 2
     stiffness: 1
-    damping: 0
+    damping: 0.5
     gravity: 1
-    repulsion: 0
-    friction: 0
+    repulsion: 0.25
+    friction: 0.8
     bendingCurvature: 0
     bendingRestRadius: 0
-    dampingFTL: 0.8
+    dampingFTL: 0.85
   boundaries:
   - {fileID: 917071516}
   - {fileID: 1101634076}
@@ -1319,9 +1335,6 @@ MonoBehaviour:
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   computeVolumeRaster: {fileID: 2100000, guid: aa93a0a214a570e49a50b0fd77420457, type: 2}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
-  offsetX: 0
-  offsetY: 0
-  volumeSplatCompute: 0
 --- !u!4 &1851342450
 Transform:
   m_ObjectHideFlags: 0
@@ -1329,14 +1342,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1851342448}
-  m_LocalRotation: {x: 0.6084966, y: 0.2830439, z: 0.20094103, w: 0.71361107}
+  m_LocalRotation: {x: -0.588768, y: -0.22006148, z: -0.25297803, w: -0.7354777}
   m_LocalPosition: {x: 0.032, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 917071512}
   m_Father: {fileID: 0}
   m_RootOrder: 3
-  m_LocalEulerAnglesHint: {x: 49.000004, y: 81.3, z: 74.193}
+  m_LocalEulerAnglesHint: {x: 49.000004, y: -288.655, z: 74.193}
 --- !u!1 &2032921483
 GameObject:
   m_ObjectHideFlags: 0
@@ -1366,19 +1379,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2b6d23d090c06245aca3124e153206f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  configuration:
+  strands:
     style: 0
     strandCount: 1024
-    strandParticleCount: 16
+    strandParticleCount: 32
     strandLength: 0.5
+  volume:
+    volumeSplatMethod: 1
+    volumeSplatFilter: 1
+    volumeResolution: 64
+    volumeOffsetX: 0
+    volumeOffsetY: 0
   debug:
-    drawParticles: 1
+    drawParticles: 0
     drawStrands: 1
     drawDensity: 0
     drawGradient: 0
-    drawSlice: 0
-    drawSliceOffset: 0.5
-    drawSliceDivider: 0.5
+    drawSliceX: 0
+    drawSliceY: 1
+    drawSliceZ: 0
+    drawSliceOffsetX: 0.4
+    drawSliceOffsetY: 0.365
+    drawSliceOffsetZ: 0.4
+    drawSliceDivider: 0
   solver:
     method: 0
     iterations: 2
@@ -1390,7 +1413,7 @@ MonoBehaviour:
     friction: 0
     bendingCurvature: 0
     bendingRestRadius: 1
-    dampingFTL: 0.8
+    dampingFTL: 0.85
   boundaries:
   - {fileID: 81391774}
   - {fileID: 1258472763}
@@ -1398,9 +1421,6 @@ MonoBehaviour:
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   computeVolumeRaster: {fileID: 2100000, guid: aa93a0a214a570e49a50b0fd77420457, type: 2}
   debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
-  offsetX: 0
-  offsetY: 0
-  volumeSplatCompute: 0
 --- !u!4 &2032921485
 Transform:
   m_ObjectHideFlags: 0
