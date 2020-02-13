@@ -131,7 +131,7 @@
 
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
-				output.color = lerp(volumeOcclusion, 1.0, 0.5) * float4(ColorizeCycle(instanceID, _StrandCount), 1.0);
+				output.color = volumeOcclusion * float4(ColorizeCycle(instanceID, _StrandCount), 1.0);
 				return output;
 			}
 

@@ -241,6 +241,7 @@ GameObject:
   - component: {fileID: 88329053}
   - component: {fileID: 88329052}
   - component: {fileID: 88329055}
+  - component: {fileID: 88329056}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -307,7 +308,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 88329051}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -3}
+  m_LocalPosition: {x: 0, y: -0.125, z: -3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -417,6 +418,23 @@ MonoBehaviour:
       data1: 0
       data2: 0
   defaultFrameSettings: 0
+--- !u!114 &88329056
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 88329051}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isGlobal: 1
+  priority: 0
+  blendDistance: 0
+  weight: 1
+  sharedProfile: {fileID: 11400000, guid: a4a8e754c7d994940a91f588a736b4c4, type: 2}
 --- !u!1 &240268940
 GameObject:
   m_ObjectHideFlags: 0
@@ -933,7 +951,7 @@ MonoBehaviour:
   fadeRadius: 0
   customPasses:
   - id: 0
-  injectionPoint: 1
+  injectionPoint: 4
   references:
     version: 1
     00000000:
@@ -996,7 +1014,7 @@ MonoBehaviour:
     strandLength: 0.5
   volume:
     volumeSplatMethod: 1
-    volumeSplatFilter: 1
+    volumeSplatFilter: 0
     volumeResolution: 64
     volumeOffsetX: 0
     volumeOffsetY: 0
@@ -1295,11 +1313,11 @@ MonoBehaviour:
   strands:
     style: 2
     strandCount: 8192
-    strandParticleCount: 16
+    strandParticleCount: 64
     strandLength: 1
   volume:
     volumeSplatMethod: 1
-    volumeSplatFilter: 1
+    volumeSplatFilter: 0
     volumeResolution: 64
     volumeOffsetX: 0
     volumeOffsetY: 0
@@ -1322,7 +1340,7 @@ MonoBehaviour:
     stiffness: 1
     damping: 0.5
     gravity: 1
-    repulsion: 0.25
+    repulsion: 0.85
     friction: 0.8
     bendingCurvature: 0
     bendingRestRadius: 0
@@ -1342,14 +1360,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1851342448}
-  m_LocalRotation: {x: -0.588768, y: -0.22006148, z: -0.25297803, w: -0.7354777}
+  m_LocalRotation: {x: -0.4843111, y: 0.013367515, z: -0.419631, w: -0.7675767}
   m_LocalPosition: {x: 0.032, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 917071512}
   m_Father: {fileID: 0}
   m_RootOrder: 3
-  m_LocalEulerAnglesHint: {x: 49.000004, y: -288.655, z: 74.193}
+  m_LocalEulerAnglesHint: {x: 49.000004, y: -1043.965, z: 74.193}
 --- !u!1 &2032921483
 GameObject:
   m_ObjectHideFlags: 0
@@ -1386,7 +1404,7 @@ MonoBehaviour:
     strandLength: 0.5
   volume:
     volumeSplatMethod: 1
-    volumeSplatFilter: 1
+    volumeSplatFilter: 0
     volumeResolution: 64
     volumeOffsetX: 0
     volumeOffsetY: 0
