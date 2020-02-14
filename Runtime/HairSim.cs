@@ -64,7 +64,8 @@ namespace Unity.DemoTeam.Hair
 			public static int _Friction = Shader.PropertyToID("_Friction");
 
 			public static int _BendingCurvature = Shader.PropertyToID("_BendingCurvature");
-			public static int _BendingRestRadius = Shader.PropertyToID("_BendingRestRadius");
+			public static int _BendingStiffness = Shader.PropertyToID("_BendingStiffness");
+
 			public static int _DampingFTL = Shader.PropertyToID("_DampingFTL");
 
 			// solver buffers
@@ -205,7 +206,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 1.0f)]
 			public float bendingCurvature;
 			[Range(0.0f, 1.0f)]
-			public float bendingRestRadius;
+			public float bendingStiffness;
 			[Range(0.0f, 1.0f)]
 			public float dampingFTL;
 
@@ -222,7 +223,7 @@ namespace Unity.DemoTeam.Hair
 				friction = 0.0f,
 
 				bendingCurvature = 0.0f,
-				bendingRestRadius = 0.0f,
+				bendingStiffness = 0.0f,
 				dampingFTL = 0.8f,
 			};
 		}
@@ -1033,12 +1034,14 @@ namespace Unity.DemoTeam.Hair
 			Matrix4x4 localToWorld = Matrix4x4.TRS(this.transform.position, this.transform.rotation, this.transform.localScale);
 			Matrix4x4 localToWorldInvT = Matrix4x4.Transpose(Matrix4x4.Inverse(localToWorld));
 
+			float strandParticleInterval = strands.strandLength / (strands.strandParticleCount - 1);
+
 			cmd.SetComputeMatrixParam(cs, UniformIDs._LocalToWorld, localToWorld);
 			cmd.SetComputeMatrixParam(cs, UniformIDs._LocalToWorldInvT, localToWorldInvT);
 
 			cmd.SetComputeIntParam(cs, UniformIDs._StrandCount, strands.strandCount);
 			cmd.SetComputeIntParam(cs, UniformIDs._StrandParticleCount, strands.strandParticleCount);
-			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleInterval, strands.strandLength / (strands.strandParticleCount - 1));
+			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleInterval, strandParticleInterval);
 
 			cmd.SetComputeFloatParam(cs, UniformIDs._DT, dt);
 			cmd.SetComputeIntParam(cs, UniformIDs._Iterations, solver.iterations);
@@ -1049,8 +1052,8 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeFloatParam(cs, UniformIDs._Repulsion, solver.repulsion);
 			cmd.SetComputeFloatParam(cs, UniformIDs._Friction, solver.friction);
 
-			cmd.SetComputeFloatParam(cs, UniformIDs._BendingCurvature, solver.bendingCurvature);
-			cmd.SetComputeFloatParam(cs, UniformIDs._BendingRestRadius, solver.bendingRestRadius);
+			cmd.SetComputeFloatParam(cs, UniformIDs._BendingCurvature, solver.bendingCurvature * 0.5f * strandParticleInterval);
+			cmd.SetComputeFloatParam(cs, UniformIDs._BendingStiffness, solver.bendingStiffness);
 			cmd.SetComputeFloatParam(cs, UniformIDs._DampingFTL, solver.dampingFTL);
 
 			cmd.SetComputeIntParam(cs, UniformIDs._BoundaryCapsuleCount, boundaryCapsuleCount);

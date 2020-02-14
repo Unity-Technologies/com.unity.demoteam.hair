@@ -1040,7 +1040,7 @@ MonoBehaviour:
     repulsion: 0
     friction: 0
     bendingCurvature: 0
-    bendingRestRadius: 0.001
+    bendingStiffness: 0
     dampingFTL: 0.85
   boundaries: []
   compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
@@ -1343,7 +1343,7 @@ MonoBehaviour:
     repulsion: 0.85
     friction: 0.8
     bendingCurvature: 0
-    bendingRestRadius: 0
+    bendingStiffness: 0
     dampingFTL: 0.85
   boundaries:
   - {fileID: 917071516}
@@ -1430,7 +1430,7 @@ MonoBehaviour:
     repulsion: 0
     friction: 0
     bendingCurvature: 0
-    bendingRestRadius: 1
+    bendingStiffness: 0
     dampingFTL: 0.85
   boundaries:
   - {fileID: 81391774}

@@ -29,7 +29,7 @@ float _Repulsion;
 float _Friction;
 
 float _BendingCurvature;
-float _BendingRestRadius;
+float _BendingStiffness;
 float _DampingFTL;
 
 StructuredBuffer<float4> _RootPosition;
@@ -687,9 +687,11 @@ void KSolveConstraints_Jacobi(
 			}//*/
 
 			// solve distance constraints along strand (FTL)
-			float3 d_pre_ftl = d;
-			SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
-			//TODO divide the delta early to reduce averaging of FTL constraint?
+			float3 d_pre_ftl = d;//TODO divide the delta early to reduce averaging of FTL constraint?
+			///*
+			{
+				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
+			}//*/
 
 			float inv_n = _Inference / n;
 			gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;

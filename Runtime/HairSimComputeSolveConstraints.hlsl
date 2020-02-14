@@ -153,9 +153,9 @@ void SolveTriangleBendingConstraint(
 	float delta = 1.0 - radius * rd_inv;
 	float W_inv = 1.0 / (w0 + w1 * 2.0 + w2);
 
-	d0 += (2.0 * w0 * W_inv * delta) * r;
-	d1 -= (4.0 * w1 * W_inv * delta) * r;
-	d2 += (2.0 * w2 * W_inv * delta) * r;
+	d0 += (2.0 * w0 * W_inv * delta * stiffness) * r;
+	d1 -= (4.0 * w1 * W_inv * delta * stiffness) * r;
+	d2 += (2.0 * w2 * W_inv * delta * stiffness) * r;
 }
 
 void SolveTriangleBendingMinConstraint(
@@ -177,9 +177,9 @@ void SolveTriangleBendingMinConstraint(
 	float delta = 1.0 - max(1.0, radiusMin * rd_inv);
 	float W_inv = 1.0 / (w0 + w1 * 2.0 + w2);
 
-	d0 += (2.0 * w0 * W_inv * delta) * r;
-	d1 -= (4.0 * w1 * W_inv * delta) * r;
-	d2 += (2.0 * w2 * W_inv * delta) * r;
+	d0 += (2.0 * w0 * W_inv * delta * stiffness) * r;
+	d1 -= (4.0 * w1 * W_inv * delta * stiffness) * r;
+	d2 += (2.0 * w2 * W_inv * delta * stiffness) * r;
 }
 
 void SolveTriangleBendingMaxConstraint(
@@ -201,9 +201,9 @@ void SolveTriangleBendingMaxConstraint(
 	float delta = 1.0 - min(1.0, radiusMax * rd_inv);
 	float W_inv = 1.0 / (w0 + w1 * 2.0 + w2);
 
-	d0 += (2.0 * w0 * W_inv * delta) * r;
-	d1 -= (4.0 * w1 * W_inv * delta) * r;
-	d2 += (2.0 * w2 * W_inv * delta) * r;
+	d0 += (2.0 * w0 * W_inv * delta * stiffness) * r;
+	d1 -= (4.0 * w1 * W_inv * delta * stiffness) * r;
+	d2 += (2.0 * w2 * W_inv * delta * stiffness) * r;
 }
 
 //-------------------
