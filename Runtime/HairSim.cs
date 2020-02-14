@@ -56,8 +56,8 @@ namespace Unity.DemoTeam.Hair
 			// solver params
 			public static int _DT = Shader.PropertyToID("_DT");
 			public static int _Iterations = Shader.PropertyToID("_Iterations");
-			public static int _Inference = Shader.PropertyToID("_Inference");
 			public static int _Stiffness = Shader.PropertyToID("_Stiffness");
+			public static int _Inference = Shader.PropertyToID("_Inference");
 			public static int _Damping = Shader.PropertyToID("_Damping");
 			public static int _Gravity = Shader.PropertyToID("_Gravity");
 			public static int _Repulsion = Shader.PropertyToID("_Repulsion");
@@ -190,10 +190,10 @@ namespace Unity.DemoTeam.Hair
 			public Method method;
 			[Range(1, 100)]
 			public int iterations;
-			[Range(1.0f, 2.0f)]
-			public float inference;
 			[Range(0.0f, 1.0f)]
 			public float stiffness;
+			[Range(1.0f, 2.0f)]
+			public float inference;
 			[Range(0.0f, 1.0f)]
 			public float damping;
 			[Range(-1.0f, 1.0f)]
@@ -215,8 +215,8 @@ namespace Unity.DemoTeam.Hair
 			{
 				method = Method.GaussSeidelReference,
 				iterations = 3,
+				stiffness = 1.0f,
 				inference = 1.0f,
-				stiffness = 0.0f,
 				damping = 0.0f,
 				gravity = 1.0f,
 				repulsion = 0.0f,
