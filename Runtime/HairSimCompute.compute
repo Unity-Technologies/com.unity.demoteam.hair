@@ -255,126 +255,7 @@ float4 BoundaryNormalDistance(in float3 p)
 //-------------
 // constraints
 
-void ApplyCollisionConstraintDelta(in float3 p, inout float3 d)
-{
-	float4 P = BoundaryNormalDistance(p);
-	if (P.w < 0.0)
-	{
-		d += P.xyz * P.w;
-	}
-}
-
-void ApplyCollisionConstraint(inout float3 p)
-{
-	float4 P = BoundaryNormalDistance(p);
-	if (P.w < 0.0)
-	{
-		p += P.xyz * P.w;
-	}
-}
-
-void ApplyDistanceConstraintDelta(const float w0, const float w1, in float3 p0, in float3 p1, inout float3 d0, inout float3 d1)
-{
-	float3 r = p1 - p0;
-	float rd_inv = rsqrt(dot(r, r));
-
-	r *= 1.0 - (_StrandParticleInterval * rd_inv);
-
-	d0 += r * w0;
-	d1 -= r * w1;
-}
-
-void ApplyDistanceConstraint(const float stiffness, const float w0, const float w1, inout float3 p0, inout float3 p1)
-{
-	float3 r = p1 - p0;
-	float rd_inv = rsqrt(dot(r, r));
-
-	r *= 1.0 - (_StrandParticleInterval * rd_inv);
-
-	p0 += r * w0 * stiffness;
-	p1 -= r * w1 * stiffness;
-}
-
-void ApplyLRAConstraintDelta(const float range, in float3 p0, in float3 p1, inout float3 d1)
-{
-	float3 r = p0 - p1;
-	float rd = length(r);
-
-	if (rd > range)
-	{
-		r *= 1.0 - (range / rd);
-		d1 += r;
-	}
-}
-
-void ApplyFTLConstraintDelta(in float3 p0, in float3 p1, inout float3 d1)
-{
-	float3 r = p0 - p1;
-	float rd_inv = rsqrt(dot(r, r));
-
-	r *= 1.0 - (_StrandParticleInterval * rd_inv);
-
-	d1 += r;
-}
-
-void ApplyFTLConstraint(in float3 p0, inout float3 p1, inout float3 d1)
-{
-	float3 r = p0 - p1;
-	float rd_inv = rsqrt(dot(r, r));
-
-	r *= 1.0 - (_StrandParticleInterval * rd_inv);
-
-	p1 += r;
-	d1 += r;
-}
-
-void ApplyTriangleBendingConstraintDelta(const float w0, const float wv, const float w1, in float3 b0, in float3 v, in float3 b1, inout float3 d0, inout float3 dv, inout float3 d1)
-{
-	const float K = _BendingCurvature;
-	const float h0 = _BendingRestRadius;
-
-	float3 c = (b0 + b1 + v) / 3.0;
-	float3 r = v - c;
-	float rd = length(r);
-
-	float C = rd - (K + h0);
-	if (C >= 0.0)// inverted to minimize bend
-	{
-		float dif = 1.0 - (K + h0) / rd;
-
-		const float Winv = 1.0 / (w0 + w1 + 2.0 * wv);
-
-		d0 += ( 2.0 * w0 * Winv * dif) * r;
-		dv += (-4.0 * wv * Winv * dif) * r;
-		d1 += ( 2.0 * w1 * Winv * dif) * r;
-	}
-}
-
-void ApplyTriangleBendingConstraint(const float stiffness, const float w0, const float wv, const float w1, inout float3 b0, inout float3 v, inout float3 b1)
-{
-	const float K = _BendingCurvature;
-	const float h0 = _BendingRestRadius;
-
-	float3 c = (b0 + b1 + v) / 3.0;
-	float3 r = (v - c);
-	float rd = length(r);
-
-	float C = rd - (K + h0);
-	if (C >= 0.0)// inverted to minimize bend
-	{
-		float dif = 1.0 - (K + h0) / rd;
-
-		const float Winv = 1.0 / (w0 + w1 + 2.0 * wv);
-
-		float3 d0 = ( 2.0 * w0 * Winv * dif) * r;
-		float3 dv = (-4.0 * wv * Winv * dif) * r;
-		float3 d1 = ( 2.0 * w1 * Winv * dif) * r;
-
-		b0 += stiffness * d0;
-		v  += stiffness * dv;
-		b1 += stiffness * d1;
-	}
-}
+#include "HairSimComputeSolveConstraints.hlsl"
 
 //---------
 // kernels
@@ -448,6 +329,7 @@ void KSolveConstraints_GaussSeidelReference(
 		const float kStiffness = 1.0 - pow(abs(1.0 - _Stiffness), 1.0 / (__iter + 1));
 
 		// solve collision constraints
+		///*
 		{
 			for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 			{
@@ -457,30 +339,32 @@ void KSolveConstraints_GaussSeidelReference(
 
 				_ParticlePosition[i].xyz = p;
 			}
-		}
+		}//*/
 
 		// solve distance constraints
+		///*
 		{
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 			float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
 
-			ApplyDistanceConstraint(kStiffness, 0.0, 1.0, p0, p1);
+			ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.0, 1.0, p0, p1);
 
 			for (uint i = strandParticleBegin + strandParticleStride * 2; i != strandParticleEnd; i += strandParticleStride)
 			{
 				p0 = p1;
 				p1 = _ParticlePosition[i].xyz;
 
-				ApplyDistanceConstraint(kStiffness, 0.5, 0.5, p0, p1);
+				ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p0, p1);
 
 				_ParticlePosition[i - strandParticleStride].xyz = p0;
 			}
 
 			_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p1;
-		}
+		}//*/
 
-		// solve bending constraints
+		// solve triangle bending constraints
 		// https://pdfs.semanticscholar.org/759f/e17efeb59ab2081135db3d1517093bbcb085.pdf
+		///*
 		{
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 			float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
@@ -492,7 +376,7 @@ void KSolveConstraints_GaussSeidelReference(
 			//--- p0 (fixed)
 			//    |
 			//    r0 (below)
-			ApplyTriangleBendingConstraint(kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
+			ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
 
 			//      p2 <-- solve
 			//     /
@@ -501,7 +385,7 @@ void KSolveConstraints_GaussSeidelReference(
 			//--- p0 (fixed)
 			//    |
 			//    ## (below)
-			ApplyTriangleBendingConstraint(kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
+			ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
 			for (uint i = strandParticleBegin + strandParticleStride * 3; i != strandParticleEnd; i += strandParticleStride)
 			{
@@ -518,17 +402,18 @@ void KSolveConstraints_GaussSeidelReference(
 				//--- ## (fixed)
 				//    |
 				//    ## (below)
-				ApplyTriangleBendingConstraint(kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
+				ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
 
 				_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
 			}
 
 			_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
 			_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
-		}
+		}//*/
 
 		// solve distance constraints along strand (FTL)
 		// https://matthias-research.github.io/pages/publications/FTLHairFur.pdf
+		///*
 		{
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 
@@ -537,14 +422,14 @@ void KSolveConstraints_GaussSeidelReference(
 				float3 p1 = _ParticlePosition[i].xyz;
 				float3 d1 = 0;
 
-				ApplyFTLConstraint(p0, p1, d1);
+				ApplyDistanceFTLConstraint(_StrandParticleInterval, p0, p1, d1);
 				
 				_ParticlePosition[i].xyz = p1;
 				_ParticlePositionCorr[i - strandParticleStride].xyz += d1;
 
 				p0 = p1;
 			}
-		}
+		}//*/
 	}
 
 	// derive velocity from effective change in position
@@ -614,8 +499,8 @@ void KSolveConstraints_GaussSeidel(
 		//    |
 		//    r0 (below)
 		ApplyCollisionConstraint(p1);
-		ApplyDistanceConstraint(kStiffness, 0.0, 1.0, p0, p1);
-		ApplyTriangleBendingConstraint(kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
+		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.0, 1.0, p0, p1);
+		ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
 
 		//      p2 <-- solve
 		//     /
@@ -625,8 +510,8 @@ void KSolveConstraints_GaussSeidel(
 		//    |
 		//    ## (below)
 		ApplyCollisionConstraint(p2.xyz);
-		ApplyDistanceConstraint(kStiffness, 0.5, 0.5, p1.xyz, p2.xyz);
-		ApplyTriangleBendingConstraint(kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
+		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1.xyz, p2.xyz);
+		ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
 		for (uint i = strandParticleBegin + strandParticleStride * 3; i != strandParticleEnd; i += strandParticleStride)
 		{
@@ -645,23 +530,24 @@ void KSolveConstraints_GaussSeidel(
 			//    |
 			//    ## (below)
 			ApplyCollisionConstraint(p2);
-			ApplyDistanceConstraint(kStiffness, 0.5, 0.5, p1, p2);
-			ApplyTriangleBendingConstraint(kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
+			ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1, p2);
+			ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
 
-			float3 d0 = 0;
-			ApplyFTLConstraint(r0, p0, d0);
+			float3 d0 = 0.0;
+			ApplyDistanceFTLConstraint(_StrandParticleInterval, r0, p0, d0);
 
 			_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
 			_ParticlePositionCorr[i - strandParticleStride * 3].xyz += d0;
 		}
 
-		float3 d1 = 0;
-		ApplyFTLConstraint(p0, p1, d1);
-		float3 d2 = 0;
-		ApplyFTLConstraint(p1, p2, d2);
+		float3 d1 = 0.0;
+		float3 d2 = 0.0;
+		ApplyDistanceFTLConstraint(_StrandParticleInterval, p0, p1, d1);
+		ApplyDistanceFTLConstraint(_StrandParticleInterval, p1, p2, d2);
 
 		_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
 		_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz += d1;
+
 		_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
 		_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz += d2;
 	}
@@ -729,13 +615,14 @@ void KSolveConstraints_Jacobi(
 		{
 			uint n = 0;
 			float3 d = 0;
-			ApplyCollisionConstraintDelta(gs_x[threadIdx], d); n++;
 
-			/*
+			// solve collision constraints
+			///*
 			{
-				ApplyLRAConstraintDelta(threadIdx * _StrandParticleInterval, gs_x[0], gs_x[threadIdx], d); n++;
+				SolveCollisionConstraint(gs_x[threadIdx], d); n++;
 			}//*/
 
+			// solve distance constraints
 			///*
 			{
 				float3 nop = 0;
@@ -744,16 +631,16 @@ void KSolveConstraints_Jacobi(
 
 				if (threadIdx == 1)
 				{
-					ApplyDistanceConstraintDelta(0.0, 1.0, gs_x[threadIdx - 1], gs_x[threadIdx], nop, sum); count++;
-					ApplyDistanceConstraintDelta(0.5, 0.5, gs_x[threadIdx], gs_x[threadIdx + 1], sum, nop); count++;
+					SolveDistanceConstraint(_StrandParticleInterval, 1.0, 0.0, 1.0, gs_x[threadIdx - 1], gs_x[threadIdx], nop, sum); count++;
+					SolveDistanceConstraint(_StrandParticleInterval, 1.0, 0.5, 0.5, gs_x[threadIdx], gs_x[threadIdx + 1], sum, nop); count++;
 				}
 				else
 				{
-					ApplyDistanceConstraintDelta(0.5, 0.5, gs_x[threadIdx - 1], gs_x[threadIdx], nop, sum); count++;
+					SolveDistanceConstraint(_StrandParticleInterval, 1.0, 0.5, 0.5, gs_x[threadIdx - 1], gs_x[threadIdx], nop, sum); count++;
 					
 					if (threadIdx < THREAD_GROUP_SIZE - 1)
 					{
-						ApplyDistanceConstraintDelta(0.5, 0.5, gs_x[threadIdx], gs_x[threadIdx + 1], sum, nop); count++;
+						SolveDistanceConstraint(_StrandParticleInterval, 1.0, 0.5, 0.5, gs_x[threadIdx], gs_x[threadIdx + 1], sum, nop); count++;
 					}
 				}
 
@@ -761,6 +648,7 @@ void KSolveConstraints_Jacobi(
 				n += count;
 			}//*/
 
+			// solve triangle bending constraints
 			///*
 			{
 				float3 nop1 = 0;
@@ -773,24 +661,24 @@ void KSolveConstraints_Jacobi(
 					const uint j = threadIdx;
 					const float3 gs_x_rooted = gs_x[0] - mul(_LocalToWorldInvT, float4(_RootTangent[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
 
-					ApplyTriangleBendingConstraintDelta(0.0, 0.0, 1.0, gs_x_rooted, gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
-					ApplyTriangleBendingConstraintDelta(0.0, 1.0, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop1, sum, nop2); count++;
-					ApplyTriangleBendingConstraintDelta(1.0, 1.0, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop1, nop2); count++;
+					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 0.0, 0.0, 1.0, gs_x_rooted, gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
+					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 0.0, 1.0, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop1, sum, nop2); count++;
+					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 1.0, 1.0, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop1, nop2); count++;
 				}
 				else
 				{
 					const uint j = threadIdx;
 
-					ApplyTriangleBendingConstraintDelta(1.0, 1.0, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
+					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 1.0, 1.0, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
 
 					if (threadIdx < THREAD_GROUP_SIZE - 1)
 					{
-						ApplyTriangleBendingConstraintDelta(1.0, 1.0, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop1, sum, nop2); count++;
+						SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 1.0, 1.0, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop1, sum, nop2); count++;
 					}
 
 					if (threadIdx < THREAD_GROUP_SIZE - 2)
 					{
-						ApplyTriangleBendingConstraintDelta(1.0, 1.0, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop1, nop2); count++;
+						SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 1.0, 1.0, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop1, nop2); count++;
 					}
 				}
 
@@ -798,13 +686,14 @@ void KSolveConstraints_Jacobi(
 				n += count;
 			}//*/
 
-			//TODO divide the delta early to reduce averaging of FTL constraint?
+			// solve distance constraints along strand (FTL)
 			float3 d_pre_ftl = d;
-			ApplyFTLConstraintDelta(gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
+			SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
+			//TODO divide the delta early to reduce averaging of FTL constraint?
 
 			float inv_n = _Inference / n;
-			gs_d[threadIdx - 1] += (d - d_pre_ftl) * inv_n;
 			gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;
+			gs_d[threadIdx - 1] += (d - d_pre_ftl) * inv_n;
 		}
 	}
 
