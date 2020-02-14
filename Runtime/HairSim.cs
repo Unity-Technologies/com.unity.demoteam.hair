@@ -904,7 +904,7 @@ namespace Unity.DemoTeam.Hair
 								if (volume.volumeSplatMethod == VolumeConfiguration.SplatMethod.Rasterization)
 									cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, strands.strandCount * strands.strandParticleCount, 1, computeVolumeRasterPB);
 								else
-									cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 1, MeshTopology.Quads, 8 * strands.strandCount * strands.strandParticleCount, 1, computeVolumeRasterPB);
+									cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 1, MeshTopology.Quads, strands.strandCount * strands.strandParticleCount * 8, 1, computeVolumeRasterPB);
 							}
 
 							using (new ProfilingSample(cmd, "HairSim.Voxelize.VolumeVelocityDensity (GPU)"))
@@ -1031,10 +1031,10 @@ namespace Unity.DemoTeam.Hair
 
 		void SetComputeParams(CommandBuffer cmd, ComputeShader cs, float dt)
 		{
+			float strandParticleInterval = strands.strandLength / (strands.strandParticleCount - 1);
+
 			Matrix4x4 localToWorld = Matrix4x4.TRS(this.transform.position, this.transform.rotation, this.transform.localScale);
 			Matrix4x4 localToWorldInvT = Matrix4x4.Transpose(Matrix4x4.Inverse(localToWorld));
-
-			float strandParticleInterval = strands.strandLength / (strands.strandParticleCount - 1);
 
 			cmd.SetComputeMatrixParam(cs, UniformIDs._LocalToWorld, localToWorld);
 			cmd.SetComputeMatrixParam(cs, UniformIDs._LocalToWorldInvT, localToWorldInvT);
@@ -1045,8 +1045,8 @@ namespace Unity.DemoTeam.Hair
 
 			cmd.SetComputeFloatParam(cs, UniformIDs._DT, dt);
 			cmd.SetComputeIntParam(cs, UniformIDs._Iterations, solver.iterations);
-			cmd.SetComputeFloatParam(cs, UniformIDs._Inference, solver.inference);
 			cmd.SetComputeFloatParam(cs, UniformIDs._Stiffness, solver.stiffness);
+			cmd.SetComputeFloatParam(cs, UniformIDs._Inference, solver.inference);
 			cmd.SetComputeFloatParam(cs, UniformIDs._Damping, solver.damping);
 			cmd.SetComputeFloatParam(cs, UniformIDs._Gravity, solver.gravity * -Vector3.Magnitude(Physics.gravity));
 			cmd.SetComputeFloatParam(cs, UniformIDs._Repulsion, solver.repulsion);

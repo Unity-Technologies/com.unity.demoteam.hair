@@ -21,6 +21,7 @@ void SolveCollisionConstraint(
 	}
 }
 
+/*
 void SolveCollisionFrictionConstraint(
 	const float friction,
 	const float3 x,
@@ -35,6 +36,7 @@ void SolveCollisionFrictionConstraint(
 		d += P.xyz * P.w;
 	}
 }
+*/
 
 void SolveDistanceConstraint(
 	const float distance, const float stiffness,
@@ -117,6 +119,9 @@ void SolveDistanceLRAConstraint(const float distanceMax, const float3 p0, const 
 
 void SolveDistanceFTLConstraint(const float distance, const float3 p0, const float3 p1, inout float3 d1)
 {
+	// Fast Simulation of Inextensible Hair and Fur
+	// https://matthias-research.github.io/pages/publications/FTLHairFur.pdf
+	//
 	//                       d1
 	//                     .----.
 	// p0 #--------------><------ p1
@@ -138,7 +143,7 @@ void SolveTriangleBendingConstraint(
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
 	// A Triangle Bending Constraint Model for Position-Based Dynamics
-	// https://pdfs.semanticscholar.org/759f/e17efeb59ab2081135db3d1517093bbcb085.pdf
+	// http://image.diku.dk/kenny/download/kelager.niebe.ea10.pdf
 	//
 	//                     p1
 	//                 . ´ : ` .

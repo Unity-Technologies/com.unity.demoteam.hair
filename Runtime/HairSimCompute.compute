@@ -1,16 +1,24 @@
-﻿#pragma kernel KUpdatePosition							THREAD_GROUP_SIZE=64
-#pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64
+﻿#pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64
 #pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64
 #pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
 #pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
 #pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
+#pragma kernel KUpdatePosition							THREAD_GROUP_SIZE=64
 #pragma kernel KUpdateVelocity							THREAD_GROUP_SIZE=64
 
 //#include "HairSimComputeConfig.hlsl"
 #define LAYOUT_INTERLEAVED 1
 #define MAX_BOUNDARIES 8
 #define DENSITY_SCALE 8192.0
+
+#define ENABLE_VOLUME_FRICTION			1
+#define ENABLE_VOLUME_REPULSION			1
+
+#define ENABLE_CONSTRAINT_COLLISION		1
+#define ENABLE_CONSTRAINT_DISTANCE		1
+#define ENABLE_CONSTRAINT_CURVATURE		1
+#define ENABLE_CONSTRAINT_FTL			1
 
 float4x4 _LocalToWorld;
 float4x4 _LocalToWorldInvT;
@@ -21,8 +29,8 @@ float _StrandParticleInterval;
 
 float _DT;
 uint _Iterations;
-float _Inference;
 float _Stiffness;
+float _Inference;
 float _Damping;
 float _Gravity;
 float _Repulsion;
@@ -41,6 +49,12 @@ StructuredBuffer<float4> _ParticleVelocityPrev;
 RWStructuredBuffer<float4> _ParticlePosition;
 RWStructuredBuffer<float4> _ParticlePositionCorr;
 RWStructuredBuffer<float4> _ParticleVelocity;
+
+//----------
+// includes
+
+#include "HairSimComputeSolverBoundaries.hlsl"
+#include "HairSimComputeSolverConstraints.hlsl"
 
 //--------
 // volume
@@ -113,173 +127,8 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 #endif
 }
 
-//------------
-// boundaries
-
-struct BoundaryCapsule { float3 centerA; float radius; float3 centerB; float __pad__; };
-struct BoundarySphere { float3 center; float radius; };
-struct BoundaryTorus { float3 center; float radiusA; float3 axis; float radiusB; };
-struct BoundaryPack
-{
-	//	shape	|	capsule		sphere		torus
-	//	----------------------------------------------
-	//	float3	|	centerA		center		center
-	//	float	|	radius		radius		radiusA
-	//	float3	|	centerB		__pad__		axis
-	//	float	|	__pad__		__pad__		radiusB
-
-	float3 pA;
-	float tA;
-	float3 pB;
-	float tB;
-};
-
-StructuredBuffer<BoundaryCapsule> _BoundaryCapsule;
-StructuredBuffer<BoundarySphere> _BoundarySphere;
-StructuredBuffer<BoundaryTorus> _BoundaryTorus; 
-StructuredBuffer<BoundaryPack> _BoundaryPack;
-
-uint _BoundaryCapsuleCount;
-uint _BoundarySphereCount;
-uint _BoundaryTorusCount;
-
-float BoundaryDistance(in float3 p)
-{
-	float d = 1e+7;
-
-#if 1
-	// capsules
-	{
-		for (uint i = 0; i != _BoundaryCapsuleCount; i++)
-		{
-			BoundaryCapsule capsule = _BoundaryCapsule[i];
-
-			float3 pa = p - capsule.centerA;
-			float3 ba = capsule.centerB - capsule.centerA;
-
-			float h = clamp(dot(pa, ba) / dot(ba, ba), 0, 1);
-			float r = capsule.radius;
-
-			d = min(d, length(pa - ba * h) - r);
-		}
-	}
-
-	// spheres
-	{
-		for (uint i = 0; i != _BoundarySphereCount; i++)
-		{
-			BoundarySphere sphere = _BoundarySphere[i];
-
-			float3 a = sphere.center;
-			float r = sphere.radius;
-
-			d = min(d, length(a - p) - r);
-		}
-	}
-
-	// tori
-	{
-		for (uint i = 0; i != _BoundaryTorusCount; i++)
-		{
-			BoundaryTorus torus = _BoundaryTorus[i];
-			//TODO
-		}
-	}
-#else
-	uint i = 0;
-	uint j = 0;
-
-	// capsules
-	{
-		for (j += _BoundaryCapsuleCount; i < j; i++)
-		{
-			BoundaryPack capsulePack = _BoundaryPack[i];
-
-			float3 pa = p - capsulePack.pA;
-			float3 ba = capsulePack.pB - capsulePack.pA;
-
-			float h = clamp(dot(pa, ba) / dot(ba, ba), 0, 1);
-			float r = capsulePack.tA;
-
-			d = min(d, length(pa - ba * h) - r);
-		}
-	}
-
-	// spheres
-	{
-		for (j += _BoundarySphereCount; i < j; i++)
-		{
-			BoundaryPack spherePack = _BoundaryPack[i];
-
-			float3 a = spherePack.pA;
-			float r = spherePack.tA;
-
-			d = min(d, length(a - p) - r);
-		}
-	}
-
-	// tori
-	{
-		for (j += _BoundaryTorusCount; i < j; i++)
-		{
-			BoundaryPack torusPack = _BoundaryPack[i];
-			//TODO
-		}
-	}
-#endif
-
-	return d;
-}
-
-float3 BoundaryNormal(in float3 p, in float d)
-{
-	const float2 h = float2(1e-4, 0.0);
-	return normalize(float3(
-		BoundaryDistance(p - h.xyy) - d,
-		BoundaryDistance(p - h.yxy) - d,
-		BoundaryDistance(p - h.yyx) - d
-	));
-}
-
-float3 BoundaryNormal(in float3 p)
-{
-	return BoundaryNormal(p, BoundaryDistance(p));
-}
-
-float4 BoundaryNormalDistance(in float3 p)
-{
-	float d = BoundaryDistance(p);
-	return float4(BoundaryNormal(p, d), d);
-}
-
-//-------------
-// constraints
-
-#include "HairSimComputeSolveConstraints.hlsl"
-
 //---------
 // kernels
-
-[numthreads(THREAD_GROUP_SIZE, 1, 1)]
-void KUpdatePosition(
-	// SV_GroupID           execution group coords
-	// SV_GroupThreadID     thread coords within execution group
-	// SV_DispatchThreadID  thread coords (global)
-	// SV_GroupIndex        thread offset within execution group
-	uint3 groupIdx : SV_GroupID,
-	uint3 localIdx : SV_GroupThreadID,
-	uint3 worldIdx : SV_DispatchThreadID,
-	uint threadIdx : SV_GroupIndex)
-{
-	const uint i = worldIdx.x;
-	{
-		// update position
-		const float4 x0 = _ParticlePositionPrev[i];
-		const float4 v0 = _ParticleVelocityPrev[i];
-		const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
-		_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
-	}
-}
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void KSolveConstraints_GaussSeidelReference(
@@ -303,6 +152,7 @@ void KSolveConstraints_GaussSeidelReference(
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
 
 	// clear corrections
+	if (ENABLE_CONSTRAINT_FTL)
 	{
 		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 		{
@@ -319,7 +169,9 @@ void KSolveConstraints_GaussSeidelReference(
 			const float4 x0 = _ParticlePositionPrev[i];
 			const float4 v0 = _ParticleVelocityPrev[i] + float4(ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction), 0.0);
 			const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
-			_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
+			{
+				_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
+			}
 		}
 	}
 
@@ -329,20 +181,16 @@ void KSolveConstraints_GaussSeidelReference(
 		const float kStiffness = 1.0 - pow(abs(1.0 - _Stiffness), 1.0 / (__iter + 1));
 
 		// solve collision constraints
-		///*
+		if (ENABLE_CONSTRAINT_COLLISION)
 		{
 			for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 			{
-				float3 p = _ParticlePosition[i].xyz;
-
-				ApplyCollisionConstraint(p);
-
-				_ParticlePosition[i].xyz = p;
+				ApplyCollisionConstraint(_ParticlePosition[i].xyz);
 			}
-		}//*/
+		}
 
 		// solve distance constraints
-		///*
+		if (ENABLE_CONSTRAINT_DISTANCE)
 		{
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 			float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
@@ -360,11 +208,10 @@ void KSolveConstraints_GaussSeidelReference(
 			}
 
 			_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p1;
-		}//*/
+		}
 
 		// solve triangle bending constraints
-		// https://pdfs.semanticscholar.org/759f/e17efeb59ab2081135db3d1517093bbcb085.pdf
-		///*
+		if (ENABLE_CONSTRAINT_CURVATURE)
 		{
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 			float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
@@ -409,11 +256,10 @@ void KSolveConstraints_GaussSeidelReference(
 
 			_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
 			_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
-		}//*/
+		}
 
 		// solve distance constraints along strand (FTL)
-		// https://matthias-research.github.io/pages/publications/FTLHairFur.pdf
-		///*
+		if (ENABLE_CONSTRAINT_FTL)
 		{
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 
@@ -429,14 +275,17 @@ void KSolveConstraints_GaussSeidelReference(
 
 				p0 = p1;
 			}
-		}//*/
+		}
 	}
 
 	// derive velocity from effective change in position
 	{
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
-			_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionCorr[i]) / _DT;
+			if (ENABLE_CONSTRAINT_FTL)
+				_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionCorr[i]) / _DT;
+			else
+				_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i]) / _DT;
 		}
 	}
 }
@@ -463,6 +312,7 @@ void KSolveConstraints_GaussSeidel(
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
 
 	// clear corrections
+	if (ENABLE_CONSTRAINT_FTL)
 	{
 		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 		{
@@ -479,7 +329,9 @@ void KSolveConstraints_GaussSeidel(
 			const float4 x0 = _ParticlePositionPrev[i];
 			const float4 v0 = _ParticleVelocityPrev[i] + float4(ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction), 0.0);
 			const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
-			_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
+			{
+				_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
+			}
 		}
 	}
 
@@ -498,10 +350,10 @@ void KSolveConstraints_GaussSeidel(
 		//--- p0 (fixed)
 		//    |
 		//    r0 (below)
-		ApplyCollisionConstraint(p1);
-		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.0, 1.0, p0, p1);
-		ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
-
+		if (ENABLE_CONSTRAINT_COLLISION)	ApplyCollisionConstraint(p1);
+		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.0, 1.0, p0, p1);
+		if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
+		
 		//      p2 <-- solve
 		//     /
 		//    p1 <-- solve
@@ -509,9 +361,9 @@ void KSolveConstraints_GaussSeidel(
 		//--- p0 (fixed)
 		//    |
 		//    ## (below)
-		ApplyCollisionConstraint(p2.xyz);
-		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1.xyz, p2.xyz);
-		ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
+		if (ENABLE_CONSTRAINT_COLLISION)	ApplyCollisionConstraint(p2.xyz);
+		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1.xyz, p2.xyz);
+		if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
 		for (uint i = strandParticleBegin + strandParticleStride * 3; i != strandParticleEnd; i += strandParticleStride)
 		{
@@ -529,34 +381,44 @@ void KSolveConstraints_GaussSeidel(
 			//--- ## (fixed)
 			//    |
 			//    ## (below)
-			ApplyCollisionConstraint(p2);
-			ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1, p2);
-			ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
+			if (ENABLE_CONSTRAINT_COLLISION)	ApplyCollisionConstraint(p2);
+			if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1, p2);
+			if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
+			
+			if (ENABLE_CONSTRAINT_FTL)
+			{
+				float3 d0 = 0.0;
+				ApplyDistanceFTLConstraint(_StrandParticleInterval, r0, p0, d0);
 
-			float3 d0 = 0.0;
-			ApplyDistanceFTLConstraint(_StrandParticleInterval, r0, p0, d0);
+				_ParticlePositionCorr[i - strandParticleStride * 3].xyz += d0;
+			}
 
 			_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
-			_ParticlePositionCorr[i - strandParticleStride * 3].xyz += d0;
 		}
 
-		float3 d1 = 0.0;
-		float3 d2 = 0.0;
-		ApplyDistanceFTLConstraint(_StrandParticleInterval, p0, p1, d1);
-		ApplyDistanceFTLConstraint(_StrandParticleInterval, p1, p2, d2);
+		if (ENABLE_CONSTRAINT_FTL)
+		{
+			float3 d1 = 0.0;
+			float3 d2 = 0.0;
+			ApplyDistanceFTLConstraint(_StrandParticleInterval, p0, p1, d1);
+			ApplyDistanceFTLConstraint(_StrandParticleInterval, p1, p2, d2);
+
+			_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz += d1;
+			_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz += d2;
+		}
 
 		_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
-		_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz += d1;
-
 		_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
-		_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz += d2;
 	}
 
 	// derive velocity from effective change in position
 	{
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
-			_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionCorr[i]) / _DT;
+			if (ENABLE_CONSTRAINT_FTL)
+				_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionCorr[i]) / _DT;
+			else
+				_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i]) / _DT;
 		}
 	}
 }
@@ -589,6 +451,7 @@ void KSolveConstraints_Jacobi(
 	const uint i = strandParticleBegin + strandParticleStride * threadIdx;
 
 	// clear corrections
+	if (ENABLE_CONSTRAINT_FTL)
 	{
 		gs_d[threadIdx] = 0;
 	}
@@ -617,13 +480,13 @@ void KSolveConstraints_Jacobi(
 			float3 d = 0;
 
 			// solve collision constraints
-			///*
+			if (ENABLE_CONSTRAINT_COLLISION)
 			{
 				SolveCollisionConstraint(gs_x[threadIdx], d); n++;
-			}//*/
+			}
 
 			// solve distance constraints
-			///*
+			if (ENABLE_CONSTRAINT_DISTANCE)
 			{
 				float3 nop = 0;
 				float3 sum = 0;
@@ -646,10 +509,10 @@ void KSolveConstraints_Jacobi(
 
 				d += sum * kStiffness;
 				n += count;
-			}//*/
+			}
 
 			// solve triangle bending constraints
-			///*
+			if (ENABLE_CONSTRAINT_CURVATURE)
 			{
 				float3 nop1 = 0;
 				float3 nop2 = 0;
@@ -684,18 +547,23 @@ void KSolveConstraints_Jacobi(
 
 				d += sum * kStiffness;
 				n += count;
-			}//*/
+			}
 
 			// solve distance constraints along strand (FTL)
-			float3 d_pre_ftl = d;//TODO divide the delta early to reduce averaging of FTL constraint?
-			///*
+			if (ENABLE_CONSTRAINT_FTL)
 			{
+				float3 d_pre_ftl = d;//TODO divide the delta early to reduce averaging of FTL constraint?
 				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
-			}//*/
 
-			float inv_n = _Inference / n;
-			gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;
-			gs_d[threadIdx - 1] += (d - d_pre_ftl) * inv_n;
+				float inv_n = _Inference / n;
+				gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;
+				gs_d[threadIdx - 1] += (d - d_pre_ftl) * inv_n;
+			}
+			else
+			{
+				float inv_n = _Inference / n;
+				gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;
+			}
 		}
 	}
 
@@ -704,7 +572,34 @@ void KSolveConstraints_Jacobi(
 	// derive velocity from effective change in position
 	{
 		_ParticlePosition[i].xyz = gs_x[threadIdx];
-		_ParticleVelocity[i].xyz = (gs_x[threadIdx] - x0 - _DampingFTL * gs_d[threadIdx]) / _DT;
+
+		if (ENABLE_CONSTRAINT_FTL)
+			_ParticleVelocity[i].xyz = (gs_x[threadIdx] - x0 - _DampingFTL * gs_d[threadIdx]) / _DT;
+		else
+			_ParticleVelocity[i].xyz = (gs_x[threadIdx] - x0) / _DT;
+	}
+}
+
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KUpdatePosition(
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+{
+	const uint i = worldIdx.x;
+	{
+		// update position
+		const float4 x0 = _ParticlePositionPrev[i];
+		const float4 v0 = _ParticleVelocityPrev[i];
+		const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeForce(i), 0.0);
+
+		_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
 	}
 }
 
