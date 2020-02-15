@@ -59,6 +59,30 @@ void SolveDistanceConstraint(
 	d1 -= (stiffness * w1) * r;
 }
 
+void SolveDistanceConstraintTEST(
+	const float distance, const float stiffness,
+	const float4 p0, const float4 p1,
+	inout float3 d0, inout float3 d1)
+{
+	//      d0                      d1
+	//    .----.                  .----.
+	// p0 ------><--------------><------ p1
+	//           \______________/
+	//               distance
+
+	float W_inv = 1.0 / (p0.w + p1.w);
+	//if (W_inv > 0.0)
+	{
+		float3 r = p1.xyz - p0.xyz;
+		float rd_inv = rsqrt(dot(r, r));
+
+		r *= 1.0 - (distance * rd_inv);
+
+		d0 += (stiffness * p0.w * W_inv) * r;
+		d1 -= (stiffness * p1.w * W_inv) * r;
+	}
+}
+
 void SolveDistanceMinConstraint(
 	const float distanceMin, const float stiffness,
 	const float w0, const float w1,
@@ -161,6 +185,32 @@ void SolveTriangleBendingConstraint(
 	d0 += (2.0 * w0 * W_inv * delta * stiffness) * r;
 	d1 -= (4.0 * w1 * W_inv * delta * stiffness) * r;
 	d2 += (2.0 * w2 * W_inv * delta * stiffness) * r;
+}
+
+void SolveTriangleBendingConstraintTEST(
+	const float radius, const float stiffness,
+	const float4 p0, const float4 p1, const float4 p2,
+	inout float3 d0, inout float3 d1, inout float3 d2)
+{
+	// A Triangle Bending Constraint Model for Position-Based Dynamics
+	// http://image.diku.dk/kenny/download/kelager.niebe.ea10.pdf
+	//
+	//                     p1
+	//                 . ´ : ` .
+	//            . ´      :      ` .
+	// :     . ´           c           ` .    :
+	// p0 ´ - - - - - - - - - - - - - - - - ` p2
+
+	float3 c = (p0.xyz + p1.xyz + p2.xyz) / 3.0;
+	float3 r = p1.xyz - c;
+	float rd_inv = rsqrt(dot(r, r));
+
+	float delta = 1.0 - radius * rd_inv;
+	float W_inv = 1.0 / (p0.w + p1.w*2.0 + p2.w);
+
+	d0 += (2.0 * p0.w * W_inv * delta * stiffness) * r;
+	d1 -= (4.0 * p1.w * W_inv * delta * stiffness) * r;
+	d2 += (2.0 * p2.w * W_inv * delta * stiffness) * r;
 }
 
 void SolveTriangleBendingMinConstraint(

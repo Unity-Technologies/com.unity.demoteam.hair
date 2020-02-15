@@ -15,10 +15,12 @@
 #define ENABLE_VOLUME_FRICTION			1
 #define ENABLE_VOLUME_REPULSION			1
 
-#define ENABLE_CONSTRAINT_COLLISION		0
+#define ENABLE_CONSTRAINT_COLLISION		1
 #define ENABLE_CONSTRAINT_DISTANCE		1
-#define ENABLE_CONSTRAINT_CURVATURE		0
-#define ENABLE_CONSTRAINT_FTL			0
+#define ENABLE_CONSTRAINT_CURVATURE		1
+#define ENABLE_CONSTRAINT_FTL			1
+
+#define EXTENDED 1
 
 float4x4 _LocalToWorld;
 float4x4 _LocalToWorldInvT;
@@ -423,8 +425,13 @@ void KSolveConstraints_GaussSeidel(
 	}
 }
 
+#if EXTENDED
+groupshared float4 gs_x[THREAD_GROUP_SIZE + 1];// pad head
+groupshared float3 gs_d[THREAD_GROUP_SIZE + 1];// pad head
+#else
 groupshared float3 gs_x[THREAD_GROUP_SIZE];
 groupshared float3 gs_d[THREAD_GROUP_SIZE];
+#endif
 
 // one thread group per strand
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
@@ -449,6 +456,128 @@ void KSolveConstraints_Jacobi(
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
 
 	const uint i = strandParticleBegin + strandParticleStride * threadIdx;
+#if EXTENDED
+
+	const uint j = threadIdx + 1;
+
+	// update position
+	const float3 x0 = _ParticlePositionPrev[i].xyz;
+	{
+		if (threadIdx == 0)
+		{
+			const float3 rootPosition = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
+			const float3 rootTangent = mul(_LocalToWorldInvT, float4(_RootTangent[strandIndex].xyz, 0.0)).xyz;
+			{
+				gs_x[0] = float4(rootPosition - rootTangent * _StrandParticleInterval, 0.0);
+				gs_x[1] = float4(rootPosition, 0.0);
+			}
+		}
+		else
+		{
+			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
+			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeForce(i);
+			{
+				gs_x[j] = float4(x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0), 1.0);
+				gs_d[j] = 0.0;
+			}
+		}
+	}
+
+	// solve constraints by Jacobi iteration
+	float3 d_ftl = 0.0;
+
+	for (uint __iter = 0; __iter != _Iterations; __iter++)
+	{
+		const float kStiffness = 1.0 - pow(abs(1.0 - _Stiffness), 1.0 / (__iter + 1));
+
+		GroupMemoryBarrierWithGroupSync();
+
+		if (threadIdx > 0)
+		{
+			float3 d = 0.0;
+			uint n = 0;
+
+			// solve collision constraints
+			if (ENABLE_CONSTRAINT_COLLISION)
+			{
+				SolveCollisionConstraint(gs_x[j].xyz, d); n++;
+			}
+
+			// solve distance constraints
+			if (ENABLE_CONSTRAINT_DISTANCE)
+			{
+				float3 nop = 0;
+				float3 sum = 0;
+				uint count = 0;
+
+				SolveDistanceConstraintTEST(_StrandParticleInterval, 1.0, gs_x[j - 1], gs_x[j], nop, d); n++;
+
+				if (threadIdx < THREAD_GROUP_SIZE - 1)
+				{
+					SolveDistanceConstraintTEST(_StrandParticleInterval, 1.0, gs_x[j], gs_x[j + 1], d, nop); n++;
+				}
+
+				d += sum * kStiffness;
+				n += count;
+			}
+
+			// solve triangle bending constraints
+			if (ENABLE_CONSTRAINT_CURVATURE)
+			{
+				float3 nop = 0;
+				float3 sum = 0;
+				uint count = 0;
+
+				SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop, nop, sum); count++;
+
+				if (threadIdx < THREAD_GROUP_SIZE - 1)
+				{
+					SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop, sum, nop); count++;
+
+					if (threadIdx < THREAD_GROUP_SIZE - 2)
+					{
+						SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop, nop); count++;
+					}
+				}
+
+				d += sum * kStiffness;
+				n += count;
+			}
+
+			// solve distance constraints along strand (FTL)
+			if (ENABLE_CONSTRAINT_FTL)
+			{
+				//TODO divide 'd' early to reduce averaging of FTL constraint?
+
+				float3 d_pre_ftl = d;
+				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[j - 1].xyz, gs_x[j].xyz, d); n++;
+				d_ftl += (d - d_pre_ftl) * (_Inference / n);
+			}
+
+			// move to next iteration
+			gs_x[j].xyz += d * (_Inference / n);
+		}
+	}
+
+	if (ENABLE_CONSTRAINT_FTL)
+	{
+		gs_d[j - 1] = d_ftl;
+	}
+
+	GroupMemoryBarrierWithGroupSync();
+
+	// derive velocity from effective change in position
+	{
+		_ParticlePosition[i].xyz = gs_x[j].xyz;
+
+		if (ENABLE_CONSTRAINT_FTL)
+			_ParticleVelocity[i].xyz = (gs_x[j].xyz - x0 - _DampingFTL * gs_d[j]) / _DT;
+		else
+			_ParticleVelocity[i].xyz = (gs_x[j].xyz - x0) / _DT;
+	}
+
+#else
+	//---------------------------------- ORIGINAL -----------------------------
 
 	// clear corrections
 	if (ENABLE_CONSTRAINT_FTL)
@@ -532,7 +661,7 @@ void KSolveConstraints_Jacobi(
 				{
 					const uint j = threadIdx;
 
-					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 1.0, 1.0, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
+					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, threadIdx != 2 ? 1.0 : 0.0, 1.0, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
 
 					if (threadIdx < THREAD_GROUP_SIZE - 1)
 					{
@@ -552,7 +681,9 @@ void KSolveConstraints_Jacobi(
 			// solve distance constraints along strand (FTL)
 			if (ENABLE_CONSTRAINT_FTL)
 			{
-				float3 d_pre_ftl = d;//TODO divide the delta early to reduce averaging of FTL constraint?
+				//TODO divide 'd' early to reduce averaging of FTL constraint?
+
+				float3 d_pre_ftl = d;
 				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
 
 				float inv_n = _Inference / n;
@@ -578,6 +709,7 @@ void KSolveConstraints_Jacobi(
 		else
 			_ParticleVelocity[i].xyz = (gs_x[threadIdx] - x0) / _DT;
 	}
+#endif
 }
 
 
