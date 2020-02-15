@@ -484,6 +484,16 @@ void KSolveConstraints_Jacobi(
 	}
 
 	// solve constraints by Jacobi iteration
+	uint n = 0;
+	{
+		const uint m = (THREAD_GROUP_SIZE - 1) - threadIdx;
+		n += ENABLE_CONSTRAINT_COLLISION;
+		n += ENABLE_CONSTRAINT_DISTANCE * min(2, 1 + m);
+		n += ENABLE_CONSTRAINT_CURVATURE * min(3, 1 + m);
+		n += ENABLE_CONSTRAINT_FTL;
+	}
+
+	float n_inv = _Inference / n;
 	float3 d_ftl = 0.0;
 
 	for (uint __iter = 0; __iter != _Iterations; __iter++)
@@ -492,15 +502,14 @@ void KSolveConstraints_Jacobi(
 
 		GroupMemoryBarrierWithGroupSync();
 
+		float3 d = 0.0;
+
 		if (threadIdx > 0)
 		{
-			float3 d = 0.0;
-			uint n = 0;
-
 			// solve collision constraints
 			if (ENABLE_CONSTRAINT_COLLISION)
 			{
-				SolveCollisionConstraint(gs_x[j].xyz, d); n++;
+				SolveCollisionConstraint(gs_x[j].xyz, d);
 			}
 
 			// solve distance constraints
@@ -508,11 +517,11 @@ void KSolveConstraints_Jacobi(
 			{
 				float3 nop = 0;
 
-				SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 1].xyz, gs_x[j].xyz, nop, d); n++;
+				SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 1].xyz, gs_x[j].xyz, nop, d);
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j].w, gs_x[j + 1].w, gs_x[j].xyz, gs_x[j + 1].xyz, d, nop); n++;
+					SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j].w, gs_x[j + 1].w, gs_x[j].xyz, gs_x[j + 1].xyz, d, nop);
 				}
 			}
 
@@ -521,15 +530,15 @@ void KSolveConstraints_Jacobi(
 			{
 				float3 nop = 0;
 
-				SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j - 2].w, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 2].xyz, gs_x[j - 1].xyz, gs_x[j].xyz, nop, nop, d); n++;
+				SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j - 2].w, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 2].xyz, gs_x[j - 1].xyz, gs_x[j].xyz, nop, nop, d);
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j - 1].w, gs_x[j].w, gs_x[j + 1].w, gs_x[j - 1].xyz, gs_x[j].xyz, gs_x[j + 1].xyz, nop, d, nop); n++;
+					SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j - 1].w, gs_x[j].w, gs_x[j + 1].w, gs_x[j - 1].xyz, gs_x[j].xyz, gs_x[j + 1].xyz, nop, d, nop);
 
 					if (threadIdx < THREAD_GROUP_SIZE - 2)
 					{
-						SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j].w, gs_x[j + 1].w, gs_x[j + 2].w, gs_x[j].xyz, gs_x[j + 1].xyz, gs_x[j + 2].xyz, d, nop, nop); n++;
+						SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j].w, gs_x[j + 1].w, gs_x[j + 2].w, gs_x[j].xyz, gs_x[j + 1].xyz, gs_x[j + 2].xyz, d, nop, nop);
 					}
 				}
 			}
@@ -540,12 +549,12 @@ void KSolveConstraints_Jacobi(
 				//TODO divide 'd' early to reduce averaging of FTL constraint?
 
 				float3 d_pre_ftl = d;
-				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[j - 1].xyz, gs_x[j].xyz, d); n++;
-				d_ftl += (d - d_pre_ftl) * (_Inference / n);
+				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[j - 1].xyz, gs_x[j].xyz, d);
+				d_ftl += (d - d_pre_ftl) * n_inv;
 			}
 
 			// move to next iteration
-			gs_x[j].xyz += d * (_Inference / n);
+			gs_x[j].xyz += d * n_inv;
 		}
 	}
 
