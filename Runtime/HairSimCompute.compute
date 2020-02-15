@@ -20,8 +20,6 @@
 #define ENABLE_CONSTRAINT_CURVATURE		1
 #define ENABLE_CONSTRAINT_FTL			1
 
-#define EXTENDED 1
-
 float4x4 _LocalToWorld;
 float4x4 _LocalToWorldInvT;
 
@@ -425,6 +423,8 @@ void KSolveConstraints_GaussSeidel(
 	}
 }
 
+#define EXTENDED 1
+
 #if EXTENDED
 groupshared float4 gs_x[THREAD_GROUP_SIZE + 1];// pad head
 groupshared float3 gs_d[THREAD_GROUP_SIZE + 1];// pad head
@@ -510,11 +510,11 @@ void KSolveConstraints_Jacobi(
 				float3 sum = 0;
 				uint count = 0;
 
-				SolveDistanceConstraintTEST(_StrandParticleInterval, 1.0, gs_x[j - 1], gs_x[j], nop, d); n++;
+				SolveDistanceConstraint(_StrandParticleInterval, 1.0, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 1].xyz, gs_x[j].xyz, nop, sum); n++;
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveDistanceConstraintTEST(_StrandParticleInterval, 1.0, gs_x[j], gs_x[j + 1], d, nop); n++;
+					SolveDistanceConstraint(_StrandParticleInterval, 1.0, gs_x[j].w, gs_x[j + 1].w, gs_x[j].xyz, gs_x[j + 1].xyz, sum, nop); n++;
 				}
 
 				d += sum * kStiffness;
@@ -528,15 +528,15 @@ void KSolveConstraints_Jacobi(
 				float3 sum = 0;
 				uint count = 0;
 
-				SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop, nop, sum); count++;
+				SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j - 2].w, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 2].xyz, gs_x[j - 1].xyz, gs_x[j].xyz, nop, nop, sum); count++;
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop, sum, nop); count++;
+					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j - 1].w, gs_x[j].w, gs_x[j + 1].w, gs_x[j - 1].xyz, gs_x[j].xyz, gs_x[j + 1].xyz, nop, sum, nop); count++;
 
 					if (threadIdx < THREAD_GROUP_SIZE - 2)
 					{
-						SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop, nop); count++;
+						SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j].w, gs_x[j + 1].w, gs_x[j + 2].w, gs_x[j].xyz, gs_x[j + 1].xyz, gs_x[j + 2].xyz, sum, nop, nop); count++;
 					}
 				}
 

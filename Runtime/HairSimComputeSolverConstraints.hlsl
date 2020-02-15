@@ -1,5 +1,23 @@
-//-------------------
-// solve constraints
+// Constraints between particles with infinite mass may exhibit division by zero.
+// Ideally, the application should not evaluate such constraints, as checking for
+// division by zero incurs an additional cost. For generic applications where the
+// mass of the particles is not known in advance, one can enable division by zero
+// checks by defining CONSTRAINTS_GUARD_DIVISION_BY_ZERO before including.
+//
+// E.g.:
+//   #define CONSTRAINTS_GUARD_DIVISION_BY_ZERO
+//   #include "HairSimComputeSlverConstraints.hlsl"
+
+//#define CONSTRAINTS_GUARD_DIVISION_BY_ZERO
+
+#ifdef CONSTRAINTS_GUARD_DIVISION_BY_ZERO
+#define GUARD(x) if (x)
+#else
+#define GUARD(x)
+#endif
+
+//--------------------
+// constraint solvers
 
 void SolveCollisionConstraint(
 	const float3 p,
@@ -18,25 +36,9 @@ void SolveCollisionConstraint(
 	if (P.w < 0.0)
 	{
 		d += P.xyz * P.w;
+		//TODO friction
 	}
 }
-
-/*
-void SolveCollisionFrictionConstraint(
-	const float friction,
-	const float3 x,
-	const float3 p,
-	inout float3 d)
-{
-	//TODO
-
-	float4 P = BoundaryNormalDistance(p);
-	if (P.w < 0.0)
-	{
-		d += P.xyz * P.w;
-	}
-}
-*/
 
 void SolveDistanceConstraint(
 	const float distance, const float stiffness,
@@ -53,33 +55,13 @@ void SolveDistanceConstraint(
 	float3 r = p1 - p0;
 	float rd_inv = rsqrt(dot(r, r));
 
-	r *= 1.0 - (distance * rd_inv);
+	float delta = 1.0 - (distance * rd_inv);
+	float W_inv = (delta * stiffness) / (w0 + w1);
 
-	d0 += (stiffness * w0) * r;
-	d1 -= (stiffness * w1) * r;
-}
-
-void SolveDistanceConstraintTEST(
-	const float distance, const float stiffness,
-	const float4 p0, const float4 p1,
-	inout float3 d0, inout float3 d1)
-{
-	//      d0                      d1
-	//    .----.                  .----.
-	// p0 ------><--------------><------ p1
-	//           \______________/
-	//               distance
-
-	float W_inv = 1.0 / (p0.w + p1.w);
-	//if (W_inv > 0.0)
+	GUARD(W_inv > 0.0)
 	{
-		float3 r = p1.xyz - p0.xyz;
-		float rd_inv = rsqrt(dot(r, r));
-
-		r *= 1.0 - (distance * rd_inv);
-
-		d0 += (stiffness * p0.w * W_inv) * r;
-		d1 -= (stiffness * p1.w * W_inv) * r;
+		d0 += (w0 * W_inv) * r;
+		d1 -= (w1 * W_inv) * r;
 	}
 }
 
@@ -98,10 +80,14 @@ void SolveDistanceMinConstraint(
 	// =>
 	// { ... 1.0 - max(1.0, distanceMin / rd) }
 
-	r *= 1.0 - max(1.0, distanceMin * rd_inv);
+	float delta = 1.0 - max(1.0, distanceMin * rd_inv);
+	float W_inv = (delta * stiffness) / (w0 + w1);
 
-	d0 += (stiffness * w0) * r;
-	d1 -= (stiffness * w1) * r;
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (w0 * W_inv) * r;
+		d1 -= (w1 * W_inv) * r;
+	}
 }
 
 void SolveDistanceMaxConstraint(
@@ -119,10 +105,14 @@ void SolveDistanceMaxConstraint(
 	// =>
 	// { ... 1.0 - min(1.0, distanceMax / rd) }
 
-	r *= 1.0 - min(1.0, distanceMax * rd_inv);
+	float delta = 1.0 - min(1.0, distanceMax * rd_inv);
+	float W_inv = (delta * stiffness) / (w0 + w1);
 
-	d0 += (stiffness * w0) * r;
-	d1 -= (stiffness * w1) * r;
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (w0 * W_inv) * r;
+		d1 -= (w1 * W_inv) * r;
+	}
 }
 
 void SolveDistanceLRAConstraint(const float distanceMax, const float3 p0, const float3 p1, inout float3 d1)
@@ -162,7 +152,7 @@ void SolveDistanceFTLConstraint(const float distance, const float3 p0, const flo
 
 void SolveTriangleBendingConstraint(
 	const float radius, const float stiffness,
-	const float w0, const float w1, const float w2,
+	const float w0, float w1, const float w2,
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
@@ -174,51 +164,32 @@ void SolveTriangleBendingConstraint(
 	//            . ´      :      ` .
 	// :     . ´           c           ` .    :
 	// p0 ´ - - - - - - - - - - - - - - - - ` p2
+
+	w1 *= 2.0;
 
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
 	float rd_inv = rsqrt(dot(r, r));
 
 	float delta = 1.0 - radius * rd_inv;
-	float W_inv = 1.0 / (w0 + w1 * 2.0 + w2);
+	float W_inv = (2.0 * delta * stiffness) / (w0 + w1 + w2);
 
-	d0 += (2.0 * w0 * W_inv * delta * stiffness) * r;
-	d1 -= (4.0 * w1 * W_inv * delta * stiffness) * r;
-	d2 += (2.0 * w2 * W_inv * delta * stiffness) * r;
-}
-
-void SolveTriangleBendingConstraintTEST(
-	const float radius, const float stiffness,
-	const float4 p0, const float4 p1, const float4 p2,
-	inout float3 d0, inout float3 d1, inout float3 d2)
-{
-	// A Triangle Bending Constraint Model for Position-Based Dynamics
-	// http://image.diku.dk/kenny/download/kelager.niebe.ea10.pdf
-	//
-	//                     p1
-	//                 . ´ : ` .
-	//            . ´      :      ` .
-	// :     . ´           c           ` .    :
-	// p0 ´ - - - - - - - - - - - - - - - - ` p2
-
-	float3 c = (p0.xyz + p1.xyz + p2.xyz) / 3.0;
-	float3 r = p1.xyz - c;
-	float rd_inv = rsqrt(dot(r, r));
-
-	float delta = 1.0 - radius * rd_inv;
-	float W_inv = 1.0 / (p0.w + p1.w*2.0 + p2.w);
-
-	d0 += (2.0 * p0.w * W_inv * delta * stiffness) * r;
-	d1 -= (4.0 * p1.w * W_inv * delta * stiffness) * r;
-	d2 += (2.0 * p2.w * W_inv * delta * stiffness) * r;
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (w0 * W_inv) * r;
+		d1 -= (w1 * W_inv) * r;
+		d2 += (w2 * W_inv) * r;
+	}
 }
 
 void SolveTriangleBendingMinConstraint(
 	const float radiusMin, const float stiffness,
-	const float w0, const float w1, const float w2,
+	const float w0, float w1, const float w2,
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
+	w1 *= 2.0;
+
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
 	float rd_inv = rsqrt(dot(r, r));
@@ -230,19 +201,24 @@ void SolveTriangleBendingMinConstraint(
 	// { ... 1.0 - max(1.0, radiusMin / rd) }
 
 	float delta = 1.0 - max(1.0, radiusMin * rd_inv);
-	float W_inv = 1.0 / (w0 + w1 * 2.0 + w2);
+	float W_inv = (2.0 * delta * stiffness) / (w0 + w1 + w2);
 
-	d0 += (2.0 * w0 * W_inv * delta * stiffness) * r;
-	d1 -= (4.0 * w1 * W_inv * delta * stiffness) * r;
-	d2 += (2.0 * w2 * W_inv * delta * stiffness) * r;
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (w0 * W_inv) * r;
+		d1 -= (w1 * W_inv) * r;
+		d2 += (w2 * W_inv) * r;
+	}
 }
 
 void SolveTriangleBendingMaxConstraint(
 	const float radiusMax, const float stiffness,
-	const float w0, const float w1, const float w2,
+	const float w0, float w1, const float w2,
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
+	w1 *= 2.0;
+
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
 	float rd_inv = rsqrt(dot(r, r));
@@ -254,15 +230,18 @@ void SolveTriangleBendingMaxConstraint(
 	// { ... 1.0 - min(1.0, radiusMax / rd) }
 
 	float delta = 1.0 - min(1.0, radiusMax * rd_inv);
-	float W_inv = 1.0 / (w0 + w1 * 2.0 + w2);
+	float W_inv = (2.0 * delta * stiffness) / (w0 + w1 + w2);
 
-	d0 += (2.0 * w0 * W_inv * delta * stiffness) * r;
-	d1 -= (4.0 * w1 * W_inv * delta * stiffness) * r;
-	d2 += (2.0 * w2 * W_inv * delta * stiffness) * r;
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (w0 * W_inv) * r;
+		d1 -= (w1 * W_inv) * r;
+		d2 += (w2 * W_inv) * r;
+	}
 }
 
-//-------------------
-// apply constraints
+//----------------------
+// constraint shortcuts
 
 void ApplyCollisionConstraint(inout float3 p)
 {
