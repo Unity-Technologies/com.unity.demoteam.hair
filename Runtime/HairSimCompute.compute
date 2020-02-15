@@ -507,65 +507,31 @@ void KSolveConstraints_Jacobi(
 			if (ENABLE_CONSTRAINT_DISTANCE)
 			{
 				float3 nop = 0;
-				float3 sum = 0;
-				uint count = 0;
 
-#define PACK
-#ifdef PACK
-				SolveDistanceConstraintTEST(_StrandParticleInterval, 1.0, gs_x[j - 1], gs_x[j], nop, sum); n++;
+				SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 1].xyz, gs_x[j].xyz, nop, d); n++;
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveDistanceConstraintTEST(_StrandParticleInterval, 1.0, gs_x[j], gs_x[j + 1], sum, nop); n++;
+					SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j].w, gs_x[j + 1].w, gs_x[j].xyz, gs_x[j + 1].xyz, d, nop); n++;
 				}
-#else
-				SolveDistanceConstraint(_StrandParticleInterval, 1.0, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 1].xyz, gs_x[j].xyz, nop, sum); n++;
-
-				if (threadIdx < THREAD_GROUP_SIZE - 1)
-				{
-					SolveDistanceConstraint(_StrandParticleInterval, 1.0, gs_x[j].w, gs_x[j + 1].w, gs_x[j].xyz, gs_x[j + 1].xyz, sum, nop); n++;
-				}
-#endif
-
-				d += sum * kStiffness;
-				n += count;
 			}
 
 			// solve triangle bending constraints
 			if (ENABLE_CONSTRAINT_CURVATURE)
 			{
 				float3 nop = 0;
-				float3 sum = 0;
-				uint count = 0;
 
-#ifdef PACK
-				SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop, nop, sum); count++;
+				SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j - 2].w, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 2].xyz, gs_x[j - 1].xyz, gs_x[j].xyz, nop, nop, d); n++;
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop, sum, nop); count++;
+					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j - 1].w, gs_x[j].w, gs_x[j + 1].w, gs_x[j - 1].xyz, gs_x[j].xyz, gs_x[j + 1].xyz, nop, d, nop); n++;
 
 					if (threadIdx < THREAD_GROUP_SIZE - 2)
 					{
-						SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop, nop); count++;
+						SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j].w, gs_x[j + 1].w, gs_x[j + 2].w, gs_x[j].xyz, gs_x[j + 1].xyz, gs_x[j + 2].xyz, d, nop, nop); n++;
 					}
 				}
-#else
-				SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j - 2].w, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 2].xyz, gs_x[j - 1].xyz, gs_x[j].xyz, nop, nop, sum); count++;
-
-				if (threadIdx < THREAD_GROUP_SIZE - 1)
-				{
-					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j - 1].w, gs_x[j].w, gs_x[j + 1].w, gs_x[j - 1].xyz, gs_x[j].xyz, gs_x[j + 1].xyz, nop, sum, nop); count++;
-
-					if (threadIdx < THREAD_GROUP_SIZE - 2)
-					{
-						SolveTriangleBendingConstraint(_BendingCurvature, 1.0, gs_x[j].w, gs_x[j + 1].w, gs_x[j + 2].w, gs_x[j].xyz, gs_x[j + 1].xyz, gs_x[j + 2].xyz, sum, nop, nop); count++;
-					}
-				}
-#endif
-
-				d += sum * kStiffness;
-				n += count;
 			}
 
 			// solve distance constraints along strand (FTL)
