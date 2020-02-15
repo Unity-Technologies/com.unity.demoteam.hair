@@ -36,9 +36,25 @@ void SolveCollisionConstraint(
 	if (P.w < 0.0)
 	{
 		d += P.xyz * P.w;
-		//TODO friction
 	}
 }
+
+/*
+void SolveCollisionFrictionConstraint(
+	const float friction,
+	const float3 x,
+	const float3 p,
+	inout float3 d)
+{
+	//TODO
+
+	float4 P = BoundaryNormalDistance(p);
+	if (P.w < 0.0)
+	{
+		d += P.xyz * P.w;
+	}
+}
+*/
 
 void SolveDistanceConstraint(
 	const float distance, const float stiffness,
@@ -62,6 +78,31 @@ void SolveDistanceConstraint(
 	{
 		d0 += (w0 * W_inv) * r;
 		d1 -= (w1 * W_inv) * r;
+	}
+}
+
+
+void SolveDistanceConstraintGROUP(
+	const float distance, const float stiffness,
+	const float4 p0, const float4 p1,
+	inout float3 d0, inout float3 d1)
+{
+	//      d0                      d1
+	//    .----.                  .----.
+	// p0 ------><--------------><------ p1
+	//           \______________/
+	//               distance
+
+	float3 r = p1.xyz - p0.xyz;
+	float rd_inv = rsqrt(dot(r, r));
+
+	float delta = 1.0 - (distance * rd_inv);
+	float W_inv = (delta * stiffness) / (p0.w + p1.w);
+
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (p0.w * W_inv) * r;
+		d1 -= (p1.w * W_inv) * r;
 	}
 }
 
@@ -152,7 +193,7 @@ void SolveDistanceFTLConstraint(const float distance, const float3 p0, const flo
 
 void SolveTriangleBendingConstraint(
 	const float radius, const float stiffness,
-	const float w0, float w1, const float w2,
+	const float w0, const float w1, const float w2,
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
@@ -165,20 +206,48 @@ void SolveTriangleBendingConstraint(
 	// :     . ´           c           ` .    :
 	// p0 ´ - - - - - - - - - - - - - - - - ` p2
 
-	w1 *= 2.0;
-
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
 	float rd_inv = rsqrt(dot(r, r));
 
 	float delta = 1.0 - radius * rd_inv;
-	float W_inv = (2.0 * delta * stiffness) / (w0 + w1 + w2);
+	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2);
 
 	GUARD(W_inv > 0.0)
 	{
 		d0 += (w0 * W_inv) * r;
-		d1 -= (w1 * W_inv) * r;
+		d1 -= (w1 * W_inv * 2.0) * r;
 		d2 += (w2 * W_inv) * r;
+	}
+}
+
+void SolveTriangleBendingConstraintGROUP(
+	const float radius, const float stiffness,
+	const float4 p0, const float4 p1, const float4 p2,
+	inout float3 d0, inout float3 d1, inout float3 d2)
+{
+	// A Triangle Bending Constraint Model for Position-Based Dynamics
+	// http://image.diku.dk/kenny/download/kelager.niebe.ea10.pdf
+	//
+	//                     p1
+	//                 . ´ : ` .
+	//            . ´      :      ` .
+	// :     . ´           c           ` .    :
+	// p0 ´ - - - - - - - - - - - - - - - - ` p2
+
+	float3 c = (p0.xyz + p1.xyz + p2.xyz) / 3.0;
+	float3 r = p1.xyz - c;
+	float rd_inv = rsqrt(dot(r, r));
+
+	float delta = 1.0 - radius * rd_inv;
+	float p1_w = p1.w * 2.0;
+	float W_inv = (2.0 * delta * stiffness) / (p0.w + p1_w + p2.w);
+
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (p0.w * W_inv) * r;
+		d1 -= (p1_w * W_inv) * r;
+		d2 += (p2.w * W_inv) * r;
 	}
 }
 
