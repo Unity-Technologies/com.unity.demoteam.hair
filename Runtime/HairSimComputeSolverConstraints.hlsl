@@ -82,7 +82,7 @@ void SolveDistanceConstraint(
 }
 
 
-void SolveDistanceConstraintGROUP(
+void SolveDistanceConstraintTEST(
 	const float distance, const float stiffness,
 	const float4 p0, const float4 p1,
 	inout float3 d0, inout float3 d1)
@@ -221,7 +221,7 @@ void SolveTriangleBendingConstraint(
 	}
 }
 
-void SolveTriangleBendingConstraintGROUP(
+void SolveTriangleBendingConstraintTEST(
 	const float radius, const float stiffness,
 	const float4 p0, const float4 p1, const float4 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)

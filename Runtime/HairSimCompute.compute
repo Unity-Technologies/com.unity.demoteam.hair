@@ -510,13 +510,13 @@ void KSolveConstraints_Jacobi(
 				float3 sum = 0;
 				uint count = 0;
 
-//#define GROUP
-#ifdef GROUP
-				SolveDistanceConstraintGROUP(_StrandParticleInterval, 1.0, gs_x[j - 1], gs_x[j], nop, sum); n++;
+#define PACK
+#ifdef PACK
+				SolveDistanceConstraintTEST(_StrandParticleInterval, 1.0, gs_x[j - 1], gs_x[j], nop, sum); n++;
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveDistanceConstraintGROUP(_StrandParticleInterval, 1.0, gs_x[j], gs_x[j + 1], sum, nop); n++;
+					SolveDistanceConstraintTEST(_StrandParticleInterval, 1.0, gs_x[j], gs_x[j + 1], sum, nop); n++;
 				}
 #else
 				SolveDistanceConstraint(_StrandParticleInterval, 1.0, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 1].xyz, gs_x[j].xyz, nop, sum); n++;
@@ -538,16 +538,16 @@ void KSolveConstraints_Jacobi(
 				float3 sum = 0;
 				uint count = 0;
 
-#ifdef GROUP
-				SolveTriangleBendingConstraintGROUP(_BendingCurvature, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop, nop, sum); count++;
+#ifdef PACK
+				SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop, nop, sum); count++;
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveTriangleBendingConstraintGROUP(_BendingCurvature, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop, sum, nop); count++;
+					SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop, sum, nop); count++;
 
 					if (threadIdx < THREAD_GROUP_SIZE - 2)
 					{
-						SolveTriangleBendingConstraintGROUP(_BendingCurvature, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop, nop); count++;
+						SolveTriangleBendingConstraintTEST(_BendingCurvature, 1.0, gs_x[j], gs_x[j + 1], gs_x[j + 2], sum, nop, nop); count++;
 					}
 				}
 #else
