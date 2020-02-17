@@ -4,9 +4,7 @@
 
 	#pragma target 5.0
 	
-	//#include "HairSimComputeConfig.hlsl"
-	#define LAYOUT_INTERLEAVED 1
-	#define DENSITY_SCALE 8192.0
+	#include "HairSimComputeConfig.hlsl"
 
 	uint _StrandCount;
 	uint _StrandParticleCount;

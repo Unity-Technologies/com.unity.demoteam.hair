@@ -7,9 +7,7 @@
 #pragma kernel KVolumeVelocityDensity
 #pragma kernel KVolumeGradient
 
-//#include "HairSimComputeConfig.hlsl"
-#define DENSITY_SCALE 8192.0
-#define DENSITY_TRILINEAR 1
+#include "HairSimComputeConfig.hlsl"
 
 #define PARTICLE_NUM_X 64
 #define PARTICLE_NUM_Y 1

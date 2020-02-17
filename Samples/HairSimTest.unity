@@ -1033,8 +1033,8 @@ MonoBehaviour:
   solver:
     method: 1
     iterations: 10
-    inference: 1
     stiffness: 1
+    inference: 1
     damping: 0.9
     gravity: 1
     repulsion: 0
@@ -1312,8 +1312,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   strands:
     style: 2
-    strandCount: 8192
-    strandParticleCount: 64
+    strandCount: 30000
+    strandParticleCount: 32
     strandLength: 1
   volume:
     volumeSplatMethod: 1
@@ -1327,7 +1327,7 @@ MonoBehaviour:
     drawDensity: 0
     drawGradient: 0
     drawSliceX: 0
-    drawSliceY: 1
+    drawSliceY: 0
     drawSliceZ: 0
     drawSliceOffsetX: 0.888
     drawSliceOffsetY: 0.259
@@ -1335,13 +1335,13 @@ MonoBehaviour:
     drawSliceDivider: 0
   solver:
     method: 2
-    iterations: 50
-    inference: 2
+    iterations: 30
     stiffness: 1
+    inference: 2
     damping: 0.5
     gravity: 1
-    repulsion: 0.85
-    friction: 0.8
+    repulsion: 0.5
+    friction: 0
     bendingCurvature: 0
     bendingStiffness: 0
     dampingFTL: 0.85
@@ -1423,8 +1423,8 @@ MonoBehaviour:
   solver:
     method: 0
     iterations: 2
-    inference: 1
     stiffness: 1
+    inference: 1
     damping: 0.9
     gravity: 1
     repulsion: 0
