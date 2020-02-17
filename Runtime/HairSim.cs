@@ -599,7 +599,7 @@ namespace Unity.DemoTeam.Hair
 
 		private Vector3 GetVolumeExtent()
 		{
-			return (0.75f + 1.2f * strands.strandLength) * Vector3.one;
+			return (0.75f + 1.25f * strands.strandLength) * Vector3.one;
 		}
 
 		private int GetVolumeCellCount()

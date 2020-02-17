@@ -120,11 +120,6 @@ float3 ParticleVolumeRepulsionForce(uint i)
 //---------
 // utility
 
-float GetPosition(int i)
-{
-
-}
-
 float GetDecay()
 {
 	return pow(max(1e-4, 1.0 - _Damping), _DT);
