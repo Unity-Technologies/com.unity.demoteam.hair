@@ -32,11 +32,8 @@ void SolveCollisionConstraint(
 	//                :
 	//                .
 
-	float4 P = BoundaryNormalDistance(p);
-	if (P.w < 0.0)
-	{
-		d += P.xyz * P.w;
-	}
+	float4 contact = BoundaryContact(p);
+	d += contact.xyz * contact.w;
 }
 
 /*
@@ -250,8 +247,58 @@ void SolveTriangleBendingMaxConstraint(
 	}
 }
 
-//----------------------
-// constraint shortcuts
+//--------------------------------------------------
+// constraint shortcuts: weight in fourth component
+void SolveDistanceConstraint(
+	const float distance, const float stiffness,
+	const float4 p0, const float4 p1,
+	inout float3 d0, inout float3 d1)
+{
+	SolveDistanceConstraint(distance, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
+}
+
+void SolveDistanceMinConstraint(
+	const float distanceMin, const float stiffness,
+	const float4 p0, const float4 p1,
+	inout float3 d0, inout float3 d1)
+{
+	SolveDistanceMinConstraint(distanceMin, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
+}
+
+void SolveDistanceMaxConstraint(
+	const float distanceMax, const float stiffness,
+	const float4 p0, const float4 p1,
+	inout float3 d0, inout float3 d1)
+{
+	SolveDistanceMaxConstraint(distanceMax, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
+}
+
+void SolveTriangleBendingConstraint(
+	const float radius, const float stiffness,
+	const float4 p0, const float4 p1, const float4 p2,
+	inout float3 d0, inout float3 d1, inout float3 d2)
+{
+	SolveTriangleBendingConstraint(radius, stiffness, p0.w, p1.w, p2.w, p0.xyz, p1.xyz, p2.xyz, d0, d1, d2);
+}
+
+void SolveTriangleBendingMinConstraint(
+	const float radiusMin, const float stiffness,
+	const float4 p0, const float4 p1, const float4 p2,
+	inout float3 d0, inout float3 d1, inout float3 d2)
+{
+	SolveTriangleBendingMinConstraint(radiusMin, stiffness, p0.w, p1.w, p2.w, p0.xyz, p1.xyz, p2.xyz, d0, d1, d2);
+}
+
+void SolveTriangleBendingMaxConstraint(
+	const float radiusMax, const float stiffness,
+	const float4 p0, const float4 p1, const float4 p2,
+	inout float3 d0, inout float3 d1, inout float3 d2)
+{
+	SolveTriangleBendingMaxConstraint(radiusMax, stiffness, p0.w, p1.w, p2.w, p0.xyz, p1.xyz, p2.xyz, d0, d1, d2);
+}
+
+//------------------------------------------------------------
+// constraint shortcuts: apply directly to position variables
 
 void ApplyCollisionConstraint(inout float3 p)
 {

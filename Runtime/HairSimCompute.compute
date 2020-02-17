@@ -7,8 +7,6 @@
 #pragma kernel KUpdatePosition							THREAD_GROUP_SIZE=64
 #pragma kernel KUpdateVelocity							THREAD_GROUP_SIZE=64
 
-#include "HairSimComputeConfig.hlsl"
-
 #define ENABLE_VOLUME_FRICTION			1
 #define ENABLE_VOLUME_REPULSION			1
 
@@ -16,6 +14,13 @@
 #define ENABLE_CONSTRAINT_DISTANCE		1
 #define ENABLE_CONSTRAINT_CURVATURE		1
 #define ENABLE_CONSTRAINT_FTL			1
+
+#include "HairSimComputeConfig.hlsl"
+#include "HairSimComputeSolverBoundaries.hlsl"
+#include "HairSimComputeSolverConstraints.hlsl"
+
+//----------
+// uniforms
 
 float4x4 _LocalToWorld;
 float4x4 _LocalToWorldInvT;
@@ -47,36 +52,18 @@ RWStructuredBuffer<float4> _ParticlePosition;
 RWStructuredBuffer<float4> _ParticlePositionCorr;
 RWStructuredBuffer<float4> _ParticleVelocity;
 
-//----------
-// includes
-
-#include "HairSimComputeSolverBoundaries.hlsl"
-#include "HairSimComputeSolverConstraints.hlsl"
-
-//--------
-// volume
-
 float3 _VolumeCells;
 float3 _VolumeWorldMin;
 float3 _VolumeWorldMax;
 
 Texture3D<int> _VolumeDensity;
-Texture3D<int> _VolumeVelocityX;
-Texture3D<int> _VolumeVelocityY;
-Texture3D<int> _VolumeVelocityZ;
 Texture3D<float3> _VolumeVelocity;
 Texture3D<float3> _VolumeGradient;
 SamplerState sampler_VolumeVelocity;
 SamplerState sampler_VolumeGradient;
 
-float3 NormalizeElseZero(float3 n)
-{
-	float d = dot(n, n);
-	if (d > 0.0)
-		return n * rsqrt(d);
-	else
-		return 0;
-}
+//----------
+// indexing
 
 float3 ParticleVolumePosition(uint i)
 {
@@ -100,28 +87,52 @@ uint3 ParticleVolumeIndex(uint i)
 
 float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
-#if ENABLE_VOLUME_FRICTION
-	float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
-	float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, volumeUVW, 0);
-	return (volumeVelocity - velocity) * friction;
-#else
-	uint3 volumeIdx = ParticleVolumeIndex(i);
-	float3 volumeVelocity = _VolumeVelocity[volumeIdx];
-	return (volumeVelocity - velocity) * friction;
+	if (ENABLE_VOLUME_FRICTION)
+	{
+		float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
+		float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, volumeUVW, 0);
+#if 0
+		float3 volumeNormal = normalize(_VolumeGradient.SampleLevel(sampler_VolumeGradient, volumeUVW, 0));
+		volumeVelocity -= volumeNormal * dot(volumeNormal, volumeVelocity);
 #endif
+		return (volumeVelocity - velocity) * friction;
+	}
+	else
+	{
+		return 0.0;
+	}
 }
 
 float3 ParticleVolumeRepulsionForce(uint i)
 {
-#if ENABLE_VOLUME_REPULSION
-	float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
-	float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, volumeUVW, 0);
-	return volumeGradient * _Repulsion;
-#else
-	uint3 volumeIdx = ParticleVolumeIndex(i);
-	float3 volumeGradient = _VolumeGradient[volumeIdx];
-	return volumeGradient * _Repulsion;
-#endif
+	if (ENABLE_VOLUME_REPULSION)
+	{
+		float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
+		float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, volumeUVW, 0);
+		return volumeGradient * _Repulsion;
+	}
+	else
+	{
+		return 0.0;
+	}
+}
+
+//---------
+// utility
+
+float GetPosition(int i)
+{
+
+}
+
+float GetDecay()
+{
+	return pow(max(1e-4, 1.0 - _Damping), _DT);
+}
+
+float3 Integrate(float3 x0, float3 v0, float3 a0)
+{
+	return x0 + (_DT * GetDecay()) * (v0 + _DT * a0);
 }
 
 //---------
@@ -153,21 +164,21 @@ void KSolveConstraints_GaussSeidelReference(
 	{
 		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 		{
-			_ParticlePositionCorr[i] = 0;
+			_ParticlePositionCorr[i].xyz = 0;
 		}
 	}
 
 	// update positions
 	{
-		_ParticlePosition[strandParticleBegin] = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0));
+		_ParticlePosition[strandParticleBegin].xyz = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
 
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
-			const float4 x0 = _ParticlePositionPrev[i];
-			const float4 v0 = _ParticleVelocityPrev[i] + float4(ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction), 0.0);
-			const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeRepulsionForce(i), 0.0);
+			const float3 x0 = _ParticlePositionPrev[i].xyz;
+			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
+			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
 			{
-				_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
+				_ParticlePosition[i].xyz = Integrate(x0, v0, a0);
 			}
 		}
 	}
@@ -280,9 +291,9 @@ void KSolveConstraints_GaussSeidelReference(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			if (ENABLE_CONSTRAINT_FTL)
-				_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionCorr[i]) / _DT;
+				_ParticleVelocity[i].xyz = (_ParticlePosition[i].xyz - _ParticlePositionPrev[i].xyz - _DampingFTL * _ParticlePositionCorr[i].xyz) / _DT;
 			else
-				_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i]) / _DT;
+				_ParticleVelocity[i].xyz = (_ParticlePosition[i].xyz - _ParticlePositionPrev[i].xyz) / _DT;
 		}
 	}
 }
@@ -323,11 +334,11 @@ void KSolveConstraints_GaussSeidel(
 
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
-			const float4 x0 = _ParticlePositionPrev[i];
-			const float4 v0 = _ParticleVelocityPrev[i] + float4(ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction), 0.0);
-			const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeRepulsionForce(i), 0.0);
+			const float3 x0 = _ParticlePositionPrev[i].xyz;
+			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
+			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
 			{
-				_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
+				_ParticlePosition[i].xyz = Integrate(x0, v0, a0);
 			}
 		}
 	}
@@ -358,8 +369,8 @@ void KSolveConstraints_GaussSeidel(
 		//--- p0 (fixed)
 		//    |
 		//    ## (below)
-		if (ENABLE_CONSTRAINT_COLLISION)	ApplyCollisionConstraint(p2.xyz);
-		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1.xyz, p2.xyz);
+		if (ENABLE_CONSTRAINT_COLLISION)	ApplyCollisionConstraint(p2);
+		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1, p2);
 		if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
 		for (uint i = strandParticleBegin + strandParticleStride * 3; i != strandParticleEnd; i += strandParticleStride)
@@ -413,9 +424,9 @@ void KSolveConstraints_GaussSeidel(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			if (ENABLE_CONSTRAINT_FTL)
-				_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i] - _DampingFTL * _ParticlePositionCorr[i]) / _DT;
+				_ParticleVelocity[i].xyz = (_ParticlePosition[i].xyz - _ParticlePositionPrev[i].xyz - _DampingFTL * _ParticlePositionCorr[i].xyz) / _DT;
 			else
-				_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i]) / _DT;
+				_ParticleVelocity[i].xyz = (_ParticlePosition[i].xyz - _ParticlePositionPrev[i].xyz) / _DT;
 		}
 	}
 }
@@ -473,7 +484,7 @@ void KSolveConstraints_Jacobi(
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
 			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
 			{
-				gs_x[j] = float4(x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0), 1.0);
+				gs_x[j] = float4(Integrate(x0, v0, a0), 1.0);
 				gs_d[j] = 0.0;
 			}
 		}
@@ -512,11 +523,11 @@ void KSolveConstraints_Jacobi(
 			{
 				float3 nop = 0;
 
-				SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 1].xyz, gs_x[j].xyz, nop, d);
+				SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j - 1], gs_x[j], nop, d);
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j].w, gs_x[j + 1].w, gs_x[j].xyz, gs_x[j + 1].xyz, d, nop);
+					SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j], gs_x[j + 1], d, nop);
 				}
 			}
 
@@ -525,15 +536,15 @@ void KSolveConstraints_Jacobi(
 			{
 				float3 nop = 0;
 
-				SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j - 2].w, gs_x[j - 1].w, gs_x[j].w, gs_x[j - 2].xyz, gs_x[j - 1].xyz, gs_x[j].xyz, nop, nop, d);
+				SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j - 2], gs_x[j - 1], gs_x[j], nop, nop, d);
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j - 1].w, gs_x[j].w, gs_x[j + 1].w, gs_x[j - 1].xyz, gs_x[j].xyz, gs_x[j + 1].xyz, nop, d, nop);
+					SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop, d, nop);
 
 					if (threadIdx < THREAD_GROUP_SIZE - 2)
 					{
-						SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j].w, gs_x[j + 1].w, gs_x[j + 2].w, gs_x[j].xyz, gs_x[j + 1].xyz, gs_x[j + 2].xyz, d, nop, nop);
+						SolveTriangleBendingConstraint(_BendingCurvature, kStiffness, gs_x[j], gs_x[j + 1], gs_x[j + 2], d, nop, nop);
 					}
 				}
 			}
@@ -587,7 +598,7 @@ void KSolveConstraints_Jacobi(
 		if (threadIdx == 0)
 			gs_x[threadIdx] = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
 		else
-			gs_x[threadIdx] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
+			gs_x[threadIdx] = Integrate(x0, v0, a0);
 	}
 
 	// solve constraints by Jacobi iteration
@@ -721,11 +732,11 @@ void KUpdatePosition(
 	const uint i = worldIdx.x;
 	{
 		// update position
-		const float4 x0 = _ParticlePositionPrev[i];
-		const float4 v0 = _ParticleVelocityPrev[i];
-		const float4 a0 = float4(0.0, _Gravity, 0.0, 0.0) + float4(ParticleVolumeRepulsionForce(i), 0.0);
+		const float3 x0 = _ParticlePositionPrev[i].xyz;
+		const float3 v0 = _ParticleVelocityPrev[i].xyz;
+		const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
 
-		_ParticlePosition[i] = x0 + (_DT * pow(max(1e-4, 1.0 - _Damping), _DT)) * (v0 + _DT * a0);
+		_ParticlePosition[i].xyz = Integrate(x0, v0, a0);
 	}
 }
 
@@ -743,6 +754,6 @@ void KUpdateVelocity(
 	const uint i = worldIdx.x;
 	{
 		// derive velocity from change in position
-		_ParticleVelocity[i] = (_ParticlePosition[i] - _ParticlePositionPrev[i]) / _DT;
+		_ParticleVelocity[i].xyz = (_ParticlePosition[i].xyz - _ParticlePositionPrev[i].xyz) / _DT;
 	}
 }
