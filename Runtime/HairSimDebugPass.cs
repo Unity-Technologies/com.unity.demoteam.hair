@@ -55,8 +55,8 @@ namespace Unity.DemoTeam.Hair
 					{
 						using (new ProfilingSample(cmd, "HairSim.Step (GPU)"))
 							hairSim.Step(cmd, dt);
-						using (new ProfilingSample(cmd, "HairSim.Voxelize (GPU)"))
-							hairSim.Voxelize(cmd, dt);
+						using (new ProfilingSample(cmd, "HairSim.Volume (GPU)"))
+							hairSim.Volume(cmd, dt);
 					}
 				}
 

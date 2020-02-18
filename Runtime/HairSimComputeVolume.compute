@@ -1,10 +1,11 @@
 ﻿#pragma kernel KVolumeClear
-#pragma kernel KVolumeDensity
-#pragma kernel KVolumeVelocityX
-#pragma kernel KVolumeVelocityY
-#pragma kernel KVolumeVelocityZ
-#pragma kernel KVolumeVelocity
-#pragma kernel KVolumeVelocityDensity
+#pragma kernel KVolumeSplatDensityVelocity
+#pragma kernel KVolumeSplatDensity
+#pragma kernel KVolumeSplatVelocityX
+#pragma kernel KVolumeSplatVelocityY
+#pragma kernel KVolumeSplatVelocityZ
+#pragma kernel KVolumeResolveVelocity
+#pragma kernel KVolumeResolveVelocityDensity
 #pragma kernel KVolumeGradient
 
 #include "HairSimComputeConfig.hlsl"
@@ -117,10 +118,29 @@ void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> vo
 #endif
 }
 
-#define MERGED
+[numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
+void KVolumeSplatDensityVelocity(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	//TODO remapping
+	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
+	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
+
+	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
+}
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
-void KVolumeDensity(
+void KVolumeSplatDensity(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -131,19 +151,24 @@ void KVolumeDensity(
 	// SV_GroupIndex        thread offset within execution group
 {
 	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
-#ifdef MERGED
-	//TODO remapping
-	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
-	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
-	
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
+}
+
+[numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
+void KVolumeSplatVelocityX(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
-#endif
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
-void KVolumeVelocityX(
+void KVolumeSplatVelocityY(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -153,29 +178,11 @@ void KVolumeVelocityX(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-#ifndef MERGED
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
-#endif
-}
-
-[numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
-void KVolumeVelocityY(
-	uint3 groupIdx : SV_GroupID,
-	uint3 localIdx : SV_GroupThreadID,
-	uint3 worldIdx : SV_DispatchThreadID,
-	uint threadIdx : SV_GroupIndex)
-	// SV_GroupID           execution group coords
-	// SV_GroupThreadID     thread coords within execution group
-	// SV_DispatchThreadID  thread coords (global)
-	// SV_GroupIndex        thread offset within execution group
-{
-#ifndef MERGED
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
-#endif
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
-void KVolumeVelocityZ(
+void KVolumeSplatVelocityZ(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -185,13 +192,11 @@ void KVolumeVelocityZ(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-#ifndef MERGED
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
-#endif
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeVelocity(
+void KVolumeResolveVelocity(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -205,12 +210,14 @@ void KVolumeVelocity(
 		float3(
 			_VolumeVelocityX[worldIdx],
 			_VolumeVelocityY[worldIdx],
-			_VolumeVelocityZ[worldIdx]) / (float)max(1, _VolumeDensity[worldIdx]),
-		_VolumeDensity[worldIdx] / DENSITY_SCALE);
+			_VolumeVelocityZ[worldIdx]) / (float)max(1, _VolumeDensity[worldIdx]
+			),
+		_VolumeDensity[worldIdx] / DENSITY_SCALE
+		);
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeVelocityDensity(
+void KVolumeResolveVelocityDensity(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -220,9 +227,11 @@ void KVolumeVelocityDensity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	float4 volumeSplat = _VolumeVelocity[worldIdx];
-	_VolumeDensity[worldIdx] = volumeSplat.w * DENSITY_SCALE;
-	_VolumeVelocity[worldIdx] = float4(volumeSplat.xyz / max(1e-4, volumeSplat.w), volumeSplat.w);
+	float4 splat = _VolumeVelocity[worldIdx];
+	{
+		_VolumeDensity[worldIdx] = splat.w * DENSITY_SCALE;
+		_VolumeVelocity[worldIdx] = float4(splat.xyz / max(1e-4, splat.w), splat.w);
+	}
 }
 
 groupshared int gs_density[VOLUME_NUM_X * VOLUME_NUM_Y * VOLUME_NUM_Z];
