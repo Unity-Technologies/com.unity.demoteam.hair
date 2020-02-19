@@ -166,6 +166,8 @@ namespace Unity.DemoTeam.Hair
 			public float volumeOffsetX;
 			[Range(-1.0f, 1.0f)]
 			public float volumeOffsetY;
+			[Range(0, 10)]
+			public int volumePressureIterations;
 
 			public static readonly VolumeConfiguration none = new VolumeConfiguration();
 			public static readonly VolumeConfiguration basic = new VolumeConfiguration()
@@ -175,6 +177,7 @@ namespace Unity.DemoTeam.Hair
 				volumeResolution = 64,
 				volumeOffsetX = 0.0f,
 				volumeOffsetY = 0.0f,
+				volumePressureIterations = 1,
 			};
 		}
 
@@ -325,6 +328,9 @@ namespace Unity.DemoTeam.Hair
 		private RenderTexture volumeVelocityZ;
 		private RenderTexture volumeVelocity;
 		private RenderTexture volumeGradient;
+		private RenderTexture volumeDivergence;
+		private RenderTexture volumePressure0;
+		private RenderTexture volumePressure1;
 
 		private void ValidateConfiguration()
 		{
@@ -448,8 +454,13 @@ namespace Unity.DemoTeam.Hair
 			changed |= CreateVolume(ref volumeVelocityX, "VolumeVelocityX", volumeCells, RenderTextureFormat.RInt);
 			changed |= CreateVolume(ref volumeVelocityY, "VolumeVelocityY", volumeCells, RenderTextureFormat.RInt);
 			changed |= CreateVolume(ref volumeVelocityZ, "VolumeVelocityZ", volumeCells, RenderTextureFormat.RInt);
+
 			changed |= CreateVolume(ref volumeVelocity, "VolumeVelocity", volumeCells, RenderTextureFormat.ARGBFloat);
 			changed |= CreateVolume(ref volumeGradient, "VolumeGradient", volumeCells, RenderTextureFormat.ARGBFloat);
+
+			changed |= CreateVolume(ref volumeDivergence, "VolumeDivergence", volumeCells, RenderTextureFormat.RFloat);
+			changed |= CreateVolume(ref volumePressure0, "VolumePressure0", volumeCells, RenderTextureFormat.RFloat);
+			changed |= CreateVolume(ref volumePressure1, "VolumePressure1", volumeCells, RenderTextureFormat.RFloat);
 
 			return changed;
 		}
@@ -460,8 +471,13 @@ namespace Unity.DemoTeam.Hair
 			ReleaseVolume(ref volumeVelocityX);
 			ReleaseVolume(ref volumeVelocityY);
 			ReleaseVolume(ref volumeVelocityZ);
+
 			ReleaseVolume(ref volumeVelocity);
 			ReleaseVolume(ref volumeGradient);
+
+			ReleaseVolume(ref volumeDivergence);
+			ReleaseVolume(ref volumePressure0);
+			ReleaseVolume(ref volumePressure1);
 		}
 
 		private NativeArray<StrandRoot> GetStrandRoots()

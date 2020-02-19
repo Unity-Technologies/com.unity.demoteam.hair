@@ -91,10 +91,6 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 	{
 		float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
 		float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, volumeUVW, 0);
-#if 0
-		float3 volumeNormal = normalize(_VolumeGradient.SampleLevel(sampler_VolumeGradient, volumeUVW, 0));
-		volumeVelocity -= volumeNormal * dot(volumeNormal, volumeVelocity);
-#endif
 		return (volumeVelocity - velocity) * friction;
 	}
 	else
