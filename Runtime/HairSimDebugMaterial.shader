@@ -24,15 +24,22 @@
 	Texture3D<int> _VolumeVelocityX;
 	Texture3D<int> _VolumeVelocityY;
 	Texture3D<int> _VolumeVelocityZ;
+
 	Texture3D<float4> _VolumeVelocity;
 	Texture3D<float3> _VolumeGradient;
-	SamplerState sampler_VolumeVelocity;
-	SamplerState sampler_VolumeGradient;
+	Texture3D<float> _VolumeDivergence;
+	Texture3D<float> _VolumePressure;
+	Texture3D<float3> _VolumePressureGradient;
+	Texture3D<float3> _VolumeVelocitySolenoidal;
 
+	SamplerState sampler_trilinear_clamp;
+
+	//--- built-in begin
 	float4x4 _ViewProjMatrix;
 	float4x4 _PrevViewProjMatrix;
 	float4x4 _NonJitteredViewProjMatrix;
 	float2 _CameraMotionVectorsScale;
+	//--- built-in end
 
 	struct DebugVaryings
 	{
@@ -124,8 +131,8 @@
 				uint i = strandParticleBegin + strandParticleStride * vertexID;
 				float3 worldPos = _ParticlePosition[i].xyz;
 
-				float volumeDensity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, ParticleVolumeUVW(i), 0).w;
-				float volumeOcclusion = 1.0;// saturate(1.0 - volumeDensity / 100.0);
+				float volumeDensity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, ParticleVolumeUVW(i), 0).w;
+				float volumeOcclusion = 1.0;// pow(1.0 - saturate(volumeDensity / 1000.0), 4.0);
 
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
@@ -239,8 +246,12 @@
 
 				uint3 volumeIdx = localPosQuantized;
 				float volumeDensity = _VolumeDensity[volumeIdx] / DENSITY_SCALE;
-				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, uvw, 0);
-				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, uvw, 0);
+				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, uvw, 0);
+				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_trilinear_clamp, uvw, 0);
+				float volumeDivergence = _VolumeDivergence.SampleLevel(sampler_trilinear_clamp, uvw, 0);
+				float volumePressure = _VolumePressure.SampleLevel(sampler_trilinear_clamp, uvw, 0);
+				float3 volumePressureGradient = _VolumePressureGradient.SampleLevel(sampler_trilinear_clamp, uvw, 0);
+				float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(sampler_trilinear_clamp, uvw, 0);
 
 				const float opacity = 0.9;
 

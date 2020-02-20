@@ -59,8 +59,9 @@ float3 _VolumeWorldMax;
 Texture3D<int> _VolumeDensity;
 Texture3D<float3> _VolumeVelocity;
 Texture3D<float3> _VolumeGradient;
-SamplerState sampler_VolumeVelocity;
-SamplerState sampler_VolumeGradient;
+Texture3D<float3> _VolumeVelocitySolenoidal;
+
+SamplerState sampler_trilinear_clamp;
 
 //----------
 // indexing
@@ -90,8 +91,15 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 	if (ENABLE_VOLUME_FRICTION)
 	{
 		float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
-		float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_VolumeVelocity, volumeUVW, 0);
+		float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
+#if 1
+		float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
+		float3 impulsePIC = volumeVelocitySolenoidal - velocity;
+		float3 impulseFLIP = volumeVelocitySolenoidal - volumeVelocity;
+		return lerp(impulseFLIP, impulsePIC, friction);
+#else
 		return (volumeVelocity - velocity) * friction;
+#endif
 	}
 	else
 	{
@@ -104,7 +112,7 @@ float3 ParticleVolumeRepulsionForce(uint i)
 	if (ENABLE_VOLUME_REPULSION)
 	{
 		float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
-		float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_VolumeGradient, volumeUVW, 0);
+		float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
 		return volumeGradient * _Repulsion;
 	}
 	else
