@@ -33,7 +33,7 @@ float3 _VolumeCells;
 float3 _VolumeWorldMin;
 float3 _VolumeWorldMax;
 /*
-    _VolumeCells = (4, 4, 4)
+    _VolumeCells = (3, 3, 3)
 
               +---+---+---Q
          +---+---+---+    |
@@ -62,40 +62,7 @@ RWTexture3D<float> _VolumePressure;
 RWTexture3D<float3> _VolumePressureGradient;
 RWTexture3D<float3> _VolumeVelocitySolenoidal;
 
-float3 GetVolumeWorldSize()
-{
-	return _VolumeWorldMax - _VolumeWorldMin;
-}
-
-float3 GetVolumeWorldExtent()
-{
-	return 0.5 * GetVolumeWorldSize();
-}
-
-float3 GetVolumeWorldCellSize()
-{
-	return GetVolumeWorldSize() / (_VolumeCells - 1);
-}
-
-float3 ParticleVolumePosition(uint i)
-{
-	float3 worldPos = _ParticlePosition[i].xyz;
-	float3 localUVW = (worldPos - _VolumeWorldMin) / (_VolumeWorldMax - _VolumeWorldMin);
-	float3 localPos = (_VolumeCells - 1) * saturate(localUVW);
-	return localPos;
-
-	//float3 worldPos = _ParticlePosition[i].xyz;
-	//float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
-	//float3 localPos = (worldPosClamped - _VolumeWorldMin) * ((_VolumeCells - 1) / (_VolumeWorldMax - _VolumeWorldMin));
-	//return localPos;
-}
-
-uint3 ParticleVolumeIndex(uint i)
-{
-	float3 localPos = ParticleVolumePosition(i);
-	float3 localPosQuantized = round(localPos);
-	return localPosQuantized;
-}
+#include "HairSimComputeVolumeUtility.hlsl"
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeClear(
@@ -131,18 +98,18 @@ void InterlockedAddTrilinear(RWTexture3D<int> volume, uint3 idx0, float value, f
 void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> volume)
 {
 #if DENSITY_TRILINEAR
-	float3 volumePos = ParticleVolumePosition(i);
-	float3 volumePosFloor = floor(volumePos);
+	float3 localPos = VolumeWorldToLocal(_ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
+	float3 localPosFloor = floor(localPos);
 
-	uint3 cellIdx0 = volumePosFloor;
-	float3 cellPos = volumePos - volumePosFloor;
+	uint3 cellIdx0 = localPosFloor;
+	float3 cellPos = localPos - localPosFloor;
 
 	float3 w0 = 1.0 - cellPos;
 	float3 w1 = cellPos;
 
 	InterlockedAddTrilinear(volume, cellIdx0, DENSITY_SCALE * value, w0, w1);
 #else
-	InterlockedAdd(volume[ParticleVolumeIndex(i)], DENSITY_SCALE * value);
+	InterlockedAdd(volume[VolumeWorldToIndex(_ParticlePosition[i].xyz)], (int)(DENSITY_SCALE * value));
 #endif
 }
 
@@ -162,8 +129,8 @@ void KVolumeSplatDensityVelocity(
 	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
 
 	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
 }
 
@@ -238,8 +205,8 @@ void KVolumeResolveVelocity(
 		float3(
 			_VolumeVelocityX[worldIdx],
 			_VolumeVelocityY[worldIdx],
-			_VolumeVelocityZ[worldIdx]) / (float)max(1, _VolumeDensity[worldIdx]
-			),
+			_VolumeVelocityZ[worldIdx]) / (float)max(1, _VolumeDensity[worldIdx])
+		,
 		_VolumeDensity[worldIdx] / DENSITY_SCALE
 		);
 }
@@ -281,9 +248,9 @@ void KVolumeGradient(
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
 #if VOLUME_SQUARE_CELLS
-	const float k = 1.0 / (2.0 * DENSITY_SCALE);// *GetVolumeWorldCellSize().x);
+	const float k = 1.0 / (2.0 * DENSITY_SCALE);// *VolumeWorldCellSize().x);
 #else
-	const float3 k = 1.0 / (2.0 * DENSITY_SCALE);// *GetVolumeWorldCellSize());
+	const float3 k = 1.0 / (2.0 * DENSITY_SCALE);// *VolumeWorldCellSize());
 #endif
 
 	float3 diff = float3(
@@ -316,9 +283,9 @@ void KVolumeGradient(
 	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
 
 #if VOLUME_SQUARE_CELLS
-	const float k = 1.0 / (2.0 * DENSITY_SCALE);// *GetVolumeWorldCellSize().x);
+	const float k = 1.0 / (2.0 * DENSITY_SCALE);// *VolumeWorldCellSize().x);
 #else
-	const float3 k = 1.0 / (2.0 * DENSITY_SCALE);// *GetVolumeWorldCellSize());
+	const float3 k = 1.0 / (2.0 * DENSITY_SCALE);// *VolumeWorldCellSize());
 #endif
 
 	const bool lowerBoundary = any(localIdx == localLowerIdx);
@@ -450,13 +417,13 @@ void KVolumeDivergence(
 	float vz_z2 = _VolumeVelocity[worldIdx + worldIdxStrideZ].z;
 
 #if VOLUME_SQUARE_CELLS
-	float k = 1.0 / (2.0 * GetVolumeWorldCellSize().x);
+	float k = 1.0 / (2.0 * VolumeWorldCellSize().x);
 	float div = float(
 		vx_x2 + vy_y2 + vz_z2 -
 		vx_x0 - vy_y0 - vz_z0
 		) * k;
 #else
-	float3 k = 1.0 / (2.0 * GetVolumeWorldCellSize());
+	float3 k = 1.0 / (2.0 * VolumeWorldCellSize());
 	float div = float(
 		(vx_x2 - vx_x0) * k.x +
 		(vy_y2 - vy_y0) * k.y +
@@ -500,7 +467,7 @@ void KVolumePressureIteration(
 	float b = _VolumeDivergence[worldIdx];
 
 #if VOLUME_SQUARE_CELLS
-	float d = GetVolumeWorldCellSize().x;
+	float d = VolumeWorldCellSize().x;
 	float a = -(d * d);
 	float p = float(
 		p_x0 + p_x2 +
@@ -508,7 +475,7 @@ void KVolumePressureIteration(
 		p_z0 + p_z2 +
 		a * b) / 6.0;
 #else
-	float3 d = GetVolumeWorldCellSize();
+	float3 d = VolumeWorldCellSize();
 	float3 a = -(d * d) / 3.0;
 	float p = float(
 		(p_x0 + p_x2 + a.x * b) + 
@@ -535,9 +502,9 @@ void KVolumePressureGradient(
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
 #if VOLUME_SQUARE_CELLS
-	const float k = 1.0 / (2.0 * GetVolumeWorldCellSize().x);
+	const float k = 1.0 / (2.0 * VolumeWorldCellSize().x);
 #else
-	const float3 k = 1.0 / (2.0 * GetVolumeWorldCellSize());
+	const float3 k = 1.0 / (2.0 * VolumeWorldCellSize());
 #endif
 
 	float3 diff = float3(

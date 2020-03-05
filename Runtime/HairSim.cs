@@ -170,6 +170,8 @@ namespace Unity.DemoTeam.Hair
 			public float volumeOffsetX;
 			[Range(-1.0f, 1.0f)]
 			public float volumeOffsetY;
+			[Range(-1.0f, 1.0f)]
+			public float volumeOffsetZ;
 			[Range(0, 100)]
 			public int volumePressureIterations;
 
@@ -181,6 +183,7 @@ namespace Unity.DemoTeam.Hair
 				volumeResolution = 64,
 				volumeOffsetX = 0.0f,
 				volumeOffsetY = 0.0f,
+				volumeOffsetZ = 0.0f,
 				volumePressureIterations = 1,
 			};
 		}
@@ -341,6 +344,9 @@ namespace Unity.DemoTeam.Hair
 		private RenderTexture volumePressure;
 		private RenderTexture volumePressureGradient;
 		private RenderTexture volumeVelocitySolenoidal;
+
+		private Vector3 volumeWorldMin;
+		private Vector3 volumeWorldMax;
 
 		private void ValidateConfiguration()
 		{
@@ -626,7 +632,7 @@ namespace Unity.DemoTeam.Hair
 
 		private Vector3 GetVolumeCenter()
 		{
-			return this.transform.position + volume.volumeOffsetX * Vector3.right + volume.volumeOffsetY * Vector3.up;
+			return this.transform.position + volume.volumeOffsetX * Vector3.right + volume.volumeOffsetY * Vector3.up + volume.volumeOffsetZ * Vector3.forward;
 		}
 
 		private Vector3 GetVolumeExtent()
@@ -739,6 +745,8 @@ namespace Unity.DemoTeam.Hair
 				kernelVolumeVelocitySolenoidal = computeVolume.FindKernel("KVolumeVelocitySolenoidal");
 
 				strandsActive = strands;
+
+				Volume(cmd, 0.0f);
 			}
 		}
 
@@ -858,6 +866,9 @@ namespace Unity.DemoTeam.Hair
 
 			using (ProfilerMarkers.Volume.Auto())
 			{
+				volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
+				volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
+
 				SetComputeParams(cmd, computeVolume, dt);
 
 				int particleThreadCountX = 64;
@@ -1127,8 +1138,8 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetInt(UniformIDs._StrandParticleCount, strands.strandParticleCount);
 
 			mpb.SetVector(UniformIDs._VolumeCells, volume.volumeResolution * Vector3.one);
-			mpb.SetVector(UniformIDs._VolumeWorldMin, GetVolumeCenter() - GetVolumeExtent());
-			mpb.SetVector(UniformIDs._VolumeWorldMax, GetVolumeCenter() + GetVolumeExtent());
+			mpb.SetVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
+			mpb.SetVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
 
 			mpb.SetBuffer(UniformIDs._ParticlePosition, particlePosition);
 			mpb.SetBuffer(UniformIDs._ParticleVelocity, particleVelocity);
@@ -1179,8 +1190,8 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeIntParam(cs, UniformIDs._BoundaryTorusCount, boundaryTorusCount);
 
 			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeCells, volume.volumeResolution * Vector3.one);
-			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMin, GetVolumeCenter() - GetVolumeExtent());
-			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMax, GetVolumeCenter() + GetVolumeExtent());
+			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMin, volumeWorldMin);
+			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMax, volumeWorldMax);
 		}
 
 		void SetComputeKernelParams(CommandBuffer cmd, ComputeShader cs, int kernel)

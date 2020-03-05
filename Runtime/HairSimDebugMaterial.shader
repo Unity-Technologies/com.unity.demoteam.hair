@@ -34,6 +34,8 @@
 
 	SamplerState sampler_trilinear_clamp;
 
+	#include "HairSimComputeVolumeUtility.hlsl"
+
 	//--- built-in begin
 	float4x4 _ViewProjMatrix;
 	float4x4 _PrevViewProjMatrix;
@@ -50,32 +52,6 @@
 	float4 DebugFrag(DebugVaryings input) : SV_Target
 	{
 		return input.color;
-	}
-
-	float3 ParticleVolumeUVW(uint i)
-	{
-		float3 worldPos = _ParticlePosition[i].xyz;
-		float3 localUVW = (worldPos - _VolumeWorldMin) / (_VolumeWorldMax - _VolumeWorldMin);
-		return saturate(localUVW);
-	}
-
-	uint3 StridedVolumeIndex(uint index)
-	{
-		uint3 cellCount = _VolumeCells;
-		uint volumeIdxX = index % cellCount.x;
-		uint volumeIdxY = (index / cellCount.x) % cellCount.y;
-		uint volumeIdxZ = (index / (cellCount.x * cellCount.y));
-		return uint3(volumeIdxX, volumeIdxY, volumeIdxZ);
-	}
-
-	float3 VolumeCellSize()
-	{
-		return (_VolumeWorldMax - _VolumeWorldMin) / (_VolumeCells - 1);
-	}
-
-	float3 VolumeIndexWorldPos(uint3 volumeIdx)
-	{
-		return _VolumeWorldMin + volumeIdx * VolumeCellSize();
 	}
 
 	float3 ColorizeCycle(uint index, const uint count)
@@ -131,8 +107,8 @@
 				uint i = strandParticleBegin + strandParticleStride * vertexID;
 				float3 worldPos = _ParticlePosition[i].xyz;
 
-				float volumeDensity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, ParticleVolumeUVW(i), 0).w;
-				float volumeOcclusion = 1.0;// pow(1.0 - saturate(volumeDensity / 1000.0), 4.0);
+				float volumeDensity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, VolumeWorldToUVW(worldPos), 0).w;
+				float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 200.0), 4.0);
 
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
@@ -152,10 +128,10 @@
 
 			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
 			{
-				uint3 volumeIdx = StridedVolumeIndex(vertexID);
+				uint3 volumeIdx = VolumeFlatIndexToIndex(vertexID);
 				int volumeDensity = _VolumeDensity[volumeIdx];
 
-				float3 worldPos = VolumeIndexWorldPos(volumeIdx);
+				float3 worldPos = VolumeIndexToWorld(volumeIdx);
 				if (volumeDensity == 0)
 				{
 					worldPos += 1e7;// just push far away
@@ -179,9 +155,8 @@
 
 			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
 			{
-				uint3 volumeIdx = StridedVolumeIndex(vertexID >> 1);
-
-				float3 worldPos = VolumeIndexWorldPos(volumeIdx);
+				uint3 volumeIdx = VolumeFlatIndexToIndex(vertexID >> 1);
+				float3 worldPos = VolumeIndexToWorld(volumeIdx);
 				if (vertexID & 1)
 				{
 					worldPos += _VolumeGradient[volumeIdx] * 0.002;
@@ -241,12 +216,16 @@
 			float4 DebugFrag_Slice(DebugVaryings input) : SV_Target
 			{
 				float3 uvw = input.color.xyz;
-				float3 localPos = uvw * (_VolumeCells - 1);
-				float3 localPosQuantized = round(localPos);
+				float3 localPos = VolumeUVWToLocal(uvw);
+				float3 localPosFloor = floor(localPos);
 
-				uint3 volumeIdx = localPosQuantized;
+				uint3 volumeIdx = localPosFloor;
 				float volumeDensity = _VolumeDensity[volumeIdx] / DENSITY_SCALE;
+#if DENSITY_TRILINEAR
 				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, uvw, 0);
+#else
+				float4 volumeVelocity = _VolumeVelocity[volumeIdx];
+#endif
 				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_trilinear_clamp, uvw, 0);
 				float volumeDivergence = _VolumeDivergence.SampleLevel(sampler_trilinear_clamp, uvw, 0);
 				float volumePressure = _VolumePressure.SampleLevel(sampler_trilinear_clamp, uvw, 0);
@@ -254,12 +233,10 @@
 				float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(sampler_trilinear_clamp, uvw, 0);
 
 				const float opacity = 0.9;
-
-				if (true)
 				{
-					float3 gridDist = abs(localPos - localPosQuantized);
+					float3 gridDist = abs(localPos - localPosFloor);
 					float3 gridWidth = fwidth(localPos);
-					if (any(gridDist < gridWidth * 0.5))
+					if (any(gridDist < gridWidth))
 					{
 						uint i = volumeIdx[_DebugSliceAxis] % 3;
 						return float4(0.2 * float3(i == 0, i == 1, i == 2), opacity);

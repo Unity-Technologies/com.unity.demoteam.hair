@@ -63,36 +63,33 @@ Texture3D<float3> _VolumeVelocitySolenoidal;
 
 SamplerState sampler_trilinear_clamp;
 
+#include "HairSimComputeVolumeUtility.hlsl"
+
 //----------
 // indexing
 
-float3 ParticleVolumePosition(uint i)
+float3 ParticleVolumeUVW(uint i)
 {
-	float3 worldPos = _ParticlePosition[i].xyz;
-	float3 localUVW = (worldPos - _VolumeWorldMin) / (_VolumeWorldMax - _VolumeWorldMin);
-	float3 localPos = (_VolumeCells - 1) * saturate(localUVW);
-	return localPos;
-
-	//float3 worldPos = _ParticlePosition[i].xyz;
-	//float3 worldPosClamped = clamp(worldPos, _VolumeWorldMin, _VolumeWorldMax);
-	//float3 localPos = (worldPosClamped - _VolumeWorldMin) * ((_VolumeCells - 1) / (_VolumeWorldMax - _VolumeWorldMin));
-	//return localPos;
+	return VolumeWorldToUVW(_ParticlePositionPrev[i].xyz);
 }
 
 uint3 ParticleVolumeIndex(uint i)
 {
-	float3 localPos = ParticleVolumePosition(i);
-	float3 localPosQuantized = round(localPos);
-	return localPosQuantized;
+	return VolumeWorldToIndex(_ParticlePositionPrev[i].xyz);
 }
 
 float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
 	if (ENABLE_VOLUME_FRICTION)
 	{
-		float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
+#if DENSITY_TRILINEAR
+		float3 volumeUVW = ParticleVolumeUVW(i);
 		float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
-#if 1
+#else
+		float3 volumeVelocity = _VolumeVelocity[ParticleVolumeIndex(i)];
+#endif
+
+#if 0
 		float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
 		float3 impulsePIC = volumeVelocitySolenoidal - velocity;
 		float3 impulseFLIP = volumeVelocitySolenoidal - volumeVelocity;
@@ -111,7 +108,7 @@ float3 ParticleVolumeRepulsionForce(uint i)
 {
 	if (ENABLE_VOLUME_REPULSION)
 	{
-		float3 volumeUVW = ParticleVolumePosition(i) / (_VolumeCells - 1);
+		float3 volumeUVW = ParticleVolumeUVW(i);
 		float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
 		return volumeGradient * _Repulsion;
 	}
@@ -394,7 +391,7 @@ void KSolveConstraints_GaussSeidel(
 			
 			if (ENABLE_CONSTRAINT_FTL)
 			{
-				float3 d0 = 0.0;
+				float3 d0 = 0;
 				ApplyDistanceFTLConstraint(_StrandParticleInterval, r0, p0, d0);
 
 				_ParticlePositionCorr[i - strandParticleStride * 3].xyz += d0;
@@ -405,8 +402,8 @@ void KSolveConstraints_GaussSeidel(
 
 		if (ENABLE_CONSTRAINT_FTL)
 		{
-			float3 d1 = 0.0;
-			float3 d2 = 0.0;
+			float3 d1 = 0;
+			float3 d2 = 0;
 			ApplyDistanceFTLConstraint(_StrandParticleInterval, p0, p1, d1);
 			ApplyDistanceFTLConstraint(_StrandParticleInterval, p1, p2, d2);
 
@@ -429,6 +426,8 @@ void KSolveConstraints_GaussSeidel(
 		}
 	}
 }
+
+#define SPLIT_FTL 0
 
 #define NEW_JACOBI 1
 #if NEW_JACOBI
@@ -484,21 +483,25 @@ void KSolveConstraints_Jacobi(
 			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
 			{
 				gs_x[j] = float4(Integrate(x0, v0, a0), 1.0);
-				gs_d[j] = 0.0;
+				gs_d[j] = 0;
 			}
 		}
 	}
 
 	// solve constraints by Jacobi iteration
 	const uint m = (THREAD_GROUP_SIZE - 1) - threadIdx;
-	const uint n = (
+	const uint n = max(1,
 		ENABLE_CONSTRAINT_COLLISION +
 		ENABLE_CONSTRAINT_DISTANCE * min(2, 1 + m) +
 		ENABLE_CONSTRAINT_CURVATURE * min(3, 1 + m) +
+#if SPLIT_FTL
+		0
+#else
 		ENABLE_CONSTRAINT_FTL
+#endif
 		);
-	
-	const float n_inv = _Inference / n;
+	const float n_inv = 1.0 / n;
+
 	float3 d_ftl = 0;
 
 	for (uint __iter = 0; __iter != _Iterations; __iter++)
@@ -509,7 +512,7 @@ void KSolveConstraints_Jacobi(
 
 		if (threadIdx > 0)
 		{
-			float3 d = 0.0;
+			float3 d = 0;
 
 			// solve collision constraints
 			if (ENABLE_CONSTRAINT_COLLISION)
@@ -548,18 +551,39 @@ void KSolveConstraints_Jacobi(
 				}
 			}
 
+			// apply SOR
+			d *= _Inference;
+
 			// solve distance constraints along strand (FTL)
 			if (ENABLE_CONSTRAINT_FTL)
 			{
+#if SPLIT_FTL
+
+				float3 d_tmp = 0;
+				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[j - 1].xyz, gs_x[j].xyz, d_tmp);
+				d_ftl += d_tmp;
+
+				// move to next iteration
+				gs_x[j].xyz += (d * n_inv) + d_tmp;
+
+#else
+
 				//TODO divide 'd' early to reduce averaging of FTL constraint?
 
-				float3 d_pre_ftl = d;
-				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[j - 1].xyz, gs_x[j].xyz, d);
-				d_ftl += (d - d_pre_ftl) * n_inv;
-			}
+				float3 d_tmp = 0;
+				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[j - 1].xyz, gs_x[j].xyz, d_tmp);
+				d_ftl += d_tmp * n_inv;
 
-			// move to next iteration
-			gs_x[j].xyz += d * n_inv;
+				// move to next iteration
+				gs_x[j].xyz += (d + d_tmp) * n_inv;
+
+#endif
+			}
+			else
+			{
+				// move to next iteration
+				gs_x[j].xyz += d * n_inv;
+			}
 		}
 	}
 
