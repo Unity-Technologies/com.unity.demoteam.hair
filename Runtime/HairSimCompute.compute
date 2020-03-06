@@ -474,6 +474,7 @@ void KSolveConstraints_Jacobi(
 			if (ENABLE_CONSTRAINT_COLLISION)
 			{
 				SolveCollisionConstraint(gs_x[j].xyz, d);
+				//SolveCollisionFrictionConstraint(_Friction, x0, gs_x[j], d);
 			}
 
 			// solve distance constraints

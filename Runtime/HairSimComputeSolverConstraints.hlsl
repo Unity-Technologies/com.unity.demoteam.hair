@@ -11,8 +11,6 @@
 //   #define CONSTRAINTS_GUARD_DIVISION_BY_ZERO
 //   #include "HairSimComputeSlverConstraints.hlsl"
 
-//#define CONSTRAINTS_GUARD_DIVISION_BY_ZERO
-
 #ifdef CONSTRAINTS_GUARD_DIVISION_BY_ZERO
 #define GUARD(x) if (x)
 #else
@@ -39,22 +37,29 @@ void SolveCollisionConstraint(
 	d += contact.xyz * contact.w;
 }
 
-/*
 void SolveCollisionFrictionConstraint(
 	const float friction,
 	const float3 x,
 	const float3 p,
 	inout float3 d)
 {
-	//TODO
+	float4 contact = BoundaryContact(p);
+	d += contact.xyz * contact.w;
 
-	float4 P = BoundaryNormalDistance(p);
-	if (P.w < 0.0)
+	// Unified Particle Physics for Real-Time Applications
+	// https://mmacklin.com/uppfrta_preprint.pdf
+	if (contact.w < 0.0)
 	{
-		d += P.xyz * P.w;
+		float3 x_star = p + contact.xyz * contact.w;
+		float3 x_delta = x_star - x;
+		float3 x_delta_tan = x_delta - dot(x_delta, contact.xyz) * contact.xyz;
+
+		if (length(x_delta_tan) < friction * -contact.w)
+			d -= x_delta_tan;
+		else
+			d -= x_delta_tan * min((friction * -contact.w) / length(x_delta_tan), 1);
 	}
 }
-*/
 
 void SolveDistanceConstraint(
 	const float distance, const float stiffness,
