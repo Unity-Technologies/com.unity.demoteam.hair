@@ -12,6 +12,13 @@
 #pragma kernel KVolumePressureGradient
 #pragma kernel KVolumeVelocitySolenoidal
 
+#define HAIRSIM_WRITEABLE_VOLUMEDATA 1
+
+#include "HairSimComputeConfig.hlsl"
+#include "HairSimComputeSolverData.hlsl"
+#include "HairSimComputeVolumeData.hlsl"
+#include "HairSimComputeVolumeUtility.hlsl"
+
 #define PARTICLE_NUM_X 64
 #define PARTICLE_NUM_Y 1
 #define PARTICLE_NUM_Z 1
@@ -19,13 +26,6 @@
 #define VOLUME_NUM_X 4
 #define VOLUME_NUM_Y 4
 #define VOLUME_NUM_Z 4
-
-#define HAIRSIM_WRITEABLE_VOLUMEDATA 1
-
-#include "HairSimComputeConfig.hlsl"
-#include "HairSimComputeSolverData.hlsl"
-#include "HairSimComputeVolumeData.hlsl"
-#include "HairSimComputeVolumeUtility.hlsl"
 
 //---------
 // utility
