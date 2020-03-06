@@ -69,7 +69,7 @@ float3 ParticleVolumeRepulsionForce(uint i)
 	{
 		float3 volumeUVW = ParticleVolumeUVW(i);
 		float3 volumeGradient = _VolumeGradient.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0);
-		return volumeGradient * _Repulsion;
+		return volumeGradient * -_Repulsion;
 	}
 	else
 	{

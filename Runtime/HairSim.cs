@@ -1,4 +1,6 @@
-﻿#define LAYOUT_INTERLEAVED
+﻿#pragma warning disable 0649 // some fields are assigned via reflection
+
+#define LAYOUT_INTERLEAVED
 
 using System;
 using System.Collections.Generic;

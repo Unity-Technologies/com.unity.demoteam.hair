@@ -136,7 +136,7 @@
 				float3 worldPos = VolumeIndexToWorld(volumeIdx);
 				if (vertexID & 1)
 				{
-					worldPos += _VolumeGradient[volumeIdx] * 0.002;
+					worldPos -= _VolumeGradient[volumeIdx] * 0.002;
 				}
 
 				DebugVaryings output;

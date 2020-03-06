@@ -228,7 +228,7 @@ void KVolumeGradient(
 		_VolumeDensity[worldIdx + worldIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
 		) * k;
 
-	_VolumeGradient[worldIdx] = -diff;
+	_VolumeGradient[worldIdx] = diff;
 #else
 	gs_density[threadIdx] = _VolumeDensity[worldIdx];
 
@@ -270,7 +270,7 @@ void KVolumeGradient(
 				_VolumeDensity[worldIdx + worldIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
 				) * k;
 
-			_VolumeGradient[worldIdx] = -diff;
+			_VolumeGradient[worldIdx] = diff;
 		}
 		else if (lowerBoundary)
 		{
@@ -280,7 +280,7 @@ void KVolumeGradient(
 				gs_density[threadIdx + threadIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
 				) * k;
 
-			_VolumeGradient[worldIdx] = -diff;
+			_VolumeGradient[worldIdx] = diff;
 		}
 		else// upperBoundary
 		{
@@ -290,7 +290,7 @@ void KVolumeGradient(
 				_VolumeDensity[worldIdx + worldIdxStrideZ] - gs_density[threadIdx - threadIdxStrideZ]
 				) * k;
 
-			_VolumeGradient[worldIdx] = -diff;
+			_VolumeGradient[worldIdx] = diff;
 		}
 	}
 	else
@@ -301,7 +301,7 @@ void KVolumeGradient(
 			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx - threadIdxStrideZ]
 			) * k;
 
-		_VolumeGradient[worldIdx] = -diff;
+		_VolumeGradient[worldIdx] = diff;
 	}
 #endif
 }
@@ -338,7 +338,7 @@ void KVolumeGradientForwardDiff(
 			_VolumeDensity[worldIdx + worldIdxStrideZ] - gs_density[threadIdx]
 			) * k;
 
-		_VolumeGradient[worldIdx] = -diff;
+		_VolumeGradient[worldIdx] = diff;
 	}
 	else
 	{
@@ -358,7 +358,7 @@ void KVolumeGradientForwardDiff(
 			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx]
 			) * k;
 
-		_VolumeGradient[worldIdx] = -diff;
+		_VolumeGradient[worldIdx] = diff;
 	}
 }
 
