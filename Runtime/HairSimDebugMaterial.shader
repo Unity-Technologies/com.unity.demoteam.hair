@@ -4,44 +4,21 @@
 
 	#pragma target 5.0
 	
-	#include "HairSimComputeConfig.hlsl"
-
-	uint _StrandCount;
-	uint _StrandParticleCount;
-
-	StructuredBuffer<float4> _ParticlePosition;
-	StructuredBuffer<float4> _ParticlePositionPrev;
-
-	uint _DebugSliceAxis;
-	float _DebugSliceOffset;
-	float _DebugSliceDivider;
-
-	float3 _VolumeCells;
-	float3 _VolumeWorldMin;
-	float3 _VolumeWorldMax;
-
-	Texture3D<int> _VolumeDensity;
-	Texture3D<int> _VolumeVelocityX;
-	Texture3D<int> _VolumeVelocityY;
-	Texture3D<int> _VolumeVelocityZ;
-
-	Texture3D<float4> _VolumeVelocity;
-	Texture3D<float3> _VolumeGradient;
-	Texture3D<float> _VolumeDivergence;
-	Texture3D<float> _VolumePressure;
-	Texture3D<float3> _VolumePressureGradient;
-	Texture3D<float3> _VolumeVelocitySolenoidal;
-
-	SamplerState sampler_trilinear_clamp;
-
-	#include "HairSimComputeVolumeUtility.hlsl"
-
-	//--- built-in begin
+	// builtin begin
 	float4x4 _ViewProjMatrix;
 	float4x4 _PrevViewProjMatrix;
 	float4x4 _NonJitteredViewProjMatrix;
 	float2 _CameraMotionVectorsScale;
-	//--- built-in end
+	// builtin end
+
+	#include "HairSimComputeConfig.hlsl"
+	#include "HairSimComputeSolverData.hlsl"
+	#include "HairSimComputeVolumeData.hlsl"
+	#include "HairSimComputeVolumeUtility.hlsl"
+	
+	uint _DebugSliceAxis;
+	float _DebugSliceOffset;
+	float _DebugSliceDivider;
 
 	struct DebugVaryings
 	{
@@ -107,7 +84,7 @@
 				uint i = strandParticleBegin + strandParticleStride * vertexID;
 				float3 worldPos = _ParticlePosition[i].xyz;
 
-				float volumeDensity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, VolumeWorldToUVW(worldPos), 0).w;
+				float volumeDensity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, VolumeWorldToUVW(worldPos), 0).w;
 				float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 200.0), 4.0);
 
 				DebugVaryings output;
@@ -222,15 +199,15 @@
 				uint3 volumeIdx = localPosFloor;
 				float volumeDensity = _VolumeDensity[volumeIdx] / DENSITY_SCALE;
 #if DENSITY_TRILINEAR
-				float4 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, uvw, 0);
+				float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
 #else
 				float4 volumeVelocity = _VolumeVelocity[volumeIdx];
 #endif
-				float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_trilinear_clamp, uvw, 0);
-				float volumeDivergence = _VolumeDivergence.SampleLevel(sampler_trilinear_clamp, uvw, 0);
-				float volumePressure = _VolumePressure.SampleLevel(sampler_trilinear_clamp, uvw, 0);
-				float3 volumePressureGradient = _VolumePressureGradient.SampleLevel(sampler_trilinear_clamp, uvw, 0);
-				float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(sampler_trilinear_clamp, uvw, 0);
+				float3 volumeGradient = _VolumeGradient.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float volumeDivergence = _VolumeDivergence.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float volumePressure = _VolumePressure.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float3 volumePressureGradient = _VolumePressureGradient.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
 
 				const float opacity = 0.9;
 				{

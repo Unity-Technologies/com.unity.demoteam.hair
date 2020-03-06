@@ -1,7 +1,23 @@
 #ifndef __HAIRSIMCOMPUTE_VOLUMEUTILITY__
 #define __HAIRSIMCOMPUTE_VOLUMEUTILITY__
 
-//#include "HairSimComputeVolumeData.hlsl"
+#include "HairSimComputeVolumeData.hlsl"
+/*
+	_VolumeCells = (3, 3, 3)
+
+			  +---+---+---Q
+		 +---+---+---+    |
+	+---+---+---+    | ---+
+	|   |   |   | ---+    |
+	+---+---+---+    | ---+
+	|   |   |   | ---+    |
+	+---+---+---+    | ---+
+	|   |   |   | ---+
+	P---+---+---+
+
+	_VolumeWorldMin = P
+	_VolumeWorldMax = Q
+*/
 
 float3 VolumeWorldSize()
 {
@@ -56,10 +72,10 @@ float3 VolumeIndexToWorld(uint3 index)
 
 uint3 VolumeFlatIndexToIndex(uint flatIndex)
 {
-	uint indexX = flatIndex % _VolumeCells.x;
-	uint indexY = (flatIndex / _VolumeCells.x) % _VolumeCells.y;
-	uint indexZ = (flatIndex / (_VolumeCells.x * _VolumeCells.y));
-	return uint3(indexX, indexY, indexZ);
+	uint x = (flatIndex % _VolumeCells.x);
+	uint y = (flatIndex / _VolumeCells.x) % _VolumeCells.y;
+	uint z = (flatIndex / (_VolumeCells.x * _VolumeCells.y));
+	return uint3(x, y, z);
 }
 
 #endif//__HAIRSIMCOMPUTE_VOLUMEUTILITY__

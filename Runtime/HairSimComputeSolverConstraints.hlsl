@@ -1,3 +1,6 @@
+#ifndef __HAIRSIMCOMPUTE_CONSTRAINTS__
+#define __HAIRSIMCOMPUTE_CONSTRAINTS__
+
 // Constraints between particles with infinite mass may exhibit division by zero.
 // Ideally, the application should not evaluate such constraints, as checking for
 // division by zero incurs an additional cost. For generic applications where the
@@ -395,3 +398,5 @@ void ApplyTriangleBendingMaxConstraint(
 	p1 += d1;
 	p2 += d2;
 }
+
+#endif//__HAIRSIMCOMPUTE_CONSTRAINTS__

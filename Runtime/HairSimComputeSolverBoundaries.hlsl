@@ -1,3 +1,6 @@
+#ifndef __HAIRSIMCOMPUTE_BOUNDARIES__
+#define __HAIRSIMCOMPUTE_BOUNDARIES__
+
 struct BoundaryCapsule { float3 centerA; float radius; float3 centerB; float __pad__; };
 struct BoundarySphere { float3 center; float radius; };
 struct BoundaryTorus { float3 center; float radiusA; float3 axis; float radiusB; };
@@ -201,3 +204,5 @@ float4 BoundaryContact(const float3 p)
 	else
 		return 0.0;
 }
+
+#endif//__HAIRSIMCOMPUTE_BOUNDARIES__

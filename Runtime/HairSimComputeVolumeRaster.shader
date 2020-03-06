@@ -5,17 +5,8 @@
 	#pragma target 5.0
 	
 	#include "HairSimComputeConfig.hlsl"
-
-	uint _StrandCount;
-	uint _StrandParticleCount;
-
-	StructuredBuffer<float4> _ParticlePosition;
-	StructuredBuffer<float4> _ParticleVelocity;
-
-	float3 _VolumeCells;
-	float3 _VolumeWorldMin;
-	float3 _VolumeWorldMax;
-
+	#include "HairSimComputeSolverData.hlsl"
+	#include "HairSimComputeVolumeData.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
 
 	struct Varyings

@@ -7,6 +7,15 @@
 #pragma kernel KUpdatePosition							THREAD_GROUP_SIZE=64
 #pragma kernel KUpdateVelocity							THREAD_GROUP_SIZE=64
 
+#define HAIRSIM_WRITEABLE_SOLVERDATA 1
+
+#include "HairSimComputeConfig.hlsl"
+#include "HairSimComputeSolverBoundaries.hlsl"
+#include "HairSimComputeSolverConstraints.hlsl"
+#include "HairSimComputeSolverData.hlsl"
+#include "HairSimComputeVolumeData.hlsl"
+#include "HairSimComputeVolumeUtility.hlsl"
+
 #define ENABLE_VOLUME_FRICTION			1
 #define ENABLE_VOLUME_REPULSION			1
 
@@ -14,56 +23,6 @@
 #define ENABLE_CONSTRAINT_DISTANCE		1
 #define ENABLE_CONSTRAINT_CURVATURE		1
 #define ENABLE_CONSTRAINT_FTL			1
-
-#include "HairSimComputeConfig.hlsl"
-#include "HairSimComputeSolverBoundaries.hlsl"
-#include "HairSimComputeSolverConstraints.hlsl"
-
-//----------
-// uniforms
-
-float4x4 _LocalToWorld;
-float4x4 _LocalToWorldInvT;
-
-uint _StrandCount;
-uint _StrandParticleCount;
-float _StrandParticleInterval;
-
-float _DT;
-uint _Iterations;
-float _Stiffness;
-float _Inference;
-float _Damping;
-float _Gravity;
-float _Repulsion;
-float _Friction;
-
-float _BendingCurvature;
-float _BendingStiffness;
-float _DampingFTL;
-
-StructuredBuffer<float4> _RootPosition;
-StructuredBuffer<float4> _RootTangent;
-
-StructuredBuffer<float4> _ParticlePositionPrev;
-StructuredBuffer<float4> _ParticleVelocityPrev;
-
-RWStructuredBuffer<float4> _ParticlePosition;
-RWStructuredBuffer<float4> _ParticlePositionCorr;
-RWStructuredBuffer<float4> _ParticleVelocity;
-
-float3 _VolumeCells;
-float3 _VolumeWorldMin;
-float3 _VolumeWorldMax;
-
-Texture3D<int> _VolumeDensity;
-Texture3D<float3> _VolumeVelocity;
-Texture3D<float3> _VolumeGradient;
-Texture3D<float3> _VolumeVelocitySolenoidal;
-
-SamplerState sampler_trilinear_clamp;
-
-#include "HairSimComputeVolumeUtility.hlsl"
 
 //----------
 // indexing
@@ -84,13 +43,13 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 	{
 #if DENSITY_TRILINEAR
 		float3 volumeUVW = ParticleVolumeUVW(i);
-		float3 volumeVelocity = _VolumeVelocity.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
+		float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0).xyz;
 #else
-		float3 volumeVelocity = _VolumeVelocity[ParticleVolumeIndex(i)];
+		float3 volumeVelocity = _VolumeVelocity[ParticleVolumeIndex(i)].xyz;
 #endif
 
 #if 0
-		float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
+		float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0);
 		float3 impulsePIC = volumeVelocitySolenoidal - velocity;
 		float3 impulseFLIP = volumeVelocitySolenoidal - volumeVelocity;
 		return lerp(impulseFLIP, impulsePIC, friction);
@@ -109,7 +68,7 @@ float3 ParticleVolumeRepulsionForce(uint i)
 	if (ENABLE_VOLUME_REPULSION)
 	{
 		float3 volumeUVW = ParticleVolumeUVW(i);
-		float3 volumeGradient = _VolumeGradient.SampleLevel(sampler_trilinear_clamp, volumeUVW, 0);
+		float3 volumeGradient = _VolumeGradient.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0);
 		return volumeGradient * _Repulsion;
 	}
 	else
@@ -739,7 +698,6 @@ void KSolveConstraints_Jacobi(
 	}
 #endif
 }
-
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void KUpdatePosition(
