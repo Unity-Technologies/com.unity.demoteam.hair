@@ -53,10 +53,8 @@ namespace Unity.DemoTeam.Hair
 				{
 					if (hairSim != null && hairSim.isActiveAndEnabled)
 					{
-						using (new ProfilingSample(cmd, "HairSim.Step (GPU)"))
-							hairSim.Step(cmd, dt);
-						using (new ProfilingSample(cmd, "HairSim.Volume (GPU)"))
-							hairSim.Volume(cmd, dt);
+						hairSim.Step(cmd, dt);
+						hairSim.Volume(cmd, dt);
 					}
 				}
 
@@ -68,13 +66,10 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (hairSim != null && hairSim.isActiveAndEnabled)
 				{
-					using (new ProfilingSample(cmd, "HairSim.Draw (GPU)"))
-					{
-						RTHandle cameraColor;
-						RTHandle cameraDepth;
-						GetCameraBuffers(out cameraColor, out cameraDepth);
-						hairSim.Draw(cmd, cameraColor, cameraDepth, motionVectorsRT);
-					}
+					RTHandle cameraColor;
+					RTHandle cameraDepth;
+					GetCameraBuffers(out cameraColor, out cameraDepth);
+					hairSim.Draw(cmd, cameraColor, cameraDepth, motionVectorsRT);
 				}
 			}
 			Profiler.EndSample();

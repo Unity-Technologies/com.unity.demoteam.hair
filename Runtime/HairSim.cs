@@ -23,13 +23,46 @@ namespace Unity.DemoTeam.Hair
 		private void OnDisable() { instances.Remove(this); ReleaseBuffers(); ReleaseVolumes(); strandsActive = StrandConfiguration.none; }
 		#endregion
 
-		public static class ProfilerMarkers
+		static class MarkersCPU
 		{
-			public static ProfilerMarker GetStrandRoots = new ProfilerMarker("HairSim.GetStrandRoots");
-			public static ProfilerMarker Init = new ProfilerMarker("HairSim.Init");
-			public static ProfilerMarker Step = new ProfilerMarker("HairSim.Step");
-			public static ProfilerMarker Volume = new ProfilerMarker("HairSim.Volume");
-			public static ProfilerMarker Draw = new ProfilerMarker("HairSim.Draw");
+			public static ProfilerMarker GetStrandRoots;
+		}
+
+		static class MarkersGPU
+		{
+			public static ProfilingSampler Init;
+			public static ProfilingSampler Step;
+			public static ProfilingSampler Volume;
+			public static ProfilingSampler Volume_Clear;
+			public static ProfilingSampler Volume_Splat;
+			public static ProfilingSampler Volume_SplatDensity;
+			public static ProfilingSampler Volume_SplatVelocityXYZ;
+			public static ProfilingSampler Volume_SplatByRasterization;
+			public static ProfilingSampler Volume_SplatByRasterizationNoGS;
+			public static ProfilingSampler Volume_Resolve;
+			public static ProfilingSampler Volume_Gradient;
+			public static ProfilingSampler Volume_Divergence;
+			public static ProfilingSampler Volume_PressureIteration;
+			public static ProfilingSampler Volume_PressureGradient;
+			public static ProfilingSampler Volume_VelocitySolenoidal;
+			public static ProfilingSampler Draw;
+		}
+
+		static void InitializeStaticMarkers<T>(Type type, string prefix, string suffix, Func<string, T> constructor)
+		{
+			var fields = type.GetFields();
+			foreach (var field in fields)
+			{
+				var name = prefix + field.Name.Replace('_', '.') + suffix;
+				//Debug.Log("creating marker: " + name);
+				field.SetValue(null, constructor(name));
+			}
+		}
+
+		static HairSim()
+		{
+			InitializeStaticMarkers(typeof(MarkersCPU), "HairSim.", "", (string s) => new ProfilerMarker(s));
+			InitializeStaticMarkers(typeof(MarkersGPU), "HairSim.", "", (string s) => new ProfilingSampler(s));
 		}
 
 		const int THREAD_GROUP_SIZE = 64;
@@ -502,7 +535,7 @@ namespace Unity.DemoTeam.Hair
 
 		private NativeArray<StrandRoot> GetStrandRoots()
 		{
-			using (ProfilerMarkers.GetStrandRoots.Auto())
+			using (MarkersCPU.GetStrandRoots.Auto())
 			{
 				NativeArray<StrandRoot> strandRoots = new NativeArray<StrandRoot>(strands.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 
@@ -664,7 +697,7 @@ namespace Unity.DemoTeam.Hair
 
 		private void Init(CommandBuffer cmd)
 		{
-			using (ProfilerMarkers.Init.Auto())
+			using (new ProfilingScope(cmd, MarkersGPU.Init))
 			{
 				using (NativeArray<StrandRoot> tmpRoots = GetStrandRoots())
 				using (NativeArray<Vector4> tmpRootsPos = new NativeArray<Vector4>(strands.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
@@ -745,9 +778,10 @@ namespace Unity.DemoTeam.Hair
 				kernelVolumeVelocitySolenoidal = computeVolume.FindKernel("KVolumeVelocitySolenoidal");
 
 				strandsActive = strands;
-
-				Volume(cmd, 0.0f);
 			}
+
+			// ensure valid volume
+			Volume(cmd, 0.0f);
 		}
 
 		public void Step(CommandBuffer cmd, float dt)
@@ -758,7 +792,7 @@ namespace Unity.DemoTeam.Hair
 				Init(cmd);
 			}
 
-			using (ProfilerMarkers.Step.Auto())
+			using (new ProfilingScope(cmd, MarkersGPU.Step))
 			{
 				SwapBuffers(ref particlePosition, ref particlePositionPrev);
 				SwapBuffers(ref particleVelocity, ref particleVelocityPrev);
@@ -864,7 +898,7 @@ namespace Unity.DemoTeam.Hair
 				Init(cmd);
 			}
 
-			using (ProfilerMarkers.Volume.Auto())
+			using (new ProfilingScope(cmd, MarkersGPU.Volume))
 			{
 				volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
 				volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
@@ -882,7 +916,7 @@ namespace Unity.DemoTeam.Hair
 				int volumeThreadGroupsZ = volume.volumeResolution / volumeThreadCountXYZ;
 
 				// clear
-				using (new ProfilingSample(cmd, "HairSim.Volume.Clear (GPU)"))
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_Clear))
 				{
 					SetComputeKernelParams(cmd, computeVolume, kernelVolumeClear);
 					cmd.DispatchCompute(computeVolume, kernelVolumeClear,
@@ -896,7 +930,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					case VolumeConfiguration.SplatMethod.Compute:
 						{
-							using (new ProfilingSample(cmd, "HairSim.Volume.SplatDensityVelocity (GPU)"))
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_Splat))
 							{
 								SetComputeKernelParams(cmd, computeVolume, kernelVolumeSplatDensityVelocity);
 								cmd.DispatchCompute(computeVolume, kernelVolumeSplatDensityVelocity,
@@ -909,7 +943,7 @@ namespace Unity.DemoTeam.Hair
 
 					case VolumeConfiguration.SplatMethod.ComputeSplit:
 						{
-							using (new ProfilingSample(cmd, "HairSim.Volume.SplatDensity (GPU)"))
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_SplatDensity))
 							{
 								SetComputeKernelParams(cmd, computeVolume, kernelVolumeSplatDensity);
 								cmd.DispatchCompute(computeVolume, kernelVolumeSplatDensity,
@@ -918,7 +952,7 @@ namespace Unity.DemoTeam.Hair
 									particleThreadGroupsZ);
 							}
 
-							using (new ProfilingSample(cmd, "HairSim.Volume.SplatVelocityX|Y|Z (GPU)"))
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_SplatVelocityXYZ))
 							{
 								SetComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityX);
 								cmd.DispatchCompute(computeVolume, kernelVolumeSplatVelocityX,
@@ -944,7 +978,7 @@ namespace Unity.DemoTeam.Hair
 
 					case VolumeConfiguration.SplatMethod.Rasterization:
 						{
-							using (new ProfilingSample(cmd, "HairSim.Volume.Rasterization (GPU)"))
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_SplatByRasterization))
 							{
 								SetRenderMaterialParams(ref computeVolumeRasterPB);
 								CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color);
@@ -955,7 +989,7 @@ namespace Unity.DemoTeam.Hair
 
 					case VolumeConfiguration.SplatMethod.RasterizationNoGS:
 						{
-							using (new ProfilingSample(cmd, "HairSim.Volume.RasterizationNoGS (GPU)"))
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_SplatByRasterizationNoGS))
 							{
 								SetRenderMaterialParams(ref computeVolumeRasterPB);
 								CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color);
@@ -971,7 +1005,7 @@ namespace Unity.DemoTeam.Hair
 					case VolumeConfiguration.SplatMethod.Compute:
 					case VolumeConfiguration.SplatMethod.ComputeSplit:
 						{
-							using (new ProfilingSample(cmd, "HairSim.Volume.ResolveVelocity (GPU)"))
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_Resolve))
 							{
 								SetComputeKernelParams(cmd, computeVolume, kernelVolumeResolveVelocity);
 								cmd.DispatchCompute(computeVolume, kernelVolumeResolveVelocity,
@@ -985,7 +1019,7 @@ namespace Unity.DemoTeam.Hair
 					case VolumeConfiguration.SplatMethod.Rasterization:
 					case VolumeConfiguration.SplatMethod.RasterizationNoGS:
 						{
-							using (new ProfilingSample(cmd, "HairSim.Volume.ResolveVelocityDensity (GPU)"))
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_Resolve))
 							{
 								SetComputeKernelParams(cmd, computeVolume, kernelVolumeResolveVelocityDensity);
 								cmd.DispatchCompute(computeVolume, kernelVolumeResolveVelocityDensity,
@@ -997,8 +1031,8 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 
-				// gradient
-				using (new ProfilingSample(cmd, "HairSim.Volume.Gradient (GPU)"))
+				// calculations
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_Gradient))
 				{
 					SetComputeKernelParams(cmd, computeVolume, kernelVolumeGradient);
 					cmd.DispatchCompute(computeVolume, kernelVolumeGradient,
@@ -1007,8 +1041,7 @@ namespace Unity.DemoTeam.Hair
 						volumeThreadGroupsZ);
 				}
 
-				// divergence
-				using (new ProfilingSample(cmd, "HairSim.Volume.Divergence (GPU)"))
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_Divergence))
 				{
 					SetComputeKernelParams(cmd, computeVolume, kernelVolumeDivergence);
 					cmd.DispatchCompute(computeVolume, kernelVolumeDivergence,
@@ -1017,8 +1050,7 @@ namespace Unity.DemoTeam.Hair
 						volumeThreadGroupsZ);
 				}
 
-				// pressure
-				using (new ProfilingSample(cmd, "HairSim.Volume.PressureIteration (GPU)"))
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_PressureIteration))
 				{
 					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressureIteration);
 					for (int i = 0; i != volume.volumePressureIterations; i++)
@@ -1033,8 +1065,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				// pressure gradient
-				using (new ProfilingSample(cmd, "HairSim.Volume.PressureGradient (GPU)"))
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_PressureGradient))
 				{
 					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressureGradient);
 					cmd.DispatchCompute(computeVolume, kernelVolumePressureGradient,
@@ -1043,8 +1074,7 @@ namespace Unity.DemoTeam.Hair
 						volumeThreadGroupsZ);
 				}
 
-				// velocity solenoidal
-				using (new ProfilingSample(cmd, "HairSim.Volume.VelocitySolenoidal (GPU)"))
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_VelocitySolenoidal))
 				{
 					SetComputeKernelParams(cmd, computeVolume, kernelVolumeVelocitySolenoidal);
 					cmd.DispatchCompute(computeVolume, kernelVolumeVelocitySolenoidal,
@@ -1063,7 +1093,7 @@ namespace Unity.DemoTeam.Hair
 				Init(cmd);
 			}
 
-			using (ProfilerMarkers.Draw.Auto())
+			using (new ProfilingScope(cmd, MarkersGPU.Draw))
 			{
 				if (!debug.drawParticles &&
 					!debug.drawStrands &&
