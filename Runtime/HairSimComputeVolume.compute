@@ -12,10 +12,6 @@
 #pragma kernel KVolumePressureGradient
 #pragma kernel KVolumeVelocitySolenoidal
 
-#include "HairSimComputeConfig.hlsl"
-
-#define VOLUME_SQUARE_CELLS 1
-
 #define PARTICLE_NUM_X 64
 #define PARTICLE_NUM_Y 1
 #define PARTICLE_NUM_Z 1
@@ -24,15 +20,15 @@
 #define VOLUME_NUM_Y 4
 #define VOLUME_NUM_Z 4
 
-float _DT;
+#define HAIRSIM_WRITEABLE_VOLUMEDATA 1
 
-StructuredBuffer<float4> _ParticlePosition;
-StructuredBuffer<float4> _ParticleVelocity;
-
-#define HAIRSIM_VOLUMEDATA_WRITEABLE 1
-
+#include "HairSimComputeConfig.hlsl"
+#include "HairSimComputeSolverData.hlsl"
 #include "HairSimComputeVolumeData.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
+
+//---------
+// utility
 
 void InterlockedAddTrilinear(RWTexture3D<int> volume, uint3 idx0, float value, float3 w0, float3 w1)
 {
@@ -64,6 +60,9 @@ void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> vo
 	InterlockedAdd(volume[VolumeWorldToIndex(_ParticlePosition[i].xyz)], (int)(DENSITY_SCALE * value));
 #endif
 }
+
+//---------
+// kernels
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeClear(

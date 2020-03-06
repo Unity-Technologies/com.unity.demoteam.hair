@@ -24,8 +24,8 @@
 #define ENABLE_CONSTRAINT_CURVATURE		1
 #define ENABLE_CONSTRAINT_FTL			1
 
-//----------
-// indexing
+//---------
+// utility
 
 float3 ParticleVolumeUVW(uint i)
 {
@@ -77,17 +77,14 @@ float3 ParticleVolumeRepulsionForce(uint i)
 	}
 }
 
-//---------
-// utility
-
-float GetDecay()
+float Decay()
 {
 	return pow(max(1e-4, 1.0 - _Damping), _DT);
 }
 
 float3 Integrate(float3 x0, float3 v0, float3 a0)
 {
-	return x0 + (_DT * GetDecay()) * (v0 + _DT * a0);
+	return x0 + (_DT * Decay()) * (v0 + _DT * a0);
 }
 
 //---------
