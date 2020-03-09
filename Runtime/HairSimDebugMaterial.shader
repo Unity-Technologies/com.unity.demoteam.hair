@@ -85,7 +85,7 @@
 				float3 worldPos = _ParticlePosition[i].xyz;
 
 				float volumeDensity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, VolumeWorldToUVW(worldPos), 0).w;
-				float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 200.0), 4.0);
+				float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 400.0), 4.0);
 
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));

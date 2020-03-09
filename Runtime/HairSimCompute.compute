@@ -19,7 +19,7 @@
 #define ENABLE_VOLUME_FRICTION			1
 #define ENABLE_VOLUME_REPULSION			1
 
-#define ENABLE_CONSTRAINT_COLLISION		1
+#define ENABLE_CONSTRAINT_COLLISION		2
 #define ENABLE_CONSTRAINT_DISTANCE		1
 #define ENABLE_CONSTRAINT_CURVATURE		1
 #define ENABLE_CONSTRAINT_FTL			1
@@ -69,7 +69,7 @@ float3 ParticleVolumeRepulsionForce(uint i)
 	{
 		float3 volumeUVW = ParticleVolumeUVW(i);
 		float3 volumeGradient = _VolumeGradient.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0);
-		return volumeGradient * -_Repulsion;
+		return volumeGradient * -(_Repulsion);
 	}
 	else
 	{
@@ -77,14 +77,14 @@ float3 ParticleVolumeRepulsionForce(uint i)
 	}
 }
 
-float Decay()
+float GetDecay()
 {
 	return pow(max(1e-4, 1.0 - _Damping), _DT);
 }
 
 float3 Integrate(float3 x0, float3 v0, float3 a0)
 {
-	return x0 + (_DT * Decay()) * (v0 + _DT * a0);
+	return x0 + _DT * (v0 * GetDecay() + _DT * a0);
 }
 
 //---------
@@ -145,7 +145,10 @@ void KSolveConstraints_GaussSeidelReference(
 		{
 			for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 			{
-				ApplyCollisionConstraint(_ParticlePosition[i].xyz);
+				if (ENABLE_CONSTRAINT_COLLISION == 2)
+					ApplyCollisionFrictionConstraint(_Friction, _ParticlePositionPrev[i].xyz, _ParticlePosition[i].xyz);
+				else
+					ApplyCollisionConstraint(_ParticlePosition[i].xyz);
 			}
 		}
 
@@ -310,7 +313,8 @@ void KSolveConstraints_GaussSeidel(
 		//--- p0 (fixed)
 		//    |
 		//    r0 (below)
-		if (ENABLE_CONSTRAINT_COLLISION)	ApplyCollisionConstraint(p1);
+		if (ENABLE_CONSTRAINT_COLLISION==1)	ApplyCollisionConstraint(p1);
+		if (ENABLE_CONSTRAINT_COLLISION==2)	ApplyCollisionFrictionConstraint(_Friction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride].xyz, p1);
 		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.0, 1.0, p0, p1);
 		if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
 		
@@ -321,7 +325,8 @@ void KSolveConstraints_GaussSeidel(
 		//--- p0 (fixed)
 		//    |
 		//    ## (below)
-		if (ENABLE_CONSTRAINT_COLLISION)	ApplyCollisionConstraint(p2);
+		if (ENABLE_CONSTRAINT_COLLISION==1)	ApplyCollisionConstraint(p2);
+		if (ENABLE_CONSTRAINT_COLLISION==2)	ApplyCollisionFrictionConstraint(_Friction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride * 2].xyz, p2);
 		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1, p2);
 		if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
@@ -341,7 +346,8 @@ void KSolveConstraints_GaussSeidel(
 			//--- ## (fixed)
 			//    |
 			//    ## (below)
-			if (ENABLE_CONSTRAINT_COLLISION)	ApplyCollisionConstraint(p2);
+			if (ENABLE_CONSTRAINT_COLLISION==1)	ApplyCollisionConstraint(p2);
+			if (ENABLE_CONSTRAINT_COLLISION==2)	ApplyCollisionFrictionConstraint(_Friction, _ParticlePositionPrev[i].xyz, p2);
 			if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1, p2);
 			if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
 			
@@ -473,8 +479,10 @@ void KSolveConstraints_Jacobi(
 			// solve collision constraints
 			if (ENABLE_CONSTRAINT_COLLISION)
 			{
-				SolveCollisionConstraint(gs_x[j].xyz, d);
-				//SolveCollisionFrictionConstraint(_Friction, x0, gs_x[j], d);
+				if (ENABLE_CONSTRAINT_COLLISION == 2)
+					SolveCollisionFrictionConstraint(_Friction, x0, gs_x[j].xyz, d);
+				else
+					SolveCollisionConstraint(gs_x[j].xyz, d);
 			}
 
 			// solve distance constraints
@@ -596,7 +604,12 @@ void KSolveConstraints_Jacobi(
 			// solve collision constraints
 			if (ENABLE_CONSTRAINT_COLLISION)
 			{
-				SolveCollisionConstraint(gs_x[threadIdx], d); n++;
+				if (ENABLE_CONSTRAINT_COLLISION == 2)
+					SolveCollisionFrictionConstraint(_Friction, x0, gs_x[threadIdx], d);
+				else
+					SolveCollisionConstraint(gs_x[threadIdx], d);
+
+				n++;
 			}
 
 			// solve distance constraints

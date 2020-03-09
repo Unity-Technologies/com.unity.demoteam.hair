@@ -39,25 +39,47 @@ void SolveCollisionConstraint(
 
 void SolveCollisionFrictionConstraint(
 	const float friction,
-	const float3 x,
+	const float3 x0,
 	const float3 p,
 	inout float3 d)
 {
-	float4 contact = BoundaryContact(p);
-	d += contact.xyz * contact.w;
-
 	// Unified Particle Physics for Real-Time Applications
 	// https://mmacklin.com/uppfrta_preprint.pdf
-	if (contact.w < 0.0)
-	{
-		float3 x_star = p + contact.xyz * contact.w;
-		float3 x_delta = x_star - x;
-		float3 x_delta_tan = x_delta - dot(x_delta, contact.xyz) * contact.xyz;
 
-		if (length(x_delta_tan) < friction * -contact.w)
+	/*
+	
+	                      x
+						 /
+						/
+					   /
+		  --------p'--/-----------
+				  |  / 
+				  | /
+				  |/
+				  ' p
+				 
+	*/
+
+	BoundaryContactInfo contact = BoundaryContactTagged(p);
+	d += contact.normal * contact.depth;
+
+	if (contact.depth < 0.0)
+	{
+		float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
+
+		float3 x_star = p + contact.normal * contact.depth;
+		float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
+		float3 x_delta_tan = x_delta - dot(x_delta, contact.normal) * contact.normal;
+
+		float sq_norm_delta_tan = dot(x_delta_tan, x_delta_tan);
+
+		const float muS = friction;// for now just using the same constant here
+		const float muK = friction;// ...
+
+		if (sq_norm_delta_tan < muS * muS * contact.depth * contact.depth)
 			d -= x_delta_tan;
 		else
-			d -= x_delta_tan * min((friction * -contact.w) / length(x_delta_tan), 1);
+			d -= x_delta_tan * min(-muK * contact.depth * rsqrt(sq_norm_delta_tan), 1);
 	}
 }
 
@@ -312,6 +334,13 @@ void ApplyCollisionConstraint(inout float3 p)
 {
 	float3 d = 0.0;
 	SolveCollisionConstraint(p, d);
+	p += d;
+}
+
+void ApplyCollisionFrictionConstraint(const float friction, const float3 x0, inout float3 p)
+{
+	float3 d = 0.0;
+	SolveCollisionFrictionConstraint(friction, x0, p, d);
 	p += d;
 }
 

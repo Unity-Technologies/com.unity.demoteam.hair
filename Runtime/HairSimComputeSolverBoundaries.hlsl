@@ -24,6 +24,20 @@ StructuredBuffer<BoundarySphere> _BoundarySphere;
 StructuredBuffer<BoundaryTorus> _BoundaryTorus;
 StructuredBuffer<BoundaryPack> _BoundaryPack;
 
+/* TODO
+StructuredBuffer<float4> _BoundaryData;
+//	data	|	capsule		sphere		torus
+//	----------------------------------------------
+//	float3	|	centerA		center		center
+//	float	|	radius		radius		radiusA
+//	float3	|	centerB		__skip__	axis
+//	float	|	__pad__		__skip__	radiusB
+*/
+
+StructuredBuffer<float4x4> _BoundaryMatrix;
+StructuredBuffer<float4x4> _BoundaryMatrixInv;
+StructuredBuffer<float4x4> _BoundaryMatrixPrev;
+
 uint _BoundaryCapsuleCount;
 uint _BoundarySphereCount;
 uint _BoundaryTorusCount;
@@ -32,7 +46,7 @@ float BoundaryDistance(const float3 p)
 {
 	float d = 1e+7;
 
-#if 1
+#if 0
 	// capsules
 	{
 		for (uint i = 0; i != _BoundaryCapsuleCount; i++)
@@ -114,6 +128,62 @@ float BoundaryDistance(const float3 p)
 #endif
 
 	return d;
+}
+
+float2 BoundaryDistanceTagged(const float3 p)
+{
+	float2 result = float2(1e+7, -1.0);
+
+	uint i = 0;
+	uint j = 0;
+
+	// capsules
+	{
+		for (j += _BoundaryCapsuleCount; i < j; i++)
+		{
+			BoundaryPack capsulePack = _BoundaryPack[i];
+
+			float3 pa = p - capsulePack.pA;
+			float3 ba = capsulePack.pB - capsulePack.pA;
+
+			float h = saturate(dot(pa, ba) / dot(ba, ba));
+			float r = capsulePack.tA;
+
+			float d = length(pa - ba * h) - r;
+			if (d < result.x)
+			{
+				result = float2(d, i);
+			}
+		}
+	}
+
+	// spheres
+	{
+		for (j += _BoundarySphereCount; i < j; i++)
+		{
+			BoundaryPack spherePack = _BoundaryPack[i];
+
+			float3 a = spherePack.pA;
+			float r = spherePack.tA;
+
+			float d = length(a - p) - r;
+			if (d < result.x)
+			{
+				result = float2(d, i);
+			}
+		}
+	}
+
+	// tori
+	{
+		for (j += _BoundaryTorusCount; i < j; i++)
+		{
+			BoundaryPack torusPack = _BoundaryPack[i];
+			//TODO
+		}
+	}
+
+	return result;
 }
 
 /*
@@ -203,6 +273,31 @@ float4 BoundaryContact(const float3 p)
 		return float4(BoundaryNormal(p, d), d);
 	else
 		return 0.0;
+}
+
+struct BoundaryContactInfo
+{
+	float3 normal;
+	float depth;
+	uint index;
+};
+
+BoundaryContactInfo BoundaryContactTagged(const float3 p)
+{
+	float2 info = BoundaryDistanceTagged(p);
+	if (info.x < 0.0)
+	{
+		BoundaryContactInfo result;
+		result.normal = BoundaryNormal(p, info.x);
+		result.depth = info.x;
+		result.index = info.y;
+		return result;
+	}
+	else
+	{
+		BoundaryContactInfo result = { 0, 0, 0, 0, 0 };
+		return result;
+	}
 }
 
 #endif//__HAIRSIMCOMPUTE_BOUNDARIES__
