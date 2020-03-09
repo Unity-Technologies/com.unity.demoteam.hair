@@ -123,7 +123,7 @@ namespace Unity.DemoTeam.Hair
 
 			public static int _BoundaryMatrix = Shader.PropertyToID("_BoundaryMatrix");
 			public static int _BoundaryMatrixInv = Shader.PropertyToID("_BoundaryMatrixInv");
-			public static int _BoundaryMatrixPrev = Shader.PropertyToID("_BoundaryMatrixPrev");
+			public static int _BoundaryMatrixW2PrevW = Shader.PropertyToID("_BoundaryMatrixW2PrevW");
 
 			// volume params
 			public static int _VolumeCells = Shader.PropertyToID("_VolumeCells");
@@ -370,8 +370,9 @@ namespace Unity.DemoTeam.Hair
 
 		private ComputeBuffer boundaryMatrix;
 		private ComputeBuffer boundaryMatrixInv;
-		private ComputeBuffer boundaryMatrixPrev;
+		private ComputeBuffer boundaryMatrixW2PrevW;
 
+		private NativeArray<Matrix4x4> boundaryMatrixPrev;
 		private Hash128 boundaryMatrixPrevHash;
 
 		private int boundaryCapsuleCount;
@@ -485,7 +486,12 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref boundaryMatrix, "BoundaryMatrix", MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref boundaryMatrixInv, "BoundaryMatrixInv", MAX_BOUNDARIES, sizeof(Matrix4x4));
-				changed |= CreateBuffer(ref boundaryMatrixPrev, "BoundaryMatrixPrev", MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref boundaryMatrixW2PrevW, "BoundaryMatrixW2PW", MAX_BOUNDARIES, sizeof(Matrix4x4));
+
+				if (boundaryMatrixPrev.IsCreated && boundaryMatrixPrev.Length != MAX_BOUNDARIES)
+					boundaryMatrixPrev.Dispose();
+				if (boundaryMatrixPrev.IsCreated == false)
+					boundaryMatrixPrev = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
 				return changed;
 			}
@@ -510,7 +516,10 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref boundaryMatrix);
 			ReleaseBuffer(ref boundaryMatrixInv);
-			ReleaseBuffer(ref boundaryMatrixPrev);
+			ReleaseBuffer(ref boundaryMatrixW2PrevW);
+
+			if (boundaryMatrixPrev.IsCreated)
+				boundaryMatrixPrev.Dispose();
 		}
 
 		private bool CreateVolumes()
@@ -820,8 +829,6 @@ namespace Unity.DemoTeam.Hair
 				//-------------------
 				// update boundaries
 
-				SwapBuffers(ref boundaryMatrix, ref boundaryMatrixPrev);
-
 				boundaryCapsuleCount = 0;
 				boundarySphereCount = 0;
 				boundaryTorusCount = 0;
@@ -835,9 +842,10 @@ namespace Unity.DemoTeam.Hair
 				using (NativeArray<Matrix4x4> tmpTorusMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (NativeArray<Matrix4x4> tmpMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (NativeArray<Matrix4x4> tmpMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (NativeArray<Matrix4x4> tmpMatrixW2PW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
+					int boundaryCount = 0;
 					var boundaryHash = new Hash128(7, 13);
-					int boundaryPackCount = 0;
 
 					unsafe
 					{
@@ -852,6 +860,8 @@ namespace Unity.DemoTeam.Hair
 
 						Matrix4x4* ptrMatrix = (Matrix4x4*)tmpMatrix.GetUnsafePtr();
 						Matrix4x4* ptrMatrixInv = (Matrix4x4*)tmpMatrixInv.GetUnsafePtr();
+						Matrix4x4* ptrMatrixW2PW = (Matrix4x4*)tmpMatrixW2PW.GetUnsafePtr();
+						Matrix4x4* ptrMatrixPrev = (Matrix4x4*)boundaryMatrixPrev.GetUnsafePtr();
 
 						foreach (HairSimBoundary boundary in boundaries)
 						{
@@ -880,43 +890,50 @@ namespace Unity.DemoTeam.Hair
 
 						for (int i = 0; i != boundaryCapsuleCount; i++)
 						{
-							ptrMatrix[boundaryPackCount] = ptrCapsuleMatrix[i];
-							ptrPack[boundaryPackCount++] = HairSimBoundary.Pack(ptrCapsule[i]);
+							ptrMatrix[boundaryCount] = ptrCapsuleMatrix[i];
+							ptrPack[boundaryCount++] = HairSimBoundary.Pack(ptrCapsule[i]);
 						}
 
 						for (int i = 0; i != boundarySphereCount; i++)
 						{
-							ptrMatrix[boundaryPackCount] = ptrSphereMatrix[i];
-							ptrPack[boundaryPackCount++] = HairSimBoundary.Pack(ptrSphere[i]);
+							ptrMatrix[boundaryCount] = ptrSphereMatrix[i];
+							ptrPack[boundaryCount++] = HairSimBoundary.Pack(ptrSphere[i]);
 						}
 
 						for (int i = 0; i != boundaryTorusCount; i++)
 						{
-							ptrMatrix[boundaryPackCount] = ptrTorusMatrix[i];
-							ptrPack[boundaryPackCount++] = HairSimBoundary.Pack(ptrTorus[i]);
+							ptrMatrix[boundaryCount] = ptrTorusMatrix[i];
+							ptrPack[boundaryCount++] = HairSimBoundary.Pack(ptrTorus[i]);
 						}
 
-						for (int i = 0; i != boundaryPackCount; i++)
+						if (boundaryHash != boundaryMatrixPrevHash)
+						{
+							Debug.Log("boundary hash changed: " + boundaryHash);
+							boundaryMatrixPrevHash = boundaryHash;
+
+							for (int i = 0; i != boundaryCount; i++)
+							{
+								ptrMatrixPrev[i] = ptrMatrix[i];
+							}
+						}
+
+						for (int i = 0; i != boundaryCount; i++)
 						{
 							ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i]);
+							ptrMatrixW2PW[i] = ptrMatrixPrev[i] * ptrMatrixInv[i];
 						}
 					}
 
 					boundaryCapsule.SetData(tmpCapsule, 0, 0, boundaryCapsuleCount);
 					boundarySphere.SetData(tmpSphere, 0, 0, boundarySphereCount);
 					boundaryTorus.SetData(tmpTorus, 0, 0, boundaryTorusCount);
-					boundaryPack.SetData(tmpPack, 0, 0, boundaryPackCount);
+					boundaryPack.SetData(tmpPack, 0, 0, boundaryCount);
 
-					boundaryMatrix.SetData(tmpMatrix, 0, 0, boundaryPackCount);
-					boundaryMatrixInv.SetData(tmpMatrixInv, 0, 0, boundaryPackCount);
+					boundaryMatrix.SetData(tmpMatrix, 0, 0, boundaryCount);
+					boundaryMatrixInv.SetData(tmpMatrixInv, 0, 0, boundaryCount);
+					boundaryMatrixW2PrevW.SetData(tmpMatrixW2PW, 0, 0, boundaryCount);
 
-					if (boundaryHash != boundaryMatrixPrevHash)
-					{
-						Debug.Log("boundary hash changed: " + boundaryHash);
-
-						boundaryMatrixPrev.SetData(tmpMatrix, 0, 0, boundaryPackCount);
-						boundaryMatrixPrevHash = boundaryHash;
-					}
+					boundaryMatrixPrev.CopyFrom(tmpMatrix);
 				}
 
 				SetComputeParams(cmd, compute, dt);
@@ -1311,7 +1328,7 @@ namespace Unity.DemoTeam.Hair
 
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrix, boundaryMatrix);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixInv, boundaryMatrixInv);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixPrev, boundaryMatrixPrev);
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixW2PrevW, boundaryMatrixW2PrevW);
 
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensity, volumeDensity);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeVelocityX, volumeVelocityX);

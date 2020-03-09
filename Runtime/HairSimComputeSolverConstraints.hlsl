@@ -1,6 +1,8 @@
 #ifndef __HAIRSIMCOMPUTE_CONSTRAINTS__
 #define __HAIRSIMCOMPUTE_CONSTRAINTS__
 
+#include "HairSimComputeSolverBoundaries.hlsl"
+
 // Constraints between particles with infinite mass may exhibit division by zero.
 // Ideally, the application should not evaluate such constraints, as checking for
 // division by zero incurs an additional cost. For generic applications where the
@@ -65,21 +67,22 @@ void SolveCollisionFrictionConstraint(
 
 	if (contact.depth < 0.0)
 	{
-		float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
+		//const float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
+		const float4x4 M_prev = _BoundaryMatrixW2PrevW[contact.index];
 
 		float3 x_star = p + contact.normal * contact.depth;
 		float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
 		float3 x_delta_tan = x_delta - dot(x_delta, contact.normal) * contact.normal;
 
-		float sq_norm_delta_tan = dot(x_delta_tan, x_delta_tan);
+		float norm2_delta_tan = dot(x_delta_tan, x_delta_tan);
 
 		const float muS = friction;// for now just using the same constant here
 		const float muK = friction;// ...
 
-		if (sq_norm_delta_tan < muS * muS * contact.depth * contact.depth)
+		if (norm2_delta_tan < muS * muS * contact.depth * contact.depth)
 			d -= x_delta_tan;
 		else
-			d -= x_delta_tan * min(-muK * contact.depth * rsqrt(sq_norm_delta_tan), 1);
+			d -= x_delta_tan * min(-muK * contact.depth * rsqrt(norm2_delta_tan), 1);
 	}
 }
 

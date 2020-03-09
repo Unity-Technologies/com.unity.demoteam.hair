@@ -36,7 +36,7 @@ StructuredBuffer<float4> _BoundaryData;
 
 StructuredBuffer<float4x4> _BoundaryMatrix;
 StructuredBuffer<float4x4> _BoundaryMatrixInv;
-StructuredBuffer<float4x4> _BoundaryMatrixPrev;
+StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;
 
 uint _BoundaryCapsuleCount;
 uint _BoundarySphereCount;

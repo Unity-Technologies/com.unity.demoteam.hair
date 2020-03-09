@@ -453,7 +453,7 @@ void KSolveConstraints_Jacobi(
 	// solve constraints by Jacobi iteration
 	const uint m = (THREAD_GROUP_SIZE - 1) - threadIdx;
 	const uint n = max(1,
-		ENABLE_CONSTRAINT_COLLISION +
+		(ENABLE_CONSTRAINT_COLLISION ? 1 : 0) +
 		ENABLE_CONSTRAINT_DISTANCE * min(2, 1 + m) +
 		ENABLE_CONSTRAINT_CURVATURE * min(3, 1 + m) +
 #if SPLIT_FTL
