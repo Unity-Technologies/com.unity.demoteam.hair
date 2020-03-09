@@ -24,16 +24,6 @@ StructuredBuffer<BoundarySphere> _BoundarySphere;
 StructuredBuffer<BoundaryTorus> _BoundaryTorus;
 StructuredBuffer<BoundaryPack> _BoundaryPack;
 
-/* TODO
-StructuredBuffer<float4> _BoundaryData;
-//	data	|	capsule		sphere		torus
-//	----------------------------------------------
-//	float3	|	centerA		center		center
-//	float	|	radius		radius		radiusA
-//	float3	|	centerB		__skip__	axis
-//	float	|	__pad__		__skip__	radiusB
-*/
-
 StructuredBuffer<float4x4> _BoundaryMatrix;
 StructuredBuffer<float4x4> _BoundaryMatrixInv;
 StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;
@@ -41,6 +31,36 @@ StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;
 uint _BoundaryCapsuleCount;
 uint _BoundarySphereCount;
 uint _BoundaryTorusCount;
+
+//-----------------
+// boundary shapes
+
+float SdCapsule(const float3 p, const float3 centerA, const float3 centerB, const float radius)
+{
+	const float3 pa = p - centerA;
+	const float3 ba = centerB - centerA;
+
+	const float h = saturate(dot(pa, ba) / dot(ba, ba));
+	const float r = radius;
+
+	return (length(pa - ba * h) - r);
+}
+
+float SdSphere(const float3 p, const float3 center, const float radius)
+{
+	const float3 a = center;
+	const float r = radius;
+
+	return (length(a - p) - r);
+}
+
+float SdTorus(const float3 p, const float3 center, const float3 axis, const float radiusA, const float radiusB)
+{
+	return 1e+7;//TODO
+}
+
+//------------------
+// boundary queries
 
 float BoundaryDistance(const float3 p)
 {
@@ -52,14 +72,7 @@ float BoundaryDistance(const float3 p)
 		for (uint i = 0; i != _BoundaryCapsuleCount; i++)
 		{
 			BoundaryCapsule capsule = _BoundaryCapsule[i];
-
-			float3 pa = p - capsule.centerA;
-			float3 ba = capsule.centerB - capsule.centerA;
-
-			float h = saturate(dot(pa, ba) / dot(ba, ba));
-			float r = capsule.radius;
-
-			d = min(d, length(pa - ba * h) - r);
+			d = min(d, SdCapsule(p, capsule.centerA, capsule.centerB, capsule.radius));
 		}
 	}
 
@@ -68,11 +81,7 @@ float BoundaryDistance(const float3 p)
 		for (uint i = 0; i != _BoundarySphereCount; i++)
 		{
 			BoundarySphere sphere = _BoundarySphere[i];
-
-			float3 a = sphere.center;
-			float r = sphere.radius;
-
-			d = min(d, length(a - p) - r);
+			d = min(d, SdSphere(p, sphere.center, sphere.radius));
 		}
 	}
 
@@ -81,7 +90,7 @@ float BoundaryDistance(const float3 p)
 		for (uint i = 0; i != _BoundaryTorusCount; i++)
 		{
 			BoundaryTorus torus = _BoundaryTorus[i];
-			//TODO
+			d = min(d, SdTorus(p, torus.center, torus.axis, torus.radiusA, torus.radiusB));
 		}
 	}
 #else
@@ -92,15 +101,8 @@ float BoundaryDistance(const float3 p)
 	{
 		for (j += _BoundaryCapsuleCount; i < j; i++)
 		{
-			BoundaryPack capsulePack = _BoundaryPack[i];
-
-			float3 pa = p - capsulePack.pA;
-			float3 ba = capsulePack.pB - capsulePack.pA;
-
-			float h = saturate(dot(pa, ba) / dot(ba, ba));
-			float r = capsulePack.tA;
-
-			d = min(d, length(pa - ba * h) - r);
+			BoundaryPack capsule = _BoundaryPack[i];
+			d = min(d, SdCapsule(p, capsule.pA, capsule.pB, capsule.tA));
 		}
 	}
 
@@ -108,12 +110,8 @@ float BoundaryDistance(const float3 p)
 	{
 		for (j += _BoundarySphereCount; i < j; i++)
 		{
-			BoundaryPack spherePack = _BoundaryPack[i];
-
-			float3 a = spherePack.pA;
-			float r = spherePack.tA;
-
-			d = min(d, length(a - p) - r);
+			BoundaryPack sphere = _BoundaryPack[i];
+			d = min(d, SdSphere(p, sphere.pA, sphere.tA));
 		}
 	}
 
@@ -121,8 +119,8 @@ float BoundaryDistance(const float3 p)
 	{
 		for (j += _BoundaryTorusCount; i < j; i++)
 		{
-			BoundaryPack torusPack = _BoundaryPack[i];
-			//TODO
+			BoundaryPack torus = _BoundaryPack[i];
+			d = min(d, SdTorus(p, torus.pA, torus.pB, torus.tA, torus.tB));
 		}
 	}
 #endif
@@ -130,9 +128,15 @@ float BoundaryDistance(const float3 p)
 	return d;
 }
 
-float2 BoundaryDistanceTagged(const float3 p)
+struct BoundaryDistanceInfo
 {
-	float2 result = float2(1e+7, -1.0);
+	float distance;
+	uint index;
+};
+
+BoundaryDistanceInfo BoundaryDistanceSelect(const float3 p)
+{
+	BoundaryDistanceInfo result = { 1e+7, 0 };
 
 	uint i = 0;
 	uint j = 0;
@@ -141,18 +145,12 @@ float2 BoundaryDistanceTagged(const float3 p)
 	{
 		for (j += _BoundaryCapsuleCount; i < j; i++)
 		{
-			BoundaryPack capsulePack = _BoundaryPack[i];
-
-			float3 pa = p - capsulePack.pA;
-			float3 ba = capsulePack.pB - capsulePack.pA;
-
-			float h = saturate(dot(pa, ba) / dot(ba, ba));
-			float r = capsulePack.tA;
-
-			float d = length(pa - ba * h) - r;
-			if (d < result.x)
+			BoundaryPack capsule = _BoundaryPack[i];
+			float d = SdCapsule(p, capsule.pA, capsule.pB, capsule.tA);
+			if (d < result.distance)
 			{
-				result = float2(d, i);
+				result.distance = d;
+				result.index = i;
 			}
 		}
 	}
@@ -161,15 +159,12 @@ float2 BoundaryDistanceTagged(const float3 p)
 	{
 		for (j += _BoundarySphereCount; i < j; i++)
 		{
-			BoundaryPack spherePack = _BoundaryPack[i];
-
-			float3 a = spherePack.pA;
-			float r = spherePack.tA;
-
-			float d = length(a - p) - r;
-			if (d < result.x)
+			BoundaryPack sphere = _BoundaryPack[i];
+			float d = SdSphere(p, sphere.pA, sphere.tA);
+			if (d < result.distance)
 			{
-				result = float2(d, i);
+				result.distance = d;
+				result.index = i;
 			}
 		}
 	}
@@ -178,13 +173,76 @@ float2 BoundaryDistanceTagged(const float3 p)
 	{
 		for (j += _BoundaryTorusCount; i < j; i++)
 		{
-			BoundaryPack torusPack = _BoundaryPack[i];
-			//TODO
+			BoundaryPack torus = _BoundaryPack[i];
+			float d = SdTorus(p, torus.pA, torus.pB, torus.tA, torus.tB);
+			if (d < result.distance)
+			{
+				result.distance = d;
+				result.index = i;
+			}
 		}
 	}
 
 	return result;
 }
+
+float3 BoundaryNormal(const float3 p, const float d)
+{
+	const float2 h = float2(1e-4, 0.0);
+	return normalize(float3(
+		BoundaryDistance(p - h.xyy) - d,
+		BoundaryDistance(p - h.yxy) - d,
+		BoundaryDistance(p - h.yyx) - d
+		));
+}
+
+float3 BoundaryNormal(const float3 p)
+{
+	return BoundaryNormal(p, BoundaryDistance(p));
+}
+
+float4 BoundaryNormalDistance(const float3 p)
+{
+	float d = BoundaryDistance(p);
+	return float4(BoundaryNormal(p, d), d);
+}
+
+float4 BoundaryContact(const float3 p)
+{
+	float d = BoundaryDistance(p);
+	if (d < 0.0)
+		return float4(BoundaryNormal(p, d), d);
+	else
+		return 0.0;
+}
+
+struct BoundaryContactInfo
+{
+	float3 normal;
+	float depth;
+	uint index;
+};
+
+BoundaryContactInfo BoundaryContactSelect(const float3 p)
+{
+	BoundaryDistanceInfo info = BoundaryDistanceSelect(p);
+	if (info.distance < 0.0)
+	{
+		BoundaryContactInfo result;
+		result.normal = BoundaryNormal(p, info.distance);
+		result.depth = info.distance;
+		result.index = info.index;
+		return result;
+	}
+	else
+	{
+		BoundaryContactInfo result = { 0, 0, 0, 0, 0 };
+		return result;
+	}
+}
+
+#endif//__HAIRSIMCOMPUTE_BOUNDARIES__
+
 
 /*
 float4 BoundaryDistance4(const float3 p0, const float3 p1, const float3 p2, const float3 p3)
@@ -244,60 +302,3 @@ float4 BoundaryDistance4(const float3 p0, const float3 p1, const float3 p2, cons
 	return d;
 }
 //*/
-
-float3 BoundaryNormal(const float3 p, const float d)
-{
-	const float2 h = float2(1e-4, 0.0);
-	return normalize(float3(
-		BoundaryDistance(p - h.xyy) - d,
-		BoundaryDistance(p - h.yxy) - d,
-		BoundaryDistance(p - h.yyx) - d
-		));
-}
-
-float3 BoundaryNormal(const float3 p)
-{
-	return BoundaryNormal(p, BoundaryDistance(p));
-}
-
-float4 BoundaryNormalDistance(const float3 p)
-{
-	float d = BoundaryDistance(p);
-	return float4(BoundaryNormal(p, d), d);
-}
-
-float4 BoundaryContact(const float3 p)
-{
-	float d = BoundaryDistance(p);
-	if (d < 0.0)
-		return float4(BoundaryNormal(p, d), d);
-	else
-		return 0.0;
-}
-
-struct BoundaryContactInfo
-{
-	float3 normal;
-	float depth;
-	uint index;
-};
-
-BoundaryContactInfo BoundaryContactTagged(const float3 p)
-{
-	float2 info = BoundaryDistanceTagged(p);
-	if (info.x < 0.0)
-	{
-		BoundaryContactInfo result;
-		result.normal = BoundaryNormal(p, info.x);
-		result.depth = info.x;
-		result.index = info.y;
-		return result;
-	}
-	else
-	{
-		BoundaryContactInfo result = { 0, 0, 0, 0, 0 };
-		return result;
-	}
-}
-
-#endif//__HAIRSIMCOMPUTE_BOUNDARIES__

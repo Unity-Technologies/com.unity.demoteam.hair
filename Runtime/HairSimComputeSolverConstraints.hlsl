@@ -35,8 +35,14 @@ void SolveCollisionConstraint(
 	//                :
 	//                .
 
-	float4 contact = BoundaryContact(p);
-	d += contact.xyz * contact.w;
+	//TODO settle
+	//BoundaryContactInfo contact = BoundaryContactTagged(p);
+	//d += contact.normal * contact.depth;
+	if (BoundaryDistance(p) < 0.0)
+	{
+		float4 contact = BoundaryContact(p);
+		d += contact.xyz * contact.w;
+	}
 }
 
 void SolveCollisionFrictionConstraint(
@@ -48,7 +54,7 @@ void SolveCollisionFrictionConstraint(
 	// Unified Particle Physics for Real-Time Applications
 	// https://mmacklin.com/uppfrta_preprint.pdf
 
-	/*
+	/* TODO
 	
 	                      x
 						 /
@@ -62,22 +68,25 @@ void SolveCollisionFrictionConstraint(
 				 
 	*/
 
-	BoundaryContactInfo contact = BoundaryContactTagged(p);
-	d += contact.normal * contact.depth;
-
-	if (contact.depth < 0.0)
+	//TODO settle
+	//BoundaryContactInfo contact = BoundaryContactSelect(p);
+	//if (contact.depth < 0.0)
+	if (BoundaryDistance(p) < 0.0)
 	{
+		BoundaryContactInfo contact = BoundaryContactSelect(p);
 		//const float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
 		const float4x4 M_prev = _BoundaryMatrixW2PrevW[contact.index];
 
-		float3 x_star = p + contact.normal * contact.depth;
-		float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
-		float3 x_delta_tan = x_delta - dot(x_delta, contact.normal) * contact.normal;
+		const float3 x_star = p + contact.normal * contact.depth;
+		const float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
+		const float3 x_delta_tan = x_delta - dot(x_delta, contact.normal) * contact.normal;
 
-		float norm2_delta_tan = dot(x_delta_tan, x_delta_tan);
+		const float norm2_delta_tan = dot(x_delta_tan, x_delta_tan);
 
 		const float muS = friction;// for now just using the same constant here
 		const float muK = friction;// ...
+
+		d += contact.normal * contact.depth;
 
 		if (norm2_delta_tan < muS * muS * contact.depth * contact.depth)
 			d -= x_delta_tan;
