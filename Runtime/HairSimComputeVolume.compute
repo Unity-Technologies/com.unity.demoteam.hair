@@ -1,16 +1,15 @@
 ﻿#pragma kernel KVolumeClear
-#pragma kernel KVolumeSplatDensityVelocity
+#pragma kernel KVolumeSplat
 #pragma kernel KVolumeSplatDensity
 #pragma kernel KVolumeSplatVelocityX
 #pragma kernel KVolumeSplatVelocityY
 #pragma kernel KVolumeSplatVelocityZ
-#pragma kernel KVolumeResolveVelocity
-#pragma kernel KVolumeResolveVelocityDensity
+#pragma kernel KVolumeResolve
+#pragma kernel KVolumeResolveFromRasterization
 #pragma kernel KVolumeGradient
 #pragma kernel KVolumeDivergence
-#pragma kernel KVolumePressureIteration
+#pragma kernel KVolumePressure
 #pragma kernel KVolumePressureGradient
-#pragma kernel KVolumeVelocitySolenoidal
 
 #define HAIRSIM_WRITEABLE_VOLUMEDATA 1
 
@@ -75,15 +74,15 @@ void KVolumeClear(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	_VolumeDensity[worldIdx] = 0;
-	_VolumeVelocityX[worldIdx] = 0;
-	_VolumeVelocityY[worldIdx] = 0;
-	_VolumeVelocityZ[worldIdx] = 0;
-	_VolumePressure[worldIdx] = 0;
+	_AccuDensity[worldIdx] = 0;
+	_AccuVelocityX[worldIdx] = 0;
+	_AccuVelocityY[worldIdx] = 0;
+	_AccuVelocityZ[worldIdx] = 0;
+	_VolumePressure[worldIdx] = 0.0;
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
-void KVolumeSplatDensityVelocity(
+void KVolumeSplat(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -93,14 +92,14 @@ void KVolumeSplatDensityVelocity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	//TODO remapping
+	//TODO remap and pack?
 	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
 	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
 
-	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
+	InterlockedAddParticleContribution(worldIdx.x, 1.0, _AccuDensity);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _AccuVelocityX);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _AccuVelocityY);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _AccuVelocityZ);
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
@@ -114,7 +113,7 @@ void KVolumeSplatDensity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	InterlockedAddParticleContribution(worldIdx.x, 1.0, _VolumeDensity);
+	InterlockedAddParticleContribution(worldIdx.x, 1.0, _AccuDensity);
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
@@ -128,7 +127,7 @@ void KVolumeSplatVelocityX(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _VolumeVelocityX);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _AccuVelocityX);
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
@@ -142,7 +141,7 @@ void KVolumeSplatVelocityY(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _VolumeVelocityY);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _AccuVelocityY);
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
@@ -156,11 +155,11 @@ void KVolumeSplatVelocityZ(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _VolumeVelocityZ);
+	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _AccuVelocityZ);
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeResolveVelocity(
+void KVolumeResolve(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -170,18 +169,20 @@ void KVolumeResolveVelocity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	_VolumeVelocity[worldIdx] = float4(
-		float3(
-			_VolumeVelocityX[worldIdx],
-			_VolumeVelocityY[worldIdx],
-			_VolumeVelocityZ[worldIdx]) / (float)max(1, _VolumeDensity[worldIdx])
-		,
-		_VolumeDensity[worldIdx] / DENSITY_SCALE
-		);
+	const uint n = _AccuDensity[worldIdx];
+	const float rho = n / DENSITY_SCALE;
+
+	_VolumeDensity[worldIdx] = rho;
+
+	_VolumeVelocity[worldIdx] = float4(float3(
+		_AccuVelocityX[worldIdx],
+		_AccuVelocityY[worldIdx],
+		_AccuVelocityZ[worldIdx]) / (float)max(1, n),
+		rho);
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeResolveVelocityDensity(
+void KVolumeResolveFromRasterization(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -193,12 +194,18 @@ void KVolumeResolveVelocityDensity(
 {
 	float4 splat = _VolumeVelocity[worldIdx];
 	{
-		_VolumeDensity[worldIdx] = splat.w * DENSITY_SCALE;
-		_VolumeVelocity[worldIdx] = float4(splat.xyz / max(1e-4, splat.w), splat.w);
+		_VolumeDensity[worldIdx] = splat.w;
+
+		if (splat.w > 0.0)
+			_VolumeVelocity[worldIdx] = float4(splat.xyz / splat.w, splat.w);
+		else
+			_VolumeVelocity[worldIdx] = 0.0;
 	}
 }
 
+#if LDS_GRADIENT
 groupshared int gs_density[VOLUME_NUM_X * VOLUME_NUM_Y * VOLUME_NUM_Z];
+#endif
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeGradient(
@@ -211,24 +218,24 @@ void KVolumeGradient(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-#if 1
+#if !LDS_GRADIENT
 	const uint3 worldIdxStrideX = uint3(1, 0, 0);
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
 #if VOLUME_SQUARE_CELLS
-	const float k = 1.0 / (2.0 * DENSITY_SCALE);// *VolumeWorldCellSize().x);
+	const float h_inv = 1.0 / (2.0);// *VolumeWorldCellSize().x);
 #else
-	const float3 k = 1.0 / (2.0 * DENSITY_SCALE);// *VolumeWorldCellSize());
+	const float3 h_inv = 1.0 / (2.0);// *VolumeWorldCellSize());
 #endif
 
 	float3 diff = float3(
 		_VolumeDensity[worldIdx + worldIdxStrideX] - _VolumeDensity[worldIdx - worldIdxStrideX],
 		_VolumeDensity[worldIdx + worldIdxStrideY] - _VolumeDensity[worldIdx - worldIdxStrideY],
 		_VolumeDensity[worldIdx + worldIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
-		) * k;
+		) * h_inv;
 
-	_VolumeGradient[worldIdx] = diff;
+	_VolumeDensityGrad[worldIdx] = diff;
 #else
 	gs_density[threadIdx] = _VolumeDensity[worldIdx];
 
@@ -252,9 +259,9 @@ void KVolumeGradient(
 	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
 
 #if VOLUME_SQUARE_CELLS
-	const float k = 1.0 / (2.0 * DENSITY_SCALE);// *VolumeWorldCellSize().x);
+	const float h_inv = 1.0 / (2.0);// *VolumeWorldCellSize().x);
 #else
-	const float3 k = 1.0 / (2.0 * DENSITY_SCALE);// *VolumeWorldCellSize());
+	const float3 h_inv = 1.0 / (2.0);// *VolumeWorldCellSize());
 #endif
 
 	const bool lowerBoundary = any(localIdx == localLowerIdx);
@@ -268,9 +275,9 @@ void KVolumeGradient(
 				_VolumeDensity[worldIdx + worldIdxStrideX] - _VolumeDensity[worldIdx - worldIdxStrideX],
 				_VolumeDensity[worldIdx + worldIdxStrideY] - _VolumeDensity[worldIdx - worldIdxStrideY],
 				_VolumeDensity[worldIdx + worldIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
-				) * k;
+				) * h_inv;
 
-			_VolumeGradient[worldIdx] = diff;
+			_VolumeDensityGrad[worldIdx] = diff;
 		}
 		else if (lowerBoundary)
 		{
@@ -278,9 +285,9 @@ void KVolumeGradient(
 				gs_density[threadIdx + threadIdxStrideX] - _VolumeDensity[worldIdx - worldIdxStrideX],
 				gs_density[threadIdx + threadIdxStrideY] - _VolumeDensity[worldIdx - worldIdxStrideY],
 				gs_density[threadIdx + threadIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
-				) * k;
+				) * h_inv;
 
-			_VolumeGradient[worldIdx] = diff;
+			_VolumeDensityGrad[worldIdx] = diff;
 		}
 		else// upperBoundary
 		{
@@ -288,9 +295,9 @@ void KVolumeGradient(
 				_VolumeDensity[worldIdx + worldIdxStrideX] - gs_density[threadIdx - threadIdxStrideX],
 				_VolumeDensity[worldIdx + worldIdxStrideY] - gs_density[threadIdx - threadIdxStrideY],
 				_VolumeDensity[worldIdx + worldIdxStrideZ] - gs_density[threadIdx - threadIdxStrideZ]
-				) * k;
+				) * h_inv;
 
-			_VolumeGradient[worldIdx] = diff;
+			_VolumeDensityGrad[worldIdx] = diff;
 		}
 	}
 	else
@@ -299,13 +306,14 @@ void KVolumeGradient(
 			gs_density[threadIdx + threadIdxStrideX] - gs_density[threadIdx - threadIdxStrideX],
 			gs_density[threadIdx + threadIdxStrideY] - gs_density[threadIdx - threadIdxStrideY],
 			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx - threadIdxStrideZ]
-			) * k;
+			) * h_inv;
 
-		_VolumeGradient[worldIdx] = diff;
+		_VolumeDensityGrad[worldIdx] = diff;
 	}
 #endif
 }
 
+#if LDS_GRADIENT
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeGradientForwardDiff(
 	uint3 groupIdx : SV_GroupID,
@@ -324,7 +332,7 @@ void KVolumeGradientForwardDiff(
 	const uint3 localLowerIdx = 0;
 	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
 
-	const float k = 1.0 / DENSITY_SCALE;
+	const float h_inv = 1.0 / (1.0);
 
 	if (any(localIdx == localUpperIdx))
 	{
@@ -336,9 +344,9 @@ void KVolumeGradientForwardDiff(
 			_VolumeDensity[worldIdx + worldIdxStrideX] - gs_density[threadIdx],
 			_VolumeDensity[worldIdx + worldIdxStrideY] - gs_density[threadIdx],
 			_VolumeDensity[worldIdx + worldIdxStrideZ] - gs_density[threadIdx]
-			) * k;
+			) * h_inv;
 
-		_VolumeGradient[worldIdx] = diff;
+		_VolumeDensityGrad[worldIdx] = diff;
 	}
 	else
 	{
@@ -356,11 +364,12 @@ void KVolumeGradientForwardDiff(
 			gs_density[threadIdx + threadIdxStrideX] - gs_density[threadIdx],
 			gs_density[threadIdx + threadIdxStrideY] - gs_density[threadIdx],
 			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx]
-			) * k;
+			) * h_inv;
 
-		_VolumeGradient[worldIdx] = diff;
+		_VolumeDensityGrad[worldIdx] = diff;
 	}
 }
+#endif
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeDivergence(
@@ -386,24 +395,25 @@ void KVolumeDivergence(
 	float vz_z2 = _VolumeVelocity[worldIdx + worldIdxStrideZ].z;
 
 #if VOLUME_SQUARE_CELLS
-	float k = 1.0 / (2.0 * VolumeWorldCellSize().x);
+	float h_inv = 1.0 / (2.0 * VolumeWorldCellSize().x);
 	float div = float(
 		vx_x2 + vy_y2 + vz_z2 -
 		vx_x0 - vy_y0 - vz_z0
-		) * k;
+		) * h_inv;
 #else
-	float3 k = 1.0 / (2.0 * VolumeWorldCellSize());
+	float3 h_inv = 1.0 / (2.0 * VolumeWorldCellSize());
 	float div = float(
 		(vx_x2 - vx_x0) * k.x +
 		(vy_y2 - vy_y0) * k.y +
-		(vz_z2 - vz_z0) * k.z);
+		(vz_z2 - vz_z0) * k.z
+		) * h_inv;
 #endif
 
 	_VolumeDivergence[worldIdx] = div;
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumePressureIteration(
+void KVolumePressure(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -420,18 +430,18 @@ void KVolumePressureIteration(
 	// solve poisson equation for pressure using central differences
 	// https://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html
 
-	if (_VolumeDensity[worldIdx] == 0)
+	if (_VolumeDensity[worldIdx] == 0.0)
 	{
 		return;// p remains 0 (Dirichlet boundary condation)
 	}
 
-	float p_x0 = _VolumePressure0[worldIdx - worldIdxStrideX];
-	float p_y0 = _VolumePressure0[worldIdx - worldIdxStrideY];
-	float p_z0 = _VolumePressure0[worldIdx - worldIdxStrideZ];
+	float p_x0 = _VolumePressureIn[worldIdx - worldIdxStrideX];
+	float p_y0 = _VolumePressureIn[worldIdx - worldIdxStrideY];
+	float p_z0 = _VolumePressureIn[worldIdx - worldIdxStrideZ];
 
-	float p_x2 = _VolumePressure0[worldIdx + worldIdxStrideX];
-	float p_y2 = _VolumePressure0[worldIdx + worldIdxStrideY];
-	float p_z2 = _VolumePressure0[worldIdx + worldIdxStrideZ];
+	float p_x2 = _VolumePressureIn[worldIdx + worldIdxStrideX];
+	float p_y2 = _VolumePressureIn[worldIdx + worldIdxStrideY];
+	float p_z2 = _VolumePressureIn[worldIdx + worldIdxStrideZ];
 
 	float b = _VolumeDivergence[worldIdx];
 
@@ -482,19 +492,5 @@ void KVolumePressureGradient(
 		_VolumePressure[worldIdx + worldIdxStrideZ] - _VolumePressure[worldIdx - worldIdxStrideZ]
 		) * k;
 
-	_VolumePressureGradient[worldIdx] = diff;
-}
-
-[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeVelocitySolenoidal(
-	uint3 groupIdx : SV_GroupID,
-	uint3 localIdx : SV_GroupThreadID,
-	uint3 worldIdx : SV_DispatchThreadID,
-	uint threadIdx : SV_GroupIndex)
-	// SV_GroupID           execution group coords
-	// SV_GroupThreadID     thread coords within execution group
-	// SV_DispatchThreadID  thread coords (global)
-	// SV_GroupIndex        thread offset within execution group
-{
-	_VolumeVelocitySolenoidal[worldIdx] = _VolumeVelocity[worldIdx].xyz - _VolumePressureGradient[worldIdx];
+	_VolumePressureGrad[worldIdx] = diff;
 }

@@ -106,17 +106,12 @@
 			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
 			{
 				uint3 volumeIdx = VolumeFlatIndexToIndex(vertexID);
-				int volumeDensity = _VolumeDensity[volumeIdx];
-
-				float3 worldPos = VolumeIndexToWorld(volumeIdx);
-				if (volumeDensity == 0)
-				{
-					worldPos += 1e7;// just push far away
-				}
+				float volumeDensity = _VolumeDensity[volumeIdx];
+				float3 worldPos = (volumeDensity == 0.0) ? 1e+7 : VolumeIndexToWorld(volumeIdx);
 
 				DebugVaryings output;
 				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
-				output.color = float4(ColorizeRamp(volumeDensity, 32 * DENSITY_SCALE), 1.0);
+				output.color = float4(ColorizeRamp(volumeDensity, 32), 1.0);
 				return output;
 			}
 
@@ -134,9 +129,10 @@
 			{
 				uint3 volumeIdx = VolumeFlatIndexToIndex(vertexID >> 1);
 				float3 worldPos = VolumeIndexToWorld(volumeIdx);
+
 				if (vertexID & 1)
 				{
-					worldPos -= _VolumeGradient[volumeIdx] * 0.002;
+					worldPos -= _VolumeDensityGrad[volumeIdx] * 0.002;
 				}
 
 				DebugVaryings output;
@@ -197,17 +193,20 @@
 				float3 localPosFloor = floor(localPos);
 
 				uint3 volumeIdx = localPosFloor;
-				float volumeDensity = _VolumeDensity[volumeIdx] / DENSITY_SCALE;
+
 #if DENSITY_TRILINEAR
-				float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0).xyz;
+				float3 volumeDensityGradient = _VolumeDensityGrad.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
 #else
-				float4 volumeVelocity = _VolumeVelocity[volumeIdx];
+				float volumeDensity = _VolumeDensity[volumeIdx];
+				float3 volumeVelocity = _VolumeVelocity[volumeIdx].xyz;
+				float3 volumeDensityGradient = _VolumeDensityGrad[volumeIdx];
 #endif
-				float3 volumeGradient = _VolumeGradient.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+
 				float volumeDivergence = _VolumeDivergence.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
 				float volumePressure = _VolumePressure.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
-				float3 volumePressureGradient = _VolumePressureGradient.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
-				float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
 
 				const float opacity = 0.9;
 				{
@@ -225,9 +224,9 @@
 				if (x < 1.0)
 					return float4(ColorizeDensity(volumeDensity), opacity);
 				else if (x < 2.0)
-					return float4(ColorizeGradient(volumeGradient), opacity);
+					return float4(ColorizeGradient(volumeDensityGradient), opacity);
 				else
-					return float4(ColorizeVelocity(volumeVelocity.xyz), opacity);
+					return float4(ColorizeVelocity(volumeVelocity), opacity);
 			}
 
 			ENDCG

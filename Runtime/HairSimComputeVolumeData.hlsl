@@ -27,18 +27,19 @@ float3 _VolumeWorldMax;
 	_VolumeWorldMax = Q
 */
 
-HAIRSIM_WRITEABLE_VOLUME<int> _VolumeDensity;
-HAIRSIM_WRITEABLE_VOLUME<int> _VolumeVelocityX;// this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
-HAIRSIM_WRITEABLE_VOLUME<int> _VolumeVelocityY;
-HAIRSIM_WRITEABLE_VOLUME<int> _VolumeVelocityZ;
+HAIRSIM_WRITEABLE_VOLUME<int> _AccuDensity;
+HAIRSIM_WRITEABLE_VOLUME<int> _AccuVelocityX;// this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
+HAIRSIM_WRITEABLE_VOLUME<int> _AccuVelocityY;
+HAIRSIM_WRITEABLE_VOLUME<int> _AccuVelocityZ;
+
+HAIRSIM_WRITEABLE_VOLUME<float> _VolumeDensity;
+HAIRSIM_WRITEABLE_VOLUME<float3> _VolumeDensityGrad;
 HAIRSIM_WRITEABLE_VOLUME<float4> _VolumeVelocity;
-HAIRSIM_WRITEABLE_VOLUME<float3> _VolumeGradient;
 
 HAIRSIM_WRITEABLE_VOLUME<float> _VolumeDivergence;
-HAIRSIM_WRITEABLE_VOLUME<float> _VolumePressure0;
 HAIRSIM_WRITEABLE_VOLUME<float> _VolumePressure;
-HAIRSIM_WRITEABLE_VOLUME<float3> _VolumePressureGradient;
-HAIRSIM_WRITEABLE_VOLUME<float3> _VolumeVelocitySolenoidal;
+HAIRSIM_WRITEABLE_VOLUME<float> _VolumePressureIn;
+HAIRSIM_WRITEABLE_VOLUME<float3> _VolumePressureGrad;
 
 SamplerState _Volume_sampler_point_clamp;
 SamplerState _Volume_sampler_trilinear_clamp;
