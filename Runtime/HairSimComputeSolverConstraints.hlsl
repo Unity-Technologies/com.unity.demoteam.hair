@@ -23,6 +23,7 @@
 // constraint solvers
 
 void SolveCollisionConstraint(
+	const float w,
 	const float3 p,
 	inout float3 d)
 {
@@ -35,63 +36,79 @@ void SolveCollisionConstraint(
 	//                :
 	//                .
 
-	//TODO settle
-	//BoundaryContactInfo contact = BoundaryContactTagged(p);
-	//d += contact.normal * contact.depth;
-	if (BoundaryDistance(p) < 0.0)
+	//         .
+	//           `.
+	//          d  \
+	//        .---. .
+	//       p----->|
+	//              `
+	//             /
+	//           .`
+	//         ´
+
+	float depth = BoundaryDistance(p);
+	if (depth < 0.0)
 	{
-		float4 contact = BoundaryContact(p);
-		d += contact.xyz * contact.w;
+		float3 normal = BoundaryNormal(p, depth);
+
+		GUARD(w > 0.0)
+		{
+			d += normal * depth;
+		}
 	}
 }
 
 void SolveCollisionFrictionConstraint(
 	const float friction,
 	const float3 x0,
+	const float w,
 	const float3 p,
 	inout float3 d)
 {
 	// Unified Particle Physics for Real-Time Applications
 	// https://mmacklin.com/uppfrta_preprint.pdf
+	//
+	//                          x0
+	//                         '
+	//                d_tan   '
+	//               .-----. '
+	// - -- ------- x* ---> x ----- -- -
+	//            .`|      /
+	//            | |     /
+	//            | |    /
+	//      d_nrm | |   / d
+	//            | |  /
+	//            | | /
+	//            '.|/
+	//              p
 
-	/* TODO
-	
-	                      x
-						 /
-						/
-					   /
-		  --------p'--/-----------
-				  |  / 
-				  | /
-				  |/
-				  ' p
-				 
-	*/
-
-	//TODO settle
-	//BoundaryContactInfo contact = BoundaryContactSelect(p);
-	//if (contact.depth < 0.0)
-	if (BoundaryDistance(p) < 0.0)
+	float depth = BoundaryDistance(p);
+	if (depth < 0.0)
 	{
-		BoundaryContactInfo contact = BoundaryContactSelect(p);
-		//const float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
-		const float4x4 M_prev = _BoundaryMatrixW2PrevW[contact.index];
+		uint index = BoundarySelect(p, depth);
+		float3 normal = BoundaryNormal(p, depth);
 
-		const float3 x_star = p + contact.normal * contact.depth;
+		//const float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
+		const float4x4 M_prev = _BoundaryMatrixW2PrevW[index];
+
+		const float3 x_star = p + normal * depth;
 		const float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
-		const float3 x_delta_tan = x_delta - dot(x_delta, contact.normal) * contact.normal;
+		const float3 x_delta_tan = x_delta - dot(x_delta, normal) * normal;
 
 		const float norm2_delta_tan = dot(x_delta_tan, x_delta_tan);
 
 		const float muS = friction;// for now just using the same constant here
 		const float muK = friction;// ...
 
-		d += contact.normal * contact.depth;
+		GUARD(w > 0.0)
+		{
+			d += normal * depth;
 
-		if (norm2_delta_tan < muS * muS * contact.depth * contact.depth)
-			d -= x_delta_tan;
-		else
-			d -= x_delta_tan * min(-muK * contact.depth * rsqrt(norm2_delta_tan), 1);
+			if (norm2_delta_tan < muS * muS * depth * depth)
+				d -= x_delta_tan;
+			else
+				d -= x_delta_tan * min(-muK * depth * rsqrt(norm2_delta_tan), 1);
+		}
 	}
 }
 
@@ -291,6 +308,23 @@ void SolveTriangleBendingMaxConstraint(
 
 //--------------------------------------------------
 // constraint shortcuts: weight in fourth component
+
+void SolveCollisionConstraint(
+	const float4 p,
+	inout float3 d)
+{
+	SolveCollisionConstraint(p.w, p.xyz, d);
+}
+
+void SolveCollisionFrictionConstraint(
+	const float friction,
+	const float3 x0,
+	const float4 p,
+	inout float3 d)
+{
+	SolveCollisionFrictionConstraint(friction, x0, p.w, p.xyz, d);
+}
+
 void SolveDistanceConstraint(
 	const float distance, const float stiffness,
 	const float4 p0, const float4 p1,
@@ -345,14 +379,14 @@ void SolveTriangleBendingMaxConstraint(
 void ApplyCollisionConstraint(inout float3 p)
 {
 	float3 d = 0.0;
-	SolveCollisionConstraint(p, d);
+	SolveCollisionConstraint(1.0, p, d);
 	p += d;
 }
 
 void ApplyCollisionFrictionConstraint(const float friction, const float3 x0, inout float3 p)
 {
 	float3 d = 0.0;
-	SolveCollisionFrictionConstraint(friction, x0, p, d);
+	SolveCollisionFrictionConstraint(friction, x0, 1.0, p, d);
 	p += d;
 }
 

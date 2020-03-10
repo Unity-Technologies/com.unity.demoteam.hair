@@ -480,9 +480,9 @@ void KSolveConstraints_Jacobi(
 			if (ENABLE_CONSTRAINT_COLLISION)
 			{
 				if (ENABLE_CONSTRAINT_COLLISION == 2)
-					SolveCollisionFrictionConstraint(_Friction, x0, gs_x[j].xyz, d);
+					SolveCollisionFrictionConstraint(_Friction, x0, gs_x[j], d);
 				else
-					SolveCollisionConstraint(gs_x[j].xyz, d);
+					SolveCollisionConstraint(gs_x[j], d);
 			}
 
 			// solve distance constraints
@@ -605,9 +605,9 @@ void KSolveConstraints_Jacobi(
 			if (ENABLE_CONSTRAINT_COLLISION)
 			{
 				if (ENABLE_CONSTRAINT_COLLISION == 2)
-					SolveCollisionFrictionConstraint(_Friction, x0, gs_x[threadIdx], d);
+					SolveCollisionFrictionConstraint(_Friction, x0, 1.0, gs_x[threadIdx], d);
 				else
-					SolveCollisionConstraint(gs_x[threadIdx], d);
+					SolveCollisionConstraint(1.0, gs_x[threadIdx], d);
 
 				n++;
 			}
