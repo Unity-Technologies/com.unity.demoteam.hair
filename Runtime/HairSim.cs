@@ -50,21 +50,20 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Draw;
 		}
 
-		static void InitializeStaticMarkers<T>(Type type, string prefix, string suffix, Func<string, T> constructor)
+		static void InitializeStaticFields<T>(Type type, string prefix, string suffix, Func<string, T> constructor)
 		{
 			var fields = type.GetFields();
 			foreach (var field in fields)
 			{
 				var name = prefix + field.Name.Replace('_', '.') + suffix;
-				//Debug.Log("creating marker: " + name);
 				field.SetValue(null, constructor(name));
 			}
 		}
 
 		static HairSim()
 		{
-			InitializeStaticMarkers(typeof(MarkersCPU), "HairSim.", "", (string s) => new ProfilerMarker(s));
-			InitializeStaticMarkers(typeof(MarkersGPU), "HairSim.", "", (string s) => new ProfilingSampler(s));
+			InitializeStaticFields(typeof(MarkersCPU), "HairSim.", "", (string s) => new ProfilerMarker(s));
+			InitializeStaticFields(typeof(MarkersGPU), "HairSim.", "", (string s) => new ProfilingSampler(s));
 		}
 
 		const int THREAD_GROUP_SIZE = 64;
@@ -73,7 +72,7 @@ namespace Unity.DemoTeam.Hair
 		const int MAX_STRAND_PARTICLES = 128;
 		const int MAX_BOUNDARIES = 8;
 
-		public static class UniformIDs
+		static class UniformIDs
 		{
 			// matrices
 			public static int _LocalToWorld = Shader.PropertyToID("_LocalToWorld");

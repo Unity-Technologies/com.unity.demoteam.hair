@@ -5,6 +5,8 @@ namespace Unity.DemoTeam.Hair
 {
 	public class HairSimBoundary : MonoBehaviour
 	{
+		const float MARGIN = 0.002f;// 2mm
+
 		public enum Type
 		{
 			Capsule,
@@ -60,14 +62,14 @@ namespace Unity.DemoTeam.Hair
 			Vector3 pos = this.transform.position;
 			Vector3 dir = this.transform.up;
 
-			float radius = 0.5f * Mathf.Max(dim.x, dim.z);
+			float radius = 0.5f * Mathf.Max(dim.x, dim.z) + MARGIN;
 			float extent = dim.y - radius;
 
 			return new BoundaryCapsule()
 			{
 				centerA = pos - dir * extent,
 				centerB = pos + dir * extent,
-				radius = radius,
+				radius = radius + MARGIN,
 			};
 		}
 
@@ -76,7 +78,7 @@ namespace Unity.DemoTeam.Hair
 			return new BoundarySphere()
 			{
 				center = this.transform.position,
-				radius = 0.5f * ComponentMax(Abs(this.transform.localScale)),
+				radius = 0.5f * ComponentMax(Abs(this.transform.localScale)) + MARGIN,
 			};
 		}
 
@@ -86,8 +88,8 @@ namespace Unity.DemoTeam.Hair
 			{
 				center = this.transform.position,
 				axis = this.transform.up,
-				radiusA = 0.5f * ComponentMax(Abs(this.transform.localScale)),
-				radiusB = this.outerRadius,
+				radiusA = 0.5f * ComponentMax(Abs(this.transform.localScale)) + MARGIN,
+				radiusB = this.outerRadius + MARGIN,
 			};
 		}
 
