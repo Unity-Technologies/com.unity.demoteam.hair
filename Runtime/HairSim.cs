@@ -296,7 +296,7 @@ namespace Unity.DemoTeam.Hair
 			public float drawSliceOffsetY;
 			[Range(0.0f, 1.0f)]
 			public float drawSliceOffsetZ;
-			[Range(0.0f, 2.0f)]
+			[Range(0.0f, 6.0f)]
 			public float drawSliceDivider;
 
 			public static readonly DebugConfiguration none = new DebugConfiguration();

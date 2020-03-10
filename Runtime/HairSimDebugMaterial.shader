@@ -197,11 +197,11 @@
 #if DENSITY_TRILINEAR
 				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
 				float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0).xyz;
-				float3 volumeDensityGradient = _VolumeDensityGrad.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
 #else
 				float volumeDensity = _VolumeDensity[volumeIdx];
 				float3 volumeVelocity = _VolumeVelocity[volumeIdx].xyz;
-				float3 volumeDensityGradient = _VolumeDensityGrad[volumeIdx];
+				float3 volumeDensityGrad = _VolumeDensityGrad[volumeIdx];
 #endif
 
 				float volumeDivergence = _VolumeDivergence.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
@@ -224,9 +224,15 @@
 				if (x < 1.0)
 					return float4(ColorizeDensity(volumeDensity), opacity);
 				else if (x < 2.0)
-					return float4(ColorizeGradient(volumeDensityGradient), opacity);
-				else
+					return float4(ColorizeGradient(volumeDensityGrad), opacity);
+				else if (x < 3.0)
 					return float4(ColorizeVelocity(volumeVelocity), opacity);
+				else if (x < 4.0)
+					return float4(ColorizeDensity(volumeDivergence), opacity);
+				else if (x < 5.0)
+					return float4(ColorizeDensity(volumePressure), opacity);
+				else
+					return float4(ColorizeGradient(volumePressureGrad), opacity);
 			}
 
 			ENDCG
