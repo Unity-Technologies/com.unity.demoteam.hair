@@ -84,8 +84,8 @@
 				uint i = strandParticleBegin + strandParticleStride * vertexID;
 				float3 worldPos = _ParticlePosition[i].xyz;
 
-				float volumeDensity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, VolumeWorldToUVW(worldPos), 0).w;
-				float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 200.0), 4.0);
+				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_sampler_trilinear_clamp, VolumeWorldToUVW(worldPos), 0);
+				float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 400.0), 4.0);
 
 				DebugVaryings output;
 				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
@@ -160,6 +160,7 @@
 
 			float3 ColorizeGradient(float3 n)
 			{
+				//return 0.5 + 0.5 * normalize(n);
 				float d = dot(n, n);
 				if (d > 1e-4)
 					return 0.5 + 0.5 * (n * rsqrt(d));
@@ -194,7 +195,7 @@
 
 				uint3 volumeIdx = localPosFloor;
 
-#if DENSITY_TRILINEAR
+#if SPLAT_TRILINEAR
 				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
 				float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0).xyz;
 				float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);

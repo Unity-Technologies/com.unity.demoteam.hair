@@ -36,8 +36,8 @@ float3 VolumeWorldCellSize()
 
 float VolumeWorldCellVolume()
 {
-	float3 cellSize = VolumeWorldCellSize();
-	return cellSize.x * cellSize.y * cellSize.z;
+	float3 worldCellSize = VolumeWorldCellSize();
+	return worldCellSize.x * worldCellSize.y * worldCellSize.z;
 }
 
 float3 VolumeLocalToUVW(float3 localPos)

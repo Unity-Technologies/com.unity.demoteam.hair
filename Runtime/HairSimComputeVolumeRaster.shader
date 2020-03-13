@@ -56,12 +56,12 @@
 		const float3 localPos = VolumeWorldToLocal(_ParticlePosition[vertexID[0]].xyz) - 0.5;// subtract offset to cell center
 		const float3 localPosFloor = floor(localPos);
 
-		const float2 cellSize = 1.0 / _VolumeCells.xy;
-		const float2 pos0 = cellSize * localPosFloor.xy;
-		const float2 posH = cellSize * 2.0;
+		const float2 uvCellSize = 1.0 / _VolumeCells.xy;
+		const float2 uv0 = uvCellSize * localPosFloor.xy;
+		const float2 uvH = uvCellSize * 2.0;
 
-		const float2 ndc0 = 2.0 * float2(pos0.x, 1.0 - pos0.y) - 1.0;
-		const float3 ndcH = 2.0 * float3(posH.x, -posH.y, 0.0);
+		const float2 ndc0 = 2.0 * float2(uv0.x, 1.0 - uv0.y) - 1.0;
+		const float3 ndcH = 2.0 * float3(uvH.x, -uvH.y, 0.0);
 
 		const uint slice0 = localPosFloor.z;
 		const uint slice1 = slice0 + 1;
@@ -103,12 +103,12 @@
 		const float3 localPos = VolumeWorldToLocal(_ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
 		const float3 localPosFloor = floor(localPos);
 
-		const float2 cellSize = 1.0 / _VolumeCells.xy;
-		const float2 pos0 = cellSize * localPosFloor.xy;
-		const float2 posH = cellSize * 2.0;
+		const float2 uvCellSize = 1.0 / _VolumeCells.xy;
+		const float2 uv0 = uvCellSize * localPosFloor.xy;
+		const float2 uvH = uvCellSize * 2.0;
 
-		const float2 ndc0 = 2.0 * float2(pos0.x, 1.0 - pos0.y) - 1.0;
-		const float2 ndcH = 2.0 * float2(posH.x, -posH.y);
+		const float2 ndc0 = 2.0 * float2(uv0.x, 1.0 - uv0.y) - 1.0;
+		const float2 ndcH = 2.0 * float2(uvH.x, -uvH.y);
 
 		const float w1 = localPos.z - localPosFloor.z;
 		const float w0 = 1.0 - w1;
