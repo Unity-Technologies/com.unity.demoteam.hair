@@ -13,6 +13,7 @@ float4x4 _LocalToWorldInvT;
 uint _StrandCount;
 uint _StrandParticleCount;
 float _StrandParticleInterval;
+float _StrandParticleVolume;
 
 float _DT;
 uint _Iterations;

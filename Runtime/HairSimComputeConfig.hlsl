@@ -5,8 +5,8 @@
 
 #define MAX_BOUNDARIES 8
 
-#define DENSITY_SCALE 8192.0
-#define DENSITY_TRILINEAR 1
+#define SPLAT_PRECISION 1e-4// == include down to fourth decimal
+#define SPLAT_TRILINEAR 1
 
 #define VOLUME_SQUARE_CELLS 1
 

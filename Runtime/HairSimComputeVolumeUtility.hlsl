@@ -34,6 +34,12 @@ float3 VolumeWorldCellSize()
 	return VolumeWorldSize() / _VolumeCells;
 }
 
+float VolumeWorldCellVolume()
+{
+	float3 cellSize = VolumeWorldCellSize();
+	return cellSize.x * cellSize.y * cellSize.z;
+}
+
 float3 VolumeLocalToUVW(float3 localPos)
 {
 	float3 uvw = localPos / _VolumeCells;
@@ -65,9 +71,22 @@ uint3 VolumeWorldToIndex(float3 worldPos)
 	return localPosFloor;
 }
 
+float3 VolumeIndexToUVW(uint index)
+{
+	float3 uvw = (index + 0.5) / _VolumeCells;
+	return uvw;
+}
+
+float3 VolumeIndexToLocal(uint3 index)
+{
+	float3 localPos = index + 0.5;
+	return localPos;
+}
+
 float3 VolumeIndexToWorld(uint3 index)
 {
-	return _VolumeWorldMin + (index + 0.5) * VolumeWorldCellSize();
+	float3 worldPos = _VolumeWorldMin + (index + 0.5) * VolumeWorldCellSize();
+	return worldPos;
 }
 
 uint3 VolumeFlatIndexToIndex(uint flatIndex)

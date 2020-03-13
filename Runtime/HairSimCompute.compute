@@ -42,7 +42,7 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
 	if (ENABLE_VOLUME_FRICTION)
 	{
-#if DENSITY_TRILINEAR
+#if SPLAT_TRILINEAR
 		float3 volumeUVW = ParticleVolumeUVW(i);
 		float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0).xyz;
 #else
@@ -50,9 +50,9 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 #endif
 
 #if 0
-		float3 volumeVelocitySolenoidal = _VolumeVelocitySolenoidal.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0);
-		float3 impulsePIC = volumeVelocitySolenoidal - velocity;
-		float3 impulseFLIP = volumeVelocitySolenoidal - volumeVelocity;
+		float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0);
+		float3 impulsePIC = -volumePressureGrad + (volumeVelocity - velocity);
+		float3 impulseFLIP = -volumePressureGrad;
 		return lerp(impulseFLIP, impulsePIC, friction);
 #else
 		return (volumeVelocity - velocity) * friction;

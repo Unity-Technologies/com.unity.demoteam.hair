@@ -25,6 +25,21 @@ namespace Unity.DemoTeam.Hair
 		private void OnDisable() { instances.Remove(this); ReleaseBuffers(); ReleaseVolumes(); strandsActive = StrandConfiguration.none; }
 		#endregion
 
+		static void InitializeStaticFields<T>(Type type, Func<string, T> construct)
+		{
+			foreach (var field in type.GetFields())
+			{
+				field.SetValue(null, construct(field.Name));
+			}
+		}
+
+		static HairSim()
+		{
+			InitializeStaticFields(typeof(MarkersCPU), (string s) => new ProfilerMarker("HairSim." + s.Replace('_', '.')));
+			InitializeStaticFields(typeof(MarkersGPU), (string s) => new ProfilingSampler("HairSim." + s.Replace('_', '.')));
+			InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
+		}
+
 		static class MarkersCPU
 		{
 			public static ProfilerMarker GetStrandRoots;
@@ -50,20 +65,81 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Draw;
 		}
 
-		static void InitializeStaticFields<T>(Type type, string prefix, string suffix, Func<string, T> constructor)
+		static class UniformIDs
 		{
-			var fields = type.GetFields();
-			foreach (var field in fields)
-			{
-				var name = prefix + field.Name.Replace('_', '.') + suffix;
-				field.SetValue(null, constructor(name));
-			}
-		}
+			// matrices
+			public static int _LocalToWorld;
+			public static int _LocalToWorldInvT;
 
-		static HairSim()
-		{
-			InitializeStaticFields(typeof(MarkersCPU), "HairSim.", "", (string s) => new ProfilerMarker(s));
-			InitializeStaticFields(typeof(MarkersGPU), "HairSim.", "", (string s) => new ProfilingSampler(s));
+			// strand params
+			public static int _StrandCount;
+			public static int _StrandParticleCount;
+			public static int _StrandParticleInterval;
+			public static int _StrandParticleVolume;
+
+			// strand buffers
+			public static int _RootPosition;
+			public static int _RootTangent;
+
+			// solver params
+			public static int _DT;
+			public static int _Iterations;
+			public static int _Stiffness;
+			public static int _Inference;
+			public static int _Damping;
+			public static int _Gravity;
+			public static int _Repulsion;
+			public static int _Friction;
+			public static int _BendingCurvature;
+			public static int _BendingStiffness;
+			public static int _DampingFTL;
+
+			// solver buffers
+			public static int _ParticlePosition;
+			public static int _ParticleVelocity;
+			public static int _ParticlePositionPrev;
+			public static int _ParticleVelocityPrev;
+			public static int _ParticlePositionCorr;
+
+			// boundary params
+			public static int _BoundaryCapsuleCount;
+			public static int _BoundarySphereCount;
+			public static int _BoundaryTorusCount;
+
+			// boundary buffers
+			public static int _BoundaryCapsule;
+			public static int _BoundarySphere;
+			public static int _BoundaryTorus;
+			public static int _BoundaryPack;
+
+			public static int _BoundaryMatrix;
+			public static int _BoundaryMatrixInv;
+			public static int _BoundaryMatrixW2PrevW;
+
+			// volume params
+			public static int _VolumeCells;
+			public static int _VolumeWorldMin;
+			public static int _VolumeWorldMax;
+
+			// volume buffers
+			public static int _AccuDensity;
+			public static int _AccuVelocityX;
+			public static int _AccuVelocityY;
+			public static int _AccuVelocityZ;
+
+			public static int _VolumeDensity;
+			public static int _VolumeDensityGrad;
+			public static int _VolumeVelocity;
+
+			public static int _VolumeDivergence;
+			public static int _VolumePressure;
+			public static int _VolumePressureIn;
+			public static int _VolumePressureGrad;
+
+			// debug params
+			public static int _DebugSliceAxis;
+			public static int _DebugSliceOffset;
+			public static int _DebugSliceDivider;
 		}
 
 		const int THREAD_GROUP_SIZE = 64;
@@ -71,90 +147,6 @@ namespace Unity.DemoTeam.Hair
 		const int MAX_STRANDS = 64000;
 		const int MAX_STRAND_PARTICLES = 128;
 		const int MAX_BOUNDARIES = 8;
-
-		static class UniformIDs
-		{
-			// matrices
-			public static int _LocalToWorld = Shader.PropertyToID("_LocalToWorld");
-			public static int _LocalToWorldInvT = Shader.PropertyToID("_LocalToWorldInvT");
-
-			// strand params
-			public static int _StrandCount = Shader.PropertyToID("_StrandCount");
-			public static int _StrandParticleCount = Shader.PropertyToID("_StrandParticleCount");
-			public static int _StrandParticleInterval = Shader.PropertyToID("_StrandParticleInterval");
-
-			// strand buffers
-			public static int _RootPosition = Shader.PropertyToID("_RootPosition");
-			public static int _RootTangent = Shader.PropertyToID("_RootTangent");
-
-			// solver params
-			public static int _DT = Shader.PropertyToID("_DT");
-			public static int _Iterations = Shader.PropertyToID("_Iterations");
-			public static int _Stiffness = Shader.PropertyToID("_Stiffness");
-			public static int _Inference = Shader.PropertyToID("_Inference");
-			public static int _Damping = Shader.PropertyToID("_Damping");
-			public static int _Gravity = Shader.PropertyToID("_Gravity");
-			public static int _Repulsion = Shader.PropertyToID("_Repulsion");
-			public static int _Friction = Shader.PropertyToID("_Friction");
-
-			public static int _BendingCurvature = Shader.PropertyToID("_BendingCurvature");
-			public static int _BendingStiffness = Shader.PropertyToID("_BendingStiffness");
-
-			public static int _DampingFTL = Shader.PropertyToID("_DampingFTL");
-
-			// solver buffers
-			public static int _ParticlePosition = Shader.PropertyToID("_ParticlePosition");
-			public static int _ParticleVelocity = Shader.PropertyToID("_ParticleVelocity");
-			public static int _ParticlePositionPrev = Shader.PropertyToID("_ParticlePositionPrev");
-			public static int _ParticleVelocityPrev = Shader.PropertyToID("_ParticleVelocityPrev");
-			public static int _ParticlePositionCorr = Shader.PropertyToID("_ParticlePositionCorr");
-
-			// boundary params
-			public static int _BoundaryCapsuleCount = Shader.PropertyToID("_BoundaryCapsuleCount");
-			public static int _BoundarySphereCount = Shader.PropertyToID("_BoundarySphereCount");
-			public static int _BoundaryTorusCount = Shader.PropertyToID("_BoundaryTorusCount");
-
-			// boundary buffers
-			public static int _BoundaryCapsule = Shader.PropertyToID("_BoundaryCapsule");
-			public static int _BoundarySphere = Shader.PropertyToID("_BoundarySphere");
-			public static int _BoundaryTorus = Shader.PropertyToID("_BoundaryTorus");
-			public static int _BoundaryPack = Shader.PropertyToID("_BoundaryPack");
-
-			public static int _BoundaryMatrix = Shader.PropertyToID("_BoundaryMatrix");
-			public static int _BoundaryMatrixInv = Shader.PropertyToID("_BoundaryMatrixInv");
-			public static int _BoundaryMatrixW2PrevW = Shader.PropertyToID("_BoundaryMatrixW2PrevW");
-
-			// volume params
-			public static int _VolumeCells = Shader.PropertyToID("_VolumeCells");
-			public static int _VolumeWorldMin = Shader.PropertyToID("_VolumeWorldMin");
-			public static int _VolumeWorldMax = Shader.PropertyToID("_VolumeWorldMax");
-
-			// volume buffers
-			public static int _AccuDensity = Shader.PropertyToID("_AccuDensity");
-			public static int _AccuVelocityX = Shader.PropertyToID("_AccuVelocityX");
-			public static int _AccuVelocityY = Shader.PropertyToID("_AccuVelocityY");
-			public static int _AccuVelocityZ = Shader.PropertyToID("_AccuVelocityZ");
-
-			public static int _VolumeDensity = Shader.PropertyToID("_VolumeDensity");
-			public static int _VolumeDensityGrad = Shader.PropertyToID("_VolumeDensityGrad");
-			public static int _VolumeVelocity = Shader.PropertyToID("_VolumeVelocity");
-
-			public static int _VolumeDivergence = Shader.PropertyToID("_VolumeDivergence");
-			public static int _VolumePressure = Shader.PropertyToID("_VolumePressure");
-			public static int _VolumePressureIn = Shader.PropertyToID("_VolumePressureIn");
-			public static int _VolumePressureGrad = Shader.PropertyToID("_VolumePressureGrad");
-
-			// debug params
-			public static int _DebugSliceAxis = Shader.PropertyToID("_DebugSliceAxis");
-			public static int _DebugSliceOffset = Shader.PropertyToID("_DebugSliceOffset");
-			public static int _DebugSliceDivider = Shader.PropertyToID("_DebugSliceDivider");
-		}
-
-		private struct StrandRoot
-		{
-			public Vector3 localPos;
-			public Vector3 localTan;
-		}
 
 		[Serializable]
 		public struct StrandConfiguration
@@ -172,8 +164,10 @@ namespace Unity.DemoTeam.Hair
 			public int strandCount;
 			[Range(3, MAX_STRAND_PARTICLES)]
 			public int strandParticleCount;
-			[Range(1e-2f, 5)]
+			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
 			public float strandLength;
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
+			public float strandDiameter;
 
 			public static readonly StrandConfiguration none = new StrandConfiguration();
 			public static readonly StrandConfiguration basic = new StrandConfiguration()
@@ -182,6 +176,7 @@ namespace Unity.DemoTeam.Hair
 				strandCount = 1024,
 				strandParticleCount = 32,
 				strandLength = 0.5f,
+				strandDiameter = 0.125f,
 			};
 		}
 
@@ -202,15 +197,17 @@ namespace Unity.DemoTeam.Hair
 				Trilinear,
 			}
 
+			const float offsetExt = 0.25f;
+
 			public SplatMethod volumeSplatMethod;
 			public SplatFilter volumeSplatFilter;
 			[Range(4, 128)]
 			public int volumeResolution;
-			[Range(-1.0f, 1.0f)]
+			[Range(-offsetExt, offsetExt)]
 			public float volumeOffsetX;
-			[Range(-1.0f, 1.0f)]
+			[Range(-offsetExt, offsetExt)]
 			public float volumeOffsetY;
-			[Range(-1.0f, 1.0f)]
+			[Range(-offsetExt, offsetExt)]
 			public float volumeOffsetZ;
 			[Range(0, 100)]
 			public int volumePressureIterations;
@@ -296,7 +293,7 @@ namespace Unity.DemoTeam.Hair
 			public float drawSliceOffsetY;
 			[Range(0.0f, 1.0f)]
 			public float drawSliceOffsetZ;
-			[Range(0.0f, 6.0f)]
+			[Range(0.0f, 5.0f)]
 			public float drawSliceDivider;
 
 			public static readonly DebugConfiguration none = new DebugConfiguration();
@@ -392,6 +389,7 @@ namespace Unity.DemoTeam.Hair
 		private RenderTexture volumePressureIn;
 		private RenderTexture volumePressureGrad;
 
+		private Vector3 volumeCells;
 		private Vector3 volumeWorldMin;
 		private Vector3 volumeWorldMax;
 
@@ -563,6 +561,12 @@ namespace Unity.DemoTeam.Hair
 			ReleaseVolume(ref volumePressureGrad);
 		}
 
+		private struct StrandRoot
+		{
+			public Vector3 localPos;
+			public Vector3 localTan;
+		}
+
 		private NativeArray<StrandRoot> GetStrandRoots()
 		{
 			using (MarkersCPU.GetStrandRoots.Auto())
@@ -691,6 +695,16 @@ namespace Unity.DemoTeam.Hair
 					break;
 			}
 			return -1;
+		}
+
+		public Vector3 GetCellSize()
+		{
+			return (volumeWorldMax - volumeWorldMin) / volume.volumeResolution;
+		}
+
+		public float GetCellVolume()
+		{
+			return GetCellSize().x * GetCellSize().y * GetCellSize().z;
 		}
 
 		private Vector3 GetVolumeCenter()
@@ -982,6 +996,7 @@ namespace Unity.DemoTeam.Hair
 
 			using (new ProfilingScope(cmd, MarkersGPU.Volume))
 			{
+				volumeCells = volume.volumeResolution * Vector3.one;
 				volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
 				volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
 
@@ -1245,7 +1260,7 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetInt(UniformIDs._StrandCount, strands.strandCount);
 			mpb.SetInt(UniformIDs._StrandParticleCount, strands.strandParticleCount);
 
-			mpb.SetVector(UniformIDs._VolumeCells, volume.volumeResolution * Vector3.one);
+			mpb.SetVector(UniformIDs._VolumeCells, volumeCells);
 			mpb.SetVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
 			mpb.SetVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
 
@@ -1267,6 +1282,8 @@ namespace Unity.DemoTeam.Hair
 		void SetComputeParams(CommandBuffer cmd, ComputeShader cs, float dt)
 		{
 			float strandParticleInterval = strands.strandLength / (strands.strandParticleCount - 1);
+			float strandCrossSectionArea = 0.25f * Mathf.PI * strands.strandDiameter * strands.strandDiameter;
+			float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
 
 			Matrix4x4 localToWorld = Matrix4x4.TRS(this.transform.position, this.transform.rotation, this.transform.localScale);
 			Matrix4x4 localToWorldInvT = Matrix4x4.Transpose(Matrix4x4.Inverse(localToWorld));
@@ -1277,6 +1294,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeIntParam(cs, UniformIDs._StrandCount, strands.strandCount);
 			cmd.SetComputeIntParam(cs, UniformIDs._StrandParticleCount, strands.strandParticleCount);
 			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleInterval, strandParticleInterval);
+			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleVolume, strandParticleVolume);
 
 			cmd.SetComputeFloatParam(cs, UniformIDs._DT, dt);
 			cmd.SetComputeIntParam(cs, UniformIDs._Iterations, solver.iterations);
@@ -1295,7 +1313,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeIntParam(cs, UniformIDs._BoundarySphereCount, boundarySphereCount);
 			cmd.SetComputeIntParam(cs, UniformIDs._BoundaryTorusCount, boundaryTorusCount);
 
-			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeCells, volume.volumeResolution * Vector3.one);
+			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeCells, volumeCells);
 			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMin, volumeWorldMin);
 			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMax, volumeWorldMax);
 		}
