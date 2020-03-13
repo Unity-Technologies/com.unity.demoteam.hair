@@ -333,7 +333,11 @@ void KVolumeGradientForwardDiff(
 	const uint3 localLowerIdx = 0;
 	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
 
-	const float h_inv = 1.0 / (1.0);
+#if VOLUME_SQUARE_CELLS
+	const float h_inv = 1.0 / (2.0 * VolumeWorldCellSize().x);
+#else
+	const float3 h_inv = 1.0 / (2.0 * VolumeWorldCellSize());
+#endif
 
 	if (any(localIdx == localUpperIdx))
 	{
