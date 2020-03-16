@@ -821,7 +821,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// pre-step volume for the first solver step
-			Volume(cmd, 0.0f);
+			Volume(cmd, 1.0f);
 		}
 
 		public void Step(CommandBuffer cmd, float dt)
