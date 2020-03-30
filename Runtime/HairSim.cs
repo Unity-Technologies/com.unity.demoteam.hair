@@ -60,7 +60,8 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Volume_2_ResolveFromRasterization;
 			public static ProfilingSampler Volume_3_Gradient;
 			public static ProfilingSampler Volume_4_Divergence;
-			public static ProfilingSampler Volume_5_Pressure;
+			public static ProfilingSampler Volume_5_PressureEOS;
+			public static ProfilingSampler Volume_5_PressureSolve;
 			public static ProfilingSampler Volume_6_PressureGradient;
 			public static ProfilingSampler Draw;
 		}
@@ -76,6 +77,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _StrandParticleCount;
 			public static int _StrandParticleInterval;
 			public static int _StrandParticleVolume;
+			public static int _StrandParticleContrib;
 
 			// strand buffers
 			public static int _RootPosition;
@@ -166,8 +168,10 @@ namespace Unity.DemoTeam.Hair
 			public int strandParticleCount;
 			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
 			public float strandLength;
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
+			[Range(0.070f, 20.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
+			[Range(0.0f, 9.0f)]
+			public float strandParticleContrib;// TODO remove
 
 			public static readonly StrandConfiguration none = new StrandConfiguration();
 			public static readonly StrandConfiguration basic = new StrandConfiguration()
@@ -177,6 +181,7 @@ namespace Unity.DemoTeam.Hair
 				strandParticleCount = 32,
 				strandLength = 0.5f,
 				strandDiameter = 0.125f,
+				strandParticleContrib = 1.0f,// TODO remove
 			};
 		}
 
@@ -197,17 +202,15 @@ namespace Unity.DemoTeam.Hair
 				Trilinear,
 			}
 
-			const float offsetExt = 0.25f;
-
 			public SplatMethod volumeSplatMethod;
 			public SplatFilter volumeSplatFilter;
-			[Range(4, 128)]
+			[Range(4, 256)]
 			public int volumeResolution;
-			[Range(-offsetExt, offsetExt)]
+			[Range(-1.0f, 1.0f)]
 			public float volumeOffsetX;
-			[Range(-offsetExt, offsetExt)]
+			[Range(-1.0f, 1.0f)]
 			public float volumeOffsetY;
-			[Range(-offsetExt, offsetExt)]
+			[Range(-1.0f, 1.0f)]
 			public float volumeOffsetZ;
 			[Range(0, 100)]
 			public int volumePressureIterations;
@@ -221,7 +224,7 @@ namespace Unity.DemoTeam.Hair
 				volumeOffsetX = 0.0f,
 				volumeOffsetY = 0.0f,
 				volumeOffsetZ = 0.0f,
-				volumePressureIterations = 1,
+				volumePressureIterations = 0,
 			};
 		}
 
@@ -347,7 +350,8 @@ namespace Unity.DemoTeam.Hair
 		private int kernelVolumeResolveFromRasterization;
 		private int kernelVolumeGradient;
 		private int kernelVolumeDivergence;
-		private int kernelVolumePressure;
+		private int kernelVolumePressureEOS;
+		private int kernelVolumePressureSolve;
 		private int kernelVolumePressureGradient;
 
 		private ComputeBuffer rootPosition;
@@ -442,7 +446,7 @@ namespace Unity.DemoTeam.Hair
 				boundaries.TrimExcess();
 			}
 
-			volume.volumeResolution = Mathf.Max(4, volume.volumeResolution);
+			volume.volumeResolution = (Mathf.Max(4, volume.volumeResolution) / 4) * 4;
 		}
 
 		private void OnValidate()
@@ -541,7 +545,7 @@ namespace Unity.DemoTeam.Hair
 			changed |= CreateVolume(ref volumePressureIn, "VolumePressure_1", volumeCells, RenderTextureFormat.RFloat);
 			changed |= CreateVolume(ref volumePressureGrad, "VolumePressureGrad", volumeCells, RenderTextureFormat.ARGBFloat);
 
-			return changed;
+			return false;// changed;
 		}
 
 		private void ReleaseVolumes()
@@ -699,7 +703,11 @@ namespace Unity.DemoTeam.Hair
 
 		public Vector3 GetCellSize()
 		{
-			return (volumeWorldMax - volumeWorldMin) / volume.volumeResolution;
+			Vector3 cellSize = new Vector3(
+				(volumeWorldMax.x - volumeWorldMin.x) / volumeCells.x,
+				(volumeWorldMax.y - volumeWorldMin.y) / volumeCells.y,
+				(volumeWorldMax.z - volumeWorldMin.z) / volumeCells.z);
+			return cellSize;
 		}
 
 		public float GetCellVolume()
@@ -709,12 +717,18 @@ namespace Unity.DemoTeam.Hair
 
 		private Vector3 GetVolumeCenter()
 		{
-			return this.transform.position + volume.volumeOffsetX * Vector3.right + volume.volumeOffsetY * Vector3.up + volume.volumeOffsetZ * Vector3.forward;
+			Vector3 cellSize = GetCellSize();
+			Vector3 cellOffset = new Vector3(
+				cellSize.x * volume.volumeOffsetX,
+				cellSize.y * volume.volumeOffsetY,
+				cellSize.z * volume.volumeOffsetZ);
+			return (this.transform.position + cellOffset);
 		}
 
 		private Vector3 GetVolumeExtent()
 		{
-			return (0.75f + 1.25f * strands.strandLength) * Vector3.one;
+			//return Vector3.one;
+			return Vector3.one * (0.5f + 1.2f * strands.strandLength);
 		}
 
 		private int GetVolumeCellCount()
@@ -814,7 +828,8 @@ namespace Unity.DemoTeam.Hair
 				kernelVolumeResolveFromRasterization = computeVolume.FindKernel("KVolumeResolveFromRasterization");
 				kernelVolumeGradient = computeVolume.FindKernel("KVolumeGradient");
 				kernelVolumeDivergence = computeVolume.FindKernel("KVolumeDivergence");
-				kernelVolumePressure = computeVolume.FindKernel("KVolumePressure");
+				kernelVolumePressureEOS = computeVolume.FindKernel("KVolumePressureEOS");
+				kernelVolumePressureSolve = computeVolume.FindKernel("KVolumePressureSolve");
 				kernelVolumePressureGradient = computeVolume.FindKernel("KVolumePressureGradient");
 
 				strandsActive = strands;
@@ -1148,17 +1163,27 @@ namespace Unity.DemoTeam.Hair
 						volumeThreadGroupsZ);
 				}
 
-				// pressure
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_5_Pressure))
+				// pressure eos (initial guess)
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_5_PressureEOS))
 				{
-					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressure);
+					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressureEOS);
+					cmd.DispatchCompute(computeVolume, kernelVolumePressureEOS,
+						volumeThreadGroupsX,
+						volumeThreadGroupsY,
+						volumeThreadGroupsZ);
+				}
+
+				// pressure solve
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_5_PressureSolve))
+				{
+					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressureSolve);
 					for (int i = 0; i != volume.volumePressureIterations; i++)
 					{
 						SwapVolumes(ref volumePressure, ref volumePressureIn);
-						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressure, UniformIDs._VolumePressure, volumePressure);
-						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressure, UniformIDs._VolumePressureIn, volumePressureIn);
+						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressure, volumePressure);
+						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressureIn, volumePressureIn);
 
-						cmd.DispatchCompute(computeVolume, kernelVolumePressure,
+						cmd.DispatchCompute(computeVolume, kernelVolumePressureSolve,
 							volumeThreadGroupsX,
 							volumeThreadGroupsY,
 							volumeThreadGroupsZ);
@@ -1295,6 +1320,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeIntParam(cs, UniformIDs._StrandParticleCount, strands.strandParticleCount);
 			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleInterval, strandParticleInterval);
 			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleVolume, strandParticleVolume);
+			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleContrib, strands.strandParticleContrib);// TODO remove
 
 			cmd.SetComputeFloatParam(cs, UniformIDs._DT, dt);
 			cmd.SetComputeIntParam(cs, UniformIDs._Iterations, solver.iterations);

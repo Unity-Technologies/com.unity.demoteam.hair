@@ -22,7 +22,7 @@
 #define ENABLE_CONSTRAINT_COLLISION		1
 #define ENABLE_CONSTRAINT_FRICTION		1
 #define ENABLE_CONSTRAINT_DISTANCE		1
-#define ENABLE_CONSTRAINT_CURVATURE		1
+#define ENABLE_CONSTRAINT_CURVATURE		0
 #define ENABLE_CONSTRAINT_FTL			1
 
 //---------
@@ -38,21 +38,26 @@ uint3 ParticleVolumeIndex(uint i)
 	return VolumeWorldToIndex(_ParticlePositionPrev[i].xyz);
 }
 
+#define USE_PRESSURE_GRADIENT 1
+
 float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
 	if (ENABLE_VOLUME_FRICTION)
 	{
-#if SPLAT_TRILINEAR
 		float3 volumeUVW = ParticleVolumeUVW(i);
-		float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0).xyz;
+#if SPLAT_TRILINEAR
+		float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0).xyz;
 #else
 		float3 volumeVelocity = _VolumeVelocity[ParticleVolumeIndex(i)].xyz;
 #endif
 
-#if 0
-		float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0);
-		float3 impulsePIC = -volumePressureGrad + (volumeVelocity - velocity);
-		float3 impulseFLIP = -volumePressureGrad;
+#if USE_PRESSURE_GRADIENT
+		float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
+		float3 volumePressureImpulse = volumePressureGrad;
+
+		float3 impulsePIC = -volumePressureImpulse + (volumeVelocity - velocity);
+		float3 impulseFLIP = -volumePressureImpulse;
+		
 		return lerp(impulseFLIP, impulsePIC, friction);
 #else
 		return (volumeVelocity - velocity) * friction;
@@ -66,16 +71,24 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 
 float3 ParticleVolumeRepulsionForce(uint i)
 {
+#if USE_PRESSURE_GRADIENT
+	return 0.0;
+#else
 	if (ENABLE_VOLUME_REPULSION)
 	{
 		float3 volumeUVW = ParticleVolumeUVW(i);
-		float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(_Volume_sampler_trilinear_clamp, volumeUVW, 0);
-		return volumeDensityGrad * -(_Repulsion);
+		float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
+
+		float rho = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
+		float rho0 = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0).w;
+
+		return volumeDensityGrad * -_Repulsion;
 	}
 	else
 	{
 		return 0.0;
 	}
+#endif
 }
 
 float GetDecay()
@@ -275,6 +288,17 @@ void KSolveConstraints_GaussSeidel(
 #endif
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
 
+#if STRAND_31_32_DEBUG
+	if (strandIndex < 31 || strandIndex > 32)
+	{
+		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
+		{
+			_ParticlePosition[i] = 1e+7;
+		}
+		return;
+	}
+#endif
+
 	// clear corrections
 	if (ENABLE_CONSTRAINT_FTL)
 	{
@@ -322,6 +346,12 @@ void KSolveConstraints_GaussSeidel(
 		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.0, 1.0, p0, p1);
 		if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
 		
+#if STRAND_31_32_DEBUG == 2
+		_ParticlePosition[strandParticleBegin + strandParticleStride].xyz = p1;
+		_ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz = 1e+7;
+		continue;
+#endif
+
 		//      p2 <-- solve
 		//     /
 		//    p1 <-- solve

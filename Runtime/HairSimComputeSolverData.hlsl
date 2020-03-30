@@ -14,6 +14,7 @@ uint _StrandCount;
 uint _StrandParticleCount;
 float _StrandParticleInterval;
 float _StrandParticleVolume;
+float _StrandParticleContrib;// TODO remove
 
 float _DT;
 uint _Iterations;

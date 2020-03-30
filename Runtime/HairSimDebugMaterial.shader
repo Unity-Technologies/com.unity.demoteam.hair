@@ -81,10 +81,15 @@
 				const uint strandParticleStride = 1;
 #endif
 
+#if STRAND_31_32_DEBUG == 2
+				if (vertexID > 1)
+					vertexID = 1;
+#endif
+
 				uint i = strandParticleBegin + strandParticleStride * vertexID;
 				float3 worldPos = _ParticlePosition[i].xyz;
 
-				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_sampler_trilinear_clamp, VolumeWorldToUVW(worldPos), 0);
+				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, VolumeWorldToUVW(worldPos), 0);
 				float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 400.0), 4.0);
 
 				DebugVaryings output;
@@ -153,16 +158,33 @@
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag_Slice
 
-			float3 ColorizeDensity(float d)
+			float3 ColorizeDensity(float rho)
 			{
-				return saturate(d.xxx);
+				return saturate(rho).xxx;
+			}
+
+			float3 ColorizeDivergence(float div)
+			{
+				if (div > 0.0)
+					return saturate(float3(div, div, 0.0));
+				else
+					return saturate(float3(0.0, -div, -div));
+			}
+
+			float3 ColorizePressure(float p)
+			{
+				p *= 1000.0;
+				if (p > 0.0)
+					return saturate(float3(p, 0.0, 0.0));
+				else
+					return saturate(float3(0.0, 0.0, -p));
 			}
 
 			float3 ColorizeGradient(float3 n)
 			{
-				//return 0.5 + 0.5 * normalize(n);
+				//return (0.5 + 0.5 * normalize(n.xzy));
 				float d = dot(n, n);
-				if (d > 1e-4)
+				if (d > 1e-11)
 					return 0.5 + 0.5 * (n * rsqrt(d));
 				else
 					return 0.0;
@@ -190,34 +212,31 @@
 			float4 DebugFrag_Slice(DebugVaryings input) : SV_Target
 			{
 				float3 uvw = input.color.xyz;
-				float3 localPos = VolumeUVWToLocal(uvw);
-				float3 localPosFloor = floor(localPos);
-
-				uint3 volumeIdx = localPosFloor;
 
 #if SPLAT_TRILINEAR
-				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
-				float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0).xyz;
-				float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+#define SLICE_SAMPLER _Volume_trilinear_clamp
 #else
-				float volumeDensity = _VolumeDensity[volumeIdx];
-				float3 volumeVelocity = _VolumeVelocity[volumeIdx].xyz;
-				float3 volumeDensityGrad = _VolumeDensityGrad[volumeIdx];
+#define SLICE_SAMPLER _Volume_point_clamp
 #endif
 
-				float volumeDivergence = _VolumeDivergence.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
-				float volumePressure = _VolumePressure.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
-				float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_sampler_trilinear_clamp, uvw, 0);
+				float volumeDensity = _VolumeDensity.SampleLevel(SLICE_SAMPLER, uvw, 0);
+				float3 volumeVelocity = _VolumeVelocity.SampleLevel(SLICE_SAMPLER, uvw, 0).xyz;
+				float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(SLICE_SAMPLER, uvw, 0);
+				float volumeDivergence = _VolumeDivergence.SampleLevel(SLICE_SAMPLER, uvw, 0);
+				float volumePressure = _VolumePressure.SampleLevel(SLICE_SAMPLER, uvw, 0);
+				float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(SLICE_SAMPLER, uvw, 0);
 
 				const float opacity = 0.9;
 				{
+					float3 localPos = VolumeUVWToLocal(uvw);
+					float3 localPosFloor = floor(localPos);
+
 					float3 gridDist = abs(localPos - localPosFloor);
 					float3 gridWidth = fwidth(localPos);
 					if (any(gridDist < gridWidth))
 					{
-						uint i = volumeIdx[_DebugSliceAxis] % 3;
+						uint i = (uint)localPosFloor[_DebugSliceAxis] % 3;
 						return float4(0.2 * float3(i == 0, i == 1, i == 2), opacity);
-						//return float4(0.2 * ColorizeRamp(volumeIdx[_DebugSliceAxis], _VolumeCells[_DebugSliceAxis]), opacity);
 					}
 				}
 
@@ -229,9 +248,9 @@
 				else if (x < 3.0)
 					return float4(ColorizeVelocity(volumeVelocity), opacity);
 				else if (x < 4.0)
-					return float4(ColorizeDensity(volumeDivergence), opacity);
+					return float4(ColorizeDivergence(volumeDivergence), opacity);
 				else if (x < 5.0)
-					return float4(ColorizeDensity(volumePressure), opacity);
+					return float4(ColorizePressure(volumePressure), opacity);
 				else
 					return float4(ColorizeGradient(volumePressureGrad), opacity);
 			}

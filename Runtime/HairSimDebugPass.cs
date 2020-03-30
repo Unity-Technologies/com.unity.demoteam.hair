@@ -43,18 +43,22 @@ namespace Unity.DemoTeam.Hair
 			int frame = Time.renderedFrameCount;
 			if (frame != lastSimulationFrame)
 			{
-				const float dtMin = 1.0f / 120.0f;
-				const float dtMax = 1.0f / 30.0f;
-
-				float dt = Mathf.Clamp(Time.deltaTime, dtMin, dtMax);
-				dt = 1.0f / 60.0f;
-
-				foreach (HairSim hairSim in HairSim.instances)
+				var dt = Time.deltaTime;
+				if (dt != 0.0f)
 				{
-					if (hairSim != null && hairSim.isActiveAndEnabled)
+					const float dtMin = 1.0f / 120.0f;
+					const float dtMax = 1.0f / 30.0f;
+
+					dt = Mathf.Clamp(dt, dtMin, dtMax);
+					dt = 1.0f / 60.0f;
+
+					foreach (HairSim hairSim in HairSim.instances)
 					{
-						hairSim.Step(cmd, dt);
-						hairSim.Volume(cmd, dt);
+						if (hairSim != null && hairSim.isActiveAndEnabled)
+						{
+							hairSim.Step(cmd, dt);
+							hairSim.Volume(cmd, dt);
+						}
 					}
 				}
 

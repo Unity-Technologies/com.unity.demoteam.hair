@@ -41,7 +41,7 @@ HAIRSIM_WRITEABLE_VOLUME<float> _VolumePressure;
 HAIRSIM_WRITEABLE_VOLUME<float> _VolumePressureIn;
 HAIRSIM_WRITEABLE_VOLUME<float3> _VolumePressureGrad;
 
-SamplerState _Volume_sampler_point_clamp;
-SamplerState _Volume_sampler_trilinear_clamp;
+SamplerState _Volume_point_clamp;
+SamplerState _Volume_trilinear_clamp;
 
 #endif//__HAIRSIMCOMPUTE_VOLUMEDATA__
