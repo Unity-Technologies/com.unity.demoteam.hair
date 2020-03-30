@@ -27,7 +27,7 @@
 #define VOLUME_NUM_Y 4
 #define VOLUME_NUM_Z 4
 
-#define VOLUME_AIR_CELL_ZERO_PRESSURE 0
+#define VOLUME_AIR_CELL_ZERO_PRESSURE 1
 #define VOLUME_AIR_CELL_ZERO_DIVERGENCE 0
 
 #define VOLUME_DIFF_STEP_IS_ONE 0// TODO remove
@@ -57,14 +57,14 @@ void InterlockedAddTrilinear(RWTexture3D<int> volume, uint3 idx0, float value, f
 void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> volume)
 {
 #if SPLAT_TRILINEAR
-	float3 localPos = VolumeWorldToLocal(_ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
-	float3 localPosFloor = floor(localPos);
+	const float3 localPos = VolumeWorldToLocal(_ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
+	const float3 localPosFloor = floor(localPos);
 
-	uint3 cellIdx0 = localPosFloor;
-	float3 cellPos = localPos - localPosFloor;
+	const uint3 cellIdx0 = localPosFloor;
+	const float3 cellPos = localPos - localPosFloor;
 
-	float3 w0 = 1.0 - cellPos;
-	float3 w1 = cellPos;
+	const float3 w0 = 1.0 - cellPos;
+	const float3 w1 = cellPos;
 
 	InterlockedAddTrilinear(volume, cellIdx0, value / SPLAT_PRECISION, w0, w1);
 #else
@@ -244,7 +244,7 @@ void KVolumeGradient(
 #if VOLUME_SQUARE_CELLS
 	const float h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.x);
 #else
-	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP);
+	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.xyz);
 #endif
 
 	const float3 diff = float3(
@@ -281,7 +281,7 @@ void KVolumeGradient(
 #if VOLUME_SQUARE_CELLS
 	const float h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.x);
 #else
-	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP);
+	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.xyz);
 #endif
 
 	const bool lowerBoundary = any(localIdx == localLowerIdx);
@@ -458,13 +458,14 @@ void KVolumeDivergence(
 	const float rho = _VolumeDensity[worldIdx];
 	const float rho0 = 1.0 / pow(_StrandParticleContrib, 3.0);
 
-	//_VolumeDivergence[worldIdx] = div + (rho0 - rho);
-
 #if VOLUME_DIFF_STEP_IS_ONE
 	_VolumeDivergence[worldIdx] = div - (rho / rho0 - 1.0) * (_Repulsion) * (VolumeWorldCellSize().x);
 #else
 	_VolumeDivergence[worldIdx] = div - (rho / rho0 - 1.0) * (_Repulsion);
 #endif
+
+	//OLD
+	//_VolumeDivergence[worldIdx] = div + (rho0 - rho);
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -495,6 +496,7 @@ void KVolumePressureEOS(
 	_VolumePressure[worldIdx] = (rho / rho0 - 1.0) * (_Repulsion * VolumeWorldCellSize().x * VolumeWorldCellSize().x);
 #endif
 
+	//OLD
 	//if (rho != 0.0)
 	//	_VolumePressure[worldIdx] = -(rho0 - rho) * (VolumeWorldCellVolume() / _DT);
 	//else
@@ -512,20 +514,12 @@ void KVolumePressureSolve(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	// solve poisson equation for pressure using central differences
-	// https://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html
-
-#if VOLUME_AIR_CELL_ZERO_PRESSURE
-	if (_VolumeDensity[worldIdx] == 0.0)
-	{
-		_VolumePressure[worldIdx] = 0.0;// Dirichlet boundary condation
-		return;
-	}
-#endif
-
 	const uint3 worldIdxStrideX = uint3(1, 0, 0);
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
+
+	// solve poisson equation for pressure using central differences
+	// https://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html
 
 	const float p_xm = _VolumePressureIn[worldIdx - worldIdxStrideX];
 	const float p_ym = _VolumePressureIn[worldIdx - worldIdxStrideY];
@@ -544,7 +538,7 @@ void KVolumePressureSolve(
 	const float h = 1.0 * VOLUME_DIFF_STEP.x;
 	const float a = -(h * h);
 
-	const float p =
+	const float pressure =
 		//(1.0 - w) * p_in +
 		(w / 6.0) * float(
 			p_xm + p_xp +
@@ -555,7 +549,7 @@ void KVolumePressureSolve(
 	const float3 h = 1.0 * VOLUME_DIFF_STEP.xyz;
 	const float3 a = -(h * h) / 3.0;
 
-	const float p =
+	const float pressure =
 		//(1.0 - w) * p_in +
 		(w / 6.0) * float(
 			(p_xm + p_xp + a.x * b) + 
@@ -563,7 +557,7 @@ void KVolumePressureSolve(
 			(p_zm + p_zp + a.z * b));
 #endif
 
-	_VolumePressure[worldIdx] = p;
+	_VolumePressure[worldIdx] = pressure;
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -587,7 +581,7 @@ void KVolumePressureGradient(
 	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.xyz);
 #endif
 
-	float3 diff = float3(
+	const float3 diff = float3(
 		_VolumePressure[worldIdx + worldIdxStrideX] - _VolumePressure[worldIdx - worldIdxStrideX],
 		_VolumePressure[worldIdx + worldIdxStrideY] - _VolumePressure[worldIdx - worldIdxStrideY],
 		_VolumePressure[worldIdx + worldIdxStrideZ] - _VolumePressure[worldIdx - worldIdxStrideZ]
