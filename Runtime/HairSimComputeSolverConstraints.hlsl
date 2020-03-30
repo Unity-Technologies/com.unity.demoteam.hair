@@ -424,13 +424,6 @@ void ApplyDistanceLRAConstraint(const float distanceMax, const float3 p0, inout 
 	p1 += d1;
 }
 
-void ApplyDistanceFTLConstraint(const float distance, const float3 p0, inout float3 p1)
-{
-	float3 d1 = 0.0;
-	SolveDistanceFTLConstraint(distance, p0, p1, d1);
-	p1 += d1;
-}
-
 void ApplyDistanceFTLConstraint(const float distance, const float3 p0, inout float3 p1, inout float3 d1)
 {
 	SolveDistanceFTLConstraint(distance, p0, p1, d1);

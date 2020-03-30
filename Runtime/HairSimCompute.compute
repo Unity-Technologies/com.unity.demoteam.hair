@@ -22,7 +22,7 @@
 #define ENABLE_CONSTRAINT_COLLISION		1
 #define ENABLE_CONSTRAINT_FRICTION		1
 #define ENABLE_CONSTRAINT_DISTANCE		1
-#define ENABLE_CONSTRAINT_CURVATURE		0
+#define ENABLE_CONSTRAINT_CURVATURE		1
 #define ENABLE_CONSTRAINT_FTL			1
 
 //---------
@@ -358,7 +358,7 @@ void KSolveConstraints_GaussSeidel(
 		//    |
 		//--- p0 (fixed)
 		//    |
-		//    ## (below)
+		//    r0 (below)
 		if (ENABLE_CONSTRAINT_COLLISION)
 		{
 			if (ENABLE_CONSTRAINT_FRICTION)	ApplyCollisionFrictionConstraint(_Friction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride * 2].xyz, p2);
@@ -380,7 +380,7 @@ void KSolveConstraints_GaussSeidel(
 			//    |
 			//    p0 <-- solve
 			//    |
-			//--- ## (fixed)
+			//--- r0 (fixed)
 			//    |
 			//    ## (below)
 			if (ENABLE_CONSTRAINT_COLLISION)
@@ -402,6 +402,7 @@ void KSolveConstraints_GaussSeidel(
 			_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
 		}
 
+		//TODO figure out why this breaks when triangle bending constraint is disabled
 		if (ENABLE_CONSTRAINT_FTL)
 		{
 			float3 d1 = 0;
