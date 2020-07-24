@@ -1,0 +1,12 @@
+{
+  "name": "com.unity.demoteam.hair",
+  "displayName": "Demo Team Hair Sim",
+  "version": "0.1.0-preview",
+  "unity": "2020.1",
+  "description": "Strand based hair simulation and rendering.",
+  "dependencies": {
+    "com.unity.demoteam.attributes": "0.1.1-preview",
+    "com.unity.mathematics": "1.1.0",
+    "com.unity.render-pipelines.high-definition": "9.0.0-preview.33"
+  }
+}

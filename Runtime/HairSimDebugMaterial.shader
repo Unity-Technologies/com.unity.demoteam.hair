@@ -1,15 +1,11 @@
 ﻿Shader "Hidden/HairSimDebugDraw"
 {
-	CGINCLUDE
+	HLSLINCLUDE
 
 	#pragma target 5.0
 	
-	// builtin begin
-	float4x4 _ViewProjMatrix;
-	float4x4 _PrevViewProjMatrix;
-	float4x4 _NonJitteredViewProjMatrix;
-	float2 _CameraMotionVectorsScale;
-	// builtin end
+	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+	#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
 
 	#include "HairSimComputeConfig.hlsl"
 	#include "HairSimComputeSolverData.hlsl"
@@ -53,7 +49,7 @@
 		return 1.0 - c * c;
 	}
 
-	ENDCG
+	ENDHLSL
 
 	SubShader
 	{
@@ -66,7 +62,7 @@
 
 		Pass// 0 == STRANDS
 		{
-			CGPROGRAM
+			HLSLPROGRAM
 
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag
@@ -90,20 +86,23 @@
 				float3 worldPos = _ParticlePosition[i].xyz;
 
 				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, VolumeWorldToUVW(worldPos), 0);
-				float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 400.0), 4.0);
+				float volumeDensityShadow = 8.0;
+				float volumeOcclusion = saturate((volumeDensityShadow - volumeDensity) / volumeDensityShadow);// pow(1.0 - saturate(volumeDensity / 200.0), 4.0);
+				//float volumeOcclusion = saturate(1.0 - pow(1.0 - exp(-volumeDensity), 2.0));
+				//float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 400.0), 4.0);
 
 				DebugVaryings output;
-				output.positionCS = mul(_ViewProjMatrix, float4(worldPos - _WorldSpaceCameraPos, 1.0));
+				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
 				output.color = volumeOcclusion * float4(ColorizeCycle(instanceID, _StrandCount), 1.0);
 				return output;
 			}
 
-			ENDCG
+			ENDHLSL
 		}
 
 		Pass// 1 == DENSITY
 		{
-			CGPROGRAM
+			HLSLPROGRAM
 
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag
@@ -115,17 +114,17 @@
 				float3 worldPos = (volumeDensity == 0.0) ? 1e+7 : VolumeIndexToWorld(volumeIdx);
 
 				DebugVaryings output;
-				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
+				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
 				output.color = float4(ColorizeRamp(volumeDensity, 32), 1.0);
 				return output;
 			}
 
-			ENDCG
+			ENDHLSL
 		}
 
 		Pass// 2 == GRADIENT
 		{
-			CGPROGRAM
+			HLSLPROGRAM
 
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag
@@ -141,19 +140,19 @@
 				}
 
 				DebugVaryings output;
-				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
+				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
 				output.color = float4(ColorizeRamp(1 - vertexID, 2), 1.0);
 				return output;
 			}
 
-			ENDCG
+			ENDHLSL
 		}
 
 		Pass// 3 == SLICE
 		{
 			Blend SrcAlpha OneMinusSrcAlpha
 
-			CGPROGRAM
+			HLSLPROGRAM
 
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag_Slice
@@ -204,7 +203,7 @@
 				uvw = uvwWorld;
 
 				DebugVaryings output;
-				output.positionCS = UnityObjectToClipPos(float4(worldPos, 1.0));
+				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
 				output.color = float4(uvw, 1);
 				return output;
 			}
@@ -255,7 +254,7 @@
 					return float4(ColorizeGradient(volumePressureGrad), opacity);
 			}
 
-			ENDCG
+			ENDHLSL
 		}
 
 		Pass// 4 == STRANDS MOTION
@@ -263,7 +262,7 @@
 			ZTest Equal
 			ZWrite Off
 
-			CGPROGRAM
+			HLSLPROGRAM
 
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag
@@ -279,22 +278,22 @@
 #endif
 
 				uint i = strandParticleBegin + strandParticleStride * vertexID;
-				float4 worldPos1 = float4(_ParticlePosition[i].xyz - _WorldSpaceCameraPos, 1.0);
-				float4 worldPos0 = float4(_ParticlePositionPrev[i].xyz - _WorldSpaceCameraPos, 1.0);
+				float3 worldPos0 = _ParticlePositionPrev[i].xyz;
+				float3 worldPos1 = _ParticlePosition[i].xyz;
+				
+				float4 clipPos0 = mul(UNITY_MATRIX_PREV_VP, float4(GetCameraRelativePositionWS(worldPos0), 1.0));
+				float4 clipPos1 = mul(UNITY_MATRIX_UNJITTERED_VP, float4(GetCameraRelativePositionWS(worldPos1), 1.0));
 
-				float4 clipPos1 = mul(_NonJitteredViewProjMatrix, worldPos1);
-				float4 clipPos0 = mul(_PrevViewProjMatrix, worldPos0);
-
-				float2 ndc1 = clipPos1.xy / clipPos1.w;
 				float2 ndc0 = clipPos0.xy / clipPos0.w;
+				float2 ndc1 = clipPos1.xy / clipPos1.w;
 
 				DebugVaryings output;
-				output.positionCS = mul(_ViewProjMatrix, worldPos1);
-				output.color = float4(_CameraMotionVectorsScale * 0.5 * (ndc1 - ndc0), 0, 0);
+				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos1));
+				output.color = float4(0.5 * (ndc1 - ndc0), 0, 0);
 				return output;
 			}
 
-			ENDCG
+			ENDHLSL
 		}
 	}
 }

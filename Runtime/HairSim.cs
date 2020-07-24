@@ -33,8 +33,10 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		static HairSim()
+		[UnityEditor.InitializeOnLoadMethod]
+		static void InitializeHairSim()
 		{
+			Debug.Log("InitializeHairSim");
 			InitializeStaticFields(typeof(MarkersCPU), (string s) => new ProfilerMarker("HairSim." + s.Replace('_', '.')));
 			InitializeStaticFields(typeof(MarkersGPU), (string s) => new ProfilingSampler("HairSim." + s.Replace('_', '.')));
 			InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
@@ -168,7 +170,7 @@ namespace Unity.DemoTeam.Hair
 			public int strandParticleCount;
 			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
 			public float strandLength;
-			[Range(0.070f, 20.0f), Tooltip("Strand diameter in millimeters")]
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
 			[Range(0.0f, 9.0f)]
 			public float strandParticleContrib;// TODO remove
@@ -728,7 +730,7 @@ namespace Unity.DemoTeam.Hair
 		private Vector3 GetVolumeExtent()
 		{
 			//return Vector3.one;
-			return Vector3.one * (0.5f + 1.2f * strands.strandLength);
+			return Vector3.one * (1.0f + 1.5f * strands.strandLength);
 		}
 
 		private int GetVolumeCellCount()

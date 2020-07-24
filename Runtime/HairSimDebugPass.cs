@@ -38,7 +38,7 @@ namespace Unity.DemoTeam.Hair
 			FindMotionVectorsRT();
 		}
 
-		protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResults)
+		protected override void Execute(CustomPassContext context)
 		{
 			int frame = Time.renderedFrameCount;
 			if (frame != lastSimulationFrame)
@@ -56,8 +56,8 @@ namespace Unity.DemoTeam.Hair
 					{
 						if (hairSim != null && hairSim.isActiveAndEnabled)
 						{
-							hairSim.Step(cmd, dt);
-							hairSim.Volume(cmd, dt);
+							hairSim.Step(context.cmd, dt);
+							hairSim.Volume(context.cmd, dt);
 						}
 					}
 				}
@@ -70,10 +70,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (hairSim != null && hairSim.isActiveAndEnabled)
 				{
-					RTHandle cameraColor;
-					RTHandle cameraDepth;
-					GetCameraBuffers(out cameraColor, out cameraDepth);
-					hairSim.Draw(cmd, cameraColor, cameraDepth, motionVectorsRT);
+					hairSim.Draw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer, motionVectorsRT);
 				}
 			}
 			Profiler.EndSample();

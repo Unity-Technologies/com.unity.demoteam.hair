@@ -41,10 +41,96 @@ MonoBehaviour:
     m_Value: 1
     min: 0
     max: 20
+  cameraMotionBlur:
+    m_OverrideState: 0
+    m_Value: 1
   m_SampleCount:
     m_OverrideState: 0
     m_Value: 8
     min: 2
+--- !u!114 &-1622065639258195466
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d08ce26990eb1a4a9177b860541e702, type: 3}
+  m_Name: Exposure
+  m_EditorClassIdentifier: 
+  active: 1
+  m_AdvancedMode: 0
+  mode:
+    m_OverrideState: 1
+    m_Value: 0
+  meteringMode:
+    m_OverrideState: 0
+    m_Value: 2
+  luminanceSource:
+    m_OverrideState: 0
+    m_Value: 1
+  fixedExposure:
+    m_OverrideState: 0
+    m_Value: 0.11
+  compensation:
+    m_OverrideState: 0
+    m_Value: 0
+  limitMin:
+    m_OverrideState: 0
+    m_Value: -10
+  limitMax:
+    m_OverrideState: 0
+    m_Value: 20
+  curveMap:
+    m_OverrideState: 0
+    m_Value:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: -10
+        value: -10
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 20
+        value: 20
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  adaptationMode:
+    m_OverrideState: 0
+    m_Value: 1
+  adaptationSpeedDarkToLight:
+    m_OverrideState: 0
+    m_Value: 3
+    min: 0.001
+  adaptationSpeedLightToDark:
+    m_OverrideState: 0
+    m_Value: 1
+    min: 0.001
+  weightTextureMask:
+    m_OverrideState: 0
+    m_Value: {fileID: 0}
+  histogramPercentages:
+    m_OverrideState: 0
+    m_Value: {x: 40, y: 90}
+    min: 0
+    max: 100
+  histogramUseCurveRemapping:
+    m_OverrideState: 0
+    m_Value: 0
 --- !u!114 &-496575378058219023
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -69,10 +155,10 @@ MonoBehaviour:
     m_Value: 0
   exposure:
     m_OverrideState: 1
-    m_Value: -2.38
+    m_Value: -1.5
   multiplier:
-    m_OverrideState: 0
-    m_Value: 1
+    m_OverrideState: 1
+    m_Value: 26.18
     min: 0
   upperHemisphereLuxValue:
     m_OverrideState: 0
@@ -114,7 +200,7 @@ MonoBehaviour:
     showEyeDropper: 1
   gradientDiffusion:
     m_OverrideState: 0
-    m_Value: -0.8
+    m_Value: -0.98
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -131,6 +217,7 @@ MonoBehaviour:
   - {fileID: -3688828918237369320}
   - {fileID: -496575378058219023}
   - {fileID: 6974059576867971045}
+  - {fileID: -1622065639258195466}
 --- !u!114 &6974059576867971045
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -150,7 +237,7 @@ MonoBehaviour:
     m_Value: 3
   skyAmbientMode:
     m_OverrideState: 0
-    m_Value: 0
+    m_Value: 1
   fogType:
     m_OverrideState: 0
     m_Value: 0
