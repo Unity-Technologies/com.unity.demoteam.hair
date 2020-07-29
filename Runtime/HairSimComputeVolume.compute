@@ -344,68 +344,6 @@ void KVolumeGradient(
 #endif// (LDS_GRADIENT)
 }
 
-#if LDS_GRADIENT
-[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeGradientForwardDiff(
-	uint3 groupIdx : SV_GroupID,
-	uint3 localIdx : SV_GroupThreadID,
-	uint3 worldIdx : SV_DispatchThreadID,
-	uint threadIdx : SV_GroupIndex)
-	// SV_GroupID           execution group coords
-	// SV_GroupThreadID     thread coords within execution group
-	// SV_DispatchThreadID  thread coords (global)
-	// SV_GroupIndex        thread offset within execution group
-{
-	gs_density[threadIdx] = _VolumeDensity[worldIdx];
-
-	GroupMemoryBarrierWithGroupSync();
-
-	const uint3 localLowerIdx = 0;
-	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
-
-#if VOLUME_SQUARE_CELLS
-	const float h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.x);
-#else
-	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.xyz);
-#endif
-
-	if (any(localIdx == localUpperIdx))
-	{
-		const uint3 worldIdxStrideX = uint3(1, 0, 0);
-		const uint3 worldIdxStrideY = uint3(0, 1, 0);
-		const uint3 worldIdxStrideZ = uint3(0, 0, 1);
-
-		const float3 diff = float3(
-			_VolumeDensity[worldIdx + worldIdxStrideX] - gs_density[threadIdx],
-			_VolumeDensity[worldIdx + worldIdxStrideY] - gs_density[threadIdx],
-			_VolumeDensity[worldIdx + worldIdxStrideZ] - gs_density[threadIdx]
-			) * h_inv;
-
-		_VolumeDensityGrad[worldIdx] = diff;
-	}
-	else
-	{
-		const uint threadIdxStrideX = 1;
-		const uint threadIdxStrideY = VOLUME_NUM_X;
-		const uint threadIdxStrideZ = VOLUME_NUM_X * VOLUME_NUM_Y;
-		/*
-		SV_GroupIndex =
-			SV_GroupThreadID.z*dimx*dimy +
-			SV_GroupThreadID.y*dimx +
-			SV_GroupThreadID.x
-		*/
-
-		const float3 diff = float3(
-			gs_density[threadIdx + threadIdxStrideX] - gs_density[threadIdx],
-			gs_density[threadIdx + threadIdxStrideY] - gs_density[threadIdx],
-			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx]
-			) * h_inv;
-
-		_VolumeDensityGrad[worldIdx] = diff;
-	}
-}
-#endif// (LDS_GRADIENT)
-
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeDivergence(
 	uint3 groupIdx : SV_GroupID,
