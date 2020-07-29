@@ -19,12 +19,12 @@ namespace Unity.DemoTeam.Hair
 	[ExecuteInEditMode]
 	public class HairSim : MonoBehaviour
 	{
-		#region static set of instances
+		#region static instances
 		public static HashSet<HairSim> instances = new HashSet<HairSim>();
 		private void OnEnable() { instances.Add(this); }
 		private void OnDisable() { instances.Remove(this); ReleaseBuffers(); ReleaseVolumes(); strandsActive = StrandConfiguration.none; }
 		#endregion
-
+		#region static initialization
 		static void InitializeStaticFields<T>(Type type, Func<string, T> construct)
 		{
 			foreach (var field in type.GetFields())
@@ -33,7 +33,11 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+#if UNITY_EDITOR
 		[UnityEditor.InitializeOnLoadMethod]
+#else
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+#endif
 		static void InitializeHairSim()
 		{
 			Debug.Log("InitializeHairSim");
@@ -41,7 +45,8 @@ namespace Unity.DemoTeam.Hair
 			InitializeStaticFields(typeof(MarkersGPU), (string s) => new ProfilingSampler("HairSim." + s.Replace('_', '.')));
 			InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
 		}
-
+		#endregion
+		#region static profile markers
 		static class MarkersCPU
 		{
 			public static ProfilerMarker GetStrandRoots;
@@ -67,12 +72,20 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Volume_6_PressureGradient;
 			public static ProfilingSampler Draw;
 		}
-
+		#endregion
+		#region static shader literals
 		static class UniformIDs
 		{
-			// matrices
-			public static int _LocalToWorld;
-			public static int _LocalToWorldInvT;
+			// uniform buffers
+			//public static int _SolverParams;
+			//public static int _VolumeParams;
+			//public static int _RenderParams;
+
+			// storage buffers
+			//TODO
+
+			// textures
+			//TODO
 
 			// strand params
 			public static int _StrandCount;
@@ -86,6 +99,9 @@ namespace Unity.DemoTeam.Hair
 			public static int _RootTangent;
 
 			// solver params
+			public static int _LocalToWorld;
+			public static int _LocalToWorldInvT;
+
 			public static int _DT;
 			public static int _Iterations;
 			public static int _Stiffness;
@@ -145,6 +161,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _DebugSliceOffset;
 			public static int _DebugSliceDivider;
 		}
+		#endregion
 
 		const int THREAD_GROUP_SIZE = 64;
 
@@ -184,6 +201,54 @@ namespace Unity.DemoTeam.Hair
 				strandLength = 0.5f,
 				strandDiameter = 0.125f,
 				strandParticleContrib = 1.0f,// TODO remove
+			};
+		}
+
+		[Serializable]
+		public struct SolverConfiguration
+		{
+			public enum Method : uint
+			{
+				GaussSeidelReference = 0,
+				GaussSeidel = 1,
+				Jacobi = 2,
+			}
+
+			public Method method;
+			[Range(1, 100)]
+			public int iterations;
+			[Range(0.0f, 1.0f)]
+			public float stiffness;
+			[Range(1.0f, 2.0f)]
+			public float inference;
+			[Range(0.0f, 1.0f)]
+			public float damping;
+			[Range(-1.0f, 1.0f)]
+			public float gravity;
+			[Range(0.0f, 5.0f)]
+			public float repulsion;
+			[Range(0.0f, 1.0f)]
+			public float friction;
+
+			[Range(0.0f, 1.0f)]
+			public float bendingCurvature;
+			[Range(0.0f, 1.0f)]
+			public float dampingFTL;
+
+			public static readonly SolverConfiguration none = new SolverConfiguration();
+			public static readonly SolverConfiguration basic = new SolverConfiguration()
+			{
+				method = Method.GaussSeidelReference,
+				iterations = 3,
+				stiffness = 1.0f,
+				inference = 1.0f,
+				damping = 0.0f,
+				gravity = 1.0f,
+				repulsion = 0.0f,
+				friction = 0.0f,
+
+				bendingCurvature = 0.0f,
+				dampingFTL = 0.8f,
 			};
 		}
 
@@ -231,57 +296,6 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
-		public struct SolverConfiguration
-		{
-			public enum Method : uint
-			{
-				GaussSeidelReference = 0,
-				GaussSeidel = 1,
-				Jacobi = 2,
-			}
-
-			public Method method;
-			[Range(1, 100)]
-			public int iterations;
-			[Range(0.0f, 1.0f)]
-			public float stiffness;
-			[Range(1.0f, 2.0f)]
-			public float inference;
-			[Range(0.0f, 1.0f)]
-			public float damping;
-			[Range(-1.0f, 1.0f)]
-			public float gravity;
-			[Range(0.0f, 5.0f)]
-			public float repulsion;
-			[Range(0.0f, 1.0f)]
-			public float friction;
-
-			[Range(0.0f, 1.0f)]
-			public float bendingCurvature;
-			[Range(0.0f, 1.0f)]
-			public float bendingStiffness;
-			[Range(0.0f, 1.0f)]
-			public float dampingFTL;
-
-			public static readonly SolverConfiguration none = new SolverConfiguration();
-			public static readonly SolverConfiguration basic = new SolverConfiguration()
-			{
-				method = Method.GaussSeidelReference,
-				iterations = 3,
-				stiffness = 1.0f,
-				inference = 1.0f,
-				damping = 0.0f,
-				gravity = 1.0f,
-				repulsion = 0.0f,
-				friction = 0.0f,
-
-				bendingCurvature = 0.0f,
-				bendingStiffness = 0.0f,
-				dampingFTL = 0.8f,
-			};
-		}
-
-		[Serializable]
 		public struct DebugConfiguration
 		{
 			public bool drawParticles;
@@ -318,20 +332,20 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
+		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(MAX_BOUNDARIES);
 		private StrandConfiguration strandsActive = StrandConfiguration.none;
 		public StrandConfiguration strands = StrandConfiguration.basic;
+		public SolverConfiguration solver = SolverConfiguration.basic;
 		public VolumeConfiguration volume = VolumeConfiguration.basic;
 		public DebugConfiguration debug = DebugConfiguration.basic;
-		public SolverConfiguration solver = SolverConfiguration.basic;
-		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(MAX_BOUNDARIES);
 
-		[HideInInspector] public ComputeShader compute;
+		[HideInInspector] public ComputeShader computeSolver;
 		[HideInInspector] public ComputeShader computeVolume;
 		[HideInInspector] public Material computeVolumeRaster;
-		private MaterialPropertyBlock computeVolumeRasterPB;
+		private MaterialPropertyBlock computeVolumeRasterMBP;
 
-		[HideInInspector] public Material debugMaterial;
-		private MaterialPropertyBlock debugMaterialPB;
+		[HideInInspector] public Material debugDraw;
+		private MaterialPropertyBlock debugDrawMPB;
 
 		private int kernelUpdatePosition;
 		private int kernelSolveConstraints_GaussSeidelReference;
@@ -724,7 +738,7 @@ namespace Unity.DemoTeam.Hair
 				cellSize.x * volume.volumeOffsetX,
 				cellSize.y * volume.volumeOffsetY,
 				cellSize.z * volume.volumeOffsetZ);
-			return (this.transform.position + cellOffset);
+			return (/*this.transform.position + */cellOffset);
 		}
 
 		private Vector3 GetVolumeExtent()
@@ -811,14 +825,14 @@ namespace Unity.DemoTeam.Hair
 					particleVelocityPrev.SetData(tmpZeroInit);
 				}
 
-				kernelUpdatePosition = compute.FindKernel("KUpdatePosition");
-				kernelSolveConstraints_GaussSeidelReference = compute.FindKernel("KSolveConstraints_GaussSeidelReference");
-				kernelSolveConstraints_GaussSeidel = compute.FindKernel("KSolveConstraints_GaussSeidel");
-				kernelSolveConstraints_Jacobi_16 = compute.FindKernel("KSolveConstraints_Jacobi_16");
-				kernelSolveConstraints_Jacobi_32 = compute.FindKernel("KSolveConstraints_Jacobi_32");
-				kernelSolveConstraints_Jacobi_64 = compute.FindKernel("KSolveConstraints_Jacobi_64");
-				kernelSolveConstraints_Jacobi_128 = compute.FindKernel("KSolveConstraints_Jacobi_128");
-				kernelUpdateVelocity = compute.FindKernel("KUpdateVelocity");
+				kernelUpdatePosition = computeSolver.FindKernel("KUpdatePosition");
+				kernelSolveConstraints_GaussSeidelReference = computeSolver.FindKernel("KSolveConstraints_GaussSeidelReference");
+				kernelSolveConstraints_GaussSeidel = computeSolver.FindKernel("KSolveConstraints_GaussSeidel");
+				kernelSolveConstraints_Jacobi_16 = computeSolver.FindKernel("KSolveConstraints_Jacobi_16");
+				kernelSolveConstraints_Jacobi_32 = computeSolver.FindKernel("KSolveConstraints_Jacobi_32");
+				kernelSolveConstraints_Jacobi_64 = computeSolver.FindKernel("KSolveConstraints_Jacobi_64");
+				kernelSolveConstraints_Jacobi_128 = computeSolver.FindKernel("KSolveConstraints_Jacobi_128");
+				kernelUpdateVelocity = computeSolver.FindKernel("KUpdateVelocity");
 
 				kernelVolumeClear = computeVolume.FindKernel("KVolumeClear");
 				kernelVolumeSplat = computeVolume.FindKernel("KVolumeSplat");
@@ -964,7 +978,7 @@ namespace Unity.DemoTeam.Hair
 					boundaryMatrixPrev.CopyFrom(tmpMatrix);
 				}
 
-				SetComputeParams(cmd, compute, dt);
+				SetComputeParams(cmd, computeSolver, dt);
 
 				//int particleThreadGroupsX = particlePosition.count / THREAD_GROUP_SIZE;
 				//int particleThreadGroupsY = 1;
@@ -989,8 +1003,8 @@ namespace Unity.DemoTeam.Hair
 					solveThreadGroupsX = strands.strandCount;
 				}
 
-				SetComputeKernelParams(cmd, compute, kernelSolveConstraints);
-				cmd.DispatchCompute(compute, kernelSolveConstraints,
+				SetComputeKernelParams(cmd, computeSolver, kernelSolveConstraints);
+				cmd.DispatchCompute(computeSolver, kernelSolveConstraints,
 					solveThreadGroupsX,
 					solveThreadGroupsY,
 					solveThreadGroupsZ);
@@ -1094,9 +1108,9 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterization))
 							{
-								SetRenderMaterialParams(ref computeVolumeRasterPB);
+								SetRenderMaterialParams(ref computeVolumeRasterMBP);
 								CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color);
-								cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, strands.strandCount * strands.strandParticleCount, 1, computeVolumeRasterPB);
+								cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, strands.strandCount * strands.strandParticleCount, 1, computeVolumeRasterMBP);
 							}
 						}
 						break;
@@ -1105,9 +1119,9 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterizationNoGS))
 							{
-								SetRenderMaterialParams(ref computeVolumeRasterPB);
+								SetRenderMaterialParams(ref computeVolumeRasterMBP);
 								CoreUtils.SetRenderTarget(cmd, volumeVelocity, ClearFlag.Color);
-								cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 1, MeshTopology.Quads, strands.strandCount * strands.strandParticleCount * 8, 1, computeVolumeRasterPB);
+								cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 1, MeshTopology.Quads, strands.strandCount * strands.strandParticleCount * 8, 1, computeVolumeRasterMBP);
 							}
 						}
 						break;
@@ -1224,57 +1238,57 @@ namespace Unity.DemoTeam.Hair
 					!debug.drawSliceZ)
 					return;
 
-				SetRenderMaterialParams(ref debugMaterialPB);
+				SetRenderMaterialParams(ref debugDrawMPB);
 				CoreUtils.SetRenderTarget(cmd, colorRT, depthStencilRT);
 
 				if (debug.drawStrands)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 0, MeshTopology.LineStrip, strands.strandParticleCount, strands.strandCount, debugMaterialPB);
+					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 0, MeshTopology.LineStrip, strands.strandParticleCount, strands.strandCount, debugDrawMPB);
 				}
 
 				if (debug.drawParticles)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 0, MeshTopology.Points, strands.strandParticleCount, strands.strandCount, debugMaterialPB);
+					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 0, MeshTopology.Points, strands.strandParticleCount, strands.strandCount, debugDrawMPB);
 				}
 
 				if (debug.drawDensity)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 1, MeshTopology.Points, GetVolumeCellCount(), 1, debugMaterialPB);
+					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 1, MeshTopology.Points, GetVolumeCellCount(), 1, debugDrawMPB);
 				}
 
 				if (debug.drawGradient)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 2, MeshTopology.Lines, GetVolumeCellCount() * 2, 1, debugMaterialPB);
+					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 2, MeshTopology.Lines, GetVolumeCellCount() * 2, 1, debugDrawMPB);
 				}
 
 				if (debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)
 				{
-					debugMaterialPB.SetFloat(UniformIDs._DebugSliceDivider, debug.drawSliceDivider);
+					debugDrawMPB.SetFloat(UniformIDs._DebugSliceDivider, debug.drawSliceDivider);
 
 					if (debug.drawSliceX)
 					{
-						debugMaterialPB.SetInt(UniformIDs._DebugSliceAxis, 0);
-						debugMaterialPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetX);
-						cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1, debugMaterialPB);
+						debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 0);
+						debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetX);
+						cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 3, MeshTopology.Quads, 4, 1, debugDrawMPB);
 					}
 					if (debug.drawSliceY)
 					{
-						debugMaterialPB.SetInt(UniformIDs._DebugSliceAxis, 1);
-						debugMaterialPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetY);
-						cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1, debugMaterialPB);
+						debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 1);
+						debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetY);
+						cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 3, MeshTopology.Quads, 4, 1, debugDrawMPB);
 					}
 					if (debug.drawSliceZ)
 					{
-						debugMaterialPB.SetInt(UniformIDs._DebugSliceAxis, 2);
-						debugMaterialPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetZ);
-						cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 3, MeshTopology.Quads, 4, 1, debugMaterialPB);
+						debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 2);
+						debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetZ);
+						cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 3, MeshTopology.Quads, 4, 1, debugDrawMPB);
 					}
 				}
 
 				if (debug.drawStrands)// motion vectors
 				{
 					CoreUtils.SetRenderTarget(cmd, motionVectorRT, depthStencilRT);
-					cmd.DrawProcedural(Matrix4x4.identity, debugMaterial, 4, MeshTopology.LineStrip, strands.strandParticleCount, strands.strandCount, debugMaterialPB);
+					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 4, MeshTopology.LineStrip, strands.strandParticleCount, strands.strandCount, debugDrawMPB);
 				}
 			}
 		}
@@ -1334,7 +1348,6 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeFloatParam(cs, UniformIDs._Friction, solver.friction);
 
 			cmd.SetComputeFloatParam(cs, UniformIDs._BendingCurvature, solver.bendingCurvature * 0.5f * strandParticleInterval);
-			cmd.SetComputeFloatParam(cs, UniformIDs._BendingStiffness, solver.bendingStiffness);
 			cmd.SetComputeFloatParam(cs, UniformIDs._DampingFTL, solver.dampingFTL);
 
 			cmd.SetComputeIntParam(cs, UniformIDs._BoundaryCapsuleCount, boundaryCapsuleCount);

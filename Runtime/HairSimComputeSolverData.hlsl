@@ -24,9 +24,7 @@ float _Damping;
 float _Gravity;
 float _Repulsion;
 float _Friction;
-
 float _BendingCurvature;
-float _BendingStiffness;
 float _DampingFTL;
 
 StructuredBuffer<float4> _RootPosition;

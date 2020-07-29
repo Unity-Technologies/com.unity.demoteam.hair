@@ -11,6 +11,7 @@
 	#include "HairSimComputeSolverData.hlsl"
 	#include "HairSimComputeVolumeData.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
+	#include "HairSimDebugDrawUtility.hlsl"
 	
 	uint _DebugSliceAxis;
 	float _DebugSliceOffset;
@@ -25,28 +26,6 @@
 	float4 DebugFrag(DebugVaryings input) : SV_Target
 	{
 		return input.color;
-	}
-
-	float3 ColorizeCycle(uint index, const uint count)
-	{
-		const float k = 1.0 / (count - 1);
-		float t = k * (index % count);
-
-		// source: https://www.shadertoy.com/view/4ttfRn
-		float3 c = 3.0 * float3(abs(t - 0.5), t.xx) - float3(1.5, 1.0, 2.0);
-		return 1.0 - c * c;
-	}
-
-	float3 ColorizeRamp(uint index, const uint count)
-	{
-		index = min(index % count, count - 1);
-
-		const float k = 1.0 / (count - 1);
-		float t = 0.5 - 0.5 * k * index;// 0.5 * (1.0 - (k * index));
-
-		// source: https://www.shadertoy.com/view/4ttfRn
-		float3 c = 2.0 * t - float3(0.0, 1.0, 2.0);
-		return 1.0 - c * c;
 	}
 
 	ENDHLSL
@@ -93,7 +72,7 @@
 
 				DebugVaryings output;
 				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
-				output.color = volumeOcclusion * float4(ColorizeCycle(instanceID, _StrandCount), 1.0);
+				output.color = volumeOcclusion * float4(ColorCycle(instanceID, _StrandCount), 1.0);
 				return output;
 			}
 
@@ -115,7 +94,7 @@
 
 				DebugVaryings output;
 				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
-				output.color = float4(ColorizeRamp(volumeDensity, 32), 1.0);
+				output.color = float4(ColorRamp(volumeDensity, 32), 1.0);
 				return output;
 			}
 
@@ -141,7 +120,7 @@
 
 				DebugVaryings output;
 				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
-				output.color = float4(ColorizeRamp(1 - vertexID, 2), 1.0);
+				output.color = float4(ColorRamp(1 - vertexID, 2), 1.0);
 				return output;
 			}
 
@@ -156,43 +135,6 @@
 
 			#pragma vertex DebugVert
 			#pragma fragment DebugFrag_Slice
-
-			float3 ColorizeDensity(float rho)
-			{
-				return saturate(rho).xxx;
-			}
-
-			float3 ColorizeDivergence(float div)
-			{
-				if (div > 0.0)
-					return saturate(float3(div, div, 0.0));
-				else
-					return saturate(float3(0.0, -div, -div));
-			}
-
-			float3 ColorizePressure(float p)
-			{
-				p *= 1000.0;
-				if (p > 0.0)
-					return saturate(float3(p, 0.0, 0.0));
-				else
-					return saturate(float3(0.0, 0.0, -p));
-			}
-
-			float3 ColorizeGradient(float3 n)
-			{
-				//return (0.5 + 0.5 * normalize(n.xzy));
-				float d = dot(n, n);
-				if (d > 1e-11)
-					return 0.5 + 0.5 * (n * rsqrt(d));
-				else
-					return 0.0;
-			}
-
-			float3 ColorizeVelocity(float3 v)
-			{
-				return abs(v);
-			}
 
 			DebugVaryings DebugVert(uint vertexID : SV_VertexID)
 			{
@@ -219,8 +161,8 @@
 #endif
 
 				float volumeDensity = _VolumeDensity.SampleLevel(SLICE_SAMPLER, uvw, 0);
-				float3 volumeVelocity = _VolumeVelocity.SampleLevel(SLICE_SAMPLER, uvw, 0).xyz;
 				float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(SLICE_SAMPLER, uvw, 0);
+				float3 volumeVelocity = _VolumeVelocity.SampleLevel(SLICE_SAMPLER, uvw, 0).xyz;
 				float volumeDivergence = _VolumeDivergence.SampleLevel(SLICE_SAMPLER, uvw, 0);
 				float volumePressure = _VolumePressure.SampleLevel(SLICE_SAMPLER, uvw, 0);
 				float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(SLICE_SAMPLER, uvw, 0);
@@ -241,17 +183,17 @@
 
 				float x = uvw.x + _DebugSliceDivider;
 				if (x < 1.0)
-					return float4(ColorizeDensity(volumeDensity), opacity);
+					return float4(ColorDensity(volumeDensity), opacity);
 				else if (x < 2.0)
-					return float4(ColorizeGradient(volumeDensityGrad), opacity);
+					return float4(ColorGradient(volumeDensityGrad), opacity);
 				else if (x < 3.0)
-					return float4(ColorizeVelocity(volumeVelocity), opacity);
+					return float4(ColorVelocity(volumeVelocity), opacity);
 				else if (x < 4.0)
-					return float4(ColorizeDivergence(volumeDivergence), opacity);
+					return float4(ColorDivergence(volumeDivergence), opacity);
 				else if (x < 5.0)
-					return float4(ColorizePressure(volumePressure), opacity);
+					return float4(ColorPressure(volumePressure), opacity);
 				else
-					return float4(ColorizeGradient(volumePressureGrad), opacity);
+					return float4(ColorGradient(volumePressureGrad), opacity);
 			}
 
 			ENDHLSL

@@ -29,6 +29,7 @@
 
 #define VOLUME_AIR_CELL_ZERO_PRESSURE 1
 #define VOLUME_AIR_CELL_ZERO_DIVERGENCE 0
+#define VOLUME_AIR_CELL_ZERO_SOURCE_TERM 1
 
 #define VOLUME_DIFF_STEP_IS_ONE 0// TODO remove
 
@@ -182,13 +183,14 @@ void KVolumeResolve(
 {
 	const uint n = _AccuDensity[worldIdx];
 
-	//const float cell_fill = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
-	//const float cell_capacity = (1e+9 * VolumeWorldCellVolume()) / _StrandParticleVolume;
-
+	const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
 	const float rho_unscaled = n * SPLAT_PRECISION;
-	const float rho = rho_unscaled;
-	//const float rho = rho_unscaled * cell_fill;
-
+#if STRAND_31_32_DEBUG
+	const float rho = pow(_StrandParticleContrib, 3.0) * rho_unscaled;
+#else
+	const float rho = rho_particle * rho_unscaled;
+#endif
+	
 	_VolumeDensity[worldIdx] = rho;
 
 	_VolumeVelocity[worldIdx] = float4(float3(
@@ -211,7 +213,15 @@ void KVolumeResolveFromRasterization(
 {
 	const float4 splat = _VolumeVelocity[worldIdx];
 	{
-		_VolumeDensity[worldIdx] = splat.w;
+		const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
+		const float rho_unscaled = splat.w;
+#if STRAND_31_32_DEBUG
+		const float rho = pow(_StrandParticleContrib, 3.0) * rho_unscaled;
+#else
+		const float rho = rho_particle * rho_unscaled;
+#endif
+
+		_VolumeDensity[worldIdx] = rho;
 
 		if (splat.w > 0.0)
 			_VolumeVelocity[worldIdx] = float4(splat.xyz / splat.w, splat.w);
@@ -456,7 +466,15 @@ void KVolumeDivergence(
 #endif
 
 	const float rho = _VolumeDensity[worldIdx];
-	const float rho0 = 1.0 / pow(_StrandParticleContrib, 3.0);
+	const float rho0 = 1.0;
+
+#if VOLUME_AIR_CELL_ZERO_SOURCE_TERM
+	if (rho == 0.0)
+	{
+		_VolumeDivergence[worldIdx] = div;
+		return;
+	}
+#endif
 
 #if VOLUME_DIFF_STEP_IS_ONE
 	_VolumeDivergence[worldIdx] = div - (rho / rho0 - 1.0) * (_Repulsion) * (VolumeWorldCellSize().x);
@@ -480,7 +498,7 @@ void KVolumePressureEOS(
 	// SV_GroupIndex        thread offset within execution group
 {
 	const float rho = _VolumeDensity[worldIdx];
-	const float rho0 = 1.0 / pow(_StrandParticleContrib, 3.0);
+	const float rho0 = 1.0;
 
 #if VOLUME_AIR_CELL_ZERO_PRESSURE
 	if (rho == 0.0)
@@ -529,7 +547,7 @@ void KVolumePressureSolve(
 	const float p_yp = _VolumePressureIn[worldIdx + worldIdxStrideY];
 	const float p_zp = _VolumePressureIn[worldIdx + worldIdxStrideZ];
 
-	//const float p_in = _VolumePressureIn[worldIdx];
+	const float p_in = _VolumePressureIn[worldIdx];
 
 	const float b = _VolumeDivergence[worldIdx];
 	const float w = 1.0;// SOR factor [1..2]
@@ -539,7 +557,7 @@ void KVolumePressureSolve(
 	const float a = -(h * h);
 
 	const float pressure =
-		//(1.0 - w) * p_in +
+		(1.0 - w) * p_in +
 		(w / 6.0) * float(
 			p_xm + p_xp +
 			p_ym + p_yp +
@@ -550,7 +568,7 @@ void KVolumePressureSolve(
 	const float3 a = -(h * h) / 3.0;
 
 	const float pressure =
-		//(1.0 - w) * p_in +
+		(1.0 - w) * p_in +
 		(w / 6.0) * float(
 			(p_xm + p_xp + a.x * b) + 
 			(p_ym + p_yp + a.y * b) +

@@ -16,14 +16,14 @@
 #include "HairSimComputeVolumeData.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
 
-#define ENABLE_VOLUME_FRICTION			1
-#define ENABLE_VOLUME_REPULSION			1
+#define ENABLE_VOLUME_FRICTION			0
+#define ENABLE_VOLUME_REPULSION			0
 
-#define ENABLE_CONSTRAINT_COLLISION		1
-#define ENABLE_CONSTRAINT_FRICTION		1
+#define ENABLE_CONSTRAINT_COLLISION		0
+#define ENABLE_CONSTRAINT_FRICTION		0
 #define ENABLE_CONSTRAINT_DISTANCE		1
-#define ENABLE_CONSTRAINT_CURVATURE		1
-#define ENABLE_CONSTRAINT_FTL			1
+#define ENABLE_CONSTRAINT_CURVATURE		0
+#define ENABLE_CONSTRAINT_FTL			0
 
 //---------
 // utility
@@ -53,10 +53,10 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 
 #if USE_PRESSURE_GRADIENT
 		float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
-		float3 volumePressureImpulse = volumePressureGrad;
+		float3 volumePressureImpulse = -volumePressureGrad;
 
-		float3 impulsePIC = -volumePressureImpulse + (volumeVelocity - velocity);
-		float3 impulseFLIP = -volumePressureImpulse;
+		float3 impulsePIC = volumePressureImpulse + (volumeVelocity - velocity);
+		float3 impulseFLIP = volumePressureImpulse;
 		
 		return lerp(impulseFLIP, impulsePIC, friction);
 #else

@@ -65,7 +65,7 @@ namespace Unity.DemoTeam.Hair
 				lastSimulationFrame = frame;
 			}
 
-			Profiler.BeginSample("HairSimDebugPass");
+			Profiler.BeginSample("HairSimDebugDraw");
 			foreach (HairSim hairSim in HairSim.instances)
 			{
 				if (hairSim != null && hairSim.isActiveAndEnabled)

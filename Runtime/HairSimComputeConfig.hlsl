@@ -19,7 +19,7 @@
 // 0 == support non-square cells
 // 1 == only square cells
 
-#define STRAND_31_32_DEBUG 0
+#define STRAND_31_32_DEBUG 2
 // 0 == off
 // 1 == on (full strands)
 // 2 == on (first segments)
