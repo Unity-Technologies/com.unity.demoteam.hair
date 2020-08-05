@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Experimental.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
@@ -24,6 +25,7 @@ namespace Unity.DemoTeam.Hair
 		private void OnEnable() { instances.Add(this); }
 		private void OnDisable() { instances.Remove(this); ReleaseBuffers(); ReleaseVolumes(); strandsActive = StrandConfiguration.none; }
 		#endregion
+
 		#region static initialization
 		static void InitializeStaticFields<T>(Type type, Func<string, T> construct)
 		{
@@ -46,6 +48,7 @@ namespace Unity.DemoTeam.Hair
 			InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
 		}
 		#endregion
+
 		#region static profile markers
 		static class MarkersCPU
 		{
@@ -73,6 +76,7 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Draw;
 		}
 		#endregion
+
 		#region static shader literals
 		static class UniformIDs
 		{
@@ -153,7 +157,7 @@ namespace Unity.DemoTeam.Hair
 
 			public static int _VolumeDivergence;
 			public static int _VolumePressure;
-			public static int _VolumePressureIn;
+			public static int _VolumePressurePrev;
 			public static int _VolumePressureGrad;
 
 			// debug params
@@ -264,13 +268,7 @@ namespace Unity.DemoTeam.Hair
 				RasterizationNoGS,
 			}
 
-			public enum SplatFilter : uint
-			{
-				Trilinear,
-			}
-
 			public SplatMethod volumeSplatMethod;
-			public SplatFilter volumeSplatFilter;
 			[Range(4, 256)]
 			public int volumeResolution;
 			[Range(-1.0f, 1.0f)]
@@ -286,7 +284,6 @@ namespace Unity.DemoTeam.Hair
 			public static readonly VolumeConfiguration basic = new VolumeConfiguration()
 			{
 				volumeSplatMethod = SplatMethod.Compute,
-				volumeSplatFilter = SplatFilter.Trilinear,
 				volumeResolution = 64,
 				volumeOffsetX = 0.0f,
 				volumeOffsetY = 0.0f,
@@ -379,11 +376,11 @@ namespace Unity.DemoTeam.Hair
 		private ComputeBuffer particleVelocity;
 		private ComputeBuffer particleVelocityPrev;
 
-		private ComputeBuffer boundaryCapsule;
-		private ComputeBuffer boundarySphere;
-		private ComputeBuffer boundaryTorus;
-		private ComputeBuffer boundaryPack;
+		private int boundaryCapsuleCount;
+		private int boundarySphereCount;
+		private int boundaryTorusCount;
 
+		private ComputeBuffer boundaryPack;
 		private ComputeBuffer boundaryMatrix;
 		private ComputeBuffer boundaryMatrixInv;
 		private ComputeBuffer boundaryMatrixW2PrevW;
@@ -391,9 +388,9 @@ namespace Unity.DemoTeam.Hair
 		private NativeArray<Matrix4x4> boundaryMatrixPrev;
 		private Hash128 boundaryMatrixPrevHash;
 
-		private int boundaryCapsuleCount;
-		private int boundarySphereCount;
-		private int boundaryTorusCount;
+		private Vector3 volumeCells;
+		private Vector3 volumeWorldMin;
+		private Vector3 volumeWorldMax;
 
 		private RenderTexture accuDensity;
 		private RenderTexture accuVelocityX;
@@ -403,15 +400,10 @@ namespace Unity.DemoTeam.Hair
 		private RenderTexture volumeDensity;
 		private RenderTexture volumeDensityGrad;
 		private RenderTexture volumeVelocity;
-
 		private RenderTexture volumeDivergence;
 		private RenderTexture volumePressure;
-		private RenderTexture volumePressureIn;
+		private RenderTexture volumePressurePrev;
 		private RenderTexture volumePressureGrad;
-
-		private Vector3 volumeCells;
-		private Vector3 volumeWorldMin;
-		private Vector3 volumeWorldMax;
 
 		private void ValidateConfiguration()
 		{
@@ -498,11 +490,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref particleVelocity, "ParticleVelocity_0", particleCount, particleStride);
 				changed |= CreateBuffer(ref particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStride);
 
-				changed |= CreateBuffer(ref boundaryCapsule, "BoundaryCapsule", MAX_BOUNDARIES, sizeof(HairSimBoundary.BoundaryCapsule));
-				changed |= CreateBuffer(ref boundarySphere, "BoundarySphere", MAX_BOUNDARIES, sizeof(HairSimBoundary.BoundarySphere));
-				changed |= CreateBuffer(ref boundaryTorus, "BoundaryTorus", MAX_BOUNDARIES, sizeof(HairSimBoundary.BoundaryTorus));
 				changed |= CreateBuffer(ref boundaryPack, "BoundaryPack", MAX_BOUNDARIES, sizeof(HairSimBoundary.BoundaryPack));
-
 				changed |= CreateBuffer(ref boundaryMatrix, "BoundaryMatrix", MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref boundaryMatrixInv, "BoundaryMatrixInv", MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref boundaryMatrixW2PrevW, "BoundaryMatrixW2PW", MAX_BOUNDARIES, sizeof(Matrix4x4));
@@ -528,11 +516,7 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref particleVelocity);
 			ReleaseBuffer(ref particleVelocityPrev);
 
-			ReleaseBuffer(ref boundaryCapsule);
-			ReleaseBuffer(ref boundarySphere);
-			ReleaseBuffer(ref boundaryTorus);
 			ReleaseBuffer(ref boundaryPack);
-
 			ReleaseBuffer(ref boundaryMatrix);
 			ReleaseBuffer(ref boundaryMatrixInv);
 			ReleaseBuffer(ref boundaryMatrixW2PrevW);
@@ -547,10 +531,10 @@ namespace Unity.DemoTeam.Hair
 
 			int volumeCells = volume.volumeResolution;
 
-			changed |= CreateVolume(ref accuDensity, "AccuDensity", volumeCells, RenderTextureFormat.RInt);//TODO switch to R16_SInt
-			changed |= CreateVolume(ref accuVelocityX, "AccuVelocityX", volumeCells, RenderTextureFormat.RInt);
-			changed |= CreateVolume(ref accuVelocityY, "AccuVelocityY", volumeCells, RenderTextureFormat.RInt);
-			changed |= CreateVolume(ref accuVelocityZ, "AccuVelocityZ", volumeCells, RenderTextureFormat.RInt);
+			changed |= CreateVolume(ref accuDensity, "AccuDensity", volumeCells, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt
+			changed |= CreateVolume(ref accuVelocityX, "AccuVelocityX", volumeCells, GraphicsFormat.R32_SInt);
+			changed |= CreateVolume(ref accuVelocityY, "AccuVelocityY", volumeCells, GraphicsFormat.R32_SInt);
+			changed |= CreateVolume(ref accuVelocityZ, "AccuVelocityZ", volumeCells, GraphicsFormat.R32_SInt);
 
 			changed |= CreateVolume(ref volumeDensity, "VolumeDensity", volumeCells, RenderTextureFormat.RFloat);
 			changed |= CreateVolume(ref volumeDensityGrad, "VolumeDensityGrad", volumeCells, RenderTextureFormat.ARGBFloat);
@@ -558,7 +542,7 @@ namespace Unity.DemoTeam.Hair
 
 			changed |= CreateVolume(ref volumeDivergence, "VolumeDivergence", volumeCells, RenderTextureFormat.RFloat);
 			changed |= CreateVolume(ref volumePressure, "VolumePressure_0", volumeCells, RenderTextureFormat.RFloat);
-			changed |= CreateVolume(ref volumePressureIn, "VolumePressure_1", volumeCells, RenderTextureFormat.RFloat);
+			changed |= CreateVolume(ref volumePressurePrev, "VolumePressure_1", volumeCells, RenderTextureFormat.RFloat);
 			changed |= CreateVolume(ref volumePressureGrad, "VolumePressureGrad", volumeCells, RenderTextureFormat.ARGBFloat);
 
 			return false;// changed;
@@ -577,7 +561,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseVolume(ref volumeDivergence);
 			ReleaseVolume(ref volumePressure);
-			ReleaseVolume(ref volumePressureIn);
+			ReleaseVolume(ref volumePressurePrev);
 			ReleaseVolume(ref volumePressureGrad);
 		}
 
@@ -880,35 +864,19 @@ namespace Unity.DemoTeam.Hair
 				boundarySphereCount = 0;
 				boundaryTorusCount = 0;
 
-				using (NativeArray<HairSimBoundary.BoundaryCapsule> tmpCapsule = new NativeArray<HairSimBoundary.BoundaryCapsule>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<HairSimBoundary.BoundarySphere> tmpSphere = new NativeArray<HairSimBoundary.BoundarySphere>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<HairSimBoundary.BoundaryTorus> tmpTorus = new NativeArray<HairSimBoundary.BoundaryTorus>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (NativeArray<HairSimBoundary.BoundaryPack> tmpPack = new NativeArray<HairSimBoundary.BoundaryPack>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<Matrix4x4> tmpCapsuleMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<Matrix4x4> tmpSphereMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<Matrix4x4> tmpTorusMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (NativeArray<Matrix4x4> tmpMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (NativeArray<Matrix4x4> tmpMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<Matrix4x4> tmpMatrixW2PW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (NativeArray<Matrix4x4> tmpMatrixW2PrevW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
-					int boundaryCount = 0;
-					var boundaryHash = new Hash128(7, 13);
-
 					unsafe
 					{
-						HairSimBoundary.BoundaryCapsule* ptrCapsule = (HairSimBoundary.BoundaryCapsule*)tmpCapsule.GetUnsafePtr();
-						HairSimBoundary.BoundarySphere* ptrSphere = (HairSimBoundary.BoundarySphere*)tmpSphere.GetUnsafePtr();
-						HairSimBoundary.BoundaryTorus* ptrTorus = (HairSimBoundary.BoundaryTorus*)tmpTorus.GetUnsafePtr();
-						HairSimBoundary.BoundaryPack* ptrPack = (HairSimBoundary.BoundaryPack*)tmpPack.GetUnsafePtr();
+						var ptrPack = (HairSimBoundary.BoundaryPack*)tmpPack.GetUnsafePtr();
+						var ptrMatrix = (Matrix4x4*)tmpMatrix.GetUnsafePtr();
+						var ptrMatrixInv = (Matrix4x4*)tmpMatrixInv.GetUnsafePtr();
+						var ptrMatrixW2PrevW = (Matrix4x4*)tmpMatrixW2PrevW.GetUnsafePtr();
 
-						Matrix4x4* ptrCapsuleMatrix = (Matrix4x4*)tmpCapsuleMatrix.GetUnsafePtr();
-						Matrix4x4* ptrSphereMatrix = (Matrix4x4*)tmpSphereMatrix.GetUnsafePtr();
-						Matrix4x4* ptrTorusMatrix = (Matrix4x4*)tmpTorusMatrix.GetUnsafePtr();
-
-						Matrix4x4* ptrMatrix = (Matrix4x4*)tmpMatrix.GetUnsafePtr();
-						Matrix4x4* ptrMatrixInv = (Matrix4x4*)tmpMatrixInv.GetUnsafePtr();
-						Matrix4x4* ptrMatrixW2PW = (Matrix4x4*)tmpMatrixW2PW.GetUnsafePtr();
-						Matrix4x4* ptrMatrixPrev = (Matrix4x4*)boundaryMatrixPrev.GetUnsafePtr();
+						var ptrMatrixPrev = (Matrix4x4*)boundaryMatrixPrev.GetUnsafePtr();
 
 						foreach (HairSimBoundary boundary in boundaries)
 						{
@@ -918,39 +886,48 @@ namespace Unity.DemoTeam.Hair
 							switch (boundary.type)
 							{
 								case HairSimBoundary.Type.Capsule:
-									ptrCapsuleMatrix[boundaryCapsuleCount] = boundary.transform.localToWorldMatrix;
-									ptrCapsule[boundaryCapsuleCount++] = boundary.GetCapsule();
+									boundaryCapsuleCount++;
 									break;
 								case HairSimBoundary.Type.Sphere:
-									ptrSphereMatrix[boundarySphereCount] = boundary.transform.localToWorldMatrix;
-									ptrSphere[boundarySphereCount++] = boundary.GetSphere();
+									boundarySphereCount++;
 									break;
 								case HairSimBoundary.Type.Torus:
-									ptrTorusMatrix[boundaryTorusCount] = boundary.transform.localToWorldMatrix;
-									ptrTorus[boundaryTorusCount++] = boundary.GetTorus();
+									boundaryTorusCount++;
+									break;
+							}
+						}
+
+						int boundaryCapsuleIndex = 0;
+						int boundarySphereIndex = boundaryCapsuleIndex + boundaryCapsuleCount;
+						int boundaryTorusIndex = boundarySphereIndex + boundarySphereCount;
+
+						int boundaryCount = boundaryCapsuleCount + boundarySphereCount + boundaryTorusIndex;
+						var boundaryHash = new Hash128(7, 13);
+
+						foreach (HairSimBoundary boundary in boundaries)
+						{
+							if (boundary == null || !boundary.isActiveAndEnabled)
+								continue;
+
+							switch (boundary.type)
+							{
+								case HairSimBoundary.Type.Capsule:
+									ptrMatrix[boundaryCapsuleIndex] = boundary.transform.localToWorldMatrix;
+									ptrPack[boundaryCapsuleIndex++] = HairSimBoundary.Pack(boundary.GetCapsule());
+									break;
+								case HairSimBoundary.Type.Sphere:
+									ptrMatrix[boundarySphereIndex] = boundary.transform.localToWorldMatrix;
+									ptrPack[boundarySphereIndex++] = HairSimBoundary.Pack(boundary.GetSphere());
+									break;
+								case HairSimBoundary.Type.Torus:
+									ptrMatrix[boundaryTorusIndex] = boundary.transform.localToWorldMatrix;
+									ptrPack[boundaryTorusIndex++] = HairSimBoundary.Pack(boundary.GetTorus());
 									break;
 							}
 
 							int instanceID = boundary.GetInstanceID();
+
 							HashUtilities.ComputeHash128(ref instanceID, ref boundaryHash);
-						}
-
-						for (int i = 0; i != boundaryCapsuleCount; i++)
-						{
-							ptrMatrix[boundaryCount] = ptrCapsuleMatrix[i];
-							ptrPack[boundaryCount++] = HairSimBoundary.Pack(ptrCapsule[i]);
-						}
-
-						for (int i = 0; i != boundarySphereCount; i++)
-						{
-							ptrMatrix[boundaryCount] = ptrSphereMatrix[i];
-							ptrPack[boundaryCount++] = HairSimBoundary.Pack(ptrSphere[i]);
-						}
-
-						for (int i = 0; i != boundaryTorusCount; i++)
-						{
-							ptrMatrix[boundaryCount] = ptrTorusMatrix[i];
-							ptrPack[boundaryCount++] = HairSimBoundary.Pack(ptrTorus[i]);
 						}
 
 						if (boundaryHash != boundaryMatrixPrevHash)
@@ -967,33 +944,19 @@ namespace Unity.DemoTeam.Hair
 						for (int i = 0; i != boundaryCount; i++)
 						{
 							ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i]);
-							ptrMatrixW2PW[i] = ptrMatrixPrev[i] * ptrMatrixInv[i];
+							ptrMatrixW2PrevW[i] = ptrMatrixPrev[i] * ptrMatrixInv[i];
 						}
+
+						cmd.SetComputeBufferData(boundaryPack, tmpPack, 0, 0, boundaryCount);
+						cmd.SetComputeBufferData(boundaryMatrix, tmpMatrix, 0, 0, boundaryCount);
+						cmd.SetComputeBufferData(boundaryMatrixInv, tmpMatrixInv, 0, 0, boundaryCount);
+						cmd.SetComputeBufferData(boundaryMatrixW2PrevW, tmpMatrixW2PrevW, 0, 0, boundaryCount);
+
+						boundaryMatrixPrev.CopyFrom(tmpMatrix);
 					}
-
-					boundaryCapsule.SetData(tmpCapsule, 0, 0, boundaryCapsuleCount);
-					boundarySphere.SetData(tmpSphere, 0, 0, boundarySphereCount);
-					boundaryTorus.SetData(tmpTorus, 0, 0, boundaryTorusCount);
-					boundaryPack.SetData(tmpPack, 0, 0, boundaryCount);
-
-					boundaryMatrix.SetData(tmpMatrix, 0, 0, boundaryCount);
-					boundaryMatrixInv.SetData(tmpMatrixInv, 0, 0, boundaryCount);
-					boundaryMatrixW2PrevW.SetData(tmpMatrixW2PW, 0, 0, boundaryCount);
-
-					boundaryMatrixPrev.CopyFrom(tmpMatrix);
 				}
 
 				SetComputeParams(cmd, computeSolver, dt);
-
-				//int particleThreadGroupsX = particlePosition.count / THREAD_GROUP_SIZE;
-				//int particleThreadGroupsY = 1;
-				//int particleThreadGroupsZ = 1;
-
-				//SetKernelBufferParams(cmd, compute, kernelUpdatePosition);
-				//cmd.DispatchCompute(compute, kernelUpdatePosition,
-				//	particleThreadGroupsX,
-				//	particleThreadGroupsY,
-				//	particleThreadGroupsZ);
 
 				int solveThreadGroupsX = strands.strandCount / THREAD_GROUP_SIZE;
 				int solveThreadGroupsY = 1;
@@ -1013,12 +976,6 @@ namespace Unity.DemoTeam.Hair
 					solveThreadGroupsX,
 					solveThreadGroupsY,
 					solveThreadGroupsZ);
-
-				//SetKernelBufferParams(cmd, compute, kernelUpdateVelocity);
-				//cmd.DispatchCompute(compute, kernelUpdateVelocity,
-				//	particleThreadGroupsX,
-				//	particleThreadGroupsY,
-				//	particleThreadGroupsZ);
 			}
 		}
 
@@ -1200,9 +1157,9 @@ namespace Unity.DemoTeam.Hair
 					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressureSolve);
 					for (int i = 0; i != volume.volumePressureIterations; i++)
 					{
-						SwapVolumes(ref volumePressure, ref volumePressureIn);
+						SwapVolumes(ref volumePressure, ref volumePressurePrev);
 						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressure, volumePressure);
-						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressureIn, volumePressureIn);
+						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressurePrev, volumePressurePrev);
 
 						cmd.DispatchCompute(computeVolume, kernelVolumePressureSolve,
 							volumeThreadGroupsX,
@@ -1321,7 +1278,7 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetTexture(UniformIDs._VolumeDivergence, volumeDivergence);
 
 			mpb.SetTexture(UniformIDs._VolumePressure, volumePressure);
-			mpb.SetTexture(UniformIDs._VolumePressureIn, volumePressureIn);
+			mpb.SetTexture(UniformIDs._VolumePressurePrev, volumePressurePrev);
 			mpb.SetTexture(UniformIDs._VolumePressureGrad, volumePressureGrad);
 		}
 
@@ -1376,11 +1333,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionCorr, particlePositionCorr);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocity, particleVelocity);
 
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryCapsule, boundaryCapsule);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundarySphere, boundarySphere);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryTorus, boundaryTorus);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryPack, boundaryPack);
-
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrix, boundaryMatrix);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixInv, boundaryMatrixInv);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixW2PrevW, boundaryMatrixW2PrevW);
@@ -1396,7 +1349,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDivergence, volumeDivergence);
 
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressure, volumePressure);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureIn, volumePressureIn);
+			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressurePrev, volumePressurePrev);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureGrad, volumePressureGrad);
 		}
 	}

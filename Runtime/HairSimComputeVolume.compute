@@ -27,12 +27,11 @@
 #define VOLUME_NUM_Y 4
 #define VOLUME_NUM_Z 4
 
-#define VOLUME_AIR_CELL_ZERO_PRESSURE 1
+#define VOLUME_AIR_CELL_ZERO_PRESSURE 0
 #define VOLUME_AIR_CELL_ZERO_PRESSURE_GRAD 0
 #define VOLUME_AIR_CELL_ZERO_SOURCE_TERM 0
-#define VOLUME_AIR_BOUNDARY_ZERO_DIVERGENCE 0
 #define VOLUME_VOF 0
-#define VOLUME_GHOST 1
+#define VOLUME_GHOST 0
 
 //---------
 // utility
@@ -318,27 +317,6 @@ void KVolumeDivergence(
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
-#if VOLUME_AIR_BOUNDARY_ZERO_DIVERGENCE
-	const float d_xm = _VolumeDensity[worldIdx - worldIdxStrideX];
-	const float d_ym = _VolumeDensity[worldIdx - worldIdxStrideY];
-	const float d_zm = _VolumeDensity[worldIdx - worldIdxStrideZ];
-
-	const float d_xp = _VolumeDensity[worldIdx + worldIdxStrideX];
-	const float d_yp = _VolumeDensity[worldIdx + worldIdxStrideY];
-	const float d_zp = _VolumeDensity[worldIdx + worldIdxStrideZ];
-
-	const bool air_x = (d_xm == 0.0) || (d_xp == 0.0);
-	const bool air_y = (d_ym == 0.0) || (d_yp == 0.0);
-	const bool air_z = (d_zm == 0.0) || (d_zp == 0.0);
-
-	const float vx_xm = air_x ? 0.0 : _VolumeVelocity[worldIdx - worldIdxStrideX].x;
-	const float vy_ym = air_y ? 0.0 : _VolumeVelocity[worldIdx - worldIdxStrideY].y;
-	const float vz_zm = air_z ? 0.0 : _VolumeVelocity[worldIdx - worldIdxStrideZ].z;
-
-	const float vx_xp = air_x ? 0.0 : _VolumeVelocity[worldIdx + worldIdxStrideX].x;
-	const float vy_yp = air_y ? 0.0 : _VolumeVelocity[worldIdx + worldIdxStrideY].y;
-	const float vz_zp = air_z ? 0.0 : _VolumeVelocity[worldIdx + worldIdxStrideZ].z;
-#else
 	const float4 v_in = _VolumeVelocity[worldIdx];
 
 #if VOLUME_VOF
@@ -376,7 +354,6 @@ void KVolumeDivergence(
 	const float vx_xp = isBoundaryUpper.x ? v_in.x : _VolumeVelocity[worldIdx + worldIdxStrideX].x;
 	const float vy_yp = isBoundaryUpper.y ? v_in.y : _VolumeVelocity[worldIdx + worldIdxStrideY].y;
 	const float vz_zp = isBoundaryUpper.z ? v_in.z : _VolumeVelocity[worldIdx + worldIdxStrideZ].z;
-	#endif
 #endif
 
 #if VOLUME_SQUARE_CELLS
@@ -466,9 +443,7 @@ void KVolumePressureSolve(
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
-	const float p_in = _VolumePressureIn[worldIdx];
-
-#if 0 && VOLUME_GHOST
+#if VOLUME_GHOST
 	const uint3 i_xm = worldIdx - worldIdxStrideX;
 	const uint3 i_ym = worldIdx - worldIdxStrideY;
 	const uint3 i_zm = worldIdx - worldIdxStrideZ;
@@ -484,6 +459,8 @@ void KVolumePressureSolve(
 	const float tmp_p_xp = isBoundaryUpper.x ? p_in : _VolumePressure[worldIdx + worldIdxStrideX];
 	const float tmp_p_yp = isBoundaryUpper.y ? p_in : _VolumePressure[worldIdx + worldIdxStrideY];
 	const float tmp_p_zp = isBoundaryUpper.z ? p_in : _VolumePressure[worldIdx + worldIdxStrideZ];
+
+	const float p_in = _VolumePressurePrev[worldIdx];
 	
 	const float p_xm = GhostPressure(i_xm, p_in, tmp_p_xp);
 	const float p_ym = GhostPressure(i_ym, p_in, tmp_p_yp);
@@ -493,13 +470,15 @@ void KVolumePressureSolve(
 	const float p_yp = GhostPressure(i_yp, p_in, tmp_p_ym);
 	const float p_zp = GhostPressure(i_zp, p_in, tmp_p_zm);	
 #else
-	const float p_xm = isBoundaryLower.x ? p_in : _VolumePressureIn[worldIdx - worldIdxStrideX];
-	const float p_ym = isBoundaryLower.y ? p_in : _VolumePressureIn[worldIdx - worldIdxStrideY];
-	const float p_zm = isBoundaryLower.z ? p_in : _VolumePressureIn[worldIdx - worldIdxStrideZ];
+	const float p_in = _VolumePressurePrev[worldIdx];
+	
+	const float p_xm = isBoundaryLower.x ? p_in : _VolumePressurePrev[worldIdx - worldIdxStrideX];
+	const float p_ym = isBoundaryLower.y ? p_in : _VolumePressurePrev[worldIdx - worldIdxStrideY];
+	const float p_zm = isBoundaryLower.z ? p_in : _VolumePressurePrev[worldIdx - worldIdxStrideZ];
 
-	const float p_xp = isBoundaryUpper.x ? p_in : _VolumePressureIn[worldIdx + worldIdxStrideX];
-	const float p_yp = isBoundaryUpper.y ? p_in : _VolumePressureIn[worldIdx + worldIdxStrideY];
-	const float p_zp = isBoundaryUpper.z ? p_in : _VolumePressureIn[worldIdx + worldIdxStrideZ];
+	const float p_xp = isBoundaryUpper.x ? p_in : _VolumePressurePrev[worldIdx + worldIdxStrideX];
+	const float p_yp = isBoundaryUpper.y ? p_in : _VolumePressurePrev[worldIdx + worldIdxStrideY];
+	const float p_zp = isBoundaryUpper.z ? p_in : _VolumePressurePrev[worldIdx + worldIdxStrideZ];
 #endif
 
 	const float b = _VolumeDivergence[worldIdx];

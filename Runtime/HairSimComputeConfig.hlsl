@@ -12,14 +12,18 @@
 // R == smallest decimal stored on grid
 
 #define SPLAT_TRILINEAR 1
-// 0 == splat only to cell centers
+// 0 == splat only to nearest cell
 // 1 == trilinear weights
 
 #define VOLUME_SQUARE_CELLS 1
 // 0 == support non-square cells
 // 1 == only square cells
 
-#define STRAND_31_32_DEBUG 0
+#define VOLUME_STAGGERED_GRID 1
+// 0 == store everything at cell centers
+// 1 == store velocity and pressure gradient at cell faces
+
+#define STRAND_31_32_DEBUG 1
 // 0 == off
 // 1 == on (full strands)
 // 2 == on (first segments)

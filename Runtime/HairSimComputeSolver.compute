@@ -40,6 +40,17 @@ uint3 ParticleVolumeIndex(uint i)
 
 #define USE_PRESSURE_GRADIENT 1
 
+float3 ParticleVolumeVelocity(uint i)
+{
+	float3 volumeUVW = ParticleVolumeUVW(i);
+#if SPLAT_TRILINEAR
+	float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
+#else
+	float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_point_clamp, volumeUVW, 0);
+#endif
+	return volumeVelocity.xyz;
+}
+
 float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
 	if (ENABLE_VOLUME_FRICTION)
@@ -49,8 +60,8 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 		float volumeDensity = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
 		float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
 #else
-		float volumeDensity = _VolumeDensity[ParticleVolumeIndex(i)];
-		float4 volumeVelocity = _VolumeVelocity[ParticleVolumeIndex(i)];
+		float volumeDensity = _VolumeDensity.SampleLevel(_Volume_point_clamp, volumeUVW, 0);
+		float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_point_clamp, volumeUVW, 0);
 #endif
 
 #if USE_PRESSURE_GRADIENT
@@ -261,6 +272,9 @@ void KSolveConstraints_GaussSeidelReference(
 
 	// derive velocity from effective change in position
 	{
+		//TODO also add this line to Jacobi solver
+		_ParticleVelocity[strandParticleBegin].xyz = (_ParticlePosition[strandParticleBegin].xyz - _ParticlePositionPrev[strandParticleBegin].xyz) / _DT;
+
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			if (ENABLE_CONSTRAINT_FTL)
@@ -329,6 +343,7 @@ void KSolveConstraints_GaussSeidel(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float3 x0 = _ParticlePositionPrev[i].xyz;
+			//const float3 v0 = ParticleVolumeVelocity(i);
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
 			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
 			{
@@ -434,6 +449,8 @@ void KSolveConstraints_GaussSeidel(
 
 	// derive velocity from effective change in position
 	{
+		_ParticleVelocity[strandParticleBegin].xyz = (_ParticlePosition[strandParticleBegin].xyz - _ParticlePositionPrev[strandParticleBegin].xyz) / _DT;
+
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			if (ENABLE_CONSTRAINT_FTL)

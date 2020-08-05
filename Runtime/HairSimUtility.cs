@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Experimental.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -36,7 +37,7 @@ namespace Unity.DemoTeam.Hair
 			bufferB = tmp;
 		}
 
-		public static bool CreateVolume(ref RenderTexture volume, string name, int cells, RenderTextureFormat format = RenderTextureFormat.Default)
+		public static bool CreateVolume(ref RenderTexture volume, string name, int cells, RenderTextureFormat format)
 		{
 			if (volume != null && volume.width == cells && volume.format == format)
 				return false;
@@ -51,6 +52,34 @@ namespace Unity.DemoTeam.Hair
 				height = cells,
 				volumeDepth = cells,
 				colorFormat = format,
+				enableRandomWrite = true,
+				msaaSamples = 1,
+			};
+
+			//Debug.Log("creating volume " + name);
+			volume = new RenderTexture(volumeDesc);
+			volume.wrapMode = TextureWrapMode.Clamp;
+			volume.hideFlags = HideFlags.HideAndDontSave;
+			volume.name = name;
+			volume.Create();
+			return true;
+		}
+
+		public static bool CreateVolume(ref RenderTexture volume, string name, int cells, GraphicsFormat format)
+		{
+			if (volume != null && volume.width == cells && volume.graphicsFormat == format)
+				return false;
+
+			if (volume != null)
+				volume.Release();
+
+			RenderTextureDescriptor volumeDesc = new RenderTextureDescriptor()
+			{
+				dimension = TextureDimension.Tex3D,
+				width = cells,
+				height = cells,
+				volumeDepth = cells,
+				graphicsFormat = format,
 				enableRandomWrite = true,
 				msaaSamples = 1,
 			};

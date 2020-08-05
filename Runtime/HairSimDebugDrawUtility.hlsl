@@ -62,7 +62,7 @@ float3 ColorGradient(float3 n)
 
 float3 ColorVelocity(float3 v)
 {
-    return saturate(float3(v.z, 0.0, -v.z));
+	return saturate(abs(float3(v.x, 0.0, -v.z)));
 }
 
 #endif//__HAIRSIM_DEBUGDRAWUTILITY__
