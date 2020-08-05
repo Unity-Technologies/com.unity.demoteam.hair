@@ -19,7 +19,7 @@
 // 0 == support non-square cells
 // 1 == only square cells
 
-#define VOLUME_STAGGERED_GRID 1
+#define VOLUME_STAGGERED_GRID 0
 // 0 == store everything at cell centers
 // 1 == store velocity and pressure gradient at cell faces
 

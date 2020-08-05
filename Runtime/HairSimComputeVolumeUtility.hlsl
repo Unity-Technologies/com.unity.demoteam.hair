@@ -98,4 +98,25 @@ uint3 VolumeFlatIndexToIndex(uint flatIndex)
 	return uint3(x, y, z);
 }
 
+float3 VolumeStaggededOffsets()
+{
+	return 0.5 / _VolumeCells;
+}
+
+float3 VolumeStaggeredSample(Texture3D<float3> volume, float3 uvw)
+{
+	return float3(
+		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(VolumeStaggededOffsets().x, 0.0, 0.0), 0).x,
+		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(0.0, VolumeStaggededOffsets().y, 0.0), 0).y,
+		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(0.0, 0.0, VolumeStaggededOffsets().z), 0).z);
+}
+
+float3 VolumeStaggeredSample(Texture3D<float4> volume, float3 uvw)
+{
+	return float3(
+		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(VolumeStaggededOffsets().x, 0.0, 0.0), 0).x,
+		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(0.0, VolumeStaggededOffsets().y, 0.0), 0).y,
+		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(0.0, 0.0, VolumeStaggededOffsets().z), 0).z);
+}
+
 #endif//__HAIRSIMCOMPUTE_VOLUMEUTILITY__

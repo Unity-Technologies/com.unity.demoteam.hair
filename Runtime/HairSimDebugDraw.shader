@@ -162,10 +162,18 @@
 
 				float volumeDensity = _VolumeDensity.SampleLevel(SLICE_SAMPLER, uvw, 0);
 				float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(SLICE_SAMPLER, uvw, 0);
+			#if VOLUME_STAGGERED_GRID
+				float3 volumeVelocity = VolumeStaggeredSample(_VolumeVelocity, uvw);
+			#else
 				float3 volumeVelocity = _VolumeVelocity.SampleLevel(SLICE_SAMPLER, uvw, 0).xyz;
+			#endif
 				float volumeDivergence = _VolumeDivergence.SampleLevel(SLICE_SAMPLER, uvw, 0);
 				float volumePressure = _VolumePressure.SampleLevel(SLICE_SAMPLER, uvw, 0);
+			#if VOLUME_STAGGERED_GRID
+				float3 volumePressureGrad = VolumeStaggeredSample(_VolumePressureGrad, uvw);
+			#else
 				float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(SLICE_SAMPLER, uvw, 0);
+			#endif
 
 				const float opacity = 0.9;
 				{

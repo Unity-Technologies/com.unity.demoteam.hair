@@ -40,17 +40,6 @@ uint3 ParticleVolumeIndex(uint i)
 
 #define USE_PRESSURE_GRADIENT 1
 
-float3 ParticleVolumeVelocity(uint i)
-{
-	float3 volumeUVW = ParticleVolumeUVW(i);
-#if SPLAT_TRILINEAR
-	float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
-#else
-	float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_point_clamp, volumeUVW, 0);
-#endif
-	return volumeVelocity.xyz;
-}
-
 float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 {
 	if (ENABLE_VOLUME_FRICTION)
@@ -58,7 +47,11 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 		float3 volumeUVW = ParticleVolumeUVW(i);
 #if SPLAT_TRILINEAR
 		float volumeDensity = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
+	#if VOLUME_STAGGERED_GRID
+		float4 volumeVelocity = float4(VolumeStaggeredSample(_VolumeVelocity, volumeUVW), 1.0);
+	#else
 		float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
+	#endif
 #else
 		float volumeDensity = _VolumeDensity.SampleLevel(_Volume_point_clamp, volumeUVW, 0);
 		float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_point_clamp, volumeUVW, 0);
@@ -67,7 +60,11 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 #if USE_PRESSURE_GRADIENT
 		const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
 		
+	#if VOLUME_STAGGERED_GRID
+		float3 volumePressureGrad = VolumeStaggeredSample(_VolumePressureGrad, volumeUVW);
+	#else
 		float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
+	#endif
 		float3 volumePressureImpulse = -volumePressureGrad;// * (_DT / volumeDensity);
 
 		float3 impulsePIC = volumePressureImpulse + (volumeVelocity.xyz - velocity);
@@ -343,7 +340,6 @@ void KSolveConstraints_GaussSeidel(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float3 x0 = _ParticlePositionPrev[i].xyz;
-			//const float3 v0 = ParticleVolumeVelocity(i);
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
 			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
 			{
