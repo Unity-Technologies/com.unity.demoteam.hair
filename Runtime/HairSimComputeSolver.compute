@@ -16,7 +16,7 @@
 #include "HairSimComputeVolumeData.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
 
-#define ENABLE_VOLUME_FRICTION			0
+#define ENABLE_VOLUME_FRICTION			1
 #define ENABLE_VOLUME_REPULSION			0
 
 #define ENABLE_CONSTRAINT_COLLISION		0
@@ -46,21 +46,25 @@ float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
 	{
 		float3 volumeUVW = ParticleVolumeUVW(i);
 #if SPLAT_TRILINEAR
-		float3 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0).xyz;
+		float volumeDensity = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
+		float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
 #else
-		float3 volumeVelocity = _VolumeVelocity[ParticleVolumeIndex(i)].xyz;
+		float volumeDensity = _VolumeDensity[ParticleVolumeIndex(i)];
+		float4 volumeVelocity = _VolumeVelocity[ParticleVolumeIndex(i)];
 #endif
 
 #if USE_PRESSURE_GRADIENT
+		const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
+		
 		float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
-		float3 volumePressureImpulse = -volumePressureGrad;
+		float3 volumePressureImpulse = -volumePressureGrad;// * (_DT / volumeDensity);
 
-		float3 impulsePIC = volumePressureImpulse + (volumeVelocity - velocity);
+		float3 impulsePIC = volumePressureImpulse + (volumeVelocity.xyz - velocity);
 		float3 impulseFLIP = volumePressureImpulse;
 		
 		return lerp(impulseFLIP, impulsePIC, friction);
 #else
-		return (volumeVelocity - velocity) * friction;
+		return (volumeVelocity.xyz - velocity) * friction;
 #endif
 	}
 	else
@@ -298,6 +302,16 @@ void KSolveConstraints_GaussSeidel(
 		return;
 	}
 #endif
+
+	#if 0// PAUSE SOLVER
+	{
+		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
+		{
+			_ParticlePosition[i] = _ParticlePositionPrev[i];
+		}
+		return;
+	}
+	#endif
 
 	// clear corrections
 	if (ENABLE_CONSTRAINT_FTL)

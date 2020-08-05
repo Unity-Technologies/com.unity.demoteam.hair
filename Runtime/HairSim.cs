@@ -863,6 +863,11 @@ namespace Unity.DemoTeam.Hair
 				Init(cmd);
 			}
 
+			if (volumeCells != volume.volumeResolution * Vector3.one)
+			{
+				Volume(cmd, 1.0f);
+			}
+
 			using (new ProfilingScope(cmd, MarkersGPU.Step))
 			{
 				SwapBuffers(ref particlePosition, ref particlePositionPrev);

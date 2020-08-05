@@ -28,16 +28,11 @@
 #define VOLUME_NUM_Z 4
 
 #define VOLUME_AIR_CELL_ZERO_PRESSURE 1
-#define VOLUME_AIR_CELL_ZERO_DIVERGENCE 0
-#define VOLUME_AIR_CELL_ZERO_SOURCE_TERM 1
-
-#define VOLUME_DIFF_STEP_IS_ONE 0// TODO remove
-
-#if VOLUME_DIFF_STEP_IS_ONE
-#define VOLUME_DIFF_STEP (1.0)
-#else
-#define VOLUME_DIFF_STEP (VolumeWorldCellSize())
-#endif
+#define VOLUME_AIR_CELL_ZERO_PRESSURE_GRAD 0
+#define VOLUME_AIR_CELL_ZERO_SOURCE_TERM 0
+#define VOLUME_AIR_BOUNDARY_ZERO_DIVERGENCE 0
+#define VOLUME_VOF 0
+#define VOLUME_GHOST 1
 
 //---------
 // utility
@@ -73,8 +68,31 @@ void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> vo
 #endif
 }
 
-//---------
-// kernels
+bool GhostPressureCell(uint3 worldIdx)
+{
+	if (_VolumeDensity[worldIdx] == 0)
+		return true;
+	else
+		return false;
+}
+
+float GhostPressure(uint3 worldIdx, float pressurePivot, float pressureOther)
+{
+	if (GhostPressureCell(worldIdx))
+	{
+		if (pressureOther > pressurePivot)
+			return -(pressureOther - pressurePivot);
+		else
+			return -pressurePivot;
+	}
+	else
+	{
+		return _VolumePressure[worldIdx];
+	}
+}
+
+//----------------
+// kernels: clear
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeClear(
@@ -92,6 +110,9 @@ void KVolumeClear(
 	_AccuVelocityY[worldIdx] = 0;
 	_AccuVelocityZ[worldIdx] = 0;
 }
+
+//---------------------
+// kernels: accumulate
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
 void KVolumeSplat(
@@ -170,6 +191,32 @@ void KVolumeSplatVelocityZ(
 	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _AccuVelocityZ);
 }
 
+//------------------
+// kernels: resolve
+
+void VolumeResolveAux(uint3 worldIdx, inout float outDensity, inout float4 outVelocity)
+{
+	const int accu_n = _AccuDensity[worldIdx];
+
+	const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
+	const float rho_unscaled = accu_n * SPLAT_PRECISION;
+#if STRAND_31_32_DEBUG
+	const float rho = pow(_StrandParticleContrib, 3.0) * rho_unscaled;
+#else
+	const float rho = rho_particle * rho_unscaled;
+#endif
+	
+	outDensity += rho;
+	
+	outVelocity += float4(
+		(float3(
+			_AccuVelocityX[worldIdx],
+			_AccuVelocityY[worldIdx],
+			_AccuVelocityZ[worldIdx]) / (float)max(1, accu_n)
+		),
+		rho_unscaled);
+}
+
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeResolve(
 	uint3 groupIdx : SV_GroupID,
@@ -181,23 +228,13 @@ void KVolumeResolve(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	const uint n = _AccuDensity[worldIdx];
-
-	const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
-	const float rho_unscaled = n * SPLAT_PRECISION;
-#if STRAND_31_32_DEBUG
-	const float rho = pow(_StrandParticleContrib, 3.0) * rho_unscaled;
-#else
-	const float rho = rho_particle * rho_unscaled;
-#endif
+	float sumDensity = 0.0;
+	float4 sumVelocity = float4(0.0, 0.0, 0.0, 0.0);
 	
-	_VolumeDensity[worldIdx] = rho;
-
-	_VolumeVelocity[worldIdx] = float4(float3(
-		_AccuVelocityX[worldIdx],
-		_AccuVelocityY[worldIdx],
-		_AccuVelocityZ[worldIdx]) / (float)max(1, n),
-		rho_unscaled);
+	VolumeResolveAux(worldIdx, sumDensity, sumVelocity);
+	
+	_VolumeDensity[worldIdx] = sumDensity / 1.0;
+	_VolumeVelocity[worldIdx] = sumVelocity / 1.0;
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -230,9 +267,8 @@ void KVolumeResolveFromRasterization(
 	}
 }
 
-#if LDS_GRADIENT
-groupshared int gs_density[VOLUME_NUM_X * VOLUME_NUM_Y * VOLUME_NUM_Z];
-#endif
+//---------------------
+// kernels: processing
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeGradient(
@@ -245,16 +281,14 @@ void KVolumeGradient(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-#if !LDS_GRADIENT
-
 	const uint3 worldIdxStrideX = uint3(1, 0, 0);
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
 #if VOLUME_SQUARE_CELLS
-	const float h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.x);
+	const float h_inv = 1.0 / (2.0 * VolumeWorldCellSize().x);
 #else
-	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.xyz);
+	const float3 h_inv = 1.0 / (2.0 * VolumeWorldCellSize().xyz);
 #endif
 
 	const float3 diff = float3(
@@ -264,84 +298,6 @@ void KVolumeGradient(
 		) * h_inv;
 
 	_VolumeDensityGrad[worldIdx] = diff;
-
-#else// if (LDS_GRADIENT)
-
-	gs_density[threadIdx] = _VolumeDensity[worldIdx];
-
-	GroupMemoryBarrierWithGroupSync();
-
-	const uint threadIdxStrideX = 1;
-	const uint threadIdxStrideY = VOLUME_NUM_X;
-	const uint threadIdxStrideZ = VOLUME_NUM_X * VOLUME_NUM_Y;
-	/*
-	SV_GroupIndex =
-		SV_GroupThreadID.z*dimx*dimy +
-		SV_GroupThreadID.y*dimx +
-		SV_GroupThreadID.x
-	*/
-
-	const uint3 worldIdxStrideX = uint3(1, 0, 0);
-	const uint3 worldIdxStrideY = uint3(0, 1, 0);
-	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
-
-	const uint3 localLowerIdx = 0;
-	const uint3 localUpperIdx = uint3(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z) - 1;
-
-#if VOLUME_SQUARE_CELLS
-	const float h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.x);
-#else
-	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.xyz);
-#endif
-
-	const bool lowerBoundary = any(localIdx == localLowerIdx);
-	const bool upperBoundary = any(localIdx == localUpperIdx);
-
-	if (lowerBoundary || upperBoundary)
-	{
-		if (lowerBoundary && upperBoundary)
-		{
-			const float3 diff = float3(
-				_VolumeDensity[worldIdx + worldIdxStrideX] - _VolumeDensity[worldIdx - worldIdxStrideX],
-				_VolumeDensity[worldIdx + worldIdxStrideY] - _VolumeDensity[worldIdx - worldIdxStrideY],
-				_VolumeDensity[worldIdx + worldIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
-				) * h_inv;
-
-			_VolumeDensityGrad[worldIdx] = diff;
-		}
-		else if (lowerBoundary)
-		{
-			const float3 diff = float3(
-				gs_density[threadIdx + threadIdxStrideX] - _VolumeDensity[worldIdx - worldIdxStrideX],
-				gs_density[threadIdx + threadIdxStrideY] - _VolumeDensity[worldIdx - worldIdxStrideY],
-				gs_density[threadIdx + threadIdxStrideZ] - _VolumeDensity[worldIdx - worldIdxStrideZ]
-				) * h_inv;
-
-			_VolumeDensityGrad[worldIdx] = diff;
-		}
-		else// upperBoundary
-		{
-			const float3 diff = float3(
-				_VolumeDensity[worldIdx + worldIdxStrideX] - gs_density[threadIdx - threadIdxStrideX],
-				_VolumeDensity[worldIdx + worldIdxStrideY] - gs_density[threadIdx - threadIdxStrideY],
-				_VolumeDensity[worldIdx + worldIdxStrideZ] - gs_density[threadIdx - threadIdxStrideZ]
-				) * h_inv;
-
-			_VolumeDensityGrad[worldIdx] = diff;
-		}
-	}
-	else
-	{
-		const float3 diff = float3(
-			gs_density[threadIdx + threadIdxStrideX] - gs_density[threadIdx - threadIdxStrideX],
-			gs_density[threadIdx + threadIdxStrideY] - gs_density[threadIdx - threadIdxStrideY],
-			gs_density[threadIdx + threadIdxStrideZ] - gs_density[threadIdx - threadIdxStrideZ]
-			) * h_inv;
-
-		_VolumeDensityGrad[worldIdx] = diff;
-	}
-
-#endif// (LDS_GRADIENT)
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -355,11 +311,14 @@ void KVolumeDivergence(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+	const bool3 isBoundaryLower = (worldIdx == 0);
+	const bool3 isBoundaryUpper = (worldIdx == (uint3)_VolumeCells.xyz - 1);
+
 	const uint3 worldIdxStrideX = uint3(1, 0, 0);
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
-#if VOLUME_AIR_CELL_ZERO_DIVERGENCE
+#if VOLUME_AIR_BOUNDARY_ZERO_DIVERGENCE
 	const float d_xm = _VolumeDensity[worldIdx - worldIdxStrideX];
 	const float d_ym = _VolumeDensity[worldIdx - worldIdxStrideY];
 	const float d_zm = _VolumeDensity[worldIdx - worldIdxStrideZ];
@@ -380,23 +339,54 @@ void KVolumeDivergence(
 	const float vy_yp = air_y ? 0.0 : _VolumeVelocity[worldIdx + worldIdxStrideY].y;
 	const float vz_zp = air_z ? 0.0 : _VolumeVelocity[worldIdx + worldIdxStrideZ].z;
 #else
-	const float vx_xm = _VolumeVelocity[worldIdx - worldIdxStrideX].x;
-	const float vy_ym = _VolumeVelocity[worldIdx - worldIdxStrideY].y;
-	const float vz_zm = _VolumeVelocity[worldIdx - worldIdxStrideZ].z;
+	const float4 v_in = _VolumeVelocity[worldIdx];
 
-	const float vx_xp = _VolumeVelocity[worldIdx + worldIdxStrideX].x;
-	const float vy_yp = _VolumeVelocity[worldIdx + worldIdxStrideY].y;
-	const float vz_zp = _VolumeVelocity[worldIdx + worldIdxStrideZ].z;
+#if VOLUME_VOF
+	const float min_contrib = 0.0;
+	const float max_contrib = 1.0;
+	
+	const float d_xm = clamp(_VolumeDensity[worldIdx - worldIdxStrideX], min_contrib, max_contrib);
+	const float d_ym = clamp(_VolumeDensity[worldIdx - worldIdxStrideY], min_contrib, max_contrib);
+	const float d_zm = clamp(_VolumeDensity[worldIdx - worldIdxStrideZ], min_contrib, max_contrib);
+
+	const float d_xp = clamp(_VolumeDensity[worldIdx + worldIdxStrideX], min_contrib, max_contrib);
+	const float d_yp = clamp(_VolumeDensity[worldIdx + worldIdxStrideY], min_contrib, max_contrib);
+	const float d_zp = clamp(_VolumeDensity[worldIdx + worldIdxStrideZ], min_contrib, max_contrib);
+	
+	const float w_xm = d_xm;// / max(1e-4, d_xm + d_xp);
+	const float w_ym = d_ym;// / max(1e-4, d_ym + d_yp);
+	const float w_zm = d_zm;// / max(1e-4, d_zm + d_zp);
+
+	const float w_xp = d_xp;// / max(1e-4, d_xm + d_xp);
+	const float w_yp = d_yp;// / max(1e-4, d_ym + d_yp);
+	const float w_zp = d_zp;// / max(1e-4, d_zm + d_zp);
+	
+	const float vx_xm = isBoundaryLower.x ? v_in.x : _VolumeVelocity[worldIdx - worldIdxStrideX].x * w_xm;
+	const float vy_ym = isBoundaryLower.y ? v_in.y : _VolumeVelocity[worldIdx - worldIdxStrideY].y * w_ym;
+	const float vz_zm = isBoundaryLower.z ? v_in.z : _VolumeVelocity[worldIdx - worldIdxStrideZ].z * w_zm;
+
+	const float vx_xp = isBoundaryUpper.x ? v_in.x : _VolumeVelocity[worldIdx + worldIdxStrideX].x * w_xp;
+	const float vy_yp = isBoundaryUpper.y ? v_in.y : _VolumeVelocity[worldIdx + worldIdxStrideY].y * w_yp;
+	const float vz_zp = isBoundaryUpper.z ? v_in.z : _VolumeVelocity[worldIdx + worldIdxStrideZ].z * w_zp;
+#else
+	const float vx_xm = isBoundaryLower.x ? v_in.x : _VolumeVelocity[worldIdx - worldIdxStrideX].x;
+	const float vy_ym = isBoundaryLower.y ? v_in.y : _VolumeVelocity[worldIdx - worldIdxStrideY].y;
+	const float vz_zm = isBoundaryLower.z ? v_in.z : _VolumeVelocity[worldIdx - worldIdxStrideZ].z;
+
+	const float vx_xp = isBoundaryUpper.x ? v_in.x : _VolumeVelocity[worldIdx + worldIdxStrideX].x;
+	const float vy_yp = isBoundaryUpper.y ? v_in.y : _VolumeVelocity[worldIdx + worldIdxStrideY].y;
+	const float vz_zp = isBoundaryUpper.z ? v_in.z : _VolumeVelocity[worldIdx + worldIdxStrideZ].z;
+	#endif
 #endif
 
 #if VOLUME_SQUARE_CELLS
-	const float h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.x);
+	const float h_inv = 1.0 / (2.0 * VolumeWorldCellSize().x);
 	const float div = float(
 		(vx_xp - vx_xm) +
 		(vy_yp - vy_ym) +
 		(vz_zp - vz_zm)) * h_inv;
 #else
-	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.xyz);
+	const float3 h_inv = 1.0 / (2.0 * VolumeWorldCellSize().xyz);
 	const float div = float(
 		(vx_xp - vx_xm) * h_inv.x +
 		(vy_yp - vy_ym) * h_inv.y +
@@ -410,18 +400,13 @@ void KVolumeDivergence(
 	if (rho == 0.0)
 	{
 		_VolumeDivergence[worldIdx] = div;
-		return;
+	}
+	else
+#else
+	{
+		_VolumeDivergence[worldIdx] = div - (rho / rho0 - 1.0)  * (_Repulsion);
 	}
 #endif
-
-#if VOLUME_DIFF_STEP_IS_ONE
-	_VolumeDivergence[worldIdx] = div - (rho / rho0 - 1.0) * (_Repulsion) * (VolumeWorldCellSize().x);
-#else
-	_VolumeDivergence[worldIdx] = div - (rho / rho0 - 1.0) * (_Repulsion);
-#endif
-
-	//OLD
-	//_VolumeDivergence[worldIdx] = div + (rho0 - rho);
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -446,17 +431,7 @@ void KVolumePressureEOS(
 	}
 #endif
 
-#if VOLUME_DIFF_STEP_IS_ONE
-	_VolumePressure[worldIdx] = (rho / rho0 - 1.0) * (_Repulsion);
-#else
 	_VolumePressure[worldIdx] = (rho / rho0 - 1.0) * (_Repulsion * VolumeWorldCellSize().x * VolumeWorldCellSize().x);
-#endif
-
-	//OLD
-	//if (rho != 0.0)
-	//	_VolumePressure[worldIdx] = -(rho0 - rho) * (VolumeWorldCellVolume() / _DT);
-	//else
-	//	_VolumePressure[worldIdx] = 0.0;
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -470,28 +445,68 @@ void KVolumePressureSolve(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+	const float rho = _VolumeDensity[worldIdx];
+	const float rho0 = 1.0;
+
+#if VOLUME_AIR_CELL_ZERO_PRESSURE
+	if (rho == 0.0)
+	{
+		_VolumePressure[worldIdx] = 0.0;
+		return;
+	}
+#endif
+	
+	// solve poisson equation for pressure using central differences
+	// https://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html
+
+	const bool3 isBoundaryLower = (worldIdx == 0);
+	const bool3 isBoundaryUpper = (worldIdx == (uint3)_VolumeCells.xyz - 1);
+	
 	const uint3 worldIdxStrideX = uint3(1, 0, 0);
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
-	// solve poisson equation for pressure using central differences
-	// https://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html
-
-	const float p_xm = _VolumePressureIn[worldIdx - worldIdxStrideX];
-	const float p_ym = _VolumePressureIn[worldIdx - worldIdxStrideY];
-	const float p_zm = _VolumePressureIn[worldIdx - worldIdxStrideZ];
-
-	const float p_xp = _VolumePressureIn[worldIdx + worldIdxStrideX];
-	const float p_yp = _VolumePressureIn[worldIdx + worldIdxStrideY];
-	const float p_zp = _VolumePressureIn[worldIdx + worldIdxStrideZ];
-
 	const float p_in = _VolumePressureIn[worldIdx];
+
+#if 0 && VOLUME_GHOST
+	const uint3 i_xm = worldIdx - worldIdxStrideX;
+	const uint3 i_ym = worldIdx - worldIdxStrideY;
+	const uint3 i_zm = worldIdx - worldIdxStrideZ;
+	
+	const uint3 i_xp = worldIdx + worldIdxStrideX;
+	const uint3 i_yp = worldIdx + worldIdxStrideY;
+	const uint3 i_zp = worldIdx + worldIdxStrideZ;
+	
+	const float tmp_p_xm = isBoundaryLower.x ? p_in : _VolumePressure[worldIdx - worldIdxStrideX];
+	const float tmp_p_ym = isBoundaryLower.y ? p_in : _VolumePressure[worldIdx - worldIdxStrideY];
+	const float tmp_p_zm = isBoundaryLower.z ? p_in : _VolumePressure[worldIdx - worldIdxStrideZ];
+
+	const float tmp_p_xp = isBoundaryUpper.x ? p_in : _VolumePressure[worldIdx + worldIdxStrideX];
+	const float tmp_p_yp = isBoundaryUpper.y ? p_in : _VolumePressure[worldIdx + worldIdxStrideY];
+	const float tmp_p_zp = isBoundaryUpper.z ? p_in : _VolumePressure[worldIdx + worldIdxStrideZ];
+	
+	const float p_xm = GhostPressure(i_xm, p_in, tmp_p_xp);
+	const float p_ym = GhostPressure(i_ym, p_in, tmp_p_yp);
+	const float p_zm = GhostPressure(i_zm, p_in, tmp_p_zp);
+
+	const float p_xp = GhostPressure(i_xp, p_in, tmp_p_xm);
+	const float p_yp = GhostPressure(i_yp, p_in, tmp_p_ym);
+	const float p_zp = GhostPressure(i_zp, p_in, tmp_p_zm);	
+#else
+	const float p_xm = isBoundaryLower.x ? p_in : _VolumePressureIn[worldIdx - worldIdxStrideX];
+	const float p_ym = isBoundaryLower.y ? p_in : _VolumePressureIn[worldIdx - worldIdxStrideY];
+	const float p_zm = isBoundaryLower.z ? p_in : _VolumePressureIn[worldIdx - worldIdxStrideZ];
+
+	const float p_xp = isBoundaryUpper.x ? p_in : _VolumePressureIn[worldIdx + worldIdxStrideX];
+	const float p_yp = isBoundaryUpper.y ? p_in : _VolumePressureIn[worldIdx + worldIdxStrideY];
+	const float p_zp = isBoundaryUpper.z ? p_in : _VolumePressureIn[worldIdx + worldIdxStrideZ];
+#endif
 
 	const float b = _VolumeDivergence[worldIdx];
 	const float w = 1.0;// SOR factor [1..2]
 
 #if VOLUME_SQUARE_CELLS
-	const float h = 1.0 * VOLUME_DIFF_STEP.x;
+	const float h = VolumeWorldCellSize().x;
 	const float a = -(h * h);
 
 	const float pressure =
@@ -502,7 +517,7 @@ void KVolumePressureSolve(
 			p_zm + p_zp +
 			a * b);
 #else
-	const float3 h = 1.0 * VOLUME_DIFF_STEP.xyz;
+	const float3 h = VolumeWorldCellSize().xyz;
 	const float3 a = -(h * h) / 3.0;
 
 	const float pressure =
@@ -527,21 +542,70 @@ void KVolumePressureGradient(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+#if VOLUME_AIR_CELL_ZERO_PRESSURE_GRAD
+	const float rho = _VolumeDensity[worldIdx];
+	const float rho0 = 1.0;
+	
+	if (rho == 0.0)
+	{
+		_VolumePressureGrad[worldIdx] = 0.0;
+		return;
+	}
+#endif
+
+	const bool3 isBoundaryLower = (worldIdx == 0);
+	const bool3 isBoundaryUpper = (worldIdx == (uint3)_VolumeCells.xyz - 1);
+
 	const uint3 worldIdxStrideX = uint3(1, 0, 0);
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
-#if VOLUME_SQUARE_CELLS
-	const float h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.x);
+	const float p_in = _VolumePressure[worldIdx];
+
+#if VOLUME_GHOST
+	const uint3 i_xm = worldIdx - worldIdxStrideX;
+	const uint3 i_ym = worldIdx - worldIdxStrideY;
+	const uint3 i_zm = worldIdx - worldIdxStrideZ;
+	
+	const uint3 i_xp = worldIdx + worldIdxStrideX;
+	const uint3 i_yp = worldIdx + worldIdxStrideY;
+	const uint3 i_zp = worldIdx + worldIdxStrideZ;
+	
+	const float tmp_p_xm = isBoundaryLower.x ? p_in : _VolumePressure[worldIdx - worldIdxStrideX];
+	const float tmp_p_ym = isBoundaryLower.y ? p_in : _VolumePressure[worldIdx - worldIdxStrideY];
+	const float tmp_p_zm = isBoundaryLower.z ? p_in : _VolumePressure[worldIdx - worldIdxStrideZ];
+
+	const float tmp_p_xp = isBoundaryUpper.x ? p_in : _VolumePressure[worldIdx + worldIdxStrideX];
+	const float tmp_p_yp = isBoundaryUpper.y ? p_in : _VolumePressure[worldIdx + worldIdxStrideY];
+	const float tmp_p_zp = isBoundaryUpper.z ? p_in : _VolumePressure[worldIdx + worldIdxStrideZ];
+	
+	const float p_xm = GhostPressure(i_xm, p_in, tmp_p_xp);
+	const float p_ym = GhostPressure(i_ym, p_in, tmp_p_yp);
+	const float p_zm = GhostPressure(i_zm, p_in, tmp_p_zp);
+
+	const float p_xp = GhostPressure(i_xp, p_in, tmp_p_xm);
+	const float p_yp = GhostPressure(i_yp, p_in, tmp_p_ym);
+	const float p_zp = GhostPressure(i_zp, p_in, tmp_p_zm);
 #else
-	const float3 h_inv = 1.0 / (2.0 * VOLUME_DIFF_STEP.xyz);
+	const float p_xm = isBoundaryLower.x ? p_in : _VolumePressure[worldIdx - worldIdxStrideX];
+	const float p_ym = isBoundaryLower.y ? p_in : _VolumePressure[worldIdx - worldIdxStrideY];
+	const float p_zm = isBoundaryLower.z ? p_in : _VolumePressure[worldIdx - worldIdxStrideZ];
+
+	const float p_xp = isBoundaryUpper.x ? p_in : _VolumePressure[worldIdx + worldIdxStrideX];
+	const float p_yp = isBoundaryUpper.y ? p_in : _VolumePressure[worldIdx + worldIdxStrideY];
+	const float p_zp = isBoundaryUpper.z ? p_in : _VolumePressure[worldIdx + worldIdxStrideZ];
+#endif
+	
+#if VOLUME_SQUARE_CELLS
+	const float h_inv = 1.0 / (2.0 * VolumeWorldCellSize().x);
+#else
+	const float3 h_inv = 1.0 / (2.0 * VolumeWorldCellSize().xyz);
 #endif
 
 	const float3 diff = float3(
-		_VolumePressure[worldIdx + worldIdxStrideX] - _VolumePressure[worldIdx - worldIdxStrideX],
-		_VolumePressure[worldIdx + worldIdxStrideY] - _VolumePressure[worldIdx - worldIdxStrideY],
-		_VolumePressure[worldIdx + worldIdxStrideZ] - _VolumePressure[worldIdx - worldIdxStrideZ]
-		) * h_inv;
+		p_xp - p_xm,
+		p_yp - p_ym,
+		p_zp - p_zm) * h_inv;
 
 	_VolumePressureGrad[worldIdx] = diff;
 }

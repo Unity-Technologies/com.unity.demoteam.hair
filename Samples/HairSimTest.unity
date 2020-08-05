@@ -43,7 +43,7 @@ RenderSettings:
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 11
+  serializedVersion: 12
   m_GIWorkflowMode: 1
   m_GISettings:
     serializedVersion: 2
@@ -98,7 +98,7 @@ LightmapSettings:
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
   m_LightingDataAsset: {fileID: 0}
-  m_UseShadowmask: 1
+  m_LightingSettings: {fileID: 0}
 --- !u!196 &4
 NavMeshSettings:
   serializedVersion: 2
@@ -118,6 +118,8 @@ NavMeshSettings:
     manualTileSize: 0
     tileSize: 256
     accuratePlacement: 0
+    maxJobWorkers: 0
+    preserveTilesOutsideBounds: 0
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
@@ -183,6 +185,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -207,6 +210,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &81391777
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -385,6 +389,11 @@ MonoBehaviour:
   dithering: 0
   stopNaNs: 0
   taaSharpenStrength: 0.6
+  TAAQuality: 1
+  taaHistorySharpening: 0.35
+  taaAntiFlicker: 0.5
+  taaMotionVectorRejection: 0
+  taaAntiHistoryRinging: 0
   physicalParameters:
     m_Iso: 200
     m_ShutterSpeed: 0.005
@@ -394,6 +403,7 @@ MonoBehaviour:
     m_BarrelClipping: 0.25
     m_Anamorphism: 0
   flipYMode: 0
+  xrRendering: 1
   fullscreenPassthrough: 0
   allowDynamicResolution: 0
   customRenderingSettings: 0
@@ -412,6 +422,9 @@ MonoBehaviour:
     maximumLODLevel: 0
     maximumLODLevelMode: 0
     maximumLODLevelQualityLevel: 0
+    sssQualityMode: 0
+    sssQualityLevel: 0
+    sssCustomSampleBudget: 20
     materialQuality: 0
   renderingPathCustomFrameSettingsOverrideMask:
     mask:
@@ -497,6 +510,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -521,6 +535,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &240268944
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -604,6 +619,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -628,6 +644,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &412194666
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -683,6 +700,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -707,6 +725,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &793265362
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -776,6 +795,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -800,6 +820,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &868458010
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -872,6 +893,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -896,6 +918,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &917071515
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -949,6 +972,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   isGlobal: 1
   fadeRadius: 0
+  priority: 0
   customPasses:
   - id: 0
   injectionPoint: 4
@@ -957,7 +981,7 @@ MonoBehaviour:
     00000000:
       type: {class: HairSimDebugPass, ns: Unity.DemoTeam.Hair, asm: Unity.DemoTeam.Hair.Runtime}
       data:
-        name: HairSimDebugPass
+        m_Name: HairSimDebugPass
         enabled: 1
         targetColorBuffer: 0
         targetDepthBuffer: 0
@@ -1007,17 +1031,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2b6d23d090c06245aca3124e153206f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  boundaries: []
   strands:
     style: 1
     strandCount: 512
     strandParticleCount: 7
     strandLength: 0.5
+    strandDiameter: 0.125
+    strandParticleContrib: 1
+  solver:
+    method: 1
+    iterations: 10
+    stiffness: 1
+    inference: 1
+    damping: 0.9
+    gravity: 1
+    repulsion: 0
+    friction: 0
+    bendingCurvature: 0
+    dampingFTL: 0.85
   volume:
     volumeSplatMethod: 1
     volumeSplatFilter: 0
     volumeResolution: 64
     volumeOffsetX: 0
     volumeOffsetY: 0
+    volumeOffsetZ: 0
+    volumePressureIterations: 0
   debug:
     drawParticles: 0
     drawStrands: 1
@@ -1030,23 +1070,10 @@ MonoBehaviour:
     drawSliceOffsetY: 0.4
     drawSliceOffsetZ: 0.571
     drawSliceDivider: 0
-  solver:
-    method: 1
-    iterations: 10
-    stiffness: 1
-    inference: 1
-    damping: 0.9
-    gravity: 1
-    repulsion: 0
-    friction: 0
-    bendingCurvature: 0
-    bendingStiffness: 0
-    dampingFTL: 0.85
-  boundaries: []
-  compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
+  computeSolver: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   computeVolumeRaster: {fileID: 2100000, guid: aa93a0a214a570e49a50b0fd77420457, type: 2}
-  debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
+  debugDraw: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
 --- !u!4 &1011175221
 Transform:
   m_ObjectHideFlags: 0
@@ -1126,6 +1153,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -1150,6 +1178,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &1101634075
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -1235,6 +1264,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -1259,6 +1289,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &1258472766
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -1310,17 +1341,36 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2b6d23d090c06245aca3124e153206f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  boundaries:
+  - {fileID: 917071516}
+  - {fileID: 1101634076}
+  - {fileID: 240268941}
   strands:
     style: 2
     strandCount: 30000
     strandParticleCount: 32
     strandLength: 1
+    strandDiameter: 0.125
+    strandParticleContrib: 1
+  solver:
+    method: 2
+    iterations: 30
+    stiffness: 1
+    inference: 2
+    damping: 0.3
+    gravity: 1
+    repulsion: 0.1
+    friction: 0.3
+    bendingCurvature: 0
+    dampingFTL: 0.85
   volume:
     volumeSplatMethod: 1
     volumeSplatFilter: 0
     volumeResolution: 64
     volumeOffsetX: 0
     volumeOffsetY: 0
+    volumeOffsetZ: 0
+    volumePressureIterations: 0
   debug:
     drawParticles: 0
     drawStrands: 1
@@ -1333,26 +1383,10 @@ MonoBehaviour:
     drawSliceOffsetY: 0.259
     drawSliceOffsetZ: 0.445
     drawSliceDivider: 0
-  solver:
-    method: 2
-    iterations: 30
-    stiffness: 1
-    inference: 2
-    damping: 0.3
-    gravity: 1
-    repulsion: 0.1
-    friction: 0.3
-    bendingCurvature: 0
-    bendingStiffness: 0
-    dampingFTL: 0.85
-  boundaries:
-  - {fileID: 917071516}
-  - {fileID: 1101634076}
-  - {fileID: 240268941}
-  compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
+  computeSolver: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   computeVolumeRaster: {fileID: 2100000, guid: aa93a0a214a570e49a50b0fd77420457, type: 2}
-  debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
+  debugDraw: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
 --- !u!4 &1851342450
 Transform:
   m_ObjectHideFlags: 0
@@ -1397,17 +1431,35 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2b6d23d090c06245aca3124e153206f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  boundaries:
+  - {fileID: 81391774}
+  - {fileID: 1258472763}
   strands:
     style: 0
     strandCount: 1024
     strandParticleCount: 32
     strandLength: 0.5
+    strandDiameter: 0.125
+    strandParticleContrib: 1
+  solver:
+    method: 0
+    iterations: 2
+    stiffness: 1
+    inference: 1
+    damping: 0.9
+    gravity: 1
+    repulsion: 0
+    friction: 0
+    bendingCurvature: 0
+    dampingFTL: 0.85
   volume:
     volumeSplatMethod: 1
     volumeSplatFilter: 0
     volumeResolution: 64
     volumeOffsetX: 0
     volumeOffsetY: 0
+    volumeOffsetZ: 0
+    volumePressureIterations: 0
   debug:
     drawParticles: 0
     drawStrands: 1
@@ -1420,25 +1472,10 @@ MonoBehaviour:
     drawSliceOffsetY: 0.365
     drawSliceOffsetZ: 0.4
     drawSliceDivider: 0
-  solver:
-    method: 0
-    iterations: 2
-    stiffness: 1
-    inference: 1
-    damping: 0.9
-    gravity: 1
-    repulsion: 0
-    friction: 0
-    bendingCurvature: 0
-    bendingStiffness: 0
-    dampingFTL: 0.85
-  boundaries:
-  - {fileID: 81391774}
-  - {fileID: 1258472763}
-  compute: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
+  computeSolver: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
   computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
   computeVolumeRaster: {fileID: 2100000, guid: aa93a0a214a570e49a50b0fd77420457, type: 2}
-  debugMaterial: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
+  debugDraw: {fileID: 2100000, guid: 9f749310abf993f4bb5f93187511e412, type: 2}
 --- !u!4 &2032921485
 Transform:
   m_ObjectHideFlags: 0
@@ -1561,7 +1598,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a68c43fe1f2a47cfa234b5eeaa98012, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Version: 9
+  m_Version: 11
   m_ObsoleteShadowResolutionTier: 1
   m_ObsoleteUseShadowQualitySettings: 0
   m_ObsoleteCustomShadowResolution: 512
@@ -1607,6 +1644,9 @@ MonoBehaviour:
   m_FilterSizeTraced: 16
   m_SunLightConeAngle: 0.5
   m_LightShadowRadius: 0.5
+  m_SemiTransparentShadow: 0
+  m_ColorShadow: 1
+  m_DistanceBasedFiltering: 0
   m_EvsmExponent: 15
   m_EvsmLightLeakBias: 0
   m_EvsmVarianceBias: 0.00001
@@ -1639,6 +1679,7 @@ MonoBehaviour:
   m_ShadowUpdateMode: 0
   m_BarnDoorAngle: 90
   m_BarnDoorLength: 0.05
+  m_preserveCachedShadow: 0
   m_ShadowCascadeRatios:
   - 0.05
   - 0.2
@@ -1655,6 +1696,9 @@ MonoBehaviour:
   useVolumetric: 1
   featuresFoldout: 1
   showAdditionalSettings: 0
+  m_AreaLightEmissiveMeshShadowCastingMode: 0
+  m_AreaLightEmissiveMeshMotionVectorGenerationMode: 0
+  m_AreaLightEmissiveMeshLayer: -1
 --- !u!1 &2064289868
 GameObject:
   m_ObjectHideFlags: 0
@@ -1702,6 +1746,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -1726,6 +1771,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &2064289871
 MeshFilter:
   m_ObjectHideFlags: 0

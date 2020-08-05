@@ -52,6 +52,7 @@ float3 VolumeUVWToLocal(float3 uvw)
 	return localPos;
 }
 
+//TODO sanitize out of bounds
 float3 VolumeWorldToUVW(float3 worldPos)
 {
 	float3 uvw = (worldPos - _VolumeWorldMin) / (_VolumeWorldMax - _VolumeWorldMin);

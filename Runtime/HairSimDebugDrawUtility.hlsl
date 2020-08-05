@@ -32,23 +32,25 @@ float3 ColorDensity(float rho)
 
 float3 ColorDivergence(float div)
 {
-    if (div < 0.0)// inward flux (increases pressure)
-        return saturate(float3(-div, -div, 0.0));
-    else
-        return saturate(float3(0.0, div, div));
+	if (div < 0.0)// inward flux increases pressure
+		return saturate(abs(float3(div, div, 0.0)));
+	else
+		return saturate(abs(float3(0.0, div, div)));
 }
 
 float3 ColorPressure(float p)
 {
-	p *= 1000.0;
+	p *= 100.0;
 	if (p > 0.0)
-		return saturate(float3(p, 0.0, 0.0));
+		return saturate(float3(frac(p), 0.0, 0.0));
 	else
-		return saturate(float3(0.0, 0.0, -p));
+		return saturate(float3(0.0, 0.0, frac(-p)));
 }
 
 float3 ColorGradient(float3 n)
 {
+	//return abs(n.zzz);
+
 	float d = dot(n, n);
 	if (d > 1e-11)
 		return 0.5 + 0.5 * (n * rsqrt(d));

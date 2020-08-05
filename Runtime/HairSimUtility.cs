@@ -55,7 +55,9 @@ namespace Unity.DemoTeam.Hair
 				msaaSamples = 1,
 			};
 
+			//Debug.Log("creating volume " + name);
 			volume = new RenderTexture(volumeDesc);
+			volume.wrapMode = TextureWrapMode.Clamp;
 			volume.hideFlags = HideFlags.HideAndDontSave;
 			volume.name = name;
 			volume.Create();
