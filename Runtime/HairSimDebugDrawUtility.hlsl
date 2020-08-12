@@ -27,7 +27,8 @@ float3 ColorRamp(uint index, uint count)
 
 float3 ColorDensity(float rho)
 {
-	return saturate(rho).xxx;
+	float above = saturate(rho - 1.0);
+	return float3(saturate(rho), saturate(rho) - above, saturate(rho) - above);
 }
 
 float3 ColorDivergence(float div)
@@ -40,7 +41,7 @@ float3 ColorDivergence(float div)
 
 float3 ColorPressure(float p)
 {
-	p *= 100.0;
+	p *= 15.0;
 	if (p > 0.0)
 		return saturate(float3(frac(p), 0.0, 0.0));
 	else

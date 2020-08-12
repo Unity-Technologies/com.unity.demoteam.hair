@@ -585,7 +585,7 @@ void KSolveConstraints_Jacobi(
 			}
 
 			// apply SOR
-			d *= _Inference;
+			d *= _Relaxation;
 
 			// solve distance constraints along strand (FTL)
 			if (ENABLE_CONSTRAINT_FTL)
@@ -752,13 +752,13 @@ void KSolveConstraints_Jacobi(
 				float3 d_pre_ftl = d;
 				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
 
-				float inv_n = _Inference / n;
+				float inv_n = _Relaxation / n;
 				gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;
 				gs_d[threadIdx - 1] += (d - d_pre_ftl) * inv_n;
 			}
 			else
 			{
-				float inv_n = _Inference / n;
+				float inv_n = _Relaxation / n;
 				gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;
 			}
 		}

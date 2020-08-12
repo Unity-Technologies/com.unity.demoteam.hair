@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Serialization;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
@@ -109,7 +110,8 @@ namespace Unity.DemoTeam.Hair
 			public static int _DT;
 			public static int _Iterations;
 			public static int _Stiffness;
-			public static int _Inference;
+			[FormerlySerializedAs("_Inference")]
+			public static int _Relaxation;
 			public static int _Damping;
 			public static int _Gravity;
 			public static int _Repulsion;
@@ -224,7 +226,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 1.0f)]
 			public float stiffness;
 			[Range(1.0f, 2.0f)]
-			public float inference;
+			public float relaxation;
 			[Range(0.0f, 1.0f)]
 			public float damping;
 			[Range(-1.0f, 1.0f)]
@@ -245,7 +247,7 @@ namespace Unity.DemoTeam.Hair
 				method = Method.GaussSeidelReference,
 				iterations = 3,
 				stiffness = 1.0f,
-				inference = 1.0f,
+				relaxation = 1.0f,
 				damping = 0.0f,
 				gravity = 1.0f,
 				repulsion = 0.0f,
@@ -1303,7 +1305,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeFloatParam(cs, UniformIDs._DT, dt);
 			cmd.SetComputeIntParam(cs, UniformIDs._Iterations, solver.iterations);
 			cmd.SetComputeFloatParam(cs, UniformIDs._Stiffness, solver.stiffness);
-			cmd.SetComputeFloatParam(cs, UniformIDs._Inference, solver.inference);
+			cmd.SetComputeFloatParam(cs, UniformIDs._Relaxation, solver.relaxation);
 			cmd.SetComputeFloatParam(cs, UniformIDs._Damping, solver.damping);
 			cmd.SetComputeFloatParam(cs, UniformIDs._Gravity, solver.gravity * -Vector3.Magnitude(Physics.gravity));
 			cmd.SetComputeFloatParam(cs, UniformIDs._Repulsion, solver.repulsion);

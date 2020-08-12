@@ -94,7 +94,7 @@
 
 				DebugVaryings output;
 				output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
-				output.color = float4(ColorRamp(volumeDensity, 32), 1.0);
+				output.color = float4(ColorDensity(volumeDensity), 1.0);
 				return output;
 			}
 
@@ -187,6 +187,48 @@
 						uint i = (uint)localPosFloor[_DebugSliceAxis] % 3;
 						return float4(0.2 * float3(i == 0, i == 1, i == 2), opacity);
 					}
+				}
+
+				// TEST LEVEL-SET
+				if (_DebugSliceDivider == 2.0)
+				{
+					float3 step = VolumeLocalToUVW(1.0);
+					float d_min = 1e+4;
+					float r_max = 0.0;
+
+					for (int i = -1; i <= 1; i++)
+					{
+						for (int j = -1; j <= 1; j++)
+						{
+							float3 uvw_xz = float3(
+								uvw.x + i * step.x,
+								uvw.y,
+								uvw.z + j * step.z);
+
+							float vol = abs(_VolumeDensity.SampleLevel(SLICE_SAMPLER, uvw_xz, 0));
+							if (vol > 0.0)
+							{
+								float vol_d = length(float2(i, j));
+								float vol_r = pow((3.0 * vol) / (4.0 * 3.14159), 1.0 / 3.0);
+
+								d_min = min(d_min, vol_d - vol_r);
+								r_max = max(r_max, vol_r);
+							}
+						}
+					}
+
+					float4 color_air = float4(0.0, 0.0, 0.0, 1.0);
+					float4 color_int = float4(1.0, 0.0, 0.0, 1.0);
+					float4 color_ext = float4(1.0, 1.0, 0.0, 1.0);
+
+					return float4(r_max.xxx, 1.0);
+
+					if (d_min == 1e+4)
+						return color_air;
+					else if (d_min < -0.5)
+						return color_int * float4(-d_min.xxx, 1.0);
+					else
+						return color_ext * float4(1.0 - d_min.xxx, 1.0);
 				}
 
 				float x = uvw.x + _DebugSliceDivider;

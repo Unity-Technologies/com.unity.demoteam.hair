@@ -23,7 +23,11 @@
 // 0 == store everything at cell centers
 // 1 == store velocity and pressure gradient at cell faces
 
-#define STRAND_31_32_DEBUG 1
+#define VOLUME_SUPPORT_CLUMPING_ 0
+// 0 == pressure is always positive
+// 1 == negative pressure causes clumping
+
+#define STRAND_31_32_DEBUG 0
 // 0 == off
 // 1 == on (full strands)
 // 2 == on (first segments)

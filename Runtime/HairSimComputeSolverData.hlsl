@@ -19,7 +19,7 @@ float _StrandParticleContrib;// TODO remove
 float _DT;
 uint _Iterations;
 float _Stiffness;
-float _Inference;
+float _Relaxation;
 float _Damping;
 float _Gravity;
 float _Repulsion;
