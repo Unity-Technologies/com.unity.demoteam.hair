@@ -64,8 +64,8 @@
 				uint i = strandParticleBegin + strandParticleStride * vertexID;
 				float3 worldPos = _ParticlePosition[i].xyz;
 
-				float volumeDensity = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, VolumeWorldToUVW(worldPos), 0);
 				float volumeDensityShadow = 8.0;
+				float volumeDensity = VolumeSampleScalar(_VolumeDensity, VolumeWorldToUVW(worldPos));
 				float volumeOcclusion = saturate((volumeDensityShadow - volumeDensity) / volumeDensityShadow);// pow(1.0 - saturate(volumeDensity / 200.0), 4.0);
 				//float volumeOcclusion = saturate(1.0 - pow(1.0 - exp(-volumeDensity), 2.0));
 				//float volumeOcclusion = pow(1.0 - saturate(volumeDensity / 400.0), 4.0);
@@ -101,7 +101,7 @@
 			ENDHLSL
 		}
 
-		Pass// 2 == GRADIENT
+		Pass// 2 == PRESSURE GRADIENT
 		{
 			HLSLPROGRAM
 
@@ -115,7 +115,7 @@
 
 				if (vertexID & 1)
 				{
-					worldPos -= _VolumeDensityGrad[volumeIdx] * 0.002;
+					worldPos -= _VolumePressureGrad[volumeIdx] * 0.002;
 				}
 
 				DebugVaryings output;
@@ -154,26 +154,11 @@
 			{
 				float3 uvw = input.color.xyz;
 
-#if SPLAT_TRILINEAR
-#define SLICE_SAMPLER _Volume_trilinear_clamp
-#else
-#define SLICE_SAMPLER _Volume_point_clamp
-#endif
-
-				float volumeDensity = _VolumeDensity.SampleLevel(SLICE_SAMPLER, uvw, 0);
-				float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(SLICE_SAMPLER, uvw, 0);
-			#if VOLUME_STAGGERED_GRID
-				float3 volumeVelocity = VolumeStaggeredSample(_VolumeVelocity, uvw);
-			#else
-				float3 volumeVelocity = _VolumeVelocity.SampleLevel(SLICE_SAMPLER, uvw, 0).xyz;
-			#endif
-				float volumeDivergence = _VolumeDivergence.SampleLevel(SLICE_SAMPLER, uvw, 0);
-				float volumePressure = _VolumePressure.SampleLevel(SLICE_SAMPLER, uvw, 0);
-			#if VOLUME_STAGGERED_GRID
-				float3 volumePressureGrad = VolumeStaggeredSample(_VolumePressureGrad, uvw);
-			#else
-				float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(SLICE_SAMPLER, uvw, 0);
-			#endif
+				float volumeDensity = VolumeSampleScalar(_VolumeDensity, uvw);
+				float3 volumeVelocity = VolumeSampleVector(_VolumeVelocity, uvw);
+				float volumeDivergence = VolumeSampleScalar(_VolumeDivergence, uvw);
+				float volumePressure = VolumeSampleScalar(_VolumePressure, uvw);
+				float3 volumePressureGrad = VolumeSampleVector(_VolumePressureGrad, uvw);
 
 				const float opacity = 0.9;
 				{
@@ -205,7 +190,7 @@
 								uvw.y,
 								uvw.z + j * step.z);
 
-							float vol = abs(_VolumeDensity.SampleLevel(SLICE_SAMPLER, uvw_xz, 0));
+							float vol = abs(VolumeSampleScalar(_VolumeDensity, uvw_xz));
 							if (vol > 0.0)
 							{
 								float vol_d = length(float2(i, j));
@@ -235,12 +220,10 @@
 				if (x < 1.0)
 					return float4(ColorDensity(volumeDensity), opacity);
 				else if (x < 2.0)
-					return float4(ColorGradient(volumeDensityGrad), opacity);
-				else if (x < 3.0)
 					return float4(ColorVelocity(volumeVelocity), opacity);
-				else if (x < 4.0)
+				else if (x < 3.0)
 					return float4(ColorDivergence(volumeDivergence), opacity);
-				else if (x < 5.0)
+				else if (x < 4.0)
 					return float4(ColorPressure(volumePressure), opacity);
 				else
 					return float4(ColorGradient(volumePressureGrad), opacity);

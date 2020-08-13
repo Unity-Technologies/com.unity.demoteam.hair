@@ -8,8 +8,8 @@
 #define MAX_BOUNDARIES 8
 // N == max number of colliders
 
-#define SPLAT_PRECISION 1e-4// == include down to fourth decimal
-// R == smallest decimal stored on grid
+#define SPLAT_FRACTIONAL_BITS 14// => 1 / (1 << 14) = 0.00006103515625
+// N == controls smallest fraction stored on grid
 
 #define SPLAT_TRILINEAR 1
 // 0 == splat only to nearest cell
@@ -23,9 +23,9 @@
 // 0 == store everything at cell centers
 // 1 == store velocity and pressure gradient at cell faces
 
-#define VOLUME_SUPPORT_CLUMPING_ 0
+#define VOLUME_SUPPORT_CONTRACTION__ 0
 // 0 == pressure is always positive
-// 1 == negative pressure causes clumping
+// 1 == negative pressure causes contraction
 
 #define STRAND_31_32_DEBUG 0
 // 0 == off

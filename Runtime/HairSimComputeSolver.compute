@@ -16,8 +16,9 @@
 #include "HairSimComputeVolumeData.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
 
+#define ENABLE_VOLUME_IMPULSE			1
 #define ENABLE_VOLUME_FRICTION			1
-#define ENABLE_VOLUME_REPULSION			0
+#define ENABLE_VOLUME_PRESSURE			1
 
 #define ENABLE_CONSTRAINT_COLLISION		0
 #define ENABLE_CONSTRAINT_FRICTION		0
@@ -28,79 +29,38 @@
 //---------
 // utility
 
-float3 ParticleVolumeUVW(uint i)
-{
-	return VolumeWorldToUVW(_ParticlePositionPrev[i].xyz);
-}
-
-uint3 ParticleVolumeIndex(uint i)
-{
-	return VolumeWorldToIndex(_ParticlePositionPrev[i].xyz);
-}
-
 #define USE_PRESSURE_GRADIENT 1
 
-float3 ParticleVolumeFrictionImpulse(uint i, float3 velocity, float friction)
+float3 ParticleVolumeImpulse(uint i, float3 velocity, float friction)
 {
-	if (ENABLE_VOLUME_FRICTION)
+	if (ENABLE_VOLUME_IMPULSE)
 	{
-		float3 volumeUVW = ParticleVolumeUVW(i);
+		float3 volumeUVW = VolumeWorldToUVW(_ParticlePositionPrev[i].xyz);
 #if SPLAT_TRILINEAR
-		float volumeDensity = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
-	#if VOLUME_STAGGERED_GRID
-		float4 volumeVelocity = float4(VolumeStaggeredSample(_VolumeVelocity, volumeUVW), 1.0);
-	#else
-		float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
-	#endif
+		float3 volumeVelocity = VolumeSampleVector(_VolumeVelocity, volumeUVW, _Volume_trilinear_clamp);
 #else
-		float volumeDensity = _VolumeDensity.SampleLevel(_Volume_point_clamp, volumeUVW, 0);
-		float4 volumeVelocity = _VolumeVelocity.SampleLevel(_Volume_point_clamp, volumeUVW, 0);
+		float3 volumeVelocity = VolumeSampleVector(_VolumeVelocity, volumeUVW, _Volume_point_clamp);
 #endif
 
-#if USE_PRESSURE_GRADIENT
-		const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
-		
-	#if VOLUME_STAGGERED_GRID
-		float3 volumePressureGrad = VolumeStaggeredSample(_VolumePressureGrad, volumeUVW);
-	#else
-		float3 volumePressureGrad = _VolumePressureGrad.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
-	#endif
-		float3 volumePressureImpulse = -volumePressureGrad;// * (_DT / volumeDensity);
+		if (ENABLE_VOLUME_PRESSURE)
+		{
+			float3 volumePressureGradient = VolumeSampleVector(_VolumePressureGrad, volumeUVW);
+			float3 volumePressureImpulse = -volumePressureGradient;// * (_DT / volumeDensity);
 
-		float3 impulsePIC = volumePressureImpulse + (volumeVelocity.xyz - velocity);
-		float3 impulseFLIP = volumePressureImpulse;
+			float3 impulsePIC = volumePressureImpulse + (volumeVelocity - velocity);
+			float3 impulseFLIP = volumePressureImpulse;
 		
-		return lerp(impulseFLIP, impulsePIC, friction);
-#else
-		return (volumeVelocity.xyz - velocity) * friction;
-#endif
+			return lerp(impulseFLIP, impulsePIC, friction);
+		}
+		else
+		{
+			return (volumeVelocity - velocity) * friction;
+		}
 	}
 	else
 	{
 		return 0.0;
 	}
-}
-
-float3 ParticleVolumeRepulsionForce(uint i)
-{
-#if USE_PRESSURE_GRADIENT
-	return 0.0;
-#else
-	if (ENABLE_VOLUME_REPULSION)
-	{
-		float3 volumeUVW = ParticleVolumeUVW(i);
-		float3 volumeDensityGrad = _VolumeDensityGrad.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
-
-		float rho = _VolumeDensity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0);
-		float rho0 = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, volumeUVW, 0).w;
-
-		return volumeDensityGrad * -_Repulsion;
-	}
-	else
-	{
-		return 0.0;
-	}
-#endif
 }
 
 float GetDecay()
@@ -153,8 +113,8 @@ void KSolveConstraints_GaussSeidelReference(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float3 x0 = _ParticlePositionPrev[i].xyz;
-			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
-			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
+			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
+			const float3 a0 = float3(0.0, _Gravity, 0.0);
 			{
 				_ParticlePosition[i].xyz = Integrate(x0, v0, a0);
 			}
@@ -340,8 +300,8 @@ void KSolveConstraints_GaussSeidel(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float3 x0 = _ParticlePositionPrev[i].xyz;
-			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
-			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
+			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
+			const float3 a0 = float3(0.0, _Gravity, 0.0);
 			{
 				_ParticlePosition[i].xyz = Integrate(x0, v0, a0);
 			}
@@ -509,8 +469,8 @@ void KSolveConstraints_Jacobi(
 		}
 		else
 		{
-			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
-			const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
+			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
+			const float3 a0 = float3(0.0, _Gravity, 0.0);
 			{
 				gs_x[j] = float4(Integrate(x0, v0, a0), 1.0);
 				gs_d[j] = 0;
@@ -648,8 +608,8 @@ void KSolveConstraints_Jacobi(
 
 	// update position
 	const float3 x0 = _ParticlePositionPrev[i].xyz;
-	const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeFrictionImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
-	const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
+	const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeImpulse(i, _ParticleVelocityPrev[i].xyz, _Friction);
+	const float3 a0 = float3(0.0, _Gravity, 0.0);
 	{
 		if (threadIdx == 0)
 			gs_x[threadIdx] = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
@@ -794,7 +754,7 @@ void KUpdatePosition(
 		// update position
 		const float3 x0 = _ParticlePositionPrev[i].xyz;
 		const float3 v0 = _ParticleVelocityPrev[i].xyz;
-		const float3 a0 = float3(0.0, _Gravity, 0.0) + ParticleVolumeRepulsionForce(i);
+		const float3 a0 = float3(0.0, _Gravity, 0.0);
 
 		_ParticlePosition[i].xyz = Integrate(x0, v0, a0);
 	}

@@ -33,10 +33,9 @@ HAIRSIM_WRITEABLE_VOLUME<int> _AccuVelocityY;
 HAIRSIM_WRITEABLE_VOLUME<int> _AccuVelocityZ;
 
 HAIRSIM_WRITEABLE_VOLUME<float> _VolumeDensity;
-HAIRSIM_WRITEABLE_VOLUME<float3> _VolumeDensityGrad;
 HAIRSIM_WRITEABLE_VOLUME<float4> _VolumeVelocity;
-
 HAIRSIM_WRITEABLE_VOLUME<float> _VolumeDivergence;
+
 HAIRSIM_WRITEABLE_VOLUME<float> _VolumePressure;
 HAIRSIM_WRITEABLE_VOLUME<float> _VolumePressurePrev;
 HAIRSIM_WRITEABLE_VOLUME<float3> _VolumePressureGrad;

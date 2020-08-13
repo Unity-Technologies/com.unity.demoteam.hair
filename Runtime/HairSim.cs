@@ -69,9 +69,8 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Volume_1_SplatByRasterizationNoGS;
 			public static ProfilingSampler Volume_2_Resolve;
 			public static ProfilingSampler Volume_2_ResolveFromRasterization;
-			public static ProfilingSampler Volume_3_Gradient;
-			public static ProfilingSampler Volume_4_Divergence;
-			public static ProfilingSampler Volume_5_PressureEOS;
+			public static ProfilingSampler Volume_3_Divergence;
+			public static ProfilingSampler Volume_4_PressureEOS;
 			public static ProfilingSampler Volume_5_PressureSolve;
 			public static ProfilingSampler Volume_6_PressureGradient;
 			public static ProfilingSampler Draw;
@@ -154,10 +153,9 @@ namespace Unity.DemoTeam.Hair
 			public static int _AccuVelocityZ;
 
 			public static int _VolumeDensity;
-			public static int _VolumeDensityGrad;
 			public static int _VolumeVelocity;
-
 			public static int _VolumeDivergence;
+
 			public static int _VolumePressure;
 			public static int _VolumePressurePrev;
 			public static int _VolumePressureGrad;
@@ -300,7 +298,6 @@ namespace Unity.DemoTeam.Hair
 			public bool drawParticles;
 			public bool drawStrands;
 			public bool drawDensity;
-			public bool drawGradient;
 			public bool drawSliceX;
 			public bool drawSliceY;
 			public bool drawSliceZ;
@@ -311,7 +308,7 @@ namespace Unity.DemoTeam.Hair
 			public float drawSliceOffsetY;
 			[Range(0.0f, 1.0f)]
 			public float drawSliceOffsetZ;
-			[Range(0.0f, 5.0f)]
+			[Range(0.0f, 4.0f)]
 			public float drawSliceDivider;
 
 			public static readonly DebugConfiguration none = new DebugConfiguration();
@@ -320,7 +317,6 @@ namespace Unity.DemoTeam.Hair
 				drawParticles = false,
 				drawStrands = true,
 				drawDensity = false,
-				drawGradient = false,
 				drawSliceX = false,
 				drawSliceY = false,
 				drawSliceZ = false,
@@ -363,7 +359,6 @@ namespace Unity.DemoTeam.Hair
 		private int kernelVolumeSplatVelocityZ;
 		private int kernelVolumeResolve;
 		private int kernelVolumeResolveFromRasterization;
-		private int kernelVolumeGradient;
 		private int kernelVolumeDivergence;
 		private int kernelVolumePressureEOS;
 		private int kernelVolumePressureSolve;
@@ -400,9 +395,9 @@ namespace Unity.DemoTeam.Hair
 		private RenderTexture accuVelocityZ;
 
 		private RenderTexture volumeDensity;
-		private RenderTexture volumeDensityGrad;
 		private RenderTexture volumeVelocity;
 		private RenderTexture volumeDivergence;
+
 		private RenderTexture volumePressure;
 		private RenderTexture volumePressurePrev;
 		private RenderTexture volumePressureGrad;
@@ -466,7 +461,7 @@ namespace Unity.DemoTeam.Hair
 
 		private void OnDrawGizmos()
 		{
-			if (debug.drawDensity || debug.drawGradient || debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)
+			if (debug.drawDensity || debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)
 			{
 				Gizmos.color = Color.Lerp(Color.black, Color.clear, 0.5f);
 				Gizmos.DrawWireCube(GetVolumeCenter(), 2.0f * GetVolumeExtent());
@@ -539,10 +534,9 @@ namespace Unity.DemoTeam.Hair
 			changed |= CreateVolume(ref accuVelocityZ, "AccuVelocityZ", volumeCells, GraphicsFormat.R32_SInt);
 
 			changed |= CreateVolume(ref volumeDensity, "VolumeDensity", volumeCells, RenderTextureFormat.RFloat);
-			changed |= CreateVolume(ref volumeDensityGrad, "VolumeDensityGrad", volumeCells, RenderTextureFormat.ARGBFloat);
 			changed |= CreateVolume(ref volumeVelocity, "VolumeVelocity", volumeCells, RenderTextureFormat.ARGBFloat);
-
 			changed |= CreateVolume(ref volumeDivergence, "VolumeDivergence", volumeCells, RenderTextureFormat.RFloat);
+
 			changed |= CreateVolume(ref volumePressure, "VolumePressure_0", volumeCells, RenderTextureFormat.RFloat);
 			changed |= CreateVolume(ref volumePressurePrev, "VolumePressure_1", volumeCells, RenderTextureFormat.RFloat);
 			changed |= CreateVolume(ref volumePressureGrad, "VolumePressureGrad", volumeCells, RenderTextureFormat.ARGBFloat);
@@ -558,7 +552,6 @@ namespace Unity.DemoTeam.Hair
 			ReleaseVolume(ref accuVelocityZ);
 
 			ReleaseVolume(ref volumeDensity);
-			ReleaseVolume(ref volumeDensityGrad);
 			ReleaseVolume(ref volumeVelocity);
 
 			ReleaseVolume(ref volumeDivergence);
@@ -800,15 +793,15 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					rootPosition.SetData(tmpRootsPos);
-					rootTangent.SetData(tmpRootsTan);
+					cmd.SetComputeBufferData(rootPosition, tmpRootsPos);
+					cmd.SetComputeBufferData(rootTangent, tmpRootsTan);
 
-					particlePosition.SetData(tmpPosition);
-					particlePositionPrev.SetData(tmpPosition);
-					particlePositionCorr.SetData(tmpZeroInit);
+					cmd.SetComputeBufferData(particlePosition, tmpPosition);
+					cmd.SetComputeBufferData(particlePositionPrev, tmpPosition);
+					cmd.SetComputeBufferData(particlePositionCorr, tmpZeroInit);
 
-					particleVelocity.SetData(tmpZeroInit);
-					particleVelocityPrev.SetData(tmpZeroInit);
+					cmd.SetComputeBufferData(particleVelocity, tmpZeroInit);
+					cmd.SetComputeBufferData(particleVelocityPrev, tmpZeroInit);
 				}
 
 				kernelUpdatePosition = computeSolver.FindKernel("KUpdatePosition");
@@ -828,7 +821,6 @@ namespace Unity.DemoTeam.Hair
 				kernelVolumeSplatVelocityZ = computeVolume.FindKernel("KVolumeSplatVelocityZ");
 				kernelVolumeResolve = computeVolume.FindKernel("KVolumeResolve");
 				kernelVolumeResolveFromRasterization = computeVolume.FindKernel("KVolumeResolveFromRasterization");
-				kernelVolumeGradient = computeVolume.FindKernel("KVolumeGradient");
 				kernelVolumeDivergence = computeVolume.FindKernel("KVolumeDivergence");
 				kernelVolumePressureEOS = computeVolume.FindKernel("KVolumePressureEOS");
 				kernelVolumePressureSolve = computeVolume.FindKernel("KVolumePressureSolve");
@@ -958,7 +950,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				SetComputeParams(cmd, computeSolver, dt);
+				PushComputeParams(cmd, computeSolver, dt);
 
 				int solveThreadGroupsX = strands.strandCount / THREAD_GROUP_SIZE;
 				int solveThreadGroupsY = 1;
@@ -973,7 +965,7 @@ namespace Unity.DemoTeam.Hair
 					solveThreadGroupsX = strands.strandCount;
 				}
 
-				SetComputeKernelParams(cmd, computeSolver, kernelSolveConstraints);
+				PushComputeKernelParams(cmd, computeSolver, kernelSolveConstraints);
 				cmd.DispatchCompute(computeSolver, kernelSolveConstraints,
 					solveThreadGroupsX,
 					solveThreadGroupsY,
@@ -995,7 +987,7 @@ namespace Unity.DemoTeam.Hair
 				volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
 				volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
 
-				SetComputeParams(cmd, computeVolume, dt);
+				PushComputeParams(cmd, computeVolume, dt);
 
 				int particleThreadCountX = 64;
 				int particleThreadGroupsX = particlePosition.count / particleThreadCountX;
@@ -1010,7 +1002,7 @@ namespace Unity.DemoTeam.Hair
 				// clear
 				using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
 				{
-					SetComputeKernelParams(cmd, computeVolume, kernelVolumeClear);
+					PushComputeKernelParams(cmd, computeVolume, kernelVolumeClear);
 					cmd.DispatchCompute(computeVolume, kernelVolumeClear,
 						volumeThreadGroupsX,
 						volumeThreadGroupsY,
@@ -1024,7 +1016,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat))
 							{
-								SetComputeKernelParams(cmd, computeVolume, kernelVolumeSplat);
+								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplat);
 								cmd.DispatchCompute(computeVolume, kernelVolumeSplat,
 									particleThreadGroupsX,
 									particleThreadGroupsY,
@@ -1037,7 +1029,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatDensity))
 							{
-								SetComputeKernelParams(cmd, computeVolume, kernelVolumeSplatDensity);
+								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplatDensity);
 								cmd.DispatchCompute(computeVolume, kernelVolumeSplatDensity,
 									particleThreadGroupsX,
 									particleThreadGroupsY,
@@ -1046,19 +1038,19 @@ namespace Unity.DemoTeam.Hair
 
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatVelocityXYZ))
 							{
-								SetComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityX);
+								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityX);
 								cmd.DispatchCompute(computeVolume, kernelVolumeSplatVelocityX,
 									particleThreadGroupsX,
 									particleThreadGroupsY,
 									particleThreadGroupsZ);
 
-								SetComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityY);
+								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityY);
 								cmd.DispatchCompute(computeVolume, kernelVolumeSplatVelocityY,
 									particleThreadGroupsX,
 									particleThreadGroupsY,
 									particleThreadGroupsZ);
 
-								SetComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityZ);
+								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityZ);
 								cmd.DispatchCompute(computeVolume, kernelVolumeSplatVelocityZ,
 									particleThreadGroupsX,
 									particleThreadGroupsY,
@@ -1099,7 +1091,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_2_Resolve))
 							{
-								SetComputeKernelParams(cmd, computeVolume, kernelVolumeResolve);
+								PushComputeKernelParams(cmd, computeVolume, kernelVolumeResolve);
 								cmd.DispatchCompute(computeVolume, kernelVolumeResolve,
 									volumeThreadGroupsX,
 									volumeThreadGroupsY,
@@ -1113,7 +1105,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_2_ResolveFromRasterization))
 							{
-								SetComputeKernelParams(cmd, computeVolume, kernelVolumeResolveFromRasterization);
+								PushComputeKernelParams(cmd, computeVolume, kernelVolumeResolveFromRasterization);
 								cmd.DispatchCompute(computeVolume, kernelVolumeResolveFromRasterization,
 									volumeThreadGroupsX,
 									volumeThreadGroupsX,
@@ -1123,20 +1115,10 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 
-				// density gradient
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_3_Gradient))
-				{
-					SetComputeKernelParams(cmd, computeVolume, kernelVolumeGradient);
-					cmd.DispatchCompute(computeVolume, kernelVolumeGradient,
-						volumeThreadGroupsX,
-						volumeThreadGroupsY,
-						volumeThreadGroupsZ);
-				}
-
 				// divergence
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_4_Divergence))
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_3_Divergence))
 				{
-					SetComputeKernelParams(cmd, computeVolume, kernelVolumeDivergence);
+					PushComputeKernelParams(cmd, computeVolume, kernelVolumeDivergence);
 					cmd.DispatchCompute(computeVolume, kernelVolumeDivergence,
 						volumeThreadGroupsX,
 						volumeThreadGroupsY,
@@ -1144,9 +1126,9 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// pressure eos (initial guess)
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_5_PressureEOS))
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_4_PressureEOS))
 				{
-					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressureEOS);
+					PushComputeKernelParams(cmd, computeVolume, kernelVolumePressureEOS);
 					cmd.DispatchCompute(computeVolume, kernelVolumePressureEOS,
 						volumeThreadGroupsX,
 						volumeThreadGroupsY,
@@ -1156,7 +1138,7 @@ namespace Unity.DemoTeam.Hair
 				// pressure solve
 				using (new ProfilingScope(cmd, MarkersGPU.Volume_5_PressureSolve))
 				{
-					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressureSolve);
+					PushComputeKernelParams(cmd, computeVolume, kernelVolumePressureSolve);
 					for (int i = 0; i != volume.volumePressureIterations; i++)
 					{
 						SwapVolumes(ref volumePressure, ref volumePressurePrev);
@@ -1174,7 +1156,7 @@ namespace Unity.DemoTeam.Hair
 				// pressure gradient
 				using (new ProfilingScope(cmd, MarkersGPU.Volume_6_PressureGradient))
 				{
-					SetComputeKernelParams(cmd, computeVolume, kernelVolumePressureGradient);
+					PushComputeKernelParams(cmd, computeVolume, kernelVolumePressureGradient);
 					cmd.DispatchCompute(computeVolume, kernelVolumePressureGradient,
 						volumeThreadGroupsX,
 						volumeThreadGroupsY,
@@ -1196,7 +1178,6 @@ namespace Unity.DemoTeam.Hair
 				if (!debug.drawParticles &&
 					!debug.drawStrands &&
 					!debug.drawDensity &&
-					!debug.drawGradient &&
 					!debug.drawSliceX &&
 					!debug.drawSliceY &&
 					!debug.drawSliceZ)
@@ -1218,11 +1199,6 @@ namespace Unity.DemoTeam.Hair
 				if (debug.drawDensity)
 				{
 					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 1, MeshTopology.Points, GetVolumeCellCount(), 1, debugDrawMPB);
-				}
-
-				if (debug.drawGradient)
-				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 2, MeshTopology.Lines, GetVolumeCellCount() * 2, 1, debugDrawMPB);
 				}
 
 				if (debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)
@@ -1257,37 +1233,10 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void SetRenderMaterialParams(ref MaterialPropertyBlock mpb)
+		void PushComputeParams(CommandBuffer cmd, ComputeShader cs, float dt)
 		{
-			if (mpb == null)
-				mpb = new MaterialPropertyBlock();
-
-			mpb.SetInt(UniformIDs._StrandCount, strands.strandCount);
-			mpb.SetInt(UniformIDs._StrandParticleCount, strands.strandParticleCount);
-
-			mpb.SetVector(UniformIDs._VolumeCells, volumeCells);
-			mpb.SetVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
-			mpb.SetVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
-
-			mpb.SetBuffer(UniformIDs._ParticlePosition, particlePosition);
-			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
-			mpb.SetBuffer(UniformIDs._ParticleVelocity, particleVelocity);
-			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, particleVelocityPrev);
-
-			mpb.SetTexture(UniformIDs._VolumeDensity, volumeDensity);
-			mpb.SetTexture(UniformIDs._VolumeDensityGrad, volumeDensityGrad);
-			mpb.SetTexture(UniformIDs._VolumeVelocity, volumeVelocity);
-			mpb.SetTexture(UniformIDs._VolumeDivergence, volumeDivergence);
-
-			mpb.SetTexture(UniformIDs._VolumePressure, volumePressure);
-			mpb.SetTexture(UniformIDs._VolumePressurePrev, volumePressurePrev);
-			mpb.SetTexture(UniformIDs._VolumePressureGrad, volumePressureGrad);
-		}
-
-		void SetComputeParams(CommandBuffer cmd, ComputeShader cs, float dt)
-		{
-			float strandParticleInterval = strands.strandLength / (strands.strandParticleCount - 1);
 			float strandCrossSectionArea = 0.25f * Mathf.PI * strands.strandDiameter * strands.strandDiameter;
+			float strandParticleInterval = strands.strandLength / (strands.strandParticleCount - 1);
 			float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
 
 			Matrix4x4 localToWorld = Matrix4x4.TRS(this.transform.position, this.transform.rotation, this.transform.localScale);
@@ -1323,7 +1272,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMax, volumeWorldMax);
 		}
 
-		void SetComputeKernelParams(CommandBuffer cmd, ComputeShader cs, int kernel)
+		void PushComputeKernelParams(CommandBuffer cmd, ComputeShader cs, int kernel)
 		{
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, rootPosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootTangent, rootTangent);
@@ -1346,13 +1295,38 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuVelocityZ, accuVelocityZ);
 
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensity, volumeDensity);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensityGrad, volumeDensityGrad);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeVelocity, volumeVelocity);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDivergence, volumeDivergence);
 
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressure, volumePressure);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressurePrev, volumePressurePrev);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureGrad, volumePressureGrad);
+		}
+
+		void SetRenderMaterialParams(ref MaterialPropertyBlock mpb)
+		{
+			if (mpb == null)
+				mpb = new MaterialPropertyBlock();
+
+			mpb.SetInt(UniformIDs._StrandCount, strands.strandCount);
+			mpb.SetInt(UniformIDs._StrandParticleCount, strands.strandParticleCount);
+
+			mpb.SetVector(UniformIDs._VolumeCells, volumeCells);
+			mpb.SetVector(UniformIDs._VolumeWorldMin, volumeWorldMin);
+			mpb.SetVector(UniformIDs._VolumeWorldMax, volumeWorldMax);
+
+			mpb.SetBuffer(UniformIDs._ParticlePosition, particlePosition);
+			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, particlePositionPrev);
+			mpb.SetBuffer(UniformIDs._ParticleVelocity, particleVelocity);
+			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, particleVelocityPrev);
+
+			mpb.SetTexture(UniformIDs._VolumeDensity, volumeDensity);
+			mpb.SetTexture(UniformIDs._VolumeVelocity, volumeVelocity);
+			mpb.SetTexture(UniformIDs._VolumeDivergence, volumeDivergence);
+
+			mpb.SetTexture(UniformIDs._VolumePressure, volumePressure);
+			mpb.SetTexture(UniformIDs._VolumePressurePrev, volumePressurePrev);
+			mpb.SetTexture(UniformIDs._VolumePressureGrad, volumePressureGrad);
 		}
 	}
 }

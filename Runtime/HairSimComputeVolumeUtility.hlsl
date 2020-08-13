@@ -1,6 +1,7 @@
 #ifndef __HAIRSIMCOMPUTE_VOLUMEUTILITY__
 #define __HAIRSIMCOMPUTE_VOLUMEUTILITY__
 
+#include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeVolumeData.hlsl"
 /*
 	_VolumeCells = (3, 3, 3)
@@ -103,20 +104,58 @@ float3 VolumeStaggededOffsets()
 	return 0.5 / _VolumeCells;
 }
 
-float3 VolumeStaggeredSample(Texture3D<float3> volume, float3 uvw)
+float3 VolumeStaggeredSample(Texture3D<float3> volume, float3 uvw, SamplerState state)
 {
 	return float3(
-		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(VolumeStaggededOffsets().x, 0.0, 0.0), 0).x,
-		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(0.0, VolumeStaggededOffsets().y, 0.0), 0).y,
-		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(0.0, 0.0, VolumeStaggededOffsets().z), 0).z);
+		volume.SampleLevel(state, uvw + float3(VolumeStaggededOffsets().x, 0.0, 0.0), 0).x,
+		volume.SampleLevel(state, uvw + float3(0.0, VolumeStaggededOffsets().y, 0.0), 0).y,
+		volume.SampleLevel(state, uvw + float3(0.0, 0.0, VolumeStaggededOffsets().z), 0).z);
 }
 
-float3 VolumeStaggeredSample(Texture3D<float4> volume, float3 uvw)
+float3 VolumeStaggeredSample(Texture3D<float4> volume, float3 uvw, SamplerState state)
 {
 	return float3(
-		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(VolumeStaggededOffsets().x, 0.0, 0.0), 0).x,
-		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(0.0, VolumeStaggededOffsets().y, 0.0), 0).y,
-		volume.SampleLevel(_Volume_trilinear_clamp, uvw + float3(0.0, 0.0, VolumeStaggededOffsets().z), 0).z);
+		volume.SampleLevel(state, uvw + float3(VolumeStaggededOffsets().x, 0.0, 0.0), 0).x,
+		volume.SampleLevel(state, uvw + float3(0.0, VolumeStaggededOffsets().y, 0.0), 0).y,
+		volume.SampleLevel(state, uvw + float3(0.0, 0.0, VolumeStaggededOffsets().z), 0).z);
+}
+
+float VolumeSampleScalar(Texture3D<float> volume, float3 uvw, SamplerState state)
+{
+	return volume.SampleLevel(state, uvw, 0);
+}
+
+float3 VolumeSampleVector(Texture3D<float3> volume, float3 uvw, SamplerState state)
+{
+#if VOLUME_STAGGERED_GRID
+	return VolumeStaggeredSample(volume, uvw, state);
+#else
+	return volume.SampleLevel(state, uvw, 0).xyz;
+#endif
+}
+
+float3 VolumeSampleVector(Texture3D<float4> volume, float3 uvw, SamplerState state)
+{
+#if VOLUME_STAGGERED_GRID
+	return VolumeStaggeredSample(volume, uvw, state);
+#else
+	return volume.SampleLevel(state, uvw, 0).xyz;
+#endif
+}
+
+float VolumeSampleScalar(Texture3D<float> volume, float3 uvw)
+{
+	return VolumeSampleScalar(volume, uvw, _Volume_trilinear_clamp);
+}
+
+float3 VolumeSampleVector(Texture3D<float3> volume, float3 uvw)
+{
+	return VolumeSampleVector(volume, uvw, _Volume_trilinear_clamp);
+}
+
+float3 VolumeSampleVector(Texture3D<float4> volume, float3 uvw)
+{
+	return VolumeSampleVector(volume, uvw, _Volume_trilinear_clamp);
 }
 
 #endif//__HAIRSIMCOMPUTE_VOLUMEUTILITY__
