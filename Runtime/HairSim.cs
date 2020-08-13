@@ -1,6 +1,7 @@
 ﻿#pragma warning disable 0649 // some fields are assigned via reflection
 
 #define LAYOUT_INTERLEAVED
+//#define CMDBUFFER_SET_DATA
 
 using System;
 using System.Collections.Generic;
@@ -109,7 +110,6 @@ namespace Unity.DemoTeam.Hair
 			public static int _DT;
 			public static int _Iterations;
 			public static int _Stiffness;
-			[FormerlySerializedAs("_Inference")]
 			public static int _Relaxation;
 			public static int _Damping;
 			public static int _Gravity;
@@ -269,7 +269,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public SplatMethod volumeSplatMethod;
-			[Range(4, 256)]
+			[Range(8, 160)]
 			public int volumeResolution;
 			[Range(-1.0f, 1.0f)]
 			public float volumeOffsetX;
@@ -451,7 +451,7 @@ namespace Unity.DemoTeam.Hair
 				boundaries.TrimExcess();
 			}
 
-			volume.volumeResolution = (Mathf.Max(4, volume.volumeResolution) / 4) * 4;
+			volume.volumeResolution = (Mathf.Max(8, volume.volumeResolution) / 8) * 8;
 		}
 
 		private void OnValidate()
@@ -793,6 +793,7 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
+#if CMDBUFFER_SET_DATA
 					cmd.SetComputeBufferData(rootPosition, tmpRootsPos);
 					cmd.SetComputeBufferData(rootTangent, tmpRootsTan);
 
@@ -802,6 +803,17 @@ namespace Unity.DemoTeam.Hair
 
 					cmd.SetComputeBufferData(particleVelocity, tmpZeroInit);
 					cmd.SetComputeBufferData(particleVelocityPrev, tmpZeroInit);
+#else
+					rootPosition.SetData(tmpRootsPos);
+					rootTangent.SetData(tmpRootsTan);
+
+					particlePosition.SetData(tmpPosition);
+					particlePositionPrev.SetData(tmpPosition);
+					particlePositionCorr.SetData(tmpZeroInit);
+
+					particleVelocity.SetData(tmpZeroInit);
+					particleVelocityPrev.SetData(tmpZeroInit);
+#endif
 				}
 
 				kernelUpdatePosition = computeSolver.FindKernel("KUpdatePosition");
@@ -941,10 +953,17 @@ namespace Unity.DemoTeam.Hair
 							ptrMatrixW2PrevW[i] = ptrMatrixPrev[i] * ptrMatrixInv[i];
 						}
 
+#if CMDBUFFER_SET_DATA
 						cmd.SetComputeBufferData(boundaryPack, tmpPack, 0, 0, boundaryCount);
 						cmd.SetComputeBufferData(boundaryMatrix, tmpMatrix, 0, 0, boundaryCount);
 						cmd.SetComputeBufferData(boundaryMatrixInv, tmpMatrixInv, 0, 0, boundaryCount);
 						cmd.SetComputeBufferData(boundaryMatrixW2PrevW, tmpMatrixW2PrevW, 0, 0, boundaryCount);
+#else
+						boundaryPack.SetData(tmpPack, 0, 0, boundaryCount);
+						boundaryMatrix.SetData(tmpMatrix, 0, 0, boundaryCount);
+						boundaryMatrixInv.SetData(tmpMatrixInv, 0, 0, boundaryCount);
+						boundaryMatrixW2PrevW.SetData(tmpMatrixW2PrevW, 0, 0, boundaryCount);
+#endif
 
 						boundaryMatrixPrev.CopyFrom(tmpMatrix);
 					}
@@ -994,10 +1013,12 @@ namespace Unity.DemoTeam.Hair
 				int particleThreadGroupsY = 1;
 				int particleThreadGroupsZ = 1;
 
-				int volumeThreadCountXYZ = 4;
-				int volumeThreadGroupsX = volume.volumeResolution / volumeThreadCountXYZ;
-				int volumeThreadGroupsY = volume.volumeResolution / volumeThreadCountXYZ;
-				int volumeThreadGroupsZ = volume.volumeResolution / volumeThreadCountXYZ;
+				int volumeThreadCountX = 8;
+				int volumeThreadCountY = 8;
+				int volumeThreadCountZ = 1;
+				int volumeThreadGroupsX = volume.volumeResolution / volumeThreadCountX;
+				int volumeThreadGroupsY = volume.volumeResolution / volumeThreadCountY;
+				int volumeThreadGroupsZ = volume.volumeResolution / volumeThreadCountZ;
 
 				// clear
 				using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
