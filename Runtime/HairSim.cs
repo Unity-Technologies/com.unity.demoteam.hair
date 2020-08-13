@@ -157,7 +157,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _VolumeDivergence;
 
 			public static int _VolumePressure;
-			public static int _VolumePressurePrev;
+			public static int _VolumePressureNext;
 			public static int _VolumePressureGrad;
 
 			// debug params
@@ -399,7 +399,7 @@ namespace Unity.DemoTeam.Hair
 		private RenderTexture volumeDivergence;
 
 		private RenderTexture volumePressure;
-		private RenderTexture volumePressurePrev;
+		private RenderTexture volumePressureNext;
 		private RenderTexture volumePressureGrad;
 
 		private void ValidateConfiguration()
@@ -538,7 +538,7 @@ namespace Unity.DemoTeam.Hair
 			changed |= CreateVolume(ref volumeDivergence, "VolumeDivergence", volumeCells, RenderTextureFormat.RFloat);
 
 			changed |= CreateVolume(ref volumePressure, "VolumePressure_0", volumeCells, RenderTextureFormat.RFloat);
-			changed |= CreateVolume(ref volumePressurePrev, "VolumePressure_1", volumeCells, RenderTextureFormat.RFloat);
+			changed |= CreateVolume(ref volumePressureNext, "VolumePressure_1", volumeCells, RenderTextureFormat.RFloat);
 			changed |= CreateVolume(ref volumePressureGrad, "VolumePressureGrad", volumeCells, RenderTextureFormat.ARGBFloat);
 
 			return false;// changed;
@@ -556,7 +556,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseVolume(ref volumeDivergence);
 			ReleaseVolume(ref volumePressure);
-			ReleaseVolume(ref volumePressurePrev);
+			ReleaseVolume(ref volumePressureNext);
 			ReleaseVolume(ref volumePressureGrad);
 		}
 
@@ -1162,15 +1162,14 @@ namespace Unity.DemoTeam.Hair
 					PushComputeKernelParams(cmd, computeVolume, kernelVolumePressureSolve);
 					for (int i = 0; i != volume.volumePressureIterations; i++)
 					{
-						SwapVolumes(ref volumePressure, ref volumePressurePrev);
-						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressure, volumePressure);
-						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressurePrev, volumePressurePrev);
-
 						cmd.DispatchCompute(computeVolume, kernelVolumePressureSolve,
 							volumeThreadGroupsX,
 							volumeThreadGroupsY,
 							volumeThreadGroupsZ);
 
+						SwapVolumes(ref volumePressure, ref volumePressureNext);
+						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressure, volumePressure);
+						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressureNext, volumePressureNext);
 					}
 				}
 
@@ -1320,7 +1319,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDivergence, volumeDivergence);
 
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressure, volumePressure);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressurePrev, volumePressurePrev);
+			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureNext, volumePressureNext);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureGrad, volumePressureGrad);
 		}
 
@@ -1346,7 +1345,7 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetTexture(UniformIDs._VolumeDivergence, volumeDivergence);
 
 			mpb.SetTexture(UniformIDs._VolumePressure, volumePressure);
-			mpb.SetTexture(UniformIDs._VolumePressurePrev, volumePressurePrev);
+			mpb.SetTexture(UniformIDs._VolumePressureNext, volumePressureNext);
 			mpb.SetTexture(UniformIDs._VolumePressureGrad, volumePressureGrad);
 		}
 	}

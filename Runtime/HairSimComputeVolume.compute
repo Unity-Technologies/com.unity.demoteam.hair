@@ -26,7 +26,7 @@
 #define VOLUME_NUM_Y 8
 #define VOLUME_NUM_Z 1
 
-#define VOLUME_SUPPORT_CONTRACTION 1
+#define VOLUME_SUPPORT_CONTRACTION 0
 
 #if VOLUME_SUPPORT_CONTRACTION
 	#define VOLUME_REST_AT_ZERO					0
@@ -443,9 +443,6 @@ void KVolumePressureEOS(
 	const float rho = _VolumeDensity[worldIdx];
 	const float rho0 = 1.0;
 
-	_VolumePressure[worldIdx] = 0.0;
-	return;
-	
 #if VOLUME_AIR_CELL_ZERO_PRESSURE
 	if (rho == 0.0)
 	{
@@ -455,9 +452,9 @@ void KVolumePressureEOS(
 #endif
 	{
 	  #if VOLUME_REST_AT_ZERO
-		_VolumePressure[worldIdx] = (rho / rho0 - 0.0) * (_Repulsion * VolumeWorldCellSize().x * VolumeWorldCellSize().x);;
+		_VolumePressure[worldIdx] = max(0.0, rho / rho0 - 1.0) * (_Repulsion * VolumeWorldCellSize().x * VolumeWorldCellSize().x);;
 	  #else
-		_VolumePressure[worldIdx] = (rho / rho0 - 1.0) * (_Repulsion * VolumeWorldCellSize().x * VolumeWorldCellSize().x);;
+		_VolumePressure[worldIdx] = (rho / rho0 - 1.0) * (_Repulsion * VolumeWorldCellSize().x * VolumeWorldCellSize().x);
 	  #endif
 	}
 }
@@ -479,12 +476,12 @@ float GhostPressureStep(int3 index, int3 step)
 		float sd_0 = -vol_0_r;
 		float sd_1 = 1.0 - vol_0_r;
 			
-		return _VolumePressurePrev[index] * (sd_0 / sd_1);
+		return _VolumePressure[index] * (sd_0 / sd_1);
 	}
 	else
 #endif
 	{
-		return _VolumePressurePrev[other];
+		return _VolumePressure[other];
 	}
 }
 
@@ -498,14 +495,9 @@ bool GhostPressureCell(uint3 worldIdx)
 
 float GhostPressure(float rho, float pressure, uint3 worldIdx)
 {
-	worldIdx = clamp(worldIdx, uint3(0,0,0), (uint3)_VolumeCells.xyz - 1);
+	worldIdx = clamp(worldIdx, uint3(0, 0, 0), (uint3)_VolumeCells.xyz - 1);
 	
-	if (rho == 0.0)
-	{
-		return _VolumePressurePrev[worldIdx];
-	}
-
-	if (GhostPressureCell(worldIdx))
+	if (rho > 0.0 && GhostPressureCell(worldIdx))
 	{
 		float vol_0 = abs(rho);
 		float vol_0_r = pow((3.0 * vol_0) / (4.0 * 3.14159), 1.0 / 3.0);
@@ -516,7 +508,7 @@ float GhostPressure(float rho, float pressure, uint3 worldIdx)
 	}
 	else
 	{
-		return _VolumePressurePrev[worldIdx];
+		return _VolumePressure[worldIdx];
 	}
 }
 
@@ -537,7 +529,7 @@ void KVolumePressureSolve(
 #if VOLUME_AIR_CELL_ZERO_PRESSURE
 	if (rho == 0.0)
 	{
-		_VolumePressure[worldIdx] = 0.0;
+		_VolumePressureNext[worldIdx] = 0.0;
 		return;
 	}
 #endif
@@ -552,7 +544,7 @@ void KVolumePressureSolve(
 	const uint3 worldIdxStrideY = uint3(0, 1, 0);
 	const uint3 worldIdxStrideZ = uint3(0, 0, 1);
 
-	const float p_in = _VolumePressurePrev[worldIdx];
+	const float p_in = _VolumePressure[worldIdx];
 	
 #if VOLUME_GHOST_PRESSURE
 	const float p_xm = GhostPressure(rho, p_in, worldIdx - worldIdxStrideX);
@@ -563,13 +555,13 @@ void KVolumePressureSolve(
 	const float p_yp = GhostPressure(rho, p_in, worldIdx + worldIdxStrideY);
 	const float p_zp = GhostPressure(rho, p_in, worldIdx + worldIdxStrideZ);
 #else
-	const float p_xm = isBoundaryLower.x ? p_in : _VolumePressurePrev[worldIdx - worldIdxStrideX];
-	const float p_ym = isBoundaryLower.y ? p_in : _VolumePressurePrev[worldIdx - worldIdxStrideY];
-	const float p_zm = isBoundaryLower.z ? p_in : _VolumePressurePrev[worldIdx - worldIdxStrideZ];
+	const float p_xm = isBoundaryLower.x ? p_in : _VolumePressure[worldIdx - worldIdxStrideX];
+	const float p_ym = isBoundaryLower.y ? p_in : _VolumePressure[worldIdx - worldIdxStrideY];
+	const float p_zm = isBoundaryLower.z ? p_in : _VolumePressure[worldIdx - worldIdxStrideZ];
 
-	const float p_xp = isBoundaryUpper.x ? p_in : _VolumePressurePrev[worldIdx + worldIdxStrideX];
-	const float p_yp = isBoundaryUpper.y ? p_in : _VolumePressurePrev[worldIdx + worldIdxStrideY];
-	const float p_zp = isBoundaryUpper.z ? p_in : _VolumePressurePrev[worldIdx + worldIdxStrideZ];
+	const float p_xp = isBoundaryUpper.x ? p_in : _VolumePressure[worldIdx + worldIdxStrideX];
+	const float p_yp = isBoundaryUpper.y ? p_in : _VolumePressure[worldIdx + worldIdxStrideY];
+	const float p_zp = isBoundaryUpper.z ? p_in : _VolumePressure[worldIdx + worldIdxStrideZ];
 #endif
 
 	const float b = _VolumeDivergence[worldIdx];
@@ -598,7 +590,7 @@ void KVolumePressureSolve(
 			(p_zm + p_zp + a.z * b));
 #endif
 
-	_VolumePressure[worldIdx] = pressure;
+	_VolumePressureNext[worldIdx] = pressure;
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
