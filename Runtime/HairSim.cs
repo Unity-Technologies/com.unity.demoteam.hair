@@ -490,7 +490,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref boundaryPack, "BoundaryPack", MAX_BOUNDARIES, sizeof(HairSimBoundary.BoundaryPack));
 				changed |= CreateBuffer(ref boundaryMatrix, "BoundaryMatrix", MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref boundaryMatrixInv, "BoundaryMatrixInv", MAX_BOUNDARIES, sizeof(Matrix4x4));
-				changed |= CreateBuffer(ref boundaryMatrixW2PrevW, "BoundaryMatrixW2PW", MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref boundaryMatrixW2PrevW, "BoundaryMatrixW2PrevW", MAX_BOUNDARIES, sizeof(Matrix4x4));
 
 				if (boundaryMatrixPrev.IsCreated && boundaryMatrixPrev.Length != MAX_BOUNDARIES)
 					boundaryMatrixPrev.Dispose();

@@ -26,7 +26,7 @@
 #define VOLUME_NUM_Y 8
 #define VOLUME_NUM_Z 1
 
-#define VOLUME_SUPPORT_CONTRACTION 0
+#define VOLUME_SUPPORT_CONTRACTION 1
 
 #if VOLUME_SUPPORT_CONTRACTION
 	#define VOLUME_REST_AT_ZERO					0
@@ -46,7 +46,7 @@
 	#define VOLUME_GHOST_PRESSURE				0
 	#define VOLUME_GHOST_PRESSURE_GRAD			0
 	#define VOLUME_VOF							0
-#else// broken?
+#else// old (incorrect)
 	#define VOLUME_REST_AT_ZERO					0
 	#define VOLUME_AIR_CELL_ZERO_PRESSURE		0
 	#define VOLUME_AIR_CELL_ZERO_PRESSURE_GRAD	0
@@ -443,7 +443,7 @@ void KVolumePressureEOS(
 	const float rho = _VolumeDensity[worldIdx];
 	const float rho0 = 1.0;
 
-#if VOLUME_AIR_CELL_ZERO_PRESSURE
+#if VOLUME_AIR_CELL_ZERO_PRESSURE || VOLUME_AIR_CELL_ZERO_SINK
 	if (rho == 0.0)
 	{
 		_VolumePressure[worldIdx] = 0.0;
