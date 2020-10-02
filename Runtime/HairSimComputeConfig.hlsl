@@ -23,7 +23,7 @@
 // 0 == store everything at cell centers
 // 1 == store velocity and pressure gradient at cell faces
 
-#define VOLUME_SUPPORT_CONTRACTION__ 0
+#define VOLUME_SUPPORT_CONTRACTION__ 1
 // 0 == pressure is always positive
 // 1 == negative pressure causes contraction
 

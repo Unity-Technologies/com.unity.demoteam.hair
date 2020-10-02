@@ -82,6 +82,7 @@ namespace Unity.DemoTeam.Hair
 		static class UniformIDs
 		{
 			// uniform buffers
+			//public static int _StrandParams;
 			//public static int _SolverParams;
 			//public static int _VolumeParams;
 			//public static int _RenderParams;
