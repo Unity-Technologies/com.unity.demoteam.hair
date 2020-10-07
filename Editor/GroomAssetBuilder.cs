@@ -41,7 +41,7 @@ public static class GroomAssetBuilder
 		ClearGroomAsset(groom);
 
 		// build the data
-		switch (groom.type)
+		switch (groom.settings.type)
 		{
 			case GroomAsset.Type.Alembic:
 				BuildGroomAsset(groom, groom.settingsAlembic);
@@ -52,6 +52,22 @@ public static class GroomAssetBuilder
 				break;
 		}
 
+		// hash the data
+		if (groom.strandGroups != null)
+		{
+			groom.checksum = new Hash128();
+
+			for (int i = 0; i != groom.strandGroups.Length; i++)
+			{
+				groom.checksum.Append(groom.strandGroups[i].meshAssetLines.GetInstanceID());
+				groom.checksum.Append(groom.strandGroups[i].initialPositions);
+			}
+		}
+		else
+		{
+			groom.checksum = new Hash128();
+		}
+
 		// link sub-assets
 		if (groom.strandGroups != null)
 		{
@@ -60,15 +76,14 @@ public static class GroomAssetBuilder
 				AssetDatabase.AddObjectToAsset(groom.strandGroups[i].meshAssetLines, groom);
 				AssetDatabase.AddObjectToAsset(groom.strandGroups[i].meshAssetRoots, groom);
 
-				groom.strandGroups[i].meshAssetLines.name = "lineMesh:" + i;
-				groom.strandGroups[i].meshAssetRoots.name = "rootMesh:" + i;
+				groom.strandGroups[i].meshAssetLines.name = "Lines:" + i;
+				groom.strandGroups[i].meshAssetRoots.name = "Roots:" + i;
 			}
 		}
 
 		// save the asset
 		EditorUtility.SetDirty(groom);
 		AssetDatabase.SaveAssets();
-		AssetDatabase.Refresh();
 	}
 
 	public static void BuildGroomAsset(GroomAsset groom, in GroomAsset.SettingsAlembic settings)
