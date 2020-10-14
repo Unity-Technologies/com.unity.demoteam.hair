@@ -673,7 +673,9 @@ namespace Unity.DemoTeam.Hair
 
 		private static void StepVolumeData_Insert(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData solverData)
 		{
-			int numX = MAX_GROUP_SIZE;
+			int particleCount = (int)solverData.cbuffer._StrandCount * (int)solverData.cbuffer._StrandParticleCount;
+
+			int numX = particleCount / MAX_GROUP_SIZE;
 			int numY = 1;
 			int numZ = 1;
 
@@ -724,7 +726,7 @@ namespace Unity.DemoTeam.Hair
 							CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
 							PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
 							PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
-							cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandCount * (int)solverData.cbuffer._StrandParticleCount, 1, s_volumeRasterMPB);
+							cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, particleCount, 1, s_volumeRasterMPB);
 						}
 					}
 					break;
@@ -736,7 +738,7 @@ namespace Unity.DemoTeam.Hair
 							CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
 							PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
 							PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
-							cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, (int)solverData.cbuffer._StrandCount * (int)solverData.cbuffer._StrandParticleCount * 8, 1, s_volumeRasterMPB);
+							cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, particleCount * 8, 1, s_volumeRasterMPB);
 						}
 					}
 					break;

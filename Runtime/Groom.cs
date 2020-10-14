@@ -19,6 +19,9 @@ namespace Unity.DemoTeam.Hair
 		private HairSim.SolverData[] solverData;
 		private HairSim.VolumeData volumeData;
 
+		//public bool solverSettingsOverride;
+		//public bool volumeSettingsOverride;
+
 		public HairSim.SolverSettings[] solverSettings;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.basic;
 		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.basic;
@@ -87,6 +90,17 @@ namespace Unity.DemoTeam.Hair
 			return new Bounds(strandBounds.center, Vector3.one * (2.0f * extentMax));
 		}
 
+		Bounds GetBoundsForSquareCells()
+		{
+			var bounds = GetBounds();
+			{
+				var nonSquareExtent = bounds.extents;
+				var nonSquareExtentMax = Mathf.Max(nonSquareExtent.x, nonSquareExtent.y, nonSquareExtent.z);
+
+				return new Bounds(bounds.center, Vector3.one * (2.0f * nonSquareExtentMax));
+			}
+		}
+
 		public void DispatchStep(CommandBuffer cmd, float dt)
 		{
 			if (!InitializeRuntimeData())
@@ -98,7 +112,7 @@ namespace Unity.DemoTeam.Hair
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings[i], dt);
 			}
 
-			var volumeBounds = GetBounds();
+			var volumeBounds = GetBoundsForSquareCells();
 			{
 				volumeSettings.volumeWorldCenter = volumeBounds.center;
 				volumeSettings.volumeWorldExtent = volumeBounds.extents;

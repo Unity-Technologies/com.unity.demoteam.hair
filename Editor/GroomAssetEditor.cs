@@ -12,8 +12,9 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty settingsBasic;
 		SerializedProperty settingsAlembic;
 		SerializedProperty settingsProcedural;
-		SerializedProperty strandGroups;
 		SerializedProperty autoBuild;
+
+		SerializedProperty strandGroups;
 
 		void StructPropertyFields(SerializedProperty settings)
 		{

@@ -83,11 +83,10 @@ namespace Unity.DemoTeam.Hair
 		public SettingsBasic settingsBasic;
 		public SettingsAlembic settingsAlembic;
 		public SettingsProcedural settingsProcedural;
+		public bool autoBuild;
 
 		public StrandGroup[] strandGroups;
 
 		public Hash128 checksum;
-
-		public bool autoBuild;
 	}
 }
