@@ -19,9 +19,6 @@ namespace Unity.DemoTeam.Hair
 		private HairSim.SolverData[] solverData;
 		private HairSim.VolumeData volumeData;
 
-		//public bool solverSettingsOverride;
-		//public bool volumeSettingsOverride;
-
 		public HairSim.SolverSettings[] solverSettings;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.basic;
 		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.basic;

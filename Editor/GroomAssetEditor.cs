@@ -76,55 +76,61 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
-				EditorGUI.BeginChangeCheck();
-				{
-					StructPropertyFieldsWithHeader(settingsBasic);
-
-					EditorGUILayout.Space();
-
-					switch ((GroomAsset.Type)type.enumValueIndex)
-					{
-						case GroomAsset.Type.Alembic:
-							StructPropertyFieldsWithHeader(settingsAlembic);
-							break;
-						case GroomAsset.Type.Procedural:
-							StructPropertyFieldsWithHeader(settingsProcedural);
-							break;
-					}
-				}
-
-				bool settingsChanged = EditorGUI.EndChangeCheck();
-
-				EditorGUILayout.Space();
-				EditorGUILayout.BeginHorizontal();
-				{
-					if (GUILayout.Button("Build strand groups") || (settingsChanged && autoBuild.boolValue))
-					{
-						GroomAssetBuilder.ClearGroomAsset(groom);
-						serializedObject.ApplyModifiedPropertiesWithoutUndo();
-						GroomAssetBuilder.BuildGroomAsset(groom);
-						serializedObject.Update();
-
-						if (meshPreview != null)
-						{
-							DestroyImmediate(meshPreview);
-							meshPreview = null;
-						}
-					}
-
-					autoBuild.boolValue = EditorGUILayout.ToggleLeft("Auto", autoBuild.boolValue, GUILayout.Width(50.0f));
-				}
-				EditorGUILayout.EndHorizontal();
+				DrawImporter(groom);
 			}
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
+
 			EditorGUILayout.LabelField("Strand groups", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
 				DrawGroups(groom);
 			}
 			EditorGUILayout.EndVertical();
+		}
+
+		public void DrawImporter(GroomAsset groom)
+		{
+			EditorGUI.BeginChangeCheck();
+			{
+				StructPropertyFieldsWithHeader(settingsBasic);
+
+				EditorGUILayout.Space();
+
+				switch ((GroomAsset.Type)type.enumValueIndex)
+				{
+					case GroomAsset.Type.Alembic:
+						StructPropertyFieldsWithHeader(settingsAlembic);
+						break;
+					case GroomAsset.Type.Procedural:
+						StructPropertyFieldsWithHeader(settingsProcedural);
+						break;
+				}
+			}
+
+			bool settingsChanged = EditorGUI.EndChangeCheck();
+
+			EditorGUILayout.Space();
+			EditorGUILayout.BeginHorizontal();
+			{
+				if (GUILayout.Button("Build strand groups") || (settingsChanged && autoBuild.boolValue))
+				{
+					GroomAssetBuilder.ClearGroomAsset(groom);
+					serializedObject.ApplyModifiedPropertiesWithoutUndo();
+					GroomAssetBuilder.BuildGroomAsset(groom);
+					serializedObject.Update();
+
+					if (meshPreview != null)
+					{
+						DestroyImmediate(meshPreview);
+						meshPreview = null;
+					}
+				}
+
+				autoBuild.boolValue = EditorGUILayout.ToggleLeft("Auto", autoBuild.boolValue, GUILayout.Width(50.0f));
+			}
+			EditorGUILayout.EndHorizontal();
 		}
 
 		public void DrawGroups(GroomAsset groom)
