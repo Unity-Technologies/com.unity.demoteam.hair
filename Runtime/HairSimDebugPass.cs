@@ -10,8 +10,8 @@ namespace Unity.DemoTeam.Hair
 	{
 		private int lastSimulationFrame = -1;
 
-		private RTHandle motionVectorsRT;
-		private void FindMotionVectorsRT()
+		private RTHandle cameraMotionVectorBuffer;
+		private void FindCameraMotionVectorBuffer()
 		{
 			var fieldInfo_m_SharedRTManager = typeof(HDRenderPipeline).GetField("m_SharedRTManager", BindingFlags.NonPublic | BindingFlags.Instance);
 			if (fieldInfo_m_SharedRTManager != null)
@@ -24,7 +24,7 @@ namespace Unity.DemoTeam.Hair
 					if (fieldInfo_m_MotionVectorsRT != null)
 					{
 						//Debug.Log("FindMotionVectorsRT : " + fieldInfo_m_MotionVectorsRT);
-						motionVectorsRT = fieldInfo_m_MotionVectorsRT.GetValue(m_SharedRTManager) as RTHandle;
+						cameraMotionVectorBuffer = fieldInfo_m_MotionVectorsRT.GetValue(m_SharedRTManager) as RTHandle;
 					}
 				}
 			}
@@ -33,9 +33,9 @@ namespace Unity.DemoTeam.Hair
 		protected override void Setup(ScriptableRenderContext renderContext, CommandBuffer cmd)
 		{
 			base.Setup(renderContext, cmd);
-			base.name = "HairSimDebugPass";
+			base.name = "GroomCustomPass";
 
-			FindMotionVectorsRT();
+			FindCameraMotionVectorBuffer();
 		}
 
 		protected override void Execute(CustomPassContext context)
@@ -52,28 +52,23 @@ namespace Unity.DemoTeam.Hair
 					dt = Mathf.Clamp(dt, dtMin, dtMax);
 					dt = 1.0f / 60.0f;
 
-					foreach (HairSim hairSim in HairSim.instances)
+					foreach (var hair in Groom.s_instances)
 					{
-						if (hairSim != null && hairSim.isActiveAndEnabled)
-						{
-							hairSim.Step(context.cmd, dt);
-							hairSim.Volume(context.cmd, dt);
-						}
+						if (hair != null && hair.isActiveAndEnabled)
+							hair.DispatchStep(context.cmd, dt);
 					}
 				}
 
 				lastSimulationFrame = frame;
 			}
 
-			Profiler.BeginSample("HairSimDebugDraw");
-			foreach (HairSim hairSim in HairSim.instances)
+			foreach (var hair in Groom.s_instances)
 			{
-				if (hairSim != null && hairSim.isActiveAndEnabled)
+				if (hair != null && hair.isActiveAndEnabled)
 				{
-					hairSim.Draw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer, motionVectorsRT);
+					hair.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer, cameraMotionVectorBuffer);
 				}
 			}
-			Profiler.EndSample();
 		}
 
 		protected override void Cleanup()

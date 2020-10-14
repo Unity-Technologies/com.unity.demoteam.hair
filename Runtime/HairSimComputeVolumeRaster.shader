@@ -1,12 +1,13 @@
 ﻿Shader "Hidden/HairSimComputeVolumeRaster"
 {
-	CGINCLUDE
+	HLSLINCLUDE
 
 	#pragma target 5.0
 	
+	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
-	#include "HairSimComputeSolverData.hlsl"
-	#include "HairSimComputeVolumeData.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
 
 	struct Varyings
@@ -127,7 +128,7 @@
 		return d.x * d.y * input.value;
 	}
 
-	ENDCG
+	ENDHLSL
 
 	SubShader
 	{
@@ -140,23 +141,23 @@
 
 		Pass
 		{
-			CGPROGRAM
+			HLSLPROGRAM
 
 			#pragma vertex Vert
 			#pragma geometry Geom
 			#pragma fragment Frag
 
-			ENDCG
+			ENDHLSL
 		}
 
 		Pass
 		{
-			CGPROGRAM
+			HLSLPROGRAM
 
 			#pragma vertex VertDirect
 			#pragma fragment Frag
 
-			ENDCG
+			ENDHLSL
 		}
 	}
 }

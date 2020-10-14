@@ -9,10 +9,11 @@ namespace Unity.DemoTeam.Hair
 		Editor meshPreview;
 
 		SerializedProperty type;
-		SerializedProperty settings;
+		SerializedProperty settingsBasic;
 		SerializedProperty settingsAlembic;
 		SerializedProperty settingsProcedural;
 		SerializedProperty strandGroups;
+		SerializedProperty autoBuild;
 
 		void StructPropertyFields(SerializedProperty settings)
 		{
@@ -54,13 +55,15 @@ namespace Unity.DemoTeam.Hair
 
 		private void OnEnable()
 		{
-			settings = serializedObject.FindProperty("settings");
+			settingsBasic = serializedObject.FindProperty("settingsBasic");
 			settingsAlembic = serializedObject.FindProperty("settingsAlembic");
 			settingsProcedural = serializedObject.FindProperty("settingsProcedural");
 
-			type = settings.FindPropertyRelative("type");
+			type = settingsBasic.FindPropertyRelative("type");
 
 			strandGroups = serializedObject.FindProperty("strandGroups");
+
+			autoBuild = serializedObject.FindProperty("autoBuild");
 		}
 
 		public override void OnInspectorGUI()
@@ -72,35 +75,49 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
-				StructPropertyFieldsWithHeader(settings);
-
-				EditorGUILayout.Space();
-
-				switch ((GroomAsset.Type)type.enumValueIndex)
+				EditorGUI.BeginChangeCheck();
 				{
-					case GroomAsset.Type.Alembic:
-						StructPropertyFieldsWithHeader(settingsAlembic);
-						break;
-					case GroomAsset.Type.Procedural:
-						StructPropertyFieldsWithHeader(settingsProcedural);
-						break;
+					StructPropertyFieldsWithHeader(settingsBasic);
+
+					EditorGUILayout.Space();
+
+					switch ((GroomAsset.Type)type.enumValueIndex)
+					{
+						case GroomAsset.Type.Alembic:
+							StructPropertyFieldsWithHeader(settingsAlembic);
+							break;
+						case GroomAsset.Type.Procedural:
+							StructPropertyFieldsWithHeader(settingsProcedural);
+							break;
+					}
 				}
 
+				bool settingsChanged = EditorGUI.EndChangeCheck();
+
 				EditorGUILayout.Space();
-
-				if (GUILayout.Button("Build strand groups"))
+				EditorGUILayout.BeginHorizontal();
 				{
-					GroomAssetBuilder.ClearGroomAsset(groom);
-					serializedObject.ApplyModifiedPropertiesWithoutUndo();
-					GroomAssetBuilder.BuildGroomAsset(groom);
-					serializedObject.Update();
+					if (GUILayout.Button("Build strand groups") || (settingsChanged && autoBuild.boolValue))
+					{
+						GroomAssetBuilder.ClearGroomAsset(groom);
+						serializedObject.ApplyModifiedPropertiesWithoutUndo();
+						GroomAssetBuilder.BuildGroomAsset(groom);
+						serializedObject.Update();
 
-					meshPreview = null;
+						if (meshPreview != null)
+						{
+							DestroyImmediate(meshPreview);
+							meshPreview = null;
+						}
+					}
+
+					autoBuild.boolValue = EditorGUILayout.ToggleLeft("Auto", autoBuild.boolValue, GUILayout.Width(50.0f));
 				}
+				EditorGUILayout.EndHorizontal();
 			}
 			EditorGUILayout.EndVertical();
-			EditorGUILayout.Space();
 
+			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Strand groups", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
@@ -115,7 +132,11 @@ namespace Unity.DemoTeam.Hair
 			{
 				EditorGUILayout.LabelField("None");
 
-				meshPreview = null;
+				if (meshPreview != null)
+				{
+					DestroyImmediate(meshPreview);
+					meshPreview = null;
+				}
 			}
 			else
 			{
@@ -128,7 +149,7 @@ namespace Unity.DemoTeam.Hair
 					numParticles += groom.strandGroups[i].strandCount * groom.strandGroups[i].strandParticleCount;
 				}
 
-				EditorGUILayout.LabelField("Summary", EditorStyles.miniBoldLabel);
+				EditorGUILayout.LabelField("Totals", EditorStyles.miniBoldLabel);
 				using (new EditorGUI.IndentLevelScope())
 				{
 					EditorGUILayout.IntField("Total groups", groom.strandGroups.Length, EditorStyles.label);
@@ -136,12 +157,11 @@ namespace Unity.DemoTeam.Hair
 					EditorGUILayout.IntField("Total particles", numParticles, EditorStyles.label);
 				}
 
-				EditorGUILayout.Space();
-
 				using (new EditorGUI.DisabledGroupScope(true))
 				{
 					for (int i = 0; i != strandGroups.arraySize; i++)
 					{
+						EditorGUILayout.Space();
 						StructPropertyFieldsWithHeader(strandGroups.GetArrayElementAtIndex(i), "Group " + i);
 					}
 				}
@@ -153,7 +173,9 @@ namespace Unity.DemoTeam.Hair
 					var meshPreviewTargets = new Mesh[groom.strandGroups.Length];
 
 					for (int i = 0; i != meshPreviewTargets.Length; i++)
+					{
 						meshPreviewTargets[i] = groom.strandGroups[i].meshAssetLines;
+					}
 
 					meshPreview = CreateEditor(meshPreviewTargets);
 				}

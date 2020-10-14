@@ -7,9 +7,8 @@
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 	#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
 
+	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
-	#include "HairSimComputeSolverData.hlsl"
-	#include "HairSimComputeVolumeData.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
 	#include "HairSimDebugDrawUtility.hlsl"
 	
@@ -175,6 +174,7 @@
 				}
 
 				// TEST LEVEL-SET
+				/*
 				if (_DebugSliceDivider == 2.0)
 				{
 					float3 step = VolumeLocalToUVW(1.0);
@@ -215,6 +215,7 @@
 					else
 						return color_ext * float4(1.0 - d_min.xxx, 1.0);
 				}
+				*/
 
 				float x = uvw.x + _DebugSliceDivider;
 				if (x < 1.0)

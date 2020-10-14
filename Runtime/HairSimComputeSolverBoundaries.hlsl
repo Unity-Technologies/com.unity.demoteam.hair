@@ -1,37 +1,6 @@
 #ifndef __HAIRSIMCOMPUTE_BOUNDARIES__
 #define __HAIRSIMCOMPUTE_BOUNDARIES__
 
-struct BoundaryCapsule { float3 centerA; float radius; float3 centerB; float __pad__; };
-struct BoundarySphere { float3 center; float radius; };
-struct BoundaryTorus { float3 center; float radiusA; float3 axis; float radiusB; };
-struct BoundaryPack
-{
-	//	shape	|	capsule		sphere		torus
-	//	----------------------------------------------
-	//	float3	|	centerA		center		center
-	//	float	|	radius		radius		radiusA
-	//	float3	|	centerB		__pad__		axis
-	//	float	|	__pad__		__pad__		radiusB
-
-	float3 pA;
-	float tA;
-	float3 pB;
-	float tB;
-};
-
-StructuredBuffer<BoundaryCapsule> _BoundaryCapsule;
-StructuredBuffer<BoundarySphere> _BoundarySphere;
-StructuredBuffer<BoundaryTorus> _BoundaryTorus;
-StructuredBuffer<BoundaryPack> _BoundaryPack;
-
-StructuredBuffer<float4x4> _BoundaryMatrix;
-StructuredBuffer<float4x4> _BoundaryMatrixInv;
-StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;
-
-uint _BoundaryCapsuleCount;
-uint _BoundarySphereCount;
-uint _BoundaryTorusCount;
-
 //-----------------
 // boundary shapes
 

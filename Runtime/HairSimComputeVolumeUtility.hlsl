@@ -1,8 +1,8 @@
 #ifndef __HAIRSIMCOMPUTE_VOLUMEUTILITY__
 #define __HAIRSIMCOMPUTE_VOLUMEUTILITY__
 
+#include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
-#include "HairSimComputeVolumeData.hlsl"
 /*
 	_VolumeCells = (3, 3, 3)
 

@@ -43,7 +43,7 @@ namespace Unity.DemoTeam.Hair
 			ClearGroomAsset(groom);
 
 			// build the data
-			switch (groom.settings.type)
+			switch (groom.settingsBasic.type)
 			{
 				case GroomAsset.Type.Alembic:
 					BuildGroomAsset(groom, groom.settingsAlembic);
@@ -218,6 +218,31 @@ namespace Unity.DemoTeam.Hair
 			// get curve counts
 			var curveCount = strandGroup.strandCount;
 			var curvePointCount = strandGroup.strandParticleCount;
+
+			// find min/max/avg strand length
+			strandGroup.strandLengthAvg = 0.0f;
+			strandGroup.strandLengthMin = float.PositiveInfinity;
+			strandGroup.strandLengthMax = float.NegativeInfinity;
+			{
+				for (int i = 0; i != curveCount; i++)
+				{
+					float strandLength = 0.0f;
+
+					for (int j = 1; j != curvePointCount; j++)
+					{
+						ref var p0 = ref strandGroup.initialPositions[i * curvePointCount + j - 1];
+						ref var p1 = ref strandGroup.initialPositions[i * curvePointCount + j];
+
+						strandLength += Vector3.Distance(p0, p1);
+					}
+
+					strandGroup.strandLengthAvg += strandLength;
+					strandGroup.strandLengthMin = Mathf.Min(strandLength, strandGroup.strandLengthMin);
+					strandGroup.strandLengthMax = Mathf.Max(strandLength, strandGroup.strandLengthMax);
+				}
+
+				strandGroup.strandLengthAvg /= curveCount;
+			}
 
 			// prep debug mesh
 			strandGroup.meshAssetLines = new Mesh();

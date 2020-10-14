@@ -8,6 +8,7 @@ namespace Unity.DemoTeam.Hair
 	{
 		public override void OnInspectorGUI()
 		{
+			/*
 			var hairSim = target as HairSim;
 			if (hairSim != null)
 			{
@@ -45,7 +46,7 @@ namespace Unity.DemoTeam.Hair
 					"",
 					MessageType.Info);
 			}
-
+			*/
 			base.OnInspectorGUI();
 
 			/*

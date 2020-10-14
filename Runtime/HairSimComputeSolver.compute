@@ -7,13 +7,14 @@
 #pragma kernel KUpdatePosition							THREAD_GROUP_SIZE=64
 #pragma kernel KUpdateVelocity							THREAD_GROUP_SIZE=64
 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
 #define HAIRSIM_WRITEABLE_SOLVERDATA 1
 
+#include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeSolverBoundaries.hlsl"
 #include "HairSimComputeSolverConstraints.hlsl"
-#include "HairSimComputeSolverData.hlsl"
-#include "HairSimComputeVolumeData.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
 
 #define ENABLE_VOLUME_IMPULSE			1
@@ -28,8 +29,6 @@
 
 //---------
 // utility
-
-#define USE_PRESSURE_GRADIENT 1
 
 float3 ParticleVolumeImpulse(uint i, float3 velocity, float friction)
 {
@@ -165,7 +164,7 @@ void KSolveConstraints_GaussSeidelReference(
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 			float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
 			float3 p2 = _ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz;
-			float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootTangent[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
+			float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
 
 			//      p1 <-- solve
 			//     /
@@ -316,7 +315,7 @@ void KSolveConstraints_GaussSeidel(
 		float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 		float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
 		float3 p2 = _ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz;
-		float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootTangent[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
+		float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
 
 		//      p1 <-- solve
 		//     /
@@ -461,7 +460,7 @@ void KSolveConstraints_Jacobi(
 		if (threadIdx == 0)
 		{
 			const float3 rootPosition = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
-			const float3 rootTangent = mul(_LocalToWorldInvT, float4(_RootTangent[strandIndex].xyz, 0.0)).xyz;
+			const float3 rootTangent = mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz;
 			{
 				gs_x[0] = float4(rootPosition - rootTangent * _StrandParticleInterval, 0.0);
 				gs_x[1] = float4(rootPosition, 0.0);
@@ -677,7 +676,7 @@ void KSolveConstraints_Jacobi(
 				if (threadIdx <= 1)
 				{
 					const uint j = threadIdx;
-					const float3 gs_x_rooted = gs_x[0] - mul(_LocalToWorldInvT, float4(_RootTangent[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
+					const float3 gs_x_rooted = gs_x[0] - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
 
 					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 0.0, 0.0, 1.0, gs_x_rooted, gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
 					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 0.0, 1.0, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop1, sum, nop2); count++;

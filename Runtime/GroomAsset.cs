@@ -16,8 +16,8 @@ namespace Unity.DemoTeam.Hair
 
 		public enum MemoryLayout
 		{
-			SequentialStrands,
-			InterleavedStrands,
+			StrandsSequential,
+			StrandsInterleaved,
 		}
 
 		[Serializable]
@@ -25,13 +25,9 @@ namespace Unity.DemoTeam.Hair
 		{
 			[Tooltip("Type of generator")]
 			public Type type;
-
-			//public MemoryLayout memoryLayout;
-
 			[Tooltip("Material applied to the generated groups")]
 			public Material defaultMaterial;
-
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float defaultStrandDiameter;
 		}
 
@@ -56,14 +52,11 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public Style style;
-
 			[Range(64, MAX_STRAND_COUNT), Tooltip("Number of strands")]
 			public int strandCount;
-
 			[Range(3, MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
 			public int strandParticleCount;
-
-			[Range(0.001f, 5.0f), Tooltip("Strand length (in meters)")]
+			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
 			public float strandLength;
 		}
 
@@ -72,28 +65,29 @@ namespace Unity.DemoTeam.Hair
 		{
 			public int strandCount;
 			public int strandParticleCount;
-			//public float strandDiameter;
-			//public float strandLength;
-			//public float strandParticleContrib;
 
-			//public Material material;
+			public float strandLengthMin;
+			public float strandLengthMax;
+			public float strandLengthAvg;
+
+			[HideInInspector] public MemoryLayout memoryLayout;
 
 			[HideInInspector] public Vector3[] initialPositions;
 			[HideInInspector] public Vector3[] initialRootPositions;
 			[HideInInspector] public Vector3[] initialRootDirections;
 
-			[HideInInspector] public MemoryLayout memoryLayout;
-
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetRoots;
 		}
 
-		public SettingsBasic settings;
+		public SettingsBasic settingsBasic;
 		public SettingsAlembic settingsAlembic;
 		public SettingsProcedural settingsProcedural;
 
 		public StrandGroup[] strandGroups;
 
 		public Hash128 checksum;
+
+		public bool autoBuild;
 	}
 }

@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 using Unity.Collections;
@@ -28,13 +29,6 @@ namespace Unity.DemoTeam.Hair
 				buffer.Release();
 				buffer = null;
 			}
-		}
-
-		public static void SwapBuffers(ref ComputeBuffer bufferA, ref ComputeBuffer bufferB)
-		{
-			ComputeBuffer tmp = bufferA;
-			bufferA = bufferB;
-			bufferB = tmp;
 		}
 
 		public static bool CreateVolume(ref RenderTexture volume, string name, int cells, RenderTextureFormat format)
@@ -102,6 +96,13 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public static void SwapBuffers(ref ComputeBuffer bufferA, ref ComputeBuffer bufferB)
+		{
+			ComputeBuffer tmp = bufferA;
+			bufferA = bufferB;
+			bufferB = tmp;
+		}
+
 		public static void SwapVolumes(ref RenderTexture volumeA, ref RenderTexture volumeB)
 		{
 			RenderTexture tmp = volumeA;
@@ -109,16 +110,23 @@ namespace Unity.DemoTeam.Hair
 			volumeB = tmp;
 		}
 
-		public static void UpdateConstantBuffer<T>(ComputeBuffer buffer, ref T contents) where T : struct
+		public static void InitializeStaticFields<T>(Type type, Func<string, T> construct)
 		{
-			using (NativeArray<T> tmp = new NativeArray<T>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			foreach (var field in type.GetFields())
 			{
-				unsafe
-				{
-					UnsafeUtility.CopyStructureToPtr(ref contents, tmp.GetUnsafePtr());
-					buffer.SetData(tmp);
-				}
+				field.SetValue(null, construct(field.Name));
 			}
+		}
+
+		public static void InitializeStructFields<TStruct, T>(ref TStruct data, Func<string, T> construct) where TStruct : struct
+		{
+			Type type = typeof(TStruct);
+			var boxed = (object)data;
+			foreach (var field in type.GetFields())
+			{
+				field.SetValue(boxed, construct(field.Name));
+			}
+			data = (TStruct)boxed;
 		}
 	}
 }

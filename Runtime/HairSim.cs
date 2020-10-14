@@ -1,7 +1,7 @@
 ﻿#pragma warning disable 0649 // some fields are assigned via reflection
 
-#define LAYOUT_INTERLEAVED
-//#define CMDBUFFER_SET_DATA
+//#define LAYOUT_INTERLEAVED
+//TODO !!
 
 using System;
 using System.Collections.Generic;
@@ -12,54 +12,29 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
 
-using Xorshift = Unity.Mathematics.Random;
-
 namespace Unity.DemoTeam.Hair
 {
 	using static HairSimUtility;
 
-	[ExecuteInEditMode]
-	public class HairSim : MonoBehaviour
+	public partial class HairSim : MonoBehaviour
 	{
-		#region static instances
-		public static HashSet<HairSim> instances = new HashSet<HairSim>();
-		private void OnEnable() { instances.Add(this); }
-		private void OnDisable() { instances.Remove(this); ReleaseBuffers(); ReleaseVolumes(); strandsActive = StrandConfiguration.none; }
-		#endregion
+		static bool s_initialized = false;
 
-		#region static initialization
-		static void InitializeStaticFields<T>(Type type, Func<string, T> construct)
-		{
-			foreach (var field in type.GetFields())
-			{
-				field.SetValue(null, construct(field.Name));
-			}
-		}
+		static ComputeShader s_solverCS;
+		static ComputeShader s_volumeCS;
 
-#if UNITY_EDITOR
-		[UnityEditor.InitializeOnLoadMethod]
-#else
-		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-#endif
-		static void InitializeHairSim()
-		{
-			Debug.Log("InitializeHairSim");
-			InitializeStaticFields(typeof(MarkersCPU), (string s) => new ProfilerMarker("HairSim." + s.Replace('_', '.')));
-			InitializeStaticFields(typeof(MarkersGPU), (string s) => new ProfilingSampler("HairSim." + s.Replace('_', '.')));
-			InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
-		}
-		#endregion
+		static Material s_volumeRasterMat;
+		static MaterialPropertyBlock s_volumeRasterMPB;
+		static Material s_debugDrawMat;
+		static MaterialPropertyBlock s_debugDrawMPB;
 
-		#region static profile markers
 		static class MarkersCPU
 		{
-			public static ProfilerMarker GetStrandRoots;
+			public static ProfilerMarker Dummy;
 		}
-
 		static class MarkersGPU
 		{
-			public static ProfilingSampler Init;
-			public static ProfilingSampler Step;
+			public static ProfilingSampler Solver;
 			public static ProfilingSampler Volume;
 			public static ProfilingSampler Volume_0_Clear;
 			public static ProfilingSampler Volume_1_Splat;
@@ -73,80 +48,26 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Volume_4_PressureEOS;
 			public static ProfilingSampler Volume_5_PressureSolve;
 			public static ProfilingSampler Volume_6_PressureGradient;
-			public static ProfilingSampler Draw;
+			public static ProfilingSampler DrawSolverData;
+			public static ProfilingSampler DrawVolumeData;
 		}
-		#endregion
-
-		#region static shader literals
 		static class UniformIDs
 		{
-			// uniform buffers
-			//public static int _StrandParams;
-			//public static int _SolverParams;
-			//public static int _VolumeParams;
-			//public static int _RenderParams;
+			// solver
+			public static int SolverParams;
 
-			// storage buffers
-			//TODO
-
-			// textures
-			//TODO
-
-			// strand params
-			public static int _StrandCount;
-			public static int _StrandParticleCount;
-			public static int _StrandParticleInterval;
-			public static int _StrandParticleVolume;
-			public static int _StrandParticleContrib;
-
-			// strand buffers
 			public static int _RootPosition;
-			public static int _RootTangent;
+			public static int _RootDirection;
 
-			// solver params
-			public static int _LocalToWorld;
-			public static int _LocalToWorldInvT;
-
-			public static int _DT;
-			public static int _Iterations;
-			public static int _Stiffness;
-			public static int _Relaxation;
-			public static int _Damping;
-			public static int _Gravity;
-			public static int _Repulsion;
-			public static int _Friction;
-			public static int _BendingCurvature;
-			public static int _BendingStiffness;
-			public static int _DampingFTL;
-
-			// solver buffers
 			public static int _ParticlePosition;
-			public static int _ParticleVelocity;
 			public static int _ParticlePositionPrev;
-			public static int _ParticleVelocityPrev;
 			public static int _ParticlePositionCorr;
+			public static int _ParticleVelocity;
+			public static int _ParticleVelocityPrev;
 
-			// boundary params
-			public static int _BoundaryCapsuleCount;
-			public static int _BoundarySphereCount;
-			public static int _BoundaryTorusCount;
+			// volume
+			public static int VolumeParams;
 
-			// boundary buffers
-			public static int _BoundaryCapsule;
-			public static int _BoundarySphere;
-			public static int _BoundaryTorus;
-			public static int _BoundaryPack;
-
-			public static int _BoundaryMatrix;
-			public static int _BoundaryMatrixInv;
-			public static int _BoundaryMatrixW2PrevW;
-
-			// volume params
-			public static int _VolumeCells;
-			public static int _VolumeWorldMin;
-			public static int _VolumeWorldMax;
-
-			// volume buffers
 			public static int _AccuDensity;
 			public static int _AccuVelocityX;
 			public static int _AccuVelocityY;
@@ -160,63 +81,59 @@ namespace Unity.DemoTeam.Hair
 			public static int _VolumePressureNext;
 			public static int _VolumePressureGrad;
 
-			// debug params
+			public static int _BoundaryPack;
+			public static int _BoundaryMatrix;
+			public static int _BoundaryMatrixInv;
+			public static int _BoundaryMatrixW2PrevW;
+
+			// debug
 			public static int _DebugSliceAxis;
 			public static int _DebugSliceOffset;
 			public static int _DebugSliceDivider;
 		}
-		#endregion
 
-		const int THREAD_GROUP_SIZE = 64;
-
-		const int MAX_STRANDS = 64000;
-		const int MAX_STRAND_PARTICLES = 128;
-		const int MAX_BOUNDARIES = 8;
-
-		[Serializable]
-		public struct StrandConfiguration
+		static class SolverKernels
 		{
-			public enum Style
+			public static int KSolveConstraints_GaussSeidelReference;
+			public static int KSolveConstraints_GaussSeidel;
+			public static int KSolveConstraints_Jacobi_16;
+			public static int KSolveConstraints_Jacobi_32;
+			public static int KSolveConstraints_Jacobi_64;
+			public static int KSolveConstraints_Jacobi_128;
+			public static int KUpdatePosition;
+			public static int KUpdateVelocity;
+		}
+		static class VolumeKernels
+		{
+			public static int KVolumeClear;
+			public static int KVolumeSplat;
+			public static int KVolumeSplatDensity;
+			public static int KVolumeSplatVelocityX;
+			public static int KVolumeSplatVelocityY;
+			public static int KVolumeSplatVelocityZ;
+			public static int KVolumeResolve;
+			public static int KVolumeResolveFromRasterization;
+			public static int KVolumeDivergence;
+			public static int KVolumePressureEOS;
+			public static int KVolumePressureSolve;
+			public static int KVolumePressureGradient;
+		}
+
+		[Serializable] public struct SolverSettings
+		{
+			public enum Method
 			{
-				Curtain,
-				Brush,
-				Cap,
-				StratifiedCurtain,
+				GaussSeidelReference = 0,
+				GaussSeidel = 1,
+				Jacobi = 2,
 			}
 
-			public Style style;
-			[Range(64, MAX_STRANDS)]
-			public int strandCount;
-			[Range(3, MAX_STRAND_PARTICLES)]
-			public int strandParticleCount;
 			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
 			public float strandLength;
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
 			[Range(0.0f, 9.0f)]
 			public float strandParticleContrib;// TODO remove
-
-			public static readonly StrandConfiguration none = new StrandConfiguration();
-			public static readonly StrandConfiguration basic = new StrandConfiguration()
-			{
-				style = Style.Curtain,
-				strandCount = 1024,
-				strandParticleCount = 32,
-				strandLength = 0.5f,
-				strandDiameter = 0.125f,
-				strandParticleContrib = 1.0f,// TODO remove
-			};
-		}
-
-		[Serializable]
-		public struct SolverConfiguration
-		{
-			public enum Method : uint
-			{
-				GaussSeidelReference = 0,
-				GaussSeidel = 1,
-				Jacobi = 2,
-			}
 
 			public Method method;
 			[Range(1, 100)]
@@ -233,31 +150,27 @@ namespace Unity.DemoTeam.Hair
 			public float repulsion;
 			[Range(0.0f, 1.0f)]
 			public float friction;
-
 			[Range(0.0f, 1.0f)]
 			public float bendingCurvature;
 			[Range(0.0f, 1.0f)]
 			public float dampingFTL;
 
-			public static readonly SolverConfiguration none = new SolverConfiguration();
-			public static readonly SolverConfiguration basic = new SolverConfiguration()
+			public static readonly SolverSettings none = new SolverSettings();
+			public static readonly SolverSettings basic = new SolverSettings()
 			{
-				method = Method.GaussSeidelReference,
-				iterations = 3,
+				method = Method.GaussSeidel,
+				iterations = 5,
 				stiffness = 1.0f,
 				relaxation = 1.0f,
 				damping = 0.0f,
 				gravity = 1.0f,
 				repulsion = 0.0f,
 				friction = 0.0f,
-
 				bendingCurvature = 0.0f,
 				dampingFTL = 0.8f,
 			};
 		}
-
-		[Serializable]
-		public struct VolumeConfiguration
+		[Serializable] public struct VolumeSettings
 		{
 			public enum SplatMethod : uint
 			{
@@ -279,21 +192,23 @@ namespace Unity.DemoTeam.Hair
 			public float volumeOffsetZ;
 			[Range(0, 100)]
 			public int volumePressureIterations;
+			[HideInInspector]
+			public Vector3 volumeWorldCenter;
+			[HideInInspector]
+			public Vector3 volumeWorldExtent;
 
-			public static readonly VolumeConfiguration none = new VolumeConfiguration();
-			public static readonly VolumeConfiguration basic = new VolumeConfiguration()
+			public static readonly VolumeSettings none = new VolumeSettings();
+			public static readonly VolumeSettings basic = new VolumeSettings()
 			{
 				volumeSplatMethod = SplatMethod.Compute,
-				volumeResolution = 64,
+				volumeResolution = 48,
 				volumeOffsetX = 0.0f,
 				volumeOffsetY = 0.0f,
 				volumeOffsetZ = 0.0f,
 				volumePressureIterations = 0,
 			};
 		}
-
-		[Serializable]
-		public struct DebugConfiguration
+		[Serializable] public struct DebugSettings
 		{
 			public bool drawParticles;
 			public bool drawStrands;
@@ -302,17 +217,13 @@ namespace Unity.DemoTeam.Hair
 			public bool drawSliceY;
 			public bool drawSliceZ;
 
-			[Range(0.0f, 1.0f)]
-			public float drawSliceOffsetX;
-			[Range(0.0f, 1.0f)]
-			public float drawSliceOffsetY;
-			[Range(0.0f, 1.0f)]
-			public float drawSliceOffsetZ;
-			[Range(0.0f, 4.0f)]
-			public float drawSliceDivider;
+			[Range(0.0f, 1.0f)] public float drawSliceOffsetX;
+			[Range(0.0f, 1.0f)] public float drawSliceOffsetY;
+			[Range(0.0f, 1.0f)] public float drawSliceOffsetZ;
+			[Range(0.0f, 4.0f)] public float drawSliceDivider;
 
-			public static readonly DebugConfiguration none = new DebugConfiguration();
-			public static readonly DebugConfiguration basic = new DebugConfiguration()
+			public static readonly DebugSettings none = new DebugSettings();
+			public static readonly DebugSettings basic = new DebugSettings()
 			{
 				drawParticles = false,
 				drawStrands = true,
@@ -327,174 +238,106 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
-		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(MAX_BOUNDARIES);
-		private StrandConfiguration strandsActive = StrandConfiguration.none;
-		public StrandConfiguration strands = StrandConfiguration.basic;
-		public SolverConfiguration solver = SolverConfiguration.basic;
-		public VolumeConfiguration volume = VolumeConfiguration.basic;
-		public DebugConfiguration debug = DebugConfiguration.basic;
+		[HideInInspector] public ComputeShader solverCS;
+		[HideInInspector] public ComputeShader volumeCS;
 
-		[HideInInspector] public ComputeShader computeSolver;
-		[HideInInspector] public ComputeShader computeVolume;
-		[HideInInspector] public Material computeVolumeRaster;
-		private MaterialPropertyBlock computeVolumeRasterMBP;
+		[HideInInspector] public Material volumeRasterMat;
+		[HideInInspector] public Material debugDrawMat;
 
-		[HideInInspector] public Material debugDraw;
-		private MaterialPropertyBlock debugDrawMPB;
+		public const int MAX_GROUP_SIZE = 64;
+		public const int MAX_BOUNDARIES = 8;
 
-		private int kernelUpdatePosition;
-		private int kernelSolveConstraints_GaussSeidelReference;
-		private int kernelSolveConstraints_GaussSeidel;
-		private int kernelSolveConstraints_Jacobi_16;
-		private int kernelSolveConstraints_Jacobi_32;
-		private int kernelSolveConstraints_Jacobi_64;
-		private int kernelSolveConstraints_Jacobi_128;
-		private int kernelUpdateVelocity;
-
-		private int kernelVolumeClear;
-		private int kernelVolumeSplat;
-		private int kernelVolumeSplatDensity;
-		private int kernelVolumeSplatVelocityX;
-		private int kernelVolumeSplatVelocityY;
-		private int kernelVolumeSplatVelocityZ;
-		private int kernelVolumeResolve;
-		private int kernelVolumeResolveFromRasterization;
-		private int kernelVolumeDivergence;
-		private int kernelVolumePressureEOS;
-		private int kernelVolumePressureSolve;
-		private int kernelVolumePressureGradient;
-
-		public struct SolverData
+#if UNITY_EDITOR
+		[UnityEditor.InitializeOnLoadMethod]
+#else
+		[RuntimeInitializeOnLoadMethod]
+#endif
+		static void StaticInitialize()
 		{
-			public ComputeBuffer rootPosition;
-			public ComputeBuffer rootTangent;
-
-			public ComputeBuffer particlePosition;
-			public ComputeBuffer particlePositionPrev;
-			public ComputeBuffer particlePositionCorr;
-			public ComputeBuffer particleVelocity;
-			public ComputeBuffer particleVelocityPrev;
-		}
-
-		public struct VolumeData
-		{
-			public RenderTexture accuDensity;
-			public RenderTexture accuVelocityX;
-			public RenderTexture accuVelocityY;
-			public RenderTexture accuVelocityZ;
-
-			public RenderTexture volumeDensity;
-			public RenderTexture volumeVelocity;
-			public RenderTexture volumeDivergence;
-
-			public RenderTexture volumePressure;
-			public RenderTexture volumePressureNext;
-			public RenderTexture volumePressureGrad;
-
-			public Vector3 volumeCells;
-			public Vector3 volumeWorldMin;
-			public Vector3 volumeWorldMax;
-
-			public ComputeBuffer boundaryPack;
-			public ComputeBuffer boundaryMatrix;
-			public ComputeBuffer boundaryMatrixInv;
-			public ComputeBuffer boundaryMatrixW2PrevW;
-
-			public int boundaryCapsuleCount;
-			public int boundarySphereCount;
-			public int boundaryTorusCount;
-
-			public NativeArray<Matrix4x4> boundaryMatrixPrev;
-			public Hash128 boundaryMatrixPrevHash;
-		}
-
-		private SolverData solverData;
-		private VolumeData volumeData;
-
-		private void ValidateConfiguration()
-		{
-			switch (solver.method)
+			if (s_initialized == false)
 			{
-				case SolverConfiguration.Method.GaussSeidelReference:
-				case SolverConfiguration.Method.GaussSeidel:
-					{
-						strands.strandCount = THREAD_GROUP_SIZE * (strands.strandCount / THREAD_GROUP_SIZE);
-						strands.strandCount = Mathf.Max(THREAD_GROUP_SIZE, strands.strandCount);
-					}
-					break;
+				var instance = ComponentSingleton<HairSim>.instance;
+				{
+					s_solverCS = instance.solverCS;
+					s_volumeCS = instance.volumeCS;
 
-				case SolverConfiguration.Method.Jacobi:
-					{
-						unsafe
-						{
-							int* jacobiGroupSizes = stackalloc int[4]
-							{
-								16,
-								32,
-								64,
-								128,
-							};
+					Debug.Log("s_solverCS = " + s_solverCS.name);
+					Debug.Log("s_volumeCS = " + s_volumeCS.name);
 
-							int n = Mathf.Clamp(strands.strandParticleCount, jacobiGroupSizes[0], jacobiGroupSizes[3]);
-							for (int i = 1; i != 4; i++)
-							{
-								int min = jacobiGroupSizes[i - 1];
-								int max = jacobiGroupSizes[i];
+					s_volumeRasterMat = new Material(instance.volumeRasterMat);
+					s_volumeRasterMat.hideFlags = HideFlags.HideAndDontSave;
+					s_volumeRasterMPB = new MaterialPropertyBlock();
 
-								if (n >= min && n <= max)
-								{
-									n = ((max - n) < (n - min)) ? max : min;
-								}
-							}
+					s_debugDrawMat = new Material(instance.debugDrawMat);
+					s_debugDrawMat.hideFlags = HideFlags.HideAndDontSave;
+					s_debugDrawMPB = new MaterialPropertyBlock();
+				}
 
-							strands.strandCount = Mathf.Max(64, strands.strandCount);
-							strands.strandParticleCount = n;
-						}
-					}
-					break;
-			}
+				InitializeStaticFields(typeof(MarkersCPU), (string s) => new ProfilerMarker("HairSim." + s.Replace('_', '.')));
+				InitializeStaticFields(typeof(MarkersGPU), (string s) => new ProfilingSampler("HairSim." + s.Replace('_', '.')));
+				InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
 
-			if (boundaries.Count > MAX_BOUNDARIES)
-			{
-				boundaries.RemoveRange(MAX_BOUNDARIES, boundaries.Count - MAX_BOUNDARIES);
-				boundaries.TrimExcess();
-			}
+				InitializeStaticFields(typeof(SolverKernels), (string s) => s_solverCS.FindKernel(s));
+				InitializeStaticFields(typeof(VolumeKernels), (string s) => s_volumeCS.FindKernel(s));
 
-			volume.volumeResolution = (Mathf.Max(8, volume.volumeResolution) / 8) * 8;
-		}
-
-		private void OnValidate()
-		{
-			ValidateConfiguration();
-		}
-
-		private void OnDrawGizmos()
-		{
-			if (debug.drawDensity || debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)
-			{
-				Gizmos.color = Color.Lerp(Color.black, Color.clear, 0.5f);
-				Gizmos.DrawWireCube(GetVolumeCenter(), 2.0f * GetVolumeExtent());
+				s_initialized = true;
 			}
 		}
 
-		private bool CreateBuffers()
+		public static bool PrepareSolverData(ref SolverData solverData, int strandCount, int strandParticleCount)
 		{
 			unsafe
 			{
 				bool changed = false;
 
-				int particleCount = strands.strandCount * strands.strandParticleCount;
+				int particleCount = strandCount * strandParticleCount;
 				int particleStride = sizeof(Vector4);
 
-				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strands.strandCount, particleStride);
-				changed |= CreateBuffer(ref solverData.rootTangent, "RootTangent", strands.strandCount, particleStride);
+				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStride);
+				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStride);
 
 				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, particleStride);
-
 				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStride);
+
+				return changed;
+			}
+		}
+
+		public static void ReleaseSolverData(ref SolverData solverData)
+		{
+			ReleaseBuffer(ref solverData.rootPosition);
+			ReleaseBuffer(ref solverData.rootDirection);
+
+			ReleaseBuffer(ref solverData.particlePosition);
+			ReleaseBuffer(ref solverData.particlePositionPrev);
+			ReleaseBuffer(ref solverData.particlePositionCorr);
+			ReleaseBuffer(ref solverData.particleVelocity);
+			ReleaseBuffer(ref solverData.particleVelocityPrev);
+
+			solverData = new SolverData();
+		}
+
+		public static bool PrepareVolumeData(ref VolumeData volumeData, int volumeCellCount)
+		{
+			unsafe
+			{
+				bool changed = false;
+
+				changed |= CreateVolume(ref volumeData.accuDensity, "AccuDensity", volumeCellCount, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt
+				changed |= CreateVolume(ref volumeData.accuVelocityX, "AccuVelocityX", volumeCellCount, GraphicsFormat.R32_SInt);
+				changed |= CreateVolume(ref volumeData.accuVelocityY, "AccuVelocityY", volumeCellCount, GraphicsFormat.R32_SInt);
+				changed |= CreateVolume(ref volumeData.accuVelocityZ, "AccuVelocityZ", volumeCellCount, GraphicsFormat.R32_SInt);
+
+				changed |= CreateVolume(ref volumeData.volumeDensity, "VolumeDensity", volumeCellCount, RenderTextureFormat.RFloat);
+				changed |= CreateVolume(ref volumeData.volumeVelocity, "VolumeVelocity", volumeCellCount, RenderTextureFormat.ARGBFloat);
+				changed |= CreateVolume(ref volumeData.volumeDivergence, "VolumeDivergence", volumeCellCount, RenderTextureFormat.RFloat);
+
+				changed |= CreateVolume(ref volumeData.volumePressure, "VolumePressure_0", volumeCellCount, RenderTextureFormat.RFloat);
+				changed |= CreateVolume(ref volumeData.volumePressureNext, "VolumePressure_1", volumeCellCount, RenderTextureFormat.RFloat);
+				changed |= CreateVolume(ref volumeData.volumePressureGrad, "VolumePressureGrad", volumeCellCount, RenderTextureFormat.ARGBFloat);
 
 				changed |= CreateBuffer(ref volumeData.boundaryPack, "BoundaryPack", MAX_BOUNDARIES, sizeof(HairSimBoundary.BoundaryPack));
 				changed |= CreateBuffer(ref volumeData.boundaryMatrix, "BoundaryMatrix", MAX_BOUNDARIES, sizeof(Matrix4x4));
@@ -510,50 +353,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		private void ReleaseBuffers()
-		{
-			ReleaseBuffer(ref solverData.rootPosition);
-			ReleaseBuffer(ref solverData.rootTangent);
-
-			ReleaseBuffer(ref solverData.particlePosition);
-			ReleaseBuffer(ref solverData.particlePositionPrev);
-			ReleaseBuffer(ref solverData.particlePositionCorr);
-
-			ReleaseBuffer(ref solverData.particleVelocity);
-			ReleaseBuffer(ref solverData.particleVelocityPrev);
-
-			ReleaseBuffer(ref volumeData.boundaryPack);
-			ReleaseBuffer(ref volumeData.boundaryMatrix);
-			ReleaseBuffer(ref volumeData.boundaryMatrixInv);
-			ReleaseBuffer(ref volumeData.boundaryMatrixW2PrevW);
-
-			if (volumeData.boundaryMatrixPrev.IsCreated)
-				volumeData.boundaryMatrixPrev.Dispose();
-		}
-
-		private bool CreateVolumes()
-		{
-			bool changed = false;
-
-			int volumeCells = volume.volumeResolution;
-
-			changed |= CreateVolume(ref volumeData.accuDensity, "AccuDensity", volumeCells, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt
-			changed |= CreateVolume(ref volumeData.accuVelocityX, "AccuVelocityX", volumeCells, GraphicsFormat.R32_SInt);
-			changed |= CreateVolume(ref volumeData.accuVelocityY, "AccuVelocityY", volumeCells, GraphicsFormat.R32_SInt);
-			changed |= CreateVolume(ref volumeData.accuVelocityZ, "AccuVelocityZ", volumeCells, GraphicsFormat.R32_SInt);
-
-			changed |= CreateVolume(ref volumeData.volumeDensity, "VolumeDensity", volumeCells, RenderTextureFormat.RFloat);
-			changed |= CreateVolume(ref volumeData.volumeVelocity, "VolumeVelocity", volumeCells, RenderTextureFormat.ARGBFloat);
-			changed |= CreateVolume(ref volumeData.volumeDivergence, "VolumeDivergence", volumeCells, RenderTextureFormat.RFloat);
-
-			changed |= CreateVolume(ref volumeData.volumePressure, "VolumePressure_0", volumeCells, RenderTextureFormat.RFloat);
-			changed |= CreateVolume(ref volumeData.volumePressureNext, "VolumePressure_1", volumeCells, RenderTextureFormat.RFloat);
-			changed |= CreateVolume(ref volumeData.volumePressureGrad, "VolumePressureGrad", volumeCells, RenderTextureFormat.ARGBFloat);
-
-			return false;// changed;
-		}
-
-		private void ReleaseVolumes()
+		public static void ReleaseVolumeData(ref VolumeData volumeData)
 		{
 			ReleaseVolume(ref volumeData.accuDensity);
 			ReleaseVolume(ref volumeData.accuVelocityX);
@@ -567,751 +367,183 @@ namespace Unity.DemoTeam.Hair
 			ReleaseVolume(ref volumeData.volumePressure);
 			ReleaseVolume(ref volumeData.volumePressureNext);
 			ReleaseVolume(ref volumeData.volumePressureGrad);
+
+			ReleaseBuffer(ref volumeData.boundaryPack);
+			ReleaseBuffer(ref volumeData.boundaryMatrix);
+			ReleaseBuffer(ref volumeData.boundaryMatrixInv);
+			ReleaseBuffer(ref volumeData.boundaryMatrixW2PrevW);
+
+			if (volumeData.boundaryMatrixPrev.IsCreated)
+				volumeData.boundaryMatrixPrev.Dispose();
+
+			volumeData = new VolumeData();
 		}
 
-		private struct StrandRoot
+		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, float dt)
 		{
-			public Vector3 localPos;
-			public Vector3 localTan;
+			ref var cbuffer = ref solverData.cbuffer;
+
+			// update strand parameters
+			cbuffer._LocalToWorld = Matrix4x4.identity;
+			cbuffer._LocalToWorldInvT = Matrix4x4.identity;
+
+			float strandCrossSectionArea = 0.25f * Mathf.PI * solverSettings.strandDiameter * solverSettings.strandDiameter;
+			float strandParticleInterval = solverSettings.strandLength / (cbuffer._StrandParticleCount - 1);
+			float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
+
+			cbuffer._StrandParticleInterval = strandParticleInterval;
+			cbuffer._StrandParticleVolume = strandParticleVolume;
+			cbuffer._StrandParticleContrib = solverSettings.strandParticleContrib;
+
+			// update solver parameters
+			cbuffer._DT = dt;
+			cbuffer._Iterations = (uint)solverSettings.iterations;
+			cbuffer._Stiffness = solverSettings.stiffness;
+			cbuffer._Relaxation = solverSettings.relaxation;
+			cbuffer._Damping = solverSettings.damping;
+			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
+			cbuffer._Repulsion = solverSettings.repulsion;
+			cbuffer._Friction = solverSettings.friction;
+			cbuffer._BendingCurvature = solverSettings.bendingCurvature * 0.5f * strandParticleInterval;
+			cbuffer._DampingFTL = solverSettings.dampingFTL;
 		}
 
-		private NativeArray<StrandRoot> GetStrandRoots()
+		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, List<HairSimBoundary> boundaries)
 		{
-			using (MarkersCPU.GetStrandRoots.Auto())
+			ref var cbuffer = ref volumeData.cbuffer;
+
+			// update volume resolution
+			cbuffer._VolumeCells = volumeSettings.volumeResolution * Vector3.one;
+
+			// update volume coordinates
+			cbuffer._VolumeWorldMin = volumeSettings.volumeWorldCenter - volumeSettings.volumeWorldExtent;
+			cbuffer._VolumeWorldMax = volumeSettings.volumeWorldCenter + volumeSettings.volumeWorldExtent;
+
+			// update boundary shapes
+			cbuffer._BoundaryCapsuleCount = 0;
+			cbuffer._BoundarySphereCount = 0;
+			cbuffer._BoundaryTorusCount = 0;
+
+			using (NativeArray<HairSimBoundary.BoundaryPack> tmpPack = new NativeArray<HairSimBoundary.BoundaryPack>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (NativeArray<Matrix4x4> tmpMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (NativeArray<Matrix4x4> tmpMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (NativeArray<Matrix4x4> tmpMatrixW2PrevW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
-				NativeArray<StrandRoot> strandRoots = new NativeArray<StrandRoot>(strands.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-
-				switch (strands.style)
+				unsafe
 				{
-					case StrandConfiguration.Style.Curtain:
-						{
-							float strandSpan = 1.0f;
-							float strandInterval = strandSpan / (strands.strandCount - 1);
+					var ptrPack = (HairSimBoundary.BoundaryPack*)tmpPack.GetUnsafePtr();
+					var ptrMatrix = (Matrix4x4*)tmpMatrix.GetUnsafePtr();
+					var ptrMatrixInv = (Matrix4x4*)tmpMatrixInv.GetUnsafePtr();
+					var ptrMatrixW2PrevW = (Matrix4x4*)tmpMatrixW2PrevW.GetUnsafePtr();
+					var ptrMatrixPrev = (Matrix4x4*)volumeData.boundaryMatrixPrev.GetUnsafePtr();
 
-							unsafe
-							{
-								var strandRootsPtr = (StrandRoot*)strandRoots.GetUnsafePtr();
-								var strandRoot = new StrandRoot()
-								{
-									localPos = (-0.5f * strandSpan) * Vector3.right,
-									localTan = Vector3.down,
-								};
-								for (int j = 0; j != strands.strandCount; j++)
-								{
-									strandRootsPtr[j] = strandRoot;
-									strandRoot.localPos += strandInterval * Vector3.right;
-								}
-							}
-						}
-						break;
-
-					case StrandConfiguration.Style.StratifiedCurtain:
-						{
-							float strandSpan = 1.0f;
-							float strandInterval = strandSpan / strands.strandCount;
-							float strandIntervalNoise = 0.5f;
-
-							var xorshift = new Unity.Mathematics.Random(257);
-
-							unsafe
-							{
-								var strandRootsPtr = (StrandRoot*)strandRoots.GetUnsafePtr();
-								var strandRoot = new StrandRoot()
-								{
-									localTan = Vector3.down,
-								};
-								for (int j = 0; j != strands.strandCount; j++)
-								{
-									var localNoise = strandIntervalNoise * xorshift.NextFloat2(-1.0f, 1.0f);
-									var localPos = -0.5f * strandSpan + (j + 0.5f + 0.5f * localNoise.x) * strandInterval;
-									strandRoot.localPos = new Vector3(localPos, 0.0f, 0.5f * localNoise.y * strandInterval);
-									strandRootsPtr[j] = strandRoot;
-								}
-							}
-						}
-						break;
-
-					case StrandConfiguration.Style.Brush:
-						{
-							var localExt = 0.5f * Vector3.one;
-							var xorshift = new Unity.Mathematics.Random(257);
-
-							Vector2 localMin = new Vector2(-localExt.x, -localExt.z);
-							Vector2 localMax = new Vector2(localExt.x, localExt.z);
-
-							unsafe
-							{
-								var strandRootsPtr = (StrandRoot*)strandRoots.GetUnsafePtr();
-								var strandRoot = new StrandRoot()
-								{
-									localTan = Vector3.down
-								};
-								for (int j = 0; j != strands.strandCount; j++)
-								{
-									var localPos = xorshift.NextFloat2(localMin, localMax);
-									strandRoot.localPos = new Vector3(localPos.x, 0.0f, localPos.y);
-									strandRootsPtr[j] = strandRoot;
-								}
-							}
-						}
-						break;
-
-					case StrandConfiguration.Style.Cap:
-						{
-							var localExt = 0.5f * Vector3.one;
-							var xorshift = new Unity.Mathematics.Random(257);
-
-							unsafe
-							{
-								var strandRootsPtr = (StrandRoot*)strandRoots.GetUnsafePtr();
-								for (int j = 0; j != strands.strandCount; j++)
-								{
-									var localDir = xorshift.NextFloat3Direction();
-									if (localDir.y < 0.0f)
-										localDir.y = -localDir.y;
-
-									strandRootsPtr[j].localPos = localDir * localExt;
-									strandRootsPtr[j].localTan = localDir;
-								}
-							}
-						}
-						break;
-				}
-
-				return strandRoots;
-			}
-		}
-
-		private int GetSolveKernel()
-		{
-			switch (solver.method)
-			{
-				case SolverConfiguration.Method.GaussSeidelReference:
-					return kernelSolveConstraints_GaussSeidelReference;
-
-				case SolverConfiguration.Method.GaussSeidel:
-					return kernelSolveConstraints_GaussSeidel;
-
-				case SolverConfiguration.Method.Jacobi:
-					switch (strands.strandParticleCount)
+					foreach (HairSimBoundary boundary in boundaries)
 					{
-						case 16: return kernelSolveConstraints_Jacobi_16;
-						case 32: return kernelSolveConstraints_Jacobi_32;
-						case 64: return kernelSolveConstraints_Jacobi_64;
-						case 128: return kernelSolveConstraints_Jacobi_128;
-					}
-					break;
-			}
-			return -1;
-		}
+						if (boundary == null || !boundary.isActiveAndEnabled)
+							continue;
 
-		public Vector3 GetCellSize()
-		{
-			Vector3 cellSize = new Vector3(
-				(volumeData.volumeWorldMax.x - volumeData.volumeWorldMin.x) / volumeData.volumeCells.x,
-				(volumeData.volumeWorldMax.y - volumeData.volumeWorldMin.y) / volumeData.volumeCells.y,
-				(volumeData.volumeWorldMax.z - volumeData.volumeWorldMin.z) / volumeData.volumeCells.z);
-			return cellSize;
-		}
-
-		public float GetCellVolume()
-		{
-			return GetCellSize().x * GetCellSize().y * GetCellSize().z;
-		}
-
-		private Vector3 GetVolumeCenter()
-		{
-			Vector3 cellSize = GetCellSize();
-			Vector3 cellOffset = new Vector3(
-				cellSize.x * volume.volumeOffsetX,
-				cellSize.y * volume.volumeOffsetY,
-				cellSize.z * volume.volumeOffsetZ);
-			return (/*this.transform.position + */cellOffset);
-		}
-
-		private Vector3 GetVolumeExtent()
-		{
-			//return Vector3.one;
-			return Vector3.one * (1.0f + 1.5f * strands.strandLength);
-		}
-
-		private int GetVolumeCellCount()
-		{
-			return volume.volumeResolution * volume.volumeResolution * volume.volumeResolution;
-		}
-
-		private bool InitCond()
-		{
-			ValidateConfiguration();
-
-			bool initRequired = false;
-
-			initRequired |= CreateBuffers();
-			initRequired |= CreateVolumes();
-
-			initRequired |= (strandsActive.style != strands.style);
-			initRequired |= (strandsActive.strandCount != strands.strandCount);
-			initRequired |= (strandsActive.strandParticleCount != strands.strandParticleCount);
-			initRequired |= (strandsActive.strandLength != strands.strandLength);
-
-			return initRequired;
-		}
-
-		private void Init(CommandBuffer cmd)
-		{
-			using (new ProfilingScope(cmd, MarkersGPU.Init))
-			{
-				using (NativeArray<StrandRoot> tmpRoots = GetStrandRoots())
-				using (NativeArray<Vector4> tmpRootsPos = new NativeArray<Vector4>(strands.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (NativeArray<Vector4> tmpRootsTan = new NativeArray<Vector4>(strands.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (NativeArray<Vector4> tmpPosition = new NativeArray<Vector4>(strands.strandCount * strands.strandParticleCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (NativeArray<Vector4> tmpZeroInit = new NativeArray<Vector4>(strands.strandCount * strands.strandParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				{
-					unsafe
-					{
-						StrandRoot* ptrRoots = (StrandRoot*)tmpRoots.GetUnsafePtr();
-						Vector4* ptrRootsPos = (Vector4*)tmpRootsPos.GetUnsafePtr();
-						Vector4* ptrRootsTan = (Vector4*)tmpRootsTan.GetUnsafePtr();
-						Vector4* ptrPosition = (Vector4*)tmpPosition.GetUnsafePtr();
-
-						Matrix4x4 localToWorld = Matrix4x4.TRS(this.transform.position, this.transform.rotation, this.transform.localScale);
-						Matrix4x4 localToWorldInvT = Matrix4x4.Transpose(Matrix4x4.Inverse(localToWorld));
-
-						float strandParticleInterval = strands.strandLength / (strands.strandParticleCount - 1);
-						for (int j = 0; j != strands.strandCount; j++)
+						switch (boundary.type)
 						{
-							ptrRootsPos[j] = ptrRoots[j].localPos;
-							ptrRootsTan[j] = ptrRoots[j].localTan;
-
-							Vector3 strandDirection = localToWorldInvT.MultiplyVector(ptrRoots[j].localTan);
-							Vector3 strandParticlePosition = localToWorld.MultiplyPoint3x4(ptrRoots[j].localPos);
-
-#if LAYOUT_INTERLEAVED
-							int strandParticleBegin = j;
-							int strandParticleStride = strands.strandCount;
-#else
-							int strandParticleBegin = j * strands.strandParticleCount;
-							int strandParticleStride = 1;
-#endif
-							int strandParticleEnd = strandParticleBegin + strandParticleStride * strands.strandParticleCount;
-							for (int i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
-							{
-								ptrPosition[i] = strandParticlePosition;
-								strandParticlePosition += strandParticleInterval * strandDirection;
-							}
+							case HairSimBoundary.Type.Capsule:
+								cbuffer._BoundaryCapsuleCount++;
+								break;
+							case HairSimBoundary.Type.Sphere:
+								cbuffer._BoundarySphereCount++;
+								break;
+							case HairSimBoundary.Type.Torus:
+								cbuffer._BoundaryTorusCount++;
+								break;
 						}
 					}
 
-#if CMDBUFFER_SET_DATA
-					cmd.SetComputeBufferData(solverData.rootPosition, tmpRootsPos);
-					cmd.SetComputeBufferData(solverData.rootTangent, tmpRootsTan);
+					int boundaryCapsuleIndex = 0;
+					int boundarySphereIndex = boundaryCapsuleIndex + cbuffer._BoundaryCapsuleCount;
+					int boundaryTorusIndex = boundarySphereIndex + cbuffer._BoundarySphereCount;
 
-					cmd.SetComputeBufferData(solverData.particlePosition, tmpPosition);
-					cmd.SetComputeBufferData(solverData.particlePositionPrev, tmpPosition);
-					cmd.SetComputeBufferData(solverData.particlePositionCorr, tmpZeroInit);
+					int boundaryCount = cbuffer._BoundaryCapsuleCount + cbuffer._BoundarySphereCount + boundaryTorusIndex;
+					var boundaryHash = new Hash128(7, 13);
 
-					cmd.SetComputeBufferData(solverData.particleVelocity, tmpZeroInit);
-					cmd.SetComputeBufferData(solverData.particleVelocityPrev, tmpZeroInit);
-#else
-					solverData.rootPosition.SetData(tmpRootsPos);
-					solverData.rootTangent.SetData(tmpRootsTan);
-
-					solverData.particlePosition.SetData(tmpPosition);
-					solverData.particlePositionPrev.SetData(tmpPosition);
-					solverData.particlePositionCorr.SetData(tmpZeroInit);
-
-					solverData.particleVelocity.SetData(tmpZeroInit);
-					solverData.particleVelocityPrev.SetData(tmpZeroInit);
-#endif
-				}
-
-				kernelUpdatePosition = computeSolver.FindKernel("KUpdatePosition");
-				kernelSolveConstraints_GaussSeidelReference = computeSolver.FindKernel("KSolveConstraints_GaussSeidelReference");
-				kernelSolveConstraints_GaussSeidel = computeSolver.FindKernel("KSolveConstraints_GaussSeidel");
-				kernelSolveConstraints_Jacobi_16 = computeSolver.FindKernel("KSolveConstraints_Jacobi_16");
-				kernelSolveConstraints_Jacobi_32 = computeSolver.FindKernel("KSolveConstraints_Jacobi_32");
-				kernelSolveConstraints_Jacobi_64 = computeSolver.FindKernel("KSolveConstraints_Jacobi_64");
-				kernelSolveConstraints_Jacobi_128 = computeSolver.FindKernel("KSolveConstraints_Jacobi_128");
-				kernelUpdateVelocity = computeSolver.FindKernel("KUpdateVelocity");
-
-				kernelVolumeClear = computeVolume.FindKernel("KVolumeClear");
-				kernelVolumeSplat = computeVolume.FindKernel("KVolumeSplat");
-				kernelVolumeSplatDensity = computeVolume.FindKernel("KVolumeSplatDensity");
-				kernelVolumeSplatVelocityX = computeVolume.FindKernel("KVolumeSplatVelocityX");
-				kernelVolumeSplatVelocityY = computeVolume.FindKernel("KVolumeSplatVelocityY");
-				kernelVolumeSplatVelocityZ = computeVolume.FindKernel("KVolumeSplatVelocityZ");
-				kernelVolumeResolve = computeVolume.FindKernel("KVolumeResolve");
-				kernelVolumeResolveFromRasterization = computeVolume.FindKernel("KVolumeResolveFromRasterization");
-				kernelVolumeDivergence = computeVolume.FindKernel("KVolumeDivergence");
-				kernelVolumePressureEOS = computeVolume.FindKernel("KVolumePressureEOS");
-				kernelVolumePressureSolve = computeVolume.FindKernel("KVolumePressureSolve");
-				kernelVolumePressureGradient = computeVolume.FindKernel("KVolumePressureGradient");
-
-				strandsActive = strands;
-			}
-
-			// pre-step volume for the first solver step
-			Volume(cmd, 1.0f);
-		}
-
-		public void Step(CommandBuffer cmd, float dt)
-		{
-			if (InitCond())
-			{
-				//Debug.Log("Step -> Init");
-				Init(cmd);
-			}
-
-			if (volumeData.volumeCells != volume.volumeResolution * Vector3.one)
-			{
-				Volume(cmd, 1.0f);
-			}
-
-			using (new ProfilingScope(cmd, MarkersGPU.Step))
-			{
-				SwapBuffers(ref solverData.particlePosition, ref solverData.particlePositionPrev);
-				SwapBuffers(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
-
-				//-------------------
-				// update boundaries
-
-				volumeData.boundaryCapsuleCount = 0;
-				volumeData.boundarySphereCount = 0;
-				volumeData.boundaryTorusCount = 0;
-
-				using (NativeArray<HairSimBoundary.BoundaryPack> tmpPack = new NativeArray<HairSimBoundary.BoundaryPack>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<Matrix4x4> tmpMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<Matrix4x4> tmpMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (NativeArray<Matrix4x4> tmpMatrixW2PrevW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				{
-					unsafe
+					foreach (HairSimBoundary boundary in boundaries)
 					{
-						var ptrPack = (HairSimBoundary.BoundaryPack*)tmpPack.GetUnsafePtr();
-						var ptrMatrix = (Matrix4x4*)tmpMatrix.GetUnsafePtr();
-						var ptrMatrixInv = (Matrix4x4*)tmpMatrixInv.GetUnsafePtr();
-						var ptrMatrixW2PrevW = (Matrix4x4*)tmpMatrixW2PrevW.GetUnsafePtr();
+						if (boundary == null || !boundary.isActiveAndEnabled)
+							continue;
 
-						var ptrMatrixPrev = (Matrix4x4*)volumeData.boundaryMatrixPrev.GetUnsafePtr();
-
-						foreach (HairSimBoundary boundary in boundaries)
+						switch (boundary.type)
 						{
-							if (boundary == null || !boundary.isActiveAndEnabled)
-								continue;
-
-							switch (boundary.type)
-							{
-								case HairSimBoundary.Type.Capsule:
-									volumeData.boundaryCapsuleCount++;
-									break;
-								case HairSimBoundary.Type.Sphere:
-									volumeData.boundarySphereCount++;
-									break;
-								case HairSimBoundary.Type.Torus:
-									volumeData.boundaryTorusCount++;
-									break;
-							}
+							case HairSimBoundary.Type.Capsule:
+								ptrMatrix[boundaryCapsuleIndex] = boundary.transform.localToWorldMatrix;
+								ptrPack[boundaryCapsuleIndex++] = HairSimBoundary.Pack(boundary.GetCapsule());
+								break;
+							case HairSimBoundary.Type.Sphere:
+								ptrMatrix[boundarySphereIndex] = boundary.transform.localToWorldMatrix;
+								ptrPack[boundarySphereIndex++] = HairSimBoundary.Pack(boundary.GetSphere());
+								break;
+							case HairSimBoundary.Type.Torus:
+								ptrMatrix[boundaryTorusIndex] = boundary.transform.localToWorldMatrix;
+								ptrPack[boundaryTorusIndex++] = HairSimBoundary.Pack(boundary.GetTorus());
+								break;
 						}
 
-						int boundaryCapsuleIndex = 0;
-						int boundarySphereIndex = boundaryCapsuleIndex + volumeData.boundaryCapsuleCount;
-						int boundaryTorusIndex = boundarySphereIndex + volumeData.boundarySphereCount;
+						boundaryHash.Append(boundary.GetInstanceID());
+					}
 
-						int boundaryCount = volumeData.boundaryCapsuleCount + volumeData.boundarySphereCount + boundaryTorusIndex;
-						var boundaryHash = new Hash128(7, 13);
-
-						foreach (HairSimBoundary boundary in boundaries)
-						{
-							if (boundary == null || !boundary.isActiveAndEnabled)
-								continue;
-
-							switch (boundary.type)
-							{
-								case HairSimBoundary.Type.Capsule:
-									ptrMatrix[boundaryCapsuleIndex] = boundary.transform.localToWorldMatrix;
-									ptrPack[boundaryCapsuleIndex++] = HairSimBoundary.Pack(boundary.GetCapsule());
-									break;
-								case HairSimBoundary.Type.Sphere:
-									ptrMatrix[boundarySphereIndex] = boundary.transform.localToWorldMatrix;
-									ptrPack[boundarySphereIndex++] = HairSimBoundary.Pack(boundary.GetSphere());
-									break;
-								case HairSimBoundary.Type.Torus:
-									ptrMatrix[boundaryTorusIndex] = boundary.transform.localToWorldMatrix;
-									ptrPack[boundaryTorusIndex++] = HairSimBoundary.Pack(boundary.GetTorus());
-									break;
-							}
-
-							int instanceID = boundary.GetInstanceID();
-
-							HashUtilities.ComputeHash128(ref instanceID, ref boundaryHash);
-						}
-
-						if (boundaryHash != volumeData.boundaryMatrixPrevHash)
-						{
-							Debug.Log("boundary hash changed: " + boundaryHash);
-							volumeData.boundaryMatrixPrevHash = boundaryHash;
-
-							for (int i = 0; i != boundaryCount; i++)
-							{
-								ptrMatrixPrev[i] = ptrMatrix[i];
-							}
-						}
+					if (volumeData.boundaryHash != boundaryHash)
+					{
+						Debug.Log("boundary hash changed: " + boundaryHash);
+						volumeData.boundaryHash = boundaryHash;
 
 						for (int i = 0; i != boundaryCount; i++)
 						{
-							ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i]);
-							ptrMatrixW2PrevW[i] = ptrMatrixPrev[i] * ptrMatrixInv[i];
+							ptrMatrixPrev[i] = ptrMatrix[i];
 						}
-
-#if CMDBUFFER_SET_DATA
-						cmd.SetComputeBufferData(boundaryPack, tmpPack, 0, 0, boundaryCount);
-						cmd.SetComputeBufferData(boundaryMatrix, tmpMatrix, 0, 0, boundaryCount);
-						cmd.SetComputeBufferData(boundaryMatrixInv, tmpMatrixInv, 0, 0, boundaryCount);
-						cmd.SetComputeBufferData(boundaryMatrixW2PrevW, tmpMatrixW2PrevW, 0, 0, boundaryCount);
-#else
-						volumeData.boundaryPack.SetData(tmpPack, 0, 0, boundaryCount);
-						volumeData.boundaryMatrix.SetData(tmpMatrix, 0, 0, boundaryCount);
-						volumeData.boundaryMatrixInv.SetData(tmpMatrixInv, 0, 0, boundaryCount);
-						volumeData.boundaryMatrixW2PrevW.SetData(tmpMatrixW2PrevW, 0, 0, boundaryCount);
-#endif
-
-						volumeData.boundaryMatrixPrev.CopyFrom(tmpMatrix);
 					}
-				}
 
-				PushComputeParams(cmd, computeSolver, dt);
-
-				int solveThreadGroupsX = strands.strandCount / THREAD_GROUP_SIZE;
-				int solveThreadGroupsY = 1;
-				int solveThreadGroupsZ = 1;
-
-				int kernelSolveConstraints = GetSolveKernel();
-				if (kernelSolveConstraints == kernelSolveConstraints_Jacobi_16 ||
-					kernelSolveConstraints == kernelSolveConstraints_Jacobi_32 ||
-					kernelSolveConstraints == kernelSolveConstraints_Jacobi_64 ||
-					kernelSolveConstraints == kernelSolveConstraints_Jacobi_128)
-				{
-					solveThreadGroupsX = strands.strandCount;
-				}
-
-				PushComputeKernelParams(cmd, computeSolver, kernelSolveConstraints);
-				cmd.DispatchCompute(computeSolver, kernelSolveConstraints,
-					solveThreadGroupsX,
-					solveThreadGroupsY,
-					solveThreadGroupsZ);
-			}
-		}
-
-		public void Volume(CommandBuffer cmd, float dt)
-		{
-			if (InitCond())
-			{
-				//Debug.Log("Volume -> Init");
-				Init(cmd);
-			}
-
-			using (new ProfilingScope(cmd, MarkersGPU.Volume))
-			{
-				volumeData.volumeCells = volume.volumeResolution * Vector3.one;
-				volumeData.volumeWorldMin = GetVolumeCenter() - GetVolumeExtent();
-				volumeData.volumeWorldMax = GetVolumeCenter() + GetVolumeExtent();
-
-				PushComputeParams(cmd, computeVolume, dt);
-
-				int particleThreadCountX = 64;
-				int particleThreadGroupsX = solverData.particlePosition.count / particleThreadCountX;
-				int particleThreadGroupsY = 1;
-				int particleThreadGroupsZ = 1;
-
-				int volumeThreadCountX = 8;
-				int volumeThreadCountY = 8;
-				int volumeThreadCountZ = 1;
-				int volumeThreadGroupsX = volume.volumeResolution / volumeThreadCountX;
-				int volumeThreadGroupsY = volume.volumeResolution / volumeThreadCountY;
-				int volumeThreadGroupsZ = volume.volumeResolution / volumeThreadCountZ;
-
-				// clear
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
-				{
-					PushComputeKernelParams(cmd, computeVolume, kernelVolumeClear);
-					cmd.DispatchCompute(computeVolume, kernelVolumeClear,
-						volumeThreadGroupsX,
-						volumeThreadGroupsY,
-						volumeThreadGroupsZ);
-				}
-
-				// splat
-				switch (volume.volumeSplatMethod)
-				{
-					case VolumeConfiguration.SplatMethod.Compute:
-						{
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat))
-							{
-								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplat);
-								cmd.DispatchCompute(computeVolume, kernelVolumeSplat,
-									particleThreadGroupsX,
-									particleThreadGroupsY,
-									particleThreadGroupsZ);
-							}
-						}
-						break;
-
-					case VolumeConfiguration.SplatMethod.ComputeSplit:
-						{
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatDensity))
-							{
-								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplatDensity);
-								cmd.DispatchCompute(computeVolume, kernelVolumeSplatDensity,
-									particleThreadGroupsX,
-									particleThreadGroupsY,
-									particleThreadGroupsZ);
-							}
-
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatVelocityXYZ))
-							{
-								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityX);
-								cmd.DispatchCompute(computeVolume, kernelVolumeSplatVelocityX,
-									particleThreadGroupsX,
-									particleThreadGroupsY,
-									particleThreadGroupsZ);
-
-								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityY);
-								cmd.DispatchCompute(computeVolume, kernelVolumeSplatVelocityY,
-									particleThreadGroupsX,
-									particleThreadGroupsY,
-									particleThreadGroupsZ);
-
-								PushComputeKernelParams(cmd, computeVolume, kernelVolumeSplatVelocityZ);
-								cmd.DispatchCompute(computeVolume, kernelVolumeSplatVelocityZ,
-									particleThreadGroupsX,
-									particleThreadGroupsY,
-									particleThreadGroupsZ);
-							}
-
-						}
-						break;
-
-					case VolumeConfiguration.SplatMethod.Rasterization:
-						{
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterization))
-							{
-								SetRenderMaterialParams(ref computeVolumeRasterMBP);
-								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
-								cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 0, MeshTopology.Points, strands.strandCount * strands.strandParticleCount, 1, computeVolumeRasterMBP);
-							}
-						}
-						break;
-
-					case VolumeConfiguration.SplatMethod.RasterizationNoGS:
-						{
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterizationNoGS))
-							{
-								SetRenderMaterialParams(ref computeVolumeRasterMBP);
-								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
-								cmd.DrawProcedural(Matrix4x4.identity, computeVolumeRaster, 1, MeshTopology.Quads, strands.strandCount * strands.strandParticleCount * 8, 1, computeVolumeRasterMBP);
-							}
-						}
-						break;
-				}
-
-				// resolve
-				switch (volume.volumeSplatMethod)
-				{
-					case VolumeConfiguration.SplatMethod.Compute:
-					case VolumeConfiguration.SplatMethod.ComputeSplit:
-						{
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_2_Resolve))
-							{
-								PushComputeKernelParams(cmd, computeVolume, kernelVolumeResolve);
-								cmd.DispatchCompute(computeVolume, kernelVolumeResolve,
-									volumeThreadGroupsX,
-									volumeThreadGroupsY,
-									volumeThreadGroupsZ);
-							}
-						}
-						break;
-
-					case VolumeConfiguration.SplatMethod.Rasterization:
-					case VolumeConfiguration.SplatMethod.RasterizationNoGS:
-						{
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_2_ResolveFromRasterization))
-							{
-								PushComputeKernelParams(cmd, computeVolume, kernelVolumeResolveFromRasterization);
-								cmd.DispatchCompute(computeVolume, kernelVolumeResolveFromRasterization,
-									volumeThreadGroupsX,
-									volumeThreadGroupsX,
-									volumeThreadGroupsX);
-							}
-						}
-						break;
-				}
-
-				// divergence
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_3_Divergence))
-				{
-					PushComputeKernelParams(cmd, computeVolume, kernelVolumeDivergence);
-					cmd.DispatchCompute(computeVolume, kernelVolumeDivergence,
-						volumeThreadGroupsX,
-						volumeThreadGroupsY,
-						volumeThreadGroupsZ);
-				}
-
-				// pressure eos (initial guess)
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_4_PressureEOS))
-				{
-					PushComputeKernelParams(cmd, computeVolume, kernelVolumePressureEOS);
-					cmd.DispatchCompute(computeVolume, kernelVolumePressureEOS,
-						volumeThreadGroupsX,
-						volumeThreadGroupsY,
-						volumeThreadGroupsZ);
-				}
-
-				// pressure solve
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_5_PressureSolve))
-				{
-					PushComputeKernelParams(cmd, computeVolume, kernelVolumePressureSolve);
-					for (int i = 0; i != volume.volumePressureIterations; i++)
+					for (int i = 0; i != boundaryCount; i++)
 					{
-						cmd.DispatchCompute(computeVolume, kernelVolumePressureSolve,
-							volumeThreadGroupsX,
-							volumeThreadGroupsY,
-							volumeThreadGroupsZ);
-
-						SwapVolumes(ref volumeData.volumePressure, ref volumeData.volumePressureNext);
-						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressure, volumeData.volumePressure);
-						cmd.SetComputeTextureParam(computeVolume, kernelVolumePressureSolve, UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
+						ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i]);
+						ptrMatrixW2PrevW[i] = ptrMatrixPrev[i] * ptrMatrixInv[i];
 					}
-				}
 
-				// pressure gradient
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_6_PressureGradient))
-				{
-					PushComputeKernelParams(cmd, computeVolume, kernelVolumePressureGradient);
-					cmd.DispatchCompute(computeVolume, kernelVolumePressureGradient,
-						volumeThreadGroupsX,
-						volumeThreadGroupsY,
-						volumeThreadGroupsZ);
+					volumeData.boundaryPack.SetData(tmpPack, 0, 0, boundaryCount);
+					volumeData.boundaryMatrix.SetData(tmpMatrix, 0, 0, boundaryCount);
+					volumeData.boundaryMatrixInv.SetData(tmpMatrixInv, 0, 0, boundaryCount);
+					volumeData.boundaryMatrixW2PrevW.SetData(tmpMatrixW2PrevW, 0, 0, boundaryCount);
+					volumeData.boundaryMatrixPrev.CopyFrom(tmpMatrix);
 				}
 			}
 		}
 
-		public void Draw(CommandBuffer cmd, RTHandle colorRT, RTHandle depthStencilRT, RTHandle motionVectorRT)
+		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData)
 		{
-			if (InitCond())
-			{
-				//Debug.Log("Draw -> Init");
-				Init(cmd);
-			}
+			ConstantBuffer.Push(cmd, solverData.cbuffer, cs, UniformIDs.SolverParams);
 
-			using (new ProfilingScope(cmd, MarkersGPU.Draw))
-			{
-				if (!debug.drawParticles &&
-					!debug.drawStrands &&
-					!debug.drawDensity &&
-					!debug.drawSliceX &&
-					!debug.drawSliceY &&
-					!debug.drawSliceZ)
-					return;
-
-				SetRenderMaterialParams(ref debugDrawMPB);
-				CoreUtils.SetRenderTarget(cmd, colorRT, depthStencilRT);
-
-				if (debug.drawStrands)
-				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 0, MeshTopology.LineStrip, strands.strandParticleCount, strands.strandCount, debugDrawMPB);
-				}
-
-				if (debug.drawParticles)
-				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 0, MeshTopology.Points, strands.strandParticleCount, strands.strandCount, debugDrawMPB);
-				}
-
-				if (debug.drawDensity)
-				{
-					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 1, MeshTopology.Points, GetVolumeCellCount(), 1, debugDrawMPB);
-				}
-
-				if (debug.drawSliceX || debug.drawSliceY || debug.drawSliceZ)
-				{
-					debugDrawMPB.SetFloat(UniformIDs._DebugSliceDivider, debug.drawSliceDivider);
-
-					if (debug.drawSliceX)
-					{
-						debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 0);
-						debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetX);
-						cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 3, MeshTopology.Quads, 4, 1, debugDrawMPB);
-					}
-					if (debug.drawSliceY)
-					{
-						debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 1);
-						debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetY);
-						cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 3, MeshTopology.Quads, 4, 1, debugDrawMPB);
-					}
-					if (debug.drawSliceZ)
-					{
-						debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 2);
-						debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debug.drawSliceOffsetZ);
-						cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 3, MeshTopology.Quads, 4, 1, debugDrawMPB);
-					}
-				}
-
-				if (debug.drawStrands)// motion vectors
-				{
-					CoreUtils.SetRenderTarget(cmd, motionVectorRT, depthStencilRT);
-					cmd.DrawProcedural(Matrix4x4.identity, debugDraw, 4, MeshTopology.LineStrip, strands.strandParticleCount, strands.strandCount, debugDrawMPB);
-				}
-			}
-		}
-
-		void PushComputeParams(CommandBuffer cmd, ComputeShader cs, float dt)
-		{
-			float strandCrossSectionArea = 0.25f * Mathf.PI * strands.strandDiameter * strands.strandDiameter;
-			float strandParticleInterval = strands.strandLength / (strands.strandParticleCount - 1);
-			float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
-
-			Matrix4x4 localToWorld = Matrix4x4.TRS(this.transform.position, this.transform.rotation, this.transform.localScale);
-			Matrix4x4 localToWorldInvT = Matrix4x4.Transpose(Matrix4x4.Inverse(localToWorld));
-
-			cmd.SetComputeMatrixParam(cs, UniformIDs._LocalToWorld, localToWorld);
-			cmd.SetComputeMatrixParam(cs, UniformIDs._LocalToWorldInvT, localToWorldInvT);
-
-			cmd.SetComputeIntParam(cs, UniformIDs._StrandCount, strands.strandCount);
-			cmd.SetComputeIntParam(cs, UniformIDs._StrandParticleCount, strands.strandParticleCount);
-			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleInterval, strandParticleInterval);
-			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleVolume, strandParticleVolume);
-			cmd.SetComputeFloatParam(cs, UniformIDs._StrandParticleContrib, strands.strandParticleContrib);// TODO remove
-
-			cmd.SetComputeFloatParam(cs, UniformIDs._DT, dt);
-			cmd.SetComputeIntParam(cs, UniformIDs._Iterations, solver.iterations);
-			cmd.SetComputeFloatParam(cs, UniformIDs._Stiffness, solver.stiffness);
-			cmd.SetComputeFloatParam(cs, UniformIDs._Relaxation, solver.relaxation);
-			cmd.SetComputeFloatParam(cs, UniformIDs._Damping, solver.damping);
-			cmd.SetComputeFloatParam(cs, UniformIDs._Gravity, solver.gravity * -Vector3.Magnitude(Physics.gravity));
-			cmd.SetComputeFloatParam(cs, UniformIDs._Repulsion, solver.repulsion);
-			cmd.SetComputeFloatParam(cs, UniformIDs._Friction, solver.friction);
-
-			cmd.SetComputeFloatParam(cs, UniformIDs._BendingCurvature, solver.bendingCurvature * 0.5f * strandParticleInterval);
-			cmd.SetComputeFloatParam(cs, UniformIDs._DampingFTL, solver.dampingFTL);
-
-			cmd.SetComputeIntParam(cs, UniformIDs._BoundaryCapsuleCount, volumeData.boundaryCapsuleCount);
-			cmd.SetComputeIntParam(cs, UniformIDs._BoundarySphereCount, volumeData.boundarySphereCount);
-			cmd.SetComputeIntParam(cs, UniformIDs._BoundaryTorusCount, volumeData.boundaryTorusCount);
-
-			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeCells, volumeData.volumeCells);
-			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMin, volumeData.volumeWorldMin);
-			cmd.SetComputeVectorParam(cs, UniformIDs._VolumeWorldMax, volumeData.volumeWorldMax);
-		}
-
-		void PushComputeKernelParams(CommandBuffer cmd, ComputeShader cs, int kernel)
-		{
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, solverData.rootPosition);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootTangent, solverData.rootTangent);
-
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootDirection, solverData.rootDirection);
 
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePosition, solverData.particlePosition);
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocity, solverData.particleVelocity);
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+		}
+
+		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData)
+		{
+			ConstantBuffer.Push(cmd, solverData.cbuffer, mat, UniformIDs.SolverParams);
+
+			mpb.SetBuffer(UniformIDs._RootPosition, solverData.rootPosition);
+			mpb.SetBuffer(UniformIDs._RootDirection, solverData.rootDirection);
+
+			mpb.SetBuffer(UniformIDs._ParticlePosition, solverData.particlePosition);
+			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
+			mpb.SetBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
+			mpb.SetBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
+			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+		}
+
+		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData)
+		{
+			ConstantBuffer.Push(cmd, volumeData.cbuffer, cs, UniformIDs.VolumeParams);
 
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryPack, volumeData.boundaryPack);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
@@ -1332,30 +564,360 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
 		}
 
-		void SetRenderMaterialParams(ref MaterialPropertyBlock mpb)
+		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData)
 		{
-			if (mpb == null)
-				mpb = new MaterialPropertyBlock();
+			ConstantBuffer.Push(cmd, volumeData.cbuffer, mat, UniformIDs.VolumeParams);
 
-			mpb.SetInt(UniformIDs._StrandCount, strands.strandCount);
-			mpb.SetInt(UniformIDs._StrandParticleCount, strands.strandParticleCount);
+			mpb.SetBuffer(UniformIDs._BoundaryPack, volumeData.boundaryPack);
+			mpb.SetBuffer(UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
+			mpb.SetBuffer(UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
+			mpb.SetBuffer(UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
 
-			mpb.SetVector(UniformIDs._VolumeCells, volumeData.volumeCells);
-			mpb.SetVector(UniformIDs._VolumeWorldMin, volumeData.volumeWorldMin);
-			mpb.SetVector(UniformIDs._VolumeWorldMax, volumeData.volumeWorldMax);
-
-			mpb.SetBuffer(UniformIDs._ParticlePosition, solverData.particlePosition);
-			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
-			mpb.SetBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
-			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+			mpb.SetTexture(UniformIDs._AccuDensity, volumeData.accuDensity);
+			mpb.SetTexture(UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
+			mpb.SetTexture(UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
+			mpb.SetTexture(UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
 
 			mpb.SetTexture(UniformIDs._VolumeDensity, volumeData.volumeDensity);
 			mpb.SetTexture(UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
 			mpb.SetTexture(UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
-
+			
 			mpb.SetTexture(UniformIDs._VolumePressure, volumeData.volumePressure);
 			mpb.SetTexture(UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
 			mpb.SetTexture(UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
+		}
+
+		public static void StepSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in VolumeData volumeData)
+		{
+			using (new ProfilingScope(cmd, MarkersGPU.Solver))
+			{
+				int solveKernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
+				int groupCountX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE;
+				int groupCountY = 1;
+				int groupCountZ = 1;
+
+				switch (solverSettings.method)
+				{
+					case SolverSettings.Method.GaussSeidelReference:
+						solveKernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
+						break;
+
+					case SolverSettings.Method.GaussSeidel:
+						solveKernel = SolverKernels.KSolveConstraints_GaussSeidel;
+						break;
+
+					case SolverSettings.Method.Jacobi:
+						switch (solverData.cbuffer._StrandParticleCount)
+						{
+							case 16:
+								solveKernel = SolverKernels.KSolveConstraints_Jacobi_16;
+								groupCountX = (int)solverData.cbuffer._StrandCount;
+								break;
+
+							case 32:
+								solveKernel = SolverKernels.KSolveConstraints_Jacobi_32;
+								groupCountX = (int)solverData.cbuffer._StrandCount;
+								break;
+
+							case 64:
+								solveKernel = SolverKernels.KSolveConstraints_Jacobi_64;
+								groupCountX = (int)solverData.cbuffer._StrandCount;
+								break;
+
+							case 128:
+								solveKernel = SolverKernels.KSolveConstraints_Jacobi_128;
+								groupCountX = (int)solverData.cbuffer._StrandCount;
+								break;
+						}
+						break;
+				}
+
+				SwapBuffers(ref solverData.particlePosition, ref solverData.particlePositionPrev);
+				SwapBuffers(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
+
+				PushVolumeData(cmd, s_solverCS, solveKernel, volumeData);
+				PushSolverData(cmd, s_solverCS, solveKernel, solverData);
+
+				cmd.DispatchCompute(s_solverCS, solveKernel, groupCountX, groupCountY, groupCountZ);
+			}
+		}
+
+		public static void StepVolumeData(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData[] solverData)
+		{
+			using (new ProfilingScope(cmd, MarkersGPU.Volume))
+			{
+				StepVolumeData_Clear(cmd, ref volumeData, volumeSettings);
+
+				for (int i = 0; i != solverData.Length; i++)
+				{
+					StepVolumeData_Insert(cmd, ref volumeData, volumeSettings, solverData[i]);
+				}
+
+				StepVolumeData_Resolve(cmd, ref volumeData, volumeSettings);
+			}
+		}
+
+		private static void StepVolumeData_Clear(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings)
+		{
+			int numX = volumeSettings.volumeResolution / 8;
+			int numY = volumeSettings.volumeResolution / 8;
+			int numZ = volumeSettings.volumeResolution;
+
+			// clear
+			using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
+			{
+				PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeClear, volumeData);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeClear, numX, numY, numZ);
+			}
+		}
+
+		private static void StepVolumeData_Insert(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData solverData)
+		{
+			int numX = MAX_GROUP_SIZE;
+			int numY = 1;
+			int numZ = 1;
+
+			// accumulate
+			switch (volumeSettings.volumeSplatMethod)
+			{
+				case VolumeSettings.SplatMethod.Compute:
+					{
+						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat))
+						{
+							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplat, volumeData);
+							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplat, solverData);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplat, numX, numY, numZ);
+						}
+					}
+					break;
+
+				case VolumeSettings.SplatMethod.ComputeSplit:
+					{
+						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatDensity))
+						{
+							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatDensity, volumeData);
+							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatDensity, solverData);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatDensity, numX, numY, numZ);
+						}
+
+						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatVelocityXYZ))
+						{
+							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, volumeData);
+							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, solverData);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, numX, numY, numZ);
+
+							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, volumeData);
+							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, solverData);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, numX, numY, numZ);
+
+							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, volumeData);
+							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, solverData);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, numX, numY, numZ);
+						}
+					}
+					break;
+
+				case VolumeSettings.SplatMethod.Rasterization:
+					{
+						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterization))
+						{
+							CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
+							PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
+							PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
+							cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandCount * (int)solverData.cbuffer._StrandParticleCount, 1, s_volumeRasterMPB);
+						}
+					}
+					break;
+
+				case VolumeSettings.SplatMethod.RasterizationNoGS:
+					{
+						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterizationNoGS))
+						{
+							CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
+							PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
+							PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
+							cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, (int)solverData.cbuffer._StrandCount * (int)solverData.cbuffer._StrandParticleCount * 8, 1, s_volumeRasterMPB);
+						}
+					}
+					break;
+			}
+		}
+
+		private static void StepVolumeData_Resolve(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings)
+		{
+			int numX = volumeSettings.volumeResolution / 8;
+			int numY = volumeSettings.volumeResolution / 8;
+			int numZ = volumeSettings.volumeResolution;
+
+			// resolve accumulated
+			switch (volumeSettings.volumeSplatMethod)
+			{
+				case VolumeSettings.SplatMethod.Compute:
+				case VolumeSettings.SplatMethod.ComputeSplit:
+					{
+						using (new ProfilingScope(cmd, MarkersGPU.Volume_2_Resolve))
+						{
+							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeResolve, volumeData);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolve, numX, numY, numZ);
+						}
+					}
+					break;
+
+				case VolumeSettings.SplatMethod.Rasterization:
+				case VolumeSettings.SplatMethod.RasterizationNoGS:
+					{
+						using (new ProfilingScope(cmd, MarkersGPU.Volume_2_ResolveFromRasterization))
+						{
+							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeResolveFromRasterization, volumeData);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolveFromRasterization, numX, numX, numX);
+						}
+					}
+					break;
+			}
+
+			// compute divergence
+			using (new ProfilingScope(cmd, MarkersGPU.Volume_3_Divergence))
+			{
+				PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeDivergence, volumeData);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeDivergence, numX, numY, numZ);
+			}
+
+			// pressure eos (initial guess)
+			using (new ProfilingScope(cmd, MarkersGPU.Volume_4_PressureEOS))
+			{
+				PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumePressureEOS, volumeData);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureEOS, numX, numY, numZ);
+			}
+
+			// pressure solve (jacobi)
+			using (new ProfilingScope(cmd, MarkersGPU.Volume_5_PressureSolve))
+			{
+				PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumePressureSolve, volumeData);
+				for (int i = 0; i != volumeSettings.volumePressureIterations; i++)
+				{
+					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureSolve, numX, numY, numZ);
+
+					SwapVolumes(ref volumeData.volumePressure, ref volumeData.volumePressureNext);
+					cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumePressureSolve, UniformIDs._VolumePressure, volumeData.volumePressure);
+					cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumePressureSolve, UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
+				}
+			}
+
+			// pressure gradient
+			using (new ProfilingScope(cmd, MarkersGPU.Volume_6_PressureGradient))
+			{
+				PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumePressureGradient, volumeData);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureGradient, numX, numY, numZ);
+			}
+		}
+
+		public static void DrawSolverData(CommandBuffer cmd, RTHandle color, RTHandle depth, RTHandle movec, in SolverData solverData, in DebugSettings debugSettings)
+		{
+			using (new ProfilingScope(cmd, MarkersGPU.DrawSolverData))
+			{
+				if (!debugSettings.drawParticles &&
+					!debugSettings.drawStrands)
+					return;
+
+				PushSolverData(cmd, s_debugDrawMat, s_debugDrawMPB, solverData);
+
+				CoreUtils.SetRenderTarget(cmd, color, depth);
+
+				// solver particles
+				if (debugSettings.drawParticles)
+				{
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
+				}
+
+				// solver strands + movecs
+				if (debugSettings.drawStrands)
+				{
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.LineStrip, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
+
+					CoreUtils.SetRenderTarget(cmd, movec, depth);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.LineStrip, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
+				}
+			}
+		}
+
+		public static void DrawVolumeData(CommandBuffer cmd, RTHandle color, RTHandle depth, in VolumeData volumeData, in DebugSettings debugSettings)
+		{
+			using (new ProfilingScope(cmd, MarkersGPU.DrawVolumeData))
+			{
+				if (!debugSettings.drawDensity &&
+					!debugSettings.drawSliceX &&
+					!debugSettings.drawSliceY &&
+					!debugSettings.drawSliceZ)
+					return;
+
+				PushVolumeData(cmd, s_debugDrawMat, s_debugDrawMPB, volumeData);
+
+				CoreUtils.SetRenderTarget(cmd, color, depth);
+
+				// volume density
+				if (debugSettings.drawDensity)
+				{
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 1, MeshTopology.Points, GetCellCount(volumeData.cbuffer), 1);
+				}
+
+				// volume slices
+				if (debugSettings.drawSliceX || debugSettings.drawSliceY || debugSettings.drawSliceZ)
+				{
+					s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceDivider, debugSettings.drawSliceDivider);
+
+					if (debugSettings.drawSliceX)
+					{
+						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 0);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetX);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+					}
+					if (debugSettings.drawSliceY)
+					{
+						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 1);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetY);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+					}
+					if (debugSettings.drawSliceZ)
+					{
+						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 2);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetZ);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+					}
+				}
+			}
+		}
+
+		//TODO move elsewhere
+		//maybe 'HairSimDataUtility' ?
+
+		public static Vector3 GetCellSize(in VolumeParams volumeParams)
+		{
+			var cellSize = new Vector3(
+				(volumeParams._VolumeWorldMax.x - volumeParams._VolumeWorldMin.x) / volumeParams._VolumeCells.x,
+				(volumeParams._VolumeWorldMax.y - volumeParams._VolumeWorldMin.y) / volumeParams._VolumeCells.y,
+				(volumeParams._VolumeWorldMax.z - volumeParams._VolumeWorldMin.z) / volumeParams._VolumeCells.z);
+			return cellSize;
+		}
+
+		public static float GetCellVolume(in VolumeParams volumeParams)
+		{
+			var cellSize = GetCellSize(volumeParams);
+			return cellSize.x * cellSize.y * cellSize.z;
+		}
+
+		public static int GetCellCount(in VolumeParams volumeParams)
+		{
+			return (int)volumeParams._VolumeCells.x * (int)volumeParams._VolumeCells.y * (int)volumeParams._VolumeCells.z;
+		}
+
+		public static Vector3 GetVolumeCenter(in VolumeParams volumeParams)
+		{
+			return (volumeParams._VolumeWorldMax + volumeParams._VolumeWorldMin) * 0.5f;
+		}
+
+		public static Vector3 GetVolumeExtent(in VolumeParams volumeParams)
+		{
+			return (volumeParams._VolumeWorldMax - volumeParams._VolumeWorldMin) * 0.5f;
 		}
 	}
 }

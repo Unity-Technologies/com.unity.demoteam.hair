@@ -5,7 +5,7 @@ using UnityEditor.Rendering.HighDefinition;
 namespace Unity.DemoTeam.Hair
 {
 	[CustomPassDrawer(typeof(HairSimDebugPass))]
-	class NormalBufferBlurPassDrawer : CustomPassDrawer
+	class HairSimDebugPassDrawer : CustomPassDrawer
 	{
 		protected override PassUIFlag commonPassUIFlags => PassUIFlag.All;
 
