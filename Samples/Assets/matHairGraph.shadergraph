@@ -1553,7 +1553,7 @@
     "m_Distortion": false,
     "m_DistortionMode": 0,
     "m_DistortionDepthTest": true,
-    "m_AddPrecomputedVelocity": false,
+    "m_AddPrecomputedVelocity": true,
     "m_TransparentWritesMotionVec": false,
     "m_AlphaToMask": false,
     "m_DepthOffset": false,

@@ -14,15 +14,23 @@ namespace Unity.DemoTeam.Hair
 
 		public GroomAsset groomAsset;
 		public GameObject[] groomContainers;
-		[HideInInspector] public Hash128 groomChecksum;
+		[HideInInspector] public string groomChecksum;
 
 		private HairSim.SolverData[] solverData;
 		private HairSim.VolumeData volumeData;
 
+		[Space]
+		public bool solverSettingsOverride;
 		public HairSim.SolverSettings[] solverSettings;
-		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.basic;
-		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.basic;
 
+		[Space]
+		public bool volumeSettingsOverride;
+		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
+
+		[Space]
+		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.defaults;
+
+		[Space]
 		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(HairSim.MAX_BOUNDARIES);
 
 		void OnEnable()
@@ -167,7 +175,7 @@ namespace Unity.DemoTeam.Hair
 			else
 			{
 				GroomUtility.ClearGroomInstance(this);
-				groomChecksum = new Hash128();
+				groomChecksum = string.Empty;
 
 				ReleaseRuntimeData();
 			}
@@ -175,31 +183,33 @@ namespace Unity.DemoTeam.Hair
 
 		bool InitializeRuntimeData()
 		{
-			if (solverData != null)
-				return true;
-
-			if (groomAsset == null || groomAsset.strandGroups == null)
+			if (groomAsset == null || groomChecksum != groomAsset.checksum)
 				return false;
 
-			solverData = new HairSim.SolverData[groomAsset.strandGroups.Length];
-			solverSettings = new HairSim.SolverSettings[groomAsset.strandGroups.Length];
+			var strandGroups = groomAsset.strandGroups;
+			if (strandGroups == null || strandGroups.Length == 0)
+				return false;
 
-			for (int i = 0; i != solverData.Length; i++)
+			if (solverData != null && solverData.Length != 0)
+				return true;
+
+			solverData = new HairSim.SolverData[strandGroups.Length];
+			solverSettings = new HairSim.SolverSettings[strandGroups.Length];
+
+			for (int i = 0; i != strandGroups.Length; i++)
 			{
-				ref var strandGroup = ref groomAsset.strandGroups[i];
+				ref var strandGroup = ref strandGroups[i];
 
-				solverSettings[i] = HairSim.SolverSettings.basic;
-				solverSettings[i].strandDiameter = groomAsset.settingsBasic.defaultStrandDiameter;
+				solverSettings[i] = groomAsset.settingsSolver;
+				solverSettings[i].strandDiameter = groomAsset.settingsBasic.strandDiameter;
 				solverSettings[i].strandLength = strandGroup.strandLengthAvg;
 
-				HairSim.PrepareSolverData(ref solverData[i],
-					strandGroup.strandCount,
-					strandGroup.strandParticleCount);
-
-				int particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
+				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 
 				solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 				solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
+
+				int particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 
 				using (var tmpZero = new NativeArray<Vector4>(particleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var tmpPosition = new NativeArray<Vector4>(particleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
@@ -274,7 +284,7 @@ namespace Unity.DemoTeam.Hair
 			ClearGroomInstance(groom);
 
 			var strandGroups = groomAsset.strandGroups;
-			if (strandGroups == null)
+			if (strandGroups == null || strandGroups.Length == 0)
 				return;
 
 			// prep groom containers
@@ -300,7 +310,7 @@ namespace Unity.DemoTeam.Hair
 
 						var lineRenderer = linesContainer.AddComponent<MeshRenderer>();
 						{
-							lineRenderer.sharedMaterial = groomAsset.settingsBasic.defaultMaterial;
+							lineRenderer.sharedMaterial = groomAsset.settingsBasic.material;
 						}
 					}
 

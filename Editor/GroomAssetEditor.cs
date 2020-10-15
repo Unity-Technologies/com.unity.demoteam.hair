@@ -6,15 +6,21 @@ namespace Unity.DemoTeam.Hair
 	[CustomEditor(typeof(GroomAsset))]
 	public class GroomAssetEditor : Editor
 	{
-		Editor meshPreview;
+		PreviewRenderUtility previewUtil;
+		Quaternion previewRotation;
 
-		SerializedProperty type;
-		SerializedProperty settingsBasic;
-		SerializedProperty settingsAlembic;
-		SerializedProperty settingsProcedural;
-		SerializedProperty autoBuild;
+		SerializedProperty _type;
+		SerializedProperty _material;
 
-		SerializedProperty strandGroups;
+		SerializedProperty _settingsBasic;
+		SerializedProperty _settingsAlembic;
+		SerializedProperty _settingsProcedural;
+
+		SerializedProperty _strandGroups;
+		SerializedProperty _strandGroupsAutoBuild;
+
+		SerializedProperty _settingsSolver;
+		SerializedProperty _settingsVolume;
 
 		void StructPropertyFields(SerializedProperty settings)
 		{
@@ -56,15 +62,40 @@ namespace Unity.DemoTeam.Hair
 
 		private void OnEnable()
 		{
-			settingsBasic = serializedObject.FindProperty("settingsBasic");
-			settingsAlembic = serializedObject.FindProperty("settingsAlembic");
-			settingsProcedural = serializedObject.FindProperty("settingsProcedural");
+			_settingsBasic = serializedObject.FindProperty("settingsBasic");
+			_settingsAlembic = serializedObject.FindProperty("settingsAlembic");
+			_settingsProcedural = serializedObject.FindProperty("settingsProcedural");
 
-			type = settingsBasic.FindPropertyRelative("type");
+			_type = _settingsBasic.FindPropertyRelative("type");
+			_material = _settingsBasic.FindPropertyRelative("material");
 
-			strandGroups = serializedObject.FindProperty("strandGroups");
+			_strandGroups = serializedObject.FindProperty("strandGroups");
+			_strandGroupsAutoBuild = serializedObject.FindProperty("strandGroupsAutoBuild");
 
-			autoBuild = serializedObject.FindProperty("autoBuild");
+			_settingsSolver = serializedObject.FindProperty("settingsSolver");
+			_settingsVolume = serializedObject.FindProperty("settingsVolume");
+
+			previewUtil = new PreviewRenderUtility();
+			previewRotation = Quaternion.identity;
+
+			previewUtil.camera.nearClipPlane = 0.001f;
+			previewUtil.camera.farClipPlane = 50.0f;
+			previewUtil.camera.fieldOfView = 90.0f;
+			previewUtil.camera.transform.position = Vector3.zero;
+			previewUtil.camera.transform.LookAt(Vector3.forward, Vector3.up);
+
+			previewUtil.lights[0].transform.position = Vector3.zero + Vector3.up;
+			previewUtil.lights[0].intensity = 5.0f;
+
+			for (int i = 1; i != previewUtil.lights.Length; i++)
+			{
+				previewUtil.lights[i].enabled = false;
+			}
+		}
+
+		private void OnDisable()
+		{
+			previewUtil.Cleanup();
 		}
 
 		public override void OnInspectorGUI()
@@ -81,11 +112,18 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
-
 			EditorGUILayout.LabelField("Strand groups", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
-				DrawGroups(groom);
+				DrawStrandGroups(groom);
+			}
+			EditorGUILayout.EndVertical();
+
+			EditorGUILayout.Space();
+			EditorGUILayout.LabelField("Simulation defaults (TODO)", EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+			{
+				DrawSimulation(groom);
 			}
 			EditorGUILayout.EndVertical();
 		}
@@ -94,17 +132,22 @@ namespace Unity.DemoTeam.Hair
 		{
 			EditorGUI.BeginChangeCheck();
 			{
-				StructPropertyFieldsWithHeader(settingsBasic);
+				StructPropertyFieldsWithHeader(_settingsBasic);
+
+				if (_material.objectReferenceValue == null)
+				{
+					_material.objectReferenceValue = groom.defaultMaterial;
+				}
 
 				EditorGUILayout.Space();
 
-				switch ((GroomAsset.Type)type.enumValueIndex)
+				switch ((GroomAsset.Type)_type.enumValueIndex)
 				{
 					case GroomAsset.Type.Alembic:
-						StructPropertyFieldsWithHeader(settingsAlembic);
+						StructPropertyFieldsWithHeader(_settingsAlembic);
 						break;
 					case GroomAsset.Type.Procedural:
-						StructPropertyFieldsWithHeader(settingsProcedural);
+						StructPropertyFieldsWithHeader(_settingsProcedural);
 						break;
 				}
 			}
@@ -114,36 +157,30 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.Space();
 			EditorGUILayout.BeginHorizontal();
 			{
-				if (GUILayout.Button("Build strand groups") || (settingsChanged && autoBuild.boolValue))
+				if (GUILayout.Button("Build strand groups") || (settingsChanged && _strandGroupsAutoBuild.boolValue))
 				{
 					GroomAssetBuilder.ClearGroomAsset(groom);
 					serializedObject.ApplyModifiedPropertiesWithoutUndo();
 					GroomAssetBuilder.BuildGroomAsset(groom);
 					serializedObject.Update();
-
-					if (meshPreview != null)
-					{
-						DestroyImmediate(meshPreview);
-						meshPreview = null;
-					}
 				}
 
-				autoBuild.boolValue = EditorGUILayout.ToggleLeft("Auto", autoBuild.boolValue, GUILayout.Width(50.0f));
+				_strandGroupsAutoBuild.boolValue = EditorGUILayout.ToggleLeft("Auto", _strandGroupsAutoBuild.boolValue, GUILayout.Width(50.0f));
 			}
 			EditorGUILayout.EndHorizontal();
 		}
 
-		public void DrawGroups(GroomAsset groom)
+		public void DrawSimulation(GroomAsset groom)
+		{
+			StructPropertyFieldsWithHeader(_settingsSolver);
+			StructPropertyFieldsWithHeader(_settingsVolume);
+		}
+
+		public void DrawStrandGroups(GroomAsset groom)
 		{
 			if (groom.strandGroups == null || groom.strandGroups.Length == 0)
 			{
 				EditorGUILayout.LabelField("None");
-
-				if (meshPreview != null)
-				{
-					DestroyImmediate(meshPreview);
-					meshPreview = null;
-				}
 			}
 			else
 			{
@@ -166,28 +203,50 @@ namespace Unity.DemoTeam.Hair
 
 				using (new EditorGUI.DisabledGroupScope(true))
 				{
-					for (int i = 0; i != strandGroups.arraySize; i++)
+					for (int i = 0; i != _strandGroups.arraySize; i++)
 					{
 						EditorGUILayout.Space();
-						StructPropertyFieldsWithHeader(strandGroups.GetArrayElementAtIndex(i), "Group " + i);
+						EditorGUILayout.LabelField("Group 0", EditorStyles.miniBoldLabel);
+						using (new EditorGUI.IndentLevelScope())
+						{
+							EditorGUILayout.BeginVertical();
+							{
+								var meshRoots = groom.strandGroups[i].meshAssetRoots;
+								var meshLines = groom.strandGroups[i].meshAssetLines;
+								var meshCenter = meshLines.bounds.center;
+								var meshRadius = meshLines.bounds.extents.magnitude;
+								var meshOffset = Mathf.Sqrt(2.0f * meshRadius * meshRadius);
+
+								var rect = GUILayoutUtility.GetRect(200.0f, 200.0f);
+								//if (rect.Contains(Event.current.mousePosition))
+								//{
+								//	float fracX = (Event.current.mousePosition.x - rect.x) / rect.width;
+								//	float fracY = (Event.current.mousePosition.y - rect.y) / rect.height;
+								//	{
+								//		previewRotation = Quaternion.Euler(0.0f, 360.0f * fracX, 0.0f);
+								//	}
+								//	EditorUtility.SetDirty(groom);
+								//}
+
+								var matrix = Matrix4x4.TRS(meshOffset * Vector3.forward, previewRotation, Vector3.one) * Matrix4x4.Translate(-meshCenter);
+
+								previewUtil.BeginPreview(rect, GUIStyle.none);
+								previewUtil.DrawMesh(meshLines, matrix, groom.defaultMaterial, 0);
+								previewUtil.Render(true, true);
+								previewUtil.EndAndDrawPreview(rect);
+
+								StructPropertyFields(_strandGroups.GetArrayElementAtIndex(i));
+							}
+							EditorGUILayout.EndVertical();
+						}
 					}
 				}
 
 				EditorGUILayout.Space();
-
-				if (meshPreview == null)
+				if (GUILayout.Button("Save changes"))
 				{
-					var meshPreviewTargets = new Mesh[groom.strandGroups.Length];
-
-					for (int i = 0; i != meshPreviewTargets.Length; i++)
-					{
-						meshPreviewTargets[i] = groom.strandGroups[i].meshAssetLines;
-					}
-
-					meshPreview = CreateEditor(meshPreviewTargets);
+					// TODO
 				}
-
-				meshPreview.DrawPreview(GUILayoutUtility.GetRect(200, 200));
 			}
 		}
 	}

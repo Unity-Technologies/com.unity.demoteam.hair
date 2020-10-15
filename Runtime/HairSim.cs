@@ -155,8 +155,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 1.0f)]
 			public float dampingFTL;
 
-			public static readonly SolverSettings none = new SolverSettings();
-			public static readonly SolverSettings basic = new SolverSettings()
+			public static readonly SolverSettings defaults = new SolverSettings()
 			{
 				method = Method.GaussSeidel,
 				iterations = 5,
@@ -197,8 +196,7 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector]
 			public Vector3 volumeWorldExtent;
 
-			public static readonly VolumeSettings none = new VolumeSettings();
-			public static readonly VolumeSettings basic = new VolumeSettings()
+			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
 				volumeSplatMethod = SplatMethod.Compute,
 				volumeResolution = 48,
@@ -222,8 +220,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 1.0f)] public float drawSliceOffsetZ;
 			[Range(0.0f, 4.0f)] public float drawSliceDivider;
 
-			public static readonly DebugSettings none = new DebugSettings();
-			public static readonly DebugSettings basic = new DebugSettings()
+			public static readonly DebugSettings defaults = new DebugSettings()
 			{
 				drawParticles = false,
 				drawStrands = true,
@@ -246,6 +243,8 @@ namespace Unity.DemoTeam.Hair
 
 		public const int MAX_GROUP_SIZE = 64;
 		public const int MAX_BOUNDARIES = 8;
+		public const int MAX_STRAND_COUNT = 64000;
+		public const int MAX_STRAND_PARTICLE_COUNT = 128;
 
 #if UNITY_EDITOR
 		[UnityEditor.InitializeOnLoadMethod]

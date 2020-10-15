@@ -57,17 +57,18 @@ namespace Unity.DemoTeam.Hair
 			// hash the data
 			if (groom.strandGroups != null)
 			{
-				groom.checksum = new Hash128();
-
+				var hash = new Hash128();
 				for (int i = 0; i != groom.strandGroups.Length; i++)
 				{
-					groom.checksum.Append(groom.strandGroups[i].meshAssetLines.GetInstanceID());
-					groom.checksum.Append(groom.strandGroups[i].initialPositions);
+					hash.Append(groom.strandGroups[i].meshAssetLines.GetInstanceID());
+					hash.Append(groom.strandGroups[i].initialPositions);
 				}
+
+				groom.checksum = hash.ToString();
 			}
 			else
 			{
-				groom.checksum = new Hash128();
+				groom.checksum = string.Empty;
 			}
 
 			// link sub-assets
