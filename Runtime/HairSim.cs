@@ -16,6 +16,7 @@ namespace Unity.DemoTeam.Hair
 {
 	using static HairSimUtility;
 
+	[AddComponentMenu("")]
 	public partial class HairSim : MonoBehaviour
 	{
 		static bool s_initialized = false;
@@ -51,7 +52,8 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler DrawSolverData;
 			public static ProfilingSampler DrawVolumeData;
 		}
-		static class UniformIDs
+
+		public static class UniformIDs
 		{
 			// solver
 			public static int SolverParams;
@@ -127,13 +129,6 @@ namespace Unity.DemoTeam.Hair
 				GaussSeidel = 1,
 				Jacobi = 2,
 			}
-
-			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
-			public float strandLength;
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
-			public float strandDiameter;
-			[Range(0.0f, 9.0f)]
-			public float strandParticleContrib;// TODO remove
 
 			public Method method;
 			[Range(1, 100)]
@@ -260,9 +255,6 @@ namespace Unity.DemoTeam.Hair
 					s_solverCS = instance.solverCS;
 					s_volumeCS = instance.volumeCS;
 
-					Debug.Log("s_solverCS = " + s_solverCS.name);
-					Debug.Log("s_volumeCS = " + s_volumeCS.name);
-
 					s_volumeRasterMat = new Material(instance.volumeRasterMat);
 					s_volumeRasterMat.hideFlags = HideFlags.HideAndDontSave;
 					s_volumeRasterMPB = new MaterialPropertyBlock();
@@ -386,13 +378,13 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._LocalToWorld = Matrix4x4.identity;
 			cbuffer._LocalToWorldInvT = Matrix4x4.identity;
 
-			float strandCrossSectionArea = 0.25f * Mathf.PI * solverSettings.strandDiameter * solverSettings.strandDiameter;
-			float strandParticleInterval = solverSettings.strandLength / (cbuffer._StrandParticleCount - 1);
-			float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
-
-			cbuffer._StrandParticleInterval = strandParticleInterval;
-			cbuffer._StrandParticleVolume = strandParticleVolume;
-			cbuffer._StrandParticleContrib = solverSettings.strandParticleContrib;
+			//TODO find a better place for these
+			//float strandCrossSectionArea = 0.25f * Mathf.PI * solverSettings.strandDiameter * solverSettings.strandDiameter;
+			//float strandParticleInterval = solverSettings.strandLength / (cbuffer._StrandParticleCount - 1);
+			//float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
+			//cbuffer._StrandParticleInterval = strandParticleInterval;
+			//cbuffer._StrandParticleVolume = strandParticleVolume;
+			//cbuffer._StrandParticleContrib = solverSettings.strandParticleContrib;
 
 			// update solver parameters
 			cbuffer._DT = dt;
@@ -403,7 +395,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
 			cbuffer._Repulsion = solverSettings.repulsion;
 			cbuffer._Friction = solverSettings.friction;
-			cbuffer._BendingCurvature = solverSettings.bendingCurvature * 0.5f * strandParticleInterval;
+			cbuffer._BendingCurvature = solverSettings.bendingCurvature * 0.5f * cbuffer._StrandParticleInterval;
 			cbuffer._DampingFTL = solverSettings.dampingFTL;
 		}
 
@@ -411,10 +403,8 @@ namespace Unity.DemoTeam.Hair
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
 
-			// update volume resolution
+			// update volume parameters
 			cbuffer._VolumeCells = volumeSettings.volumeResolution * Vector3.one;
-
-			// update volume coordinates
 			cbuffer._VolumeWorldMin = volumeSettings.volumeWorldCenter - volumeSettings.volumeWorldExtent;
 			cbuffer._VolumeWorldMax = volumeSettings.volumeWorldCenter + volumeSettings.volumeWorldExtent;
 

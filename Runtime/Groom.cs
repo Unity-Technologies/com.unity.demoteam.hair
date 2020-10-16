@@ -10,27 +10,30 @@ namespace Unity.DemoTeam.Hair
 	[ExecuteAlways]
 	public class Groom : MonoBehaviour
 	{
+		[Serializable]
+		public struct GroomContainer
+		{
+			public GameObject group;
+
+			public MeshFilter lineFilter;
+			public MeshRenderer lineRenderer;
+			public MaterialPropertyBlock lineRendererMPB;
+
+			public MeshFilter rootFilter;
+			//public SkinAttachment rootAttachment;
+		}
+
 		public static HashSet<Groom> s_instances = new HashSet<Groom>();
 
 		public GroomAsset groomAsset;
-		public GameObject[] groomContainers;
+		public GroomContainer[] groomContainers;
 		[HideInInspector] public string groomChecksum;
 
 		private HairSim.SolverData[] solverData;
 		private HairSim.VolumeData volumeData;
-
-		[Space]
-		public bool solverSettingsOverride;
 		public HairSim.SolverSettings[] solverSettings;
-
-		[Space]
-		public bool volumeSettingsOverride;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
-
-		[Space]
 		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.defaults;
-
-		[Space]
 		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(HairSim.MAX_BOUNDARIES);
 
 		void OnEnable()
@@ -61,49 +64,13 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDrawGizmos()
 		{
-			if (!debugSettings.drawDensity &&
-				!debugSettings.drawSliceX &&
-				!debugSettings.drawSliceY &&
-				!debugSettings.drawSliceZ)
-				return;
-
-			Gizmos.color = Color.Lerp(Color.black, Color.clear, 0.5f);
+			Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
 			Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData.cbuffer), 2.0f * HairSim.GetVolumeExtent(volumeData.cbuffer));
 		}
 
 		void Update()
 		{
 			InitializeContainers();
-		}
-
-		Bounds GetBounds()
-		{
-			var strandBounds = groomAsset.strandGroups[0].meshAssetRoots.bounds;
-			var strandLength = groomAsset.strandGroups[0].strandLengthMax;
-
-			for (int i = 1; i != groomAsset.strandGroups.Length; i++)
-			{
-				strandBounds.Encapsulate(groomAsset.strandGroups[i].meshAssetRoots.bounds);
-				strandLength = Mathf.Max(groomAsset.strandGroups[i].strandLengthMax, strandLength);
-			}
-
-			strandBounds.Expand(1.5f * (2.0f * strandLength));
-
-			var extent = strandBounds.extents;
-			var extentMax = Mathf.Max(extent.x, extent.y, extent.z);
-
-			return new Bounds(strandBounds.center, Vector3.one * (2.0f * extentMax));
-		}
-
-		Bounds GetBoundsForSquareCells()
-		{
-			var bounds = GetBounds();
-			{
-				var nonSquareExtent = bounds.extents;
-				var nonSquareExtentMax = Mathf.Max(nonSquareExtent.x, nonSquareExtent.y, nonSquareExtent.z);
-
-				return new Bounds(bounds.center, Vector3.one * (2.0f * nonSquareExtentMax));
-			}
 		}
 
 		public void DispatchStep(CommandBuffer cmd, float dt)
@@ -117,15 +84,18 @@ namespace Unity.DemoTeam.Hair
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings[i], dt);
 			}
 
-			var volumeBounds = GetBoundsForSquareCells();
+			var volumeBounds = groomAsset.GetBoundsForSquareCells();
 			{
 				volumeSettings.volumeWorldCenter = volumeBounds.center;
 				volumeSettings.volumeWorldExtent = volumeBounds.extents;
 			}
 
+			Debug.Log("volumeBounds.center " + volumeBounds.center);
+			Debug.Log("volumeBounds.extents " + volumeBounds.extents);
+
 			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, boundaries);
 
-			// pre-step volume if resolution changed
+			// pre-step if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution))
 			{
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
@@ -134,7 +104,15 @@ namespace Unity.DemoTeam.Hair
 			// step
 			for (int i = 0; i != solverData.Length; i++)
 			{
+				if (groomContainers[i].lineRendererMPB == null)
+					groomContainers[i].lineRendererMPB = new MaterialPropertyBlock();
+
 				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings[i], volumeData);
+				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
+
+				groomContainers[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
+				//groomContainers[i].lineRendererMPB.SetBuffer("_ParticlePosition", solverData[i].particlePosition);
+				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
 			}
 
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
@@ -183,7 +161,10 @@ namespace Unity.DemoTeam.Hair
 
 		bool InitializeRuntimeData()
 		{
-			if (groomAsset == null || groomChecksum != groomAsset.checksum)
+			if (groomAsset == null)
+				return false;
+
+			if (groomAsset.checksum != groomChecksum)
 				return false;
 
 			var strandGroups = groomAsset.strandGroups;
@@ -195,19 +176,25 @@ namespace Unity.DemoTeam.Hair
 
 			solverData = new HairSim.SolverData[strandGroups.Length];
 			solverSettings = new HairSim.SolverSettings[strandGroups.Length];
+			volumeSettings = groomAsset.settingsVolume;
 
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
 				ref var strandGroup = ref strandGroups[i];
 
 				solverSettings[i] = groomAsset.settingsSolver;
-				solverSettings[i].strandDiameter = groomAsset.settingsBasic.strandDiameter;
-				solverSettings[i].strandLength = strandGroup.strandLengthAvg;
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 
+				float strandCrossSectionArea = 0.25f * Mathf.PI * groomAsset.settingsBasic.strandDiameter * groomAsset.settingsBasic.strandDiameter;
+				float strandParticleInterval = strandGroup.strandLengthAvg / (strandGroup.strandParticleCount - 1);
+				float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
+
 				solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 				solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
+				solverData[i].cbuffer._StrandParticleInterval = strandParticleInterval;
+				solverData[i].cbuffer._StrandParticleVolume = strandParticleVolume;
+				solverData[i].cbuffer._StrandParticleContrib = groomAsset.settingsBasic.strandParticleContrib;
 
 				int particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 
@@ -268,11 +255,11 @@ namespace Unity.DemoTeam.Hair
 			if (groom.groomContainers == null)
 				return;
 
-			foreach (var groomObject in groom.groomContainers)
+			foreach (var groomContainer in groom.groomContainers)
 			{
-				if (groomObject != null)
+				if (groomContainer.group != null)
 				{
-					GameObject.DestroyImmediate(groomObject);
+					GameObject.DestroyImmediate(groomContainer.group);
 				}
 			}
 
@@ -288,20 +275,22 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			// prep groom containers
-			groom.groomContainers = new GameObject[strandGroups.Length];
+			groom.groomContainers = new Groom.GroomContainer[strandGroups.Length];
 
 			// build groom containers
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
-				var groupObject = new GameObject();
+				ref var groomContainer = ref groom.groomContainers[i];
+
+				var group = new GameObject();
 				{
-					groupObject.name = "Group:" + i;
-					groupObject.transform.SetParent(groom.transform, worldPositionStays: false);
+					group.name = "Group:" + i;
+					group.transform.SetParent(groom.transform, worldPositionStays: false);
 
 					var linesContainer = new GameObject();
 					{
 						linesContainer.name = "Lines:" + i;
-						linesContainer.transform.SetParent(groupObject.transform, worldPositionStays: false);
+						linesContainer.transform.SetParent(group.transform, worldPositionStays: false);
 
 						var lineFilter = linesContainer.AddComponent<MeshFilter>();
 						{
@@ -310,25 +299,36 @@ namespace Unity.DemoTeam.Hair
 
 						var lineRenderer = linesContainer.AddComponent<MeshRenderer>();
 						{
-							lineRenderer.sharedMaterial = groomAsset.settingsBasic.material;
+							lineRenderer.sharedMaterial = new Material(groomAsset.settingsBasic.material);
 						}
+
+						groomContainer.lineFilter = lineFilter;
+						groomContainer.lineRenderer = lineRenderer;
 					}
 
 					var rootsContainer = new GameObject();
 					{
 						rootsContainer.name = "Roots:" + i;
-						rootsContainer.transform.SetParent(groupObject.transform, worldPositionStays: false);
+						rootsContainer.transform.SetParent(group.transform, worldPositionStays: false);
 
 						var rootFilter = rootsContainer.AddComponent<MeshFilter>();
 						{
 							rootFilter.sharedMesh = strandGroups[i].meshAssetRoots;
 						}
 
+						//TODO
 						//var rootAttachment = rootObject.AddComponent<SkinAttachment>();
+						//{
+						//}
+
+						groomContainer.rootFilter = rootFilter;
+
+						//TODO
+						//groomContainer.rootAttachment = rootAttachment;
 					}
 				}
 
-				groom.groomContainers[i] = groupObject;
+				groom.groomContainers[i].group = group;
 			}
 		}
 	}

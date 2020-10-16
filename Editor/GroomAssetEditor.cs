@@ -120,13 +120,13 @@ namespace Unity.DemoTeam.Hair
 			}
 			EditorGUILayout.EndVertical();
 
-			//EditorGUILayout.Space();
-			//EditorGUILayout.LabelField("Simulation defaults (TODO)", EditorStyles.centeredGreyMiniLabel);
-			//EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-			//{
-			//	DrawSimulation(groom);
-			//}
-			//EditorGUILayout.EndVertical();
+			EditorGUILayout.Space();
+			EditorGUILayout.LabelField("Simulation defaults (TODO)", EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+			{
+				DrawSimulation(groom);
+			}
+			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField(groom.checksum, EditorStyles.centeredGreyMiniLabel);

@@ -255,11 +255,13 @@ namespace Unity.DemoTeam.Hair
 
 			using (var wireStrandTangents = new NativeArray<Vector3>(curveCount * curvePointCount, Allocator.Temp))
 			using (var wireStrandIndices = new NativeArray<int>(curveCount * wireStrandPointCount, Allocator.Temp))
+			using (var wireStrandUVs = new NativeArray<Vector2>(curveCount * curvePointCount, Allocator.Temp))
 			{
 				unsafe
 				{
 					var wireTangentPtr = (Vector3*)wireStrandTangents.GetUnsafePtr();
 					var wireIndexPtr = (int*)wireStrandIndices.GetUnsafePtr();
+					var wireUVPtr = (Vector2*)wireStrandUVs.GetUnsafePtr();
 
 					for (int i = 0; i != curveCount; i++)
 					{
@@ -282,11 +284,20 @@ namespace Unity.DemoTeam.Hair
 
 						*(wireTangentPtr++) = *(wireTangentPtr - 1);
 					}
+
+					for (int i = 0, k = 0; i != curveCount; i++)
+					{
+						for (int j = 0; j != curvePointCount - 1; j++)
+						{
+							*(wireUVPtr++) = new Vector2(k++, 0.0f);
+						}
+					}
 				}
 
 				strandGroup.meshAssetLines.SetVertices(strandGroup.initialPositions);
 				strandGroup.meshAssetLines.SetNormals(wireStrandTangents);
 				strandGroup.meshAssetLines.SetIndices(wireStrandIndices, MeshTopology.Lines, 0);
+				strandGroup.meshAssetLines.SetUVs(0, wireStrandUVs);
 			}
 
 			// prep roots mesh

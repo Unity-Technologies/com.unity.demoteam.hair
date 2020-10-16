@@ -16,8 +16,8 @@ namespace Unity.DemoTeam.Hair
 
 		public enum MemoryLayout
 		{
-			StrandsSequential,
 			StrandsInterleaved,
+			StrandsSequential,
 		}
 
 		[Serializable]
@@ -27,12 +27,17 @@ namespace Unity.DemoTeam.Hair
 			public Type type;
 			[Tooltip("Material applied to the generated groups")]
 			public Material material;
+			[Tooltip("Memory layout for the strands")]
+			public MemoryLayout memoryLayout;
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
+			[Range(0.0f, 9.0f)]
+			public float strandParticleContrib;// TODO remove
 
 			public static readonly SettingsBasic defaults = new SettingsBasic()
 			{
 				type = Type.Procedural,
+				memoryLayout = MemoryLayout.StrandsInterleaved,
 				strandDiameter = 10.0f,
 			};
 		}
@@ -86,6 +91,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public int strandCount;
 			public int strandParticleCount;
+			public float strandDiameter;
 
 			[HideInInspector] public float strandLengthMin;
 			[HideInInspector] public float strandLengthMax;
@@ -96,6 +102,7 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector3[] initialPositions;
 			[HideInInspector] public Vector3[] initialRootPositions;
 			[HideInInspector] public Vector3[] initialRootDirections;
+			[HideInInspector] public float[] initialLengths;
 
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetRoots;
@@ -114,5 +121,37 @@ namespace Unity.DemoTeam.Hair
 
 		public HairSim.SolverSettings settingsSolver = HairSim.SolverSettings.defaults;
 		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults;
+
+		public Bounds GetBounds()
+		{
+			Debug.Assert(strandGroups != null && strandGroups.Length != 0);
+
+			var strandBounds = strandGroups[0].meshAssetRoots.bounds;
+			var strandLength = strandGroups[0].strandLengthMax;
+
+			for (int i = 1; i != strandGroups.Length; i++)
+			{
+				strandBounds.Encapsulate(strandGroups[i].meshAssetRoots.bounds);
+				strandLength = Mathf.Max(strandGroups[i].strandLengthMax, strandLength);
+			}
+
+			strandBounds.Expand(1.5f * (2.0f * strandLength));
+
+			var extent = strandBounds.extents;
+			var extentMax = Mathf.Max(extent.x, extent.y, extent.z);
+
+			return new Bounds(strandBounds.center, Vector3.one * (2.0f * extentMax));
+		}
+
+		public Bounds GetBoundsForSquareCells()
+		{
+			var bounds = GetBounds();
+			{
+				var nonSquareExtent = bounds.extents;
+				var nonSquareExtentMax = Mathf.Max(nonSquareExtent.x, nonSquareExtent.y, nonSquareExtent.z);
+
+				return new Bounds(bounds.center, Vector3.one * (2.0f * nonSquareExtentMax));
+			}
+		}
 	}
 }

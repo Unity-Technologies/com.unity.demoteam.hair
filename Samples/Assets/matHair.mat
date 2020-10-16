@@ -9,7 +9,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: matHair
   m_Shader: {fileID: -6465566751694194690, guid: 2fa8c2da3a58a3b49be5441117c20876, type: 3}
-  m_ShaderKeywords: _DISABLE_SSR_TRANSPARENT
+  m_ShaderKeywords: BOOLEAN_58B50922201C4296ADCD3604F1135012_ON _DISABLE_SSR_TRANSPARENT
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -110,6 +110,8 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
+    - BOOLEAN_58B50922201C4296ADCD3604F1135012: 1
+    - BOOLEAN_69B014B20E2848539F679A29B317D5BD: 0
     - Vector1_20a47d405fd34354a347258fdfeff805: 0
     - Vector1_2e12ccf506a14853b660778272a7d4f1: 0
     - Vector1_3c480a7375e14916a17cfbcc2326c547: 0
