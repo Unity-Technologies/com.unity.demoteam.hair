@@ -78,6 +78,7 @@ namespace Unity.DemoTeam.Hair
 			previewUtil = new PreviewRenderUtility();
 			previewRotation = Quaternion.identity;
 
+			previewUtil.camera.backgroundColor = Color.black;// Color.Lerp(Color.black, Color.grey, 0.5f);
 			previewUtil.camera.nearClipPlane = 0.001f;
 			previewUtil.camera.farClipPlane = 50.0f;
 			previewUtil.camera.fieldOfView = 90.0f;
@@ -119,13 +120,16 @@ namespace Unity.DemoTeam.Hair
 			}
 			EditorGUILayout.EndVertical();
 
+			//EditorGUILayout.Space();
+			//EditorGUILayout.LabelField("Simulation defaults (TODO)", EditorStyles.centeredGreyMiniLabel);
+			//EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+			//{
+			//	DrawSimulation(groom);
+			//}
+			//EditorGUILayout.EndVertical();
+
 			EditorGUILayout.Space();
-			EditorGUILayout.LabelField("Simulation defaults (TODO)", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-			{
-				DrawSimulation(groom);
-			}
-			EditorGUILayout.EndVertical();
+			EditorGUILayout.LabelField(groom.checksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
 		public void DrawImporter(GroomAsset groom)
@@ -193,7 +197,7 @@ namespace Unity.DemoTeam.Hair
 					numParticles += groom.strandGroups[i].strandCount * groom.strandGroups[i].strandParticleCount;
 				}
 
-				EditorGUILayout.LabelField("Totals", EditorStyles.miniBoldLabel);
+				EditorGUILayout.LabelField("Summary", EditorStyles.miniBoldLabel);
 				using (new EditorGUI.IndentLevelScope())
 				{
 					EditorGUILayout.IntField("Total groups", groom.strandGroups.Length, EditorStyles.label);
@@ -201,23 +205,32 @@ namespace Unity.DemoTeam.Hair
 					EditorGUILayout.IntField("Total particles", numParticles, EditorStyles.label);
 				}
 
-				using (new EditorGUI.DisabledGroupScope(true))
+				for (int i = 0; i != _strandGroups.arraySize; i++)
 				{
-					for (int i = 0; i != _strandGroups.arraySize; i++)
+					EditorGUILayout.Space();
+					EditorGUILayout.LabelField("Group 0", EditorStyles.miniBoldLabel);
+					using (new EditorGUI.IndentLevelScope())
 					{
-						EditorGUILayout.Space();
-						EditorGUILayout.LabelField("Group 0", EditorStyles.miniBoldLabel);
-						using (new EditorGUI.IndentLevelScope())
+						EditorGUILayout.BeginVertical();
 						{
-							EditorGUILayout.BeginVertical();
-							{
-								var meshRoots = groom.strandGroups[i].meshAssetRoots;
-								var meshLines = groom.strandGroups[i].meshAssetLines;
-								var meshCenter = meshLines.bounds.center;
-								var meshRadius = meshLines.bounds.extents.magnitude;
-								var meshOffset = Mathf.Sqrt(2.0f * meshRadius * meshRadius);
+							var meshRoots = groom.strandGroups[i].meshAssetRoots;
+							var meshLines = groom.strandGroups[i].meshAssetLines;
+							var meshCenter = meshLines.bounds.center;
+							var meshRadius = meshLines.bounds.extents.magnitude;
+							var meshOffset = Mathf.Sqrt(2.0f * meshRadius * meshRadius);
 
-								var rect = GUILayoutUtility.GetRect(200.0f, 200.0f);
+							var rect = GUILayoutUtility.GetRect(150.0f, 150.0f);
+							if (rect.width >= 200.0f)
+							{
+								rect = EditorGUI.IndentedRect(rect);
+
+								GUI.Box(rect, Texture2D.blackTexture, EditorStyles.textField);
+
+								rect.xMin += 1;
+								rect.yMin += 1;
+								rect.xMax -= 1;
+								rect.yMax -= 1;
+
 								//if (rect.Contains(Event.current.mousePosition))
 								//{
 								//	float fracX = (Event.current.mousePosition.x - rect.x) / rect.width;
@@ -234,10 +247,13 @@ namespace Unity.DemoTeam.Hair
 								previewUtil.DrawMesh(meshLines, matrix, groom.defaultMaterial, 0);
 								previewUtil.Render(true, true);
 								previewUtil.EndAndDrawPreview(rect);
-
-								StructPropertyFields(_strandGroups.GetArrayElementAtIndex(i));
 							}
-							EditorGUILayout.EndVertical();
+						}
+						EditorGUILayout.EndVertical();
+
+						using (new EditorGUI.DisabledScope(true))
+						{
+							StructPropertyFields(_strandGroups.GetArrayElementAtIndex(i));
 						}
 					}
 				}
