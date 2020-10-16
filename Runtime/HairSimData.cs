@@ -11,6 +11,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public SolverParams cbuffer;
 
+			public ComputeBuffer restLength;
 			public ComputeBuffer rootPosition;
 			public ComputeBuffer rootDirection;
 

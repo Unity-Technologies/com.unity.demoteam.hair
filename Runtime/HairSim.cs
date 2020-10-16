@@ -26,6 +26,7 @@ namespace Unity.DemoTeam.Hair
 
 		static Material s_volumeRasterMat;
 		static MaterialPropertyBlock s_volumeRasterMPB;
+
 		static Material s_debugDrawMat;
 		static MaterialPropertyBlock s_debugDrawMPB;
 
@@ -58,6 +59,7 @@ namespace Unity.DemoTeam.Hair
 			// solver
 			public static int SolverParams;
 
+			public static int _RestLength;
 			public static int _RootPosition;
 			public static int _RootDirection;
 
@@ -284,6 +286,7 @@ namespace Unity.DemoTeam.Hair
 				int particleCount = strandCount * strandParticleCount;
 				int particleStride = sizeof(Vector4);
 
+				changed |= CreateBuffer(ref solverData.restLength, "RestLength", strandCount, sizeof(float));
 				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStride);
 				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStride);
 

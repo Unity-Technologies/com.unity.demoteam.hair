@@ -90,9 +90,6 @@ namespace Unity.DemoTeam.Hair
 				volumeSettings.volumeWorldExtent = volumeBounds.extents;
 			}
 
-			Debug.Log("volumeBounds.center " + volumeBounds.center);
-			Debug.Log("volumeBounds.extents " + volumeBounds.extents);
-
 			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, boundaries);
 
 			// pre-step if resolution changed
@@ -101,7 +98,7 @@ namespace Unity.DemoTeam.Hair
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
 
-			// step
+			// perform time step
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				if (groomContainers[i].lineRendererMPB == null)
@@ -111,7 +108,6 @@ namespace Unity.DemoTeam.Hair
 				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
 
 				groomContainers[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
-				//groomContainers[i].lineRendererMPB.SetBuffer("_ParticlePosition", solverData[i].particlePosition);
 				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
 			}
 

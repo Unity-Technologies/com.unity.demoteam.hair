@@ -12,6 +12,7 @@
 #define HAIRSIM_SOLVERDATA StructuredBuffer
 #endif
 
+HAIRSIM_SOLVERDATA<float4> _RestLength;
 HAIRSIM_SOLVERDATA<float4> _RootPosition;
 HAIRSIM_SOLVERDATA<float4> _RootDirection;
 

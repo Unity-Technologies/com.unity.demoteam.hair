@@ -91,7 +91,6 @@ namespace Unity.DemoTeam.Hair
 		{
 			public int strandCount;
 			public int strandParticleCount;
-			public float strandDiameter;
 
 			[HideInInspector] public float strandLengthMin;
 			[HideInInspector] public float strandLengthMax;

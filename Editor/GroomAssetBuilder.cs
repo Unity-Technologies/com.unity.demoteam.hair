@@ -200,6 +200,7 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.initialPositions = new Vector3[curveCount * curvePointCount];
 			strandGroup.initialRootPositions = new Vector3[curveCount];
 			strandGroup.initialRootDirections = new Vector3[curveCount];
+			strandGroup.initialLengths = new float[curveCount];
 
 			// build curve buffers
 			using (var tempRoots = GenerateRoots(settings))
@@ -240,6 +241,7 @@ namespace Unity.DemoTeam.Hair
 					strandGroup.strandLengthAvg += strandLength;
 					strandGroup.strandLengthMin = Mathf.Min(strandLength, strandGroup.strandLengthMin);
 					strandGroup.strandLengthMax = Mathf.Max(strandLength, strandGroup.strandLengthMax);
+					strandGroup.initialLengths[i] = strandLength;
 				}
 
 				strandGroup.strandLengthAvg /= curveCount;
