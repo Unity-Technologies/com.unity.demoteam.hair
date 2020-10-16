@@ -5,7 +5,7 @@ namespace Unity.DemoTeam.Hair
 {
 	public class HairSimBoundary : MonoBehaviour
 	{
-		const float MARGIN = 0.002f;// 2mm
+		const float MARGIN = 0.005f;// 5mm
 
 		public enum Type
 		{
