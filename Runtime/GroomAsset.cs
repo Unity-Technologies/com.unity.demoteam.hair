@@ -37,8 +37,8 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SettingsBasic defaults = new SettingsBasic()
 			{
 				type = Type.Procedural,
-				memoryLayout = MemoryLayout.StrandsInterleaved,
-				strandDiameter = 10.0f,
+				memoryLayout = MemoryLayout.StrandsSequential,
+				strandDiameter = 2.0f,
 			};
 		}
 
@@ -82,7 +82,7 @@ namespace Unity.DemoTeam.Hair
 				style = Style.Curtain,
 				strandCount = 64,
 				strandParticleCount = 32,
-				strandLength = 0.5f,
+				strandLength = 0.25f,
 			};
 		}
 
@@ -92,16 +92,16 @@ namespace Unity.DemoTeam.Hair
 			public int strandCount;
 			public int strandParticleCount;
 
-			[HideInInspector] public float strandLengthMin;
-			[HideInInspector] public float strandLengthMax;
-			[HideInInspector] public float strandLengthAvg;
+			[HideInInspector] public float[] initialLength;
+			[HideInInspector] public Vector3[] initialPosition;
+			[HideInInspector] public Vector3[] initialRootPosition;
+			[HideInInspector] public Vector3[] initialRootDirection;
 
 			[HideInInspector] public MemoryLayout memoryLayout;
 
-			[HideInInspector] public Vector3[] initialPositions;
-			[HideInInspector] public Vector3[] initialRootPositions;
-			[HideInInspector] public Vector3[] initialRootDirections;
-			[HideInInspector] public float[] initialLengths;
+			[HideInInspector] public float strandLengthMin;
+			[HideInInspector] public float strandLengthMax;
+			[HideInInspector] public float strandLengthAvg;
 
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetRoots;

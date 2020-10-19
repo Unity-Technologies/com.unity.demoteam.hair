@@ -8,7 +8,7 @@
 #define MAX_BOUNDARIES 8
 // N == max number of colliders
 
-#define SPLAT_FRACTIONAL_BITS 14// => 1 / (1 << 14) = 0.00006103515625
+#define SPLAT_FRACTIONAL_BITS 12// => 1 / (1 << 14) = 0.00006103515625
 // N == controls smallest fraction stored on grid
 
 #define SPLAT_TRILINEAR 1

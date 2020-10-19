@@ -59,7 +59,7 @@ namespace Unity.DemoTeam.Hair
 			// solver
 			public static int SolverParams;
 
-			public static int _RestLength;
+			public static int _Length;
 			public static int _RootPosition;
 			public static int _RootDirection;
 
@@ -155,7 +155,7 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
 				method = Method.GaussSeidel,
-				iterations = 5,
+				iterations = 3,
 				stiffness = 1.0f,
 				relaxation = 1.0f,
 				damping = 0.0f,
@@ -286,7 +286,7 @@ namespace Unity.DemoTeam.Hair
 				int particleCount = strandCount * strandParticleCount;
 				int particleStride = sizeof(Vector4);
 
-				changed |= CreateBuffer(ref solverData.restLength, "RestLength", strandCount, sizeof(float));
+				changed |= CreateBuffer(ref solverData.length, "Length", strandCount, sizeof(float));
 				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStride);
 				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStride);
 
@@ -302,6 +302,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void ReleaseSolverData(ref SolverData solverData)
 		{
+			ReleaseBuffer(ref solverData.length);
 			ReleaseBuffer(ref solverData.rootPosition);
 			ReleaseBuffer(ref solverData.rootDirection);
 
@@ -380,14 +381,6 @@ namespace Unity.DemoTeam.Hair
 			// update strand parameters
 			cbuffer._LocalToWorld = Matrix4x4.identity;
 			cbuffer._LocalToWorldInvT = Matrix4x4.identity;
-
-			//TODO find a better place for these
-			//float strandCrossSectionArea = 0.25f * Mathf.PI * solverSettings.strandDiameter * solverSettings.strandDiameter;
-			//float strandParticleInterval = solverSettings.strandLength / (cbuffer._StrandParticleCount - 1);
-			//float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
-			//cbuffer._StrandParticleInterval = strandParticleInterval;
-			//cbuffer._StrandParticleVolume = strandParticleVolume;
-			//cbuffer._StrandParticleContrib = solverSettings.strandParticleContrib;
 
 			// update solver parameters
 			cbuffer._DT = dt;
@@ -509,6 +502,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			ConstantBuffer.Push(cmd, solverData.cbuffer, cs, UniformIDs.SolverParams);
 
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._Length, solverData.length);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, solverData.rootPosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootDirection, solverData.rootDirection);
 
@@ -523,6 +517,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			ConstantBuffer.Push(cmd, solverData.cbuffer, mat, UniformIDs.SolverParams);
 
+			mpb.SetBuffer(UniformIDs._Length, solverData.length);
 			mpb.SetBuffer(UniformIDs._RootPosition, solverData.rootPosition);
 			mpb.SetBuffer(UniformIDs._RootDirection, solverData.rootDirection);
 

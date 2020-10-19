@@ -62,14 +62,19 @@ float3 ParticleVolumeImpulse(uint i, float3 velocity, float friction)
 	}
 }
 
-float GetDecay()
+float GetDampingDecay()
 {
 	return pow(max(1e-4, 1.0 - _Damping), _DT);
 }
 
+float GetParticleInterval(uint strandIndex)
+{
+	return _Length[strandIndex] / (_StrandParticleCount - 1);
+}
+
 float3 Integrate(float3 x0, float3 v0, float3 a0)
 {
-	return x0 + _DT * (v0 * GetDecay() + _DT * a0);
+	return x0 + _DT * (v0 * GetDampingDecay() + _DT * a0);
 }
 
 //---------
@@ -143,14 +148,14 @@ void KSolveConstraints_GaussSeidelReference(
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 			float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
 
-			ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.0, 1.0, p0, p1);
+			ApplyDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, 0.0, 1.0, p0, p1);
 
 			for (uint i = strandParticleBegin + strandParticleStride * 2; i != strandParticleEnd; i += strandParticleStride)
 			{
 				p0 = p1;
 				p1 = _ParticlePosition[i].xyz;
 
-				ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p0, p1);
+				ApplyDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, 0.5, 0.5, p0, p1);
 
 				_ParticlePosition[i - strandParticleStride].xyz = p0;
 			}
@@ -164,7 +169,7 @@ void KSolveConstraints_GaussSeidelReference(
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 			float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
 			float3 p2 = _ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz;
-			float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
+			float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * GetParticleInterval(strandIndex);
 
 			//      p1 <-- solve
 			//     /
@@ -216,7 +221,7 @@ void KSolveConstraints_GaussSeidelReference(
 				float3 p1 = _ParticlePosition[i].xyz;
 				float3 d1 = 0;
 
-				ApplyDistanceFTLConstraint(_StrandParticleInterval, p0, p1, d1);
+				ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, d1);
 				
 				_ParticlePosition[i].xyz = p1;
 				_ParticlePositionCorr[i - strandParticleStride].xyz += d1;
@@ -315,7 +320,7 @@ void KSolveConstraints_GaussSeidel(
 		float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 		float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
 		float3 p2 = _ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz;
-		float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
+		float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * GetParticleInterval(strandIndex);
 
 		//      p1 <-- solve
 		//     /
@@ -327,7 +332,7 @@ void KSolveConstraints_GaussSeidel(
 			if (ENABLE_CONSTRAINT_FRICTION)	ApplyCollisionFrictionConstraint(_Friction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride].xyz, p1);
 			else/* frictionless */			ApplyCollisionConstraint(p1);
 		}
-		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.0, 1.0, p0, p1);
+		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, 0.0, 1.0, p0, p1);
 		if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 0.0, 1.0, r0, p0, p1);
 		
 #if STRAND_31_32_DEBUG == 2
@@ -348,7 +353,7 @@ void KSolveConstraints_GaussSeidel(
 			if (ENABLE_CONSTRAINT_FRICTION)	ApplyCollisionFrictionConstraint(_Friction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride * 2].xyz, p2);
 			else/* frictionless */			ApplyCollisionConstraint(p2);
 		}
-		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1, p2);
+		if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, 0.5, 0.5, p1, p2);
 		if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
 		for (uint i = strandParticleBegin + strandParticleStride * 3; i != strandParticleEnd; i += strandParticleStride)
@@ -372,13 +377,13 @@ void KSolveConstraints_GaussSeidel(
 				if (ENABLE_CONSTRAINT_FRICTION)	ApplyCollisionFrictionConstraint(_Friction, _ParticlePositionPrev[i].xyz, p2);
 				else/* frictionless */			ApplyCollisionConstraint(p2);
 			}
-			if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(_StrandParticleInterval, kStiffness, 0.5, 0.5, p1, p2);
+			if (ENABLE_CONSTRAINT_DISTANCE)		ApplyDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, 0.5, 0.5, p1, p2);
 			if (ENABLE_CONSTRAINT_CURVATURE)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
 			
 			if (ENABLE_CONSTRAINT_FTL)
 			{
 				float3 d0 = 0;
-				ApplyDistanceFTLConstraint(_StrandParticleInterval, r0, p0, d0);
+				ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), r0, p0, d0);
 
 				_ParticlePositionCorr[i - strandParticleStride * 3].xyz += d0;
 			}
@@ -391,8 +396,8 @@ void KSolveConstraints_GaussSeidel(
 		{
 			float3 d1 = 0;
 			float3 d2 = 0;
-			ApplyDistanceFTLConstraint(_StrandParticleInterval, p0, p1, d1);
-			ApplyDistanceFTLConstraint(_StrandParticleInterval, p1, p2, d2);
+			ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, d1);
+			ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, d2);
 
 			_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz += d1;
 			_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz += d2;
@@ -462,7 +467,7 @@ void KSolveConstraints_Jacobi(
 			const float3 rootPosition = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
 			const float3 rootTangent = mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz;
 			{
-				gs_x[0] = float4(rootPosition - rootTangent * _StrandParticleInterval, 0.0);
+				gs_x[0] = float4(rootPosition - rootTangent * GetParticleInterval(strandIndex), 0.0);
 				gs_x[1] = float4(rootPosition, 0.0);
 			}
 		}
@@ -517,11 +522,11 @@ void KSolveConstraints_Jacobi(
 			{
 				float3 nop = 0;
 
-				SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j - 1], gs_x[j], nop, d);
+				SolveDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, gs_x[j - 1], gs_x[j], nop, d);
 
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveDistanceConstraint(_StrandParticleInterval, kStiffness, gs_x[j], gs_x[j + 1], d, nop);
+					SolveDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, gs_x[j], gs_x[j + 1], d, nop);
 				}
 			}
 
@@ -552,7 +557,7 @@ void KSolveConstraints_Jacobi(
 #if SPLIT_FTL
 
 				float3 d_tmp = 0;
-				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[j - 1].xyz, gs_x[j].xyz, d_tmp);
+				SolveDistanceFTLConstraint(GetParticleInterval(strandIndex), gs_x[j - 1].xyz, gs_x[j].xyz, d_tmp);
 				d_ftl += d_tmp;
 
 				// move to next iteration
@@ -563,7 +568,7 @@ void KSolveConstraints_Jacobi(
 				//TODO divide 'd' early to reduce averaging of FTL constraint?
 
 				float3 d_tmp = 0;
-				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[j - 1].xyz, gs_x[j].xyz, d_tmp);
+				SolveDistanceFTLConstraint(GetParticleInterval(strandIndex), gs_x[j - 1].xyz, gs_x[j].xyz, d_tmp);
 				d_ftl += d_tmp * n_inv;
 
 				// move to next iteration
@@ -648,16 +653,16 @@ void KSolveConstraints_Jacobi(
 
 				if (threadIdx == 1)
 				{
-					SolveDistanceConstraint(_StrandParticleInterval, 1.0, 0.0, 1.0, gs_x[threadIdx - 1], gs_x[threadIdx], nop, sum); count++;
-					SolveDistanceConstraint(_StrandParticleInterval, 1.0, 0.5, 0.5, gs_x[threadIdx], gs_x[threadIdx + 1], sum, nop); count++;
+					SolveDistanceConstraint(GetParticleInterval(strandIndex), 1.0, 0.0, 1.0, gs_x[threadIdx - 1], gs_x[threadIdx], nop, sum); count++;
+					SolveDistanceConstraint(GetParticleInterval(strandIndex), 1.0, 0.5, 0.5, gs_x[threadIdx], gs_x[threadIdx + 1], sum, nop); count++;
 				}
 				else
 				{
-					SolveDistanceConstraint(_StrandParticleInterval, 1.0, 0.5, 0.5, gs_x[threadIdx - 1], gs_x[threadIdx], nop, sum); count++;
+					SolveDistanceConstraint(GetParticleInterval(strandIndex), 1.0, 0.5, 0.5, gs_x[threadIdx - 1], gs_x[threadIdx], nop, sum); count++;
 					
 					if (threadIdx < THREAD_GROUP_SIZE - 1)
 					{
-						SolveDistanceConstraint(_StrandParticleInterval, 1.0, 0.5, 0.5, gs_x[threadIdx], gs_x[threadIdx + 1], sum, nop); count++;
+						SolveDistanceConstraint(GetParticleInterval(strandIndex), 1.0, 0.5, 0.5, gs_x[threadIdx], gs_x[threadIdx + 1], sum, nop); count++;
 					}
 				}
 
@@ -676,7 +681,7 @@ void KSolveConstraints_Jacobi(
 				if (threadIdx <= 1)
 				{
 					const uint j = threadIdx;
-					const float3 gs_x_rooted = gs_x[0] - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * _StrandParticleInterval;
+					const float3 gs_x_rooted = gs_x[0] - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * GetParticleInterval(strandIndex);
 
 					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 0.0, 0.0, 1.0, gs_x_rooted, gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
 					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 0.0, 1.0, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop1, sum, nop2); count++;
@@ -709,7 +714,7 @@ void KSolveConstraints_Jacobi(
 				//TODO divide 'd' early to reduce averaging of FTL constraint?
 
 				float3 d_pre_ftl = d;
-				SolveDistanceFTLConstraint(_StrandParticleInterval, gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
+				SolveDistanceFTLConstraint(GetParticleInterval(strandIndex), gs_x[threadIdx - 1], gs_x[threadIdx], d); n++;
 
 				float inv_n = _Relaxation / n;
 				gs_x[threadIdx] = gs_x[threadIdx] + d * inv_n;

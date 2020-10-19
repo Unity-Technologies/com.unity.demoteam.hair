@@ -7,6 +7,7 @@ namespace Unity.DemoTeam.Hair
 	public class GroomAssetEditor : Editor
 	{
 		PreviewRenderUtility previewUtil;
+		MaterialPropertyBlock previewUtilMPB;
 		Quaternion previewRotation;
 
 		SerializedProperty _type;
@@ -76,6 +77,7 @@ namespace Unity.DemoTeam.Hair
 			_settingsVolume = serializedObject.FindProperty("settingsVolume");
 
 			previewUtil = new PreviewRenderUtility();
+			previewUtilMPB = new MaterialPropertyBlock();
 			previewRotation = Quaternion.identity;
 
 			previewUtil.camera.backgroundColor = Color.black;// Color.Lerp(Color.black, Color.grey, 0.5f);
@@ -243,8 +245,11 @@ namespace Unity.DemoTeam.Hair
 
 								var matrix = Matrix4x4.TRS(meshOffset * Vector3.forward, previewRotation, Vector3.one) * Matrix4x4.Translate(-meshCenter);
 
+								//TODO get rid of this
+								previewUtilMPB.SetInt("_StrandCount", groom.strandGroups[i].strandCount);
+
 								previewUtil.BeginPreview(rect, GUIStyle.none);
-								previewUtil.DrawMesh(meshLines, matrix, groom.defaultMaterial, 0);
+								previewUtil.DrawMesh(meshLines, matrix, groom.defaultMaterial, 0, previewUtilMPB);
 								previewUtil.Render(true, true);
 								previewUtil.EndAndDrawPreview(rect);
 							}

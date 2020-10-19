@@ -78,6 +78,20 @@ namespace Unity.DemoTeam.Hair
 			if (!InitializeRuntimeData())
 				return;
 
+			for (int i = 0; i != solverData.Length; i++)
+			{
+				if (groomContainers[i].lineRendererMPB == null)
+					groomContainers[i].lineRendererMPB = new MaterialPropertyBlock();
+
+				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
+				//TODO this visibly happens one frame after respawning the groom... need to also sync the properties on creation
+
+				groomContainers[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
+				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
+			}
+
+			return;
+
 			// apply settings
 			for (int i = 0; i != solverData.Length; i++)
 			{
@@ -106,6 +120,7 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings[i], volumeData);
 				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
+				//TODO this visibly happens one frame after respawning the groom... need to also sync the properties on creation
 
 				groomContainers[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
 				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
@@ -201,9 +216,9 @@ namespace Unity.DemoTeam.Hair
 				{
 					unsafe
 					{
-						fixed (void* srcPosition = strandGroup.initialPositions)
-						fixed (void* srcRootPosition = strandGroup.initialRootPositions)
-						fixed (void* srcRootDirection = strandGroup.initialRootDirections)
+						fixed (void* srcPosition = strandGroup.initialPosition)
+						fixed (void* srcRootPosition = strandGroup.initialRootPosition)
+						fixed (void* srcRootDirection = strandGroup.initialRootDirection)
 						{
 							UnsafeUtility.MemCpyStride(tmpPosition.GetUnsafePtr(), sizeof(Vector4), srcPosition, sizeof(Vector3), sizeof(Vector3), particleCount);
 							UnsafeUtility.MemCpyStride(tmpRootPosition.GetUnsafePtr(), sizeof(Vector4), srcRootPosition, sizeof(Vector3), sizeof(Vector3), strandGroup.strandCount);
@@ -211,6 +226,7 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
+					solverData[i].length.SetData(strandGroup.initialLength);
 					solverData[i].rootPosition.SetData(tmpRootPosition);
 					solverData[i].rootDirection.SetData(tmpRootDirection);
 

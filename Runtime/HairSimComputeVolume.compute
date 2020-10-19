@@ -27,7 +27,7 @@
 #define VOLUME_NUM_Y 8
 #define VOLUME_NUM_Z 1
 
-#define VOLUME_SUPPORT_CONTRACTION 0
+#define VOLUME_SUPPORT_CONTRACTION 1
 
 #if VOLUME_SUPPORT_CONTRACTION
 	#define VOLUME_REST_AT_ZERO					0
@@ -127,8 +127,8 @@ void InterlockedAddParticleContributionPackedW(uint i, float value, RWTexture3D<
 #endif
 }
 
-//-------
-// clear
+//---------------
+// kernels clear
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeClear(
@@ -147,8 +147,8 @@ void KVolumeClear(
 	_AccuVelocityZ[worldIdx] = 0;
 }
 
-//-------
-// splat
+//---------------
+// kernels splat
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
 void KVolumeSplat(
@@ -245,8 +245,8 @@ void KVolumeSplatVelocityZ(
 #endif
 }
 
-//---------
-// resolve
+//-----------------
+// kernels resolve
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeResolve(
@@ -322,8 +322,8 @@ void KVolumeResolveFromRasterization(
 	}
 }
 
-//------------
-// divergence
+//--------------------
+// kernels divergence
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeDivergence(
@@ -427,8 +427,8 @@ void KVolumeDivergence(
 	}
 }
 
-//----------
-// pressure
+//------------------
+// kernels pressure
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumePressureEOS(
