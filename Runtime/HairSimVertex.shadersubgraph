@@ -146,6 +146,20 @@
         {
             "m_OutputSlot": {
                 "m_Node": {
+                    "m_Id": "aa4adf42c1da4b26b365de57d4ba31c7"
+                },
+                "m_SlotId": 0
+            },
+            "m_InputSlot": {
+                "m_Node": {
+                    "m_Id": "d9d0e356411a4a35a679f5161c3d4cc7"
+                },
+                "m_SlotId": 1
+            }
+        },
+        {
+            "m_OutputSlot": {
+                "m_Node": {
                     "m_Id": "aef90e0d247f4182a0bc652b6e9e7165"
                 },
                 "m_SlotId": 1
@@ -211,20 +225,6 @@
                     "m_Id": "2285df7f60dd491eb6b30dbdb2297802"
                 },
                 "m_SlotId": 5
-            }
-        },
-        {
-            "m_OutputSlot": {
-                "m_Node": {
-                    "m_Id": "aa4adf42c1da4b26b365de57d4ba31c7"
-                },
-                "m_SlotId": 0
-            },
-            "m_InputSlot": {
-                "m_Node": {
-                    "m_Id": "d9d0e356411a4a35a679f5161c3d4cc7"
-                },
-                "m_SlotId": 1
             }
         }
     ],
@@ -416,24 +416,6 @@
 }
 
 {
-    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
-    "m_ObjectId": "3c76aad244f3485bb3a72c0eec3c84f1",
-    "m_Guid": {
-        "m_GuidSerialized": "d1bc055d-9dba-44e7-aefb-12d255ab383f"
-    },
-    "m_Name": "HAIRSIMVERTEX_ENABLE_POSITION",
-    "m_DefaultReferenceName": "BOOLEAN_3C76AAD244F3485BB3A72C0EEC3C84F1_ON",
-    "m_OverrideReferenceName": "HAIRSIMVERTEX_ENABLE_POSITION",
-    "m_GeneratePropertyBlock": true,
-    "m_KeywordType": 0,
-    "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_Entries": [],
-    "m_Value": 0,
-    "m_IsEditable": true
-}
-
-{
     "m_Type": "UnityEditor.ShaderGraph.GroupData",
     "m_ObjectId": "3aaa704617834fe4827991043aea3439",
     "m_Title": "OS Normal",
@@ -441,6 +423,24 @@
         "x": 270.0,
         "y": -302.0
     }
+}
+
+{
+    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
+    "m_ObjectId": "3c76aad244f3485bb3a72c0eec3c84f1",
+    "m_Guid": {
+        "m_GuidSerialized": "d1bc055d-9dba-44e7-aefb-12d255ab383f"
+    },
+    "m_Name": "HAIRSIMVERTEX_STATIC_PREVIEW",
+    "m_DefaultReferenceName": "BOOLEAN_3C76AAD244F3485BB3A72C0EEC3C84F1_ON",
+    "m_OverrideReferenceName": "HAIRSIMVERTEX_STATIC_PREVIEW",
+    "m_GeneratePropertyBlock": true,
+    "m_KeywordType": 0,
+    "m_KeywordDefinition": 1,
+    "m_KeywordScope": 0,
+    "m_Entries": [],
+    "m_Value": 0,
+    "m_IsEditable": true
 }
 
 {
@@ -839,6 +839,37 @@
         "Y",
         "Z"
     ]
+}
+
+{
+    "m_Type": "UnityEditor.ShaderGraph.ViewDirectionNode",
+    "m_ObjectId": "aa4adf42c1da4b26b365de57d4ba31c7",
+    "m_Group": {
+        "m_Id": "5e6268fe5c9440bbb5053d14b3997d74"
+    },
+    "m_Name": "View Direction",
+    "m_NodeVersion": 0,
+    "m_DrawState": {
+        "m_Expanded": true,
+        "m_Position": {
+            "serializedVersion": "2",
+            "x": -204.99998474121095,
+            "y": -111.0,
+            "width": 206.0,
+            "height": 132.0
+        }
+    },
+    "m_Slots": [
+        {
+            "m_Id": "77451a6a4dbf459a9d5c35109ea82682"
+        }
+    ],
+    "m_Precision": 0,
+    "m_PreviewExpanded": false,
+    "m_CustomColors": {
+        "m_SerializableColors": []
+    },
+    "m_Space": 0
 }
 
 {
@@ -1278,36 +1309,5 @@
     "m_FunctionName": "HairSimVertex",
     "m_FunctionSource": "4f6d24cde688f7343b07b92b71138a5a",
     "m_FunctionBody": "Enter function body here..."
-}
-
-{
-    "m_Type": "UnityEditor.ShaderGraph.ViewDirectionNode",
-    "m_ObjectId": "aa4adf42c1da4b26b365de57d4ba31c7",
-    "m_Group": {
-        "m_Id": "5e6268fe5c9440bbb5053d14b3997d74"
-    },
-    "m_Name": "View Direction",
-    "m_NodeVersion": 0,
-    "m_DrawState": {
-        "m_Expanded": true,
-        "m_Position": {
-            "serializedVersion": "2",
-            "x": -204.99998474121095,
-            "y": -111.0,
-            "width": 206.0,
-            "height": 132.0
-        }
-    },
-    "m_Slots": [
-        {
-            "m_Id": "77451a6a4dbf459a9d5c35109ea82682"
-        }
-    ],
-    "m_Precision": 0,
-    "m_PreviewExpanded": false,
-    "m_CustomColors": {
-        "m_SerializableColors": []
-    },
-    "m_Space": 0
 }
 

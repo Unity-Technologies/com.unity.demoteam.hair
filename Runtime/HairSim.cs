@@ -1,8 +1,5 @@
 ﻿#pragma warning disable 0649 // some fields are assigned via reflection
 
-//#define LAYOUT_INTERLEAVED
-//TODO !!
-
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -300,22 +297,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void ReleaseSolverData(ref SolverData solverData)
-		{
-			ReleaseBuffer(ref solverData.length);
-			ReleaseBuffer(ref solverData.rootPosition);
-			ReleaseBuffer(ref solverData.rootDirection);
-
-			ReleaseBuffer(ref solverData.particlePosition);
-			ReleaseBuffer(ref solverData.particlePositionPrev);
-			ReleaseBuffer(ref solverData.particlePositionCorr);
-			ReleaseBuffer(ref solverData.particleVelocity);
-			ReleaseBuffer(ref solverData.particleVelocityPrev);
-
-			solverData = new SolverData();
-		}
-
-		public static bool PrepareVolumeData(ref VolumeData volumeData, int volumeCellCount)
+		public static bool PrepareVolumeData(ref VolumeData volumeData, int volumeCellCount, bool halfPrecision)
 		{
 			unsafe
 			{
@@ -326,13 +308,17 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateVolume(ref volumeData.accuVelocityY, "AccuVelocityY", volumeCellCount, GraphicsFormat.R32_SInt);
 				changed |= CreateVolume(ref volumeData.accuVelocityZ, "AccuVelocityZ", volumeCellCount, GraphicsFormat.R32_SInt);
 
-				changed |= CreateVolume(ref volumeData.volumeDensity, "VolumeDensity", volumeCellCount, RenderTextureFormat.RFloat);
-				changed |= CreateVolume(ref volumeData.volumeVelocity, "VolumeVelocity", volumeCellCount, RenderTextureFormat.ARGBFloat);
-				changed |= CreateVolume(ref volumeData.volumeDivergence, "VolumeDivergence", volumeCellCount, RenderTextureFormat.RFloat);
+				var fmtFloatR = halfPrecision ? RenderTextureFormat.RHalf : RenderTextureFormat.RFloat;
+				var fmtFloatRGBA = halfPrecision ? RenderTextureFormat.ARGBHalf : RenderTextureFormat.ARGBFloat;
+				{
+					changed |= CreateVolume(ref volumeData.volumeDensity, "VolumeDensity", volumeCellCount, fmtFloatR);
+					changed |= CreateVolume(ref volumeData.volumeVelocity, "VolumeVelocity", volumeCellCount, fmtFloatRGBA);
+					changed |= CreateVolume(ref volumeData.volumeDivergence, "VolumeDivergence", volumeCellCount, fmtFloatR);
 
-				changed |= CreateVolume(ref volumeData.volumePressure, "VolumePressure_0", volumeCellCount, RenderTextureFormat.RFloat);
-				changed |= CreateVolume(ref volumeData.volumePressureNext, "VolumePressure_1", volumeCellCount, RenderTextureFormat.RFloat);
-				changed |= CreateVolume(ref volumeData.volumePressureGrad, "VolumePressureGrad", volumeCellCount, RenderTextureFormat.ARGBFloat);
+					changed |= CreateVolume(ref volumeData.volumePressure, "VolumePressure_0", volumeCellCount, fmtFloatR);
+					changed |= CreateVolume(ref volumeData.volumePressureNext, "VolumePressure_1", volumeCellCount, fmtFloatR);
+					changed |= CreateVolume(ref volumeData.volumePressureGrad, "VolumePressureGrad", volumeCellCount, fmtFloatRGBA);
+				}
 
 				changed |= CreateBuffer(ref volumeData.boundaryPack, "BoundaryPack", MAX_BOUNDARIES, sizeof(HairSimBoundary.BoundaryPack));
 				changed |= CreateBuffer(ref volumeData.boundaryMatrix, "BoundaryMatrix", MAX_BOUNDARIES, sizeof(Matrix4x4));
@@ -346,6 +332,21 @@ namespace Unity.DemoTeam.Hair
 
 				return changed;
 			}
+		}
+
+		public static void ReleaseSolverData(ref SolverData solverData)
+		{
+			ReleaseBuffer(ref solverData.length);
+			ReleaseBuffer(ref solverData.rootPosition);
+			ReleaseBuffer(ref solverData.rootDirection);
+
+			ReleaseBuffer(ref solverData.particlePosition);
+			ReleaseBuffer(ref solverData.particlePositionPrev);
+			ReleaseBuffer(ref solverData.particlePositionCorr);
+			ReleaseBuffer(ref solverData.particleVelocity);
+			ReleaseBuffer(ref solverData.particleVelocityPrev);
+
+			solverData = new SolverData();
 		}
 
 		public static void ReleaseVolumeData(ref VolumeData volumeData)
@@ -511,6 +512,8 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+
+			CoreUtils.SetKeyword(cs, "LAYOUT_INTERLEAVED", solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData)
@@ -526,6 +529,8 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			mpb.SetBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+
+			CoreUtils.SetKeyword(mat, "LAYOUT_INTERLEAVED", solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
 		}
 
 		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData)

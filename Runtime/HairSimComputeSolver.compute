@@ -7,6 +7,10 @@
 #pragma kernel KUpdatePosition							THREAD_GROUP_SIZE=64
 #pragma kernel KUpdateVelocity							THREAD_GROUP_SIZE=64
 
+#pragma multi_compile_local __ LAYOUT_INTERLEAVED
+// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
+// 1 == particles grouped by index, i.e. root, root, root+1, root+1
+
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 #define HAIRSIM_WRITEABLE_SOLVERDATA 1

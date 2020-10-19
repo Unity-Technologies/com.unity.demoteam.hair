@@ -20,6 +20,8 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particlePositionCorr;
 			public ComputeBuffer particleVelocity;
 			public ComputeBuffer particleVelocityPrev;
+
+			public GroomAsset.MemoryLayout memoryLayout;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]

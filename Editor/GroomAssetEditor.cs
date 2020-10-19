@@ -6,6 +6,8 @@ namespace Unity.DemoTeam.Hair
 	[CustomEditor(typeof(GroomAsset))]
 	public class GroomAssetEditor : Editor
 	{
+		static Material s_previewMat;
+
 		PreviewRenderUtility previewUtil;
 		MaterialPropertyBlock previewUtilMPB;
 		Quaternion previewRotation;
@@ -63,19 +65,6 @@ namespace Unity.DemoTeam.Hair
 
 		private void OnEnable()
 		{
-			_settingsBasic = serializedObject.FindProperty("settingsBasic");
-			_settingsAlembic = serializedObject.FindProperty("settingsAlembic");
-			_settingsProcedural = serializedObject.FindProperty("settingsProcedural");
-
-			_type = _settingsBasic.FindPropertyRelative("type");
-			_material = _settingsBasic.FindPropertyRelative("material");
-
-			_strandGroups = serializedObject.FindProperty("strandGroups");
-			_strandGroupsAutoBuild = serializedObject.FindProperty("strandGroupsAutoBuild");
-
-			_settingsSolver = serializedObject.FindProperty("settingsSolver");
-			_settingsVolume = serializedObject.FindProperty("settingsVolume");
-
 			previewUtil = new PreviewRenderUtility();
 			previewUtilMPB = new MaterialPropertyBlock();
 			previewRotation = Quaternion.identity;
@@ -94,6 +83,19 @@ namespace Unity.DemoTeam.Hair
 			{
 				previewUtil.lights[i].enabled = false;
 			}
+
+			_settingsBasic = serializedObject.FindProperty("settingsBasic");
+			_settingsAlembic = serializedObject.FindProperty("settingsAlembic");
+			_settingsProcedural = serializedObject.FindProperty("settingsProcedural");
+
+			_type = _settingsBasic.FindPropertyRelative("type");
+			_material = _settingsBasic.FindPropertyRelative("material");
+
+			_strandGroups = serializedObject.FindProperty("strandGroups");
+			_strandGroupsAutoBuild = serializedObject.FindProperty("strandGroupsAutoBuild");
+
+			_settingsSolver = serializedObject.FindProperty("settingsSolver");
+			_settingsVolume = serializedObject.FindProperty("settingsVolume");
 		}
 
 		private void OnDisable()
@@ -141,9 +143,7 @@ namespace Unity.DemoTeam.Hair
 				StructPropertyFieldsWithHeader(_settingsBasic);
 
 				if (_material.objectReferenceValue == null)
-				{
 					_material.objectReferenceValue = groom.defaultMaterial;
-				}
 
 				EditorGUILayout.Space();
 
@@ -245,11 +245,22 @@ namespace Unity.DemoTeam.Hair
 
 								var matrix = Matrix4x4.TRS(meshOffset * Vector3.forward, previewRotation, Vector3.one) * Matrix4x4.Translate(-meshCenter);
 
-								//TODO get rid of this
+								if (s_previewMat == null)
+								{
+									s_previewMat = new Material(groom.defaultMaterial);
+									s_previewMat.hideFlags = HideFlags.HideAndDontSave;
+									s_previewMat.EnableKeyword("HAIRSIMVERTEX_STATIC_PREVIEW");
+								}
+								else
+								{
+									s_previewMat.CopyPropertiesFromMaterial(groom.defaultMaterial);
+									s_previewMat.EnableKeyword("HAIRSIMVERTEX_STATIC_PREVIEW");
+								}
+
 								previewUtilMPB.SetInt("_StrandCount", groom.strandGroups[i].strandCount);
 
 								previewUtil.BeginPreview(rect, GUIStyle.none);
-								previewUtil.DrawMesh(meshLines, matrix, groom.defaultMaterial, 0, previewUtilMPB);
+								previewUtil.DrawMesh(meshLines, matrix, s_previewMat, 0, previewUtilMPB);
 								previewUtil.Render(true, true);
 								previewUtil.EndAndDrawPreview(rect);
 							}

@@ -176,13 +176,13 @@ namespace Unity.DemoTeam.Hair
 			// apply memory layout
 			switch (memoryLayout)
 			{
-				case GroomAsset.MemoryLayout.StrandsSequential:
+				case GroomAsset.MemoryLayout.Sequential:
 					{
 						// do nothing
 					}
 					break;
 
-				case GroomAsset.MemoryLayout.StrandsInterleaved:
+				case GroomAsset.MemoryLayout.Interleaved:
 					unsafe
 					{
 						using (var src = new NativeArray<Vector3>(strandGroup.initialPosition, Allocator.Temp))
@@ -521,15 +521,15 @@ namespace Unity.DemoTeam.Hair
 		{
 			switch (memoryLayout)
 			{
-				case GroomAsset.MemoryLayout.StrandsInterleaved:
-					strandParticleBegin = strandIndex;
-					strandParticleStride = strandCount;
-					break;
-
 				default:
-				case GroomAsset.MemoryLayout.StrandsSequential:
+				case GroomAsset.MemoryLayout.Sequential:
 					strandParticleBegin = strandIndex * strandParticleCount;
 					strandParticleStride = 1;
+					break;
+
+				case GroomAsset.MemoryLayout.Interleaved:
+					strandParticleBegin = strandIndex;
+					strandParticleStride = strandCount;
 					break;
 			}
 

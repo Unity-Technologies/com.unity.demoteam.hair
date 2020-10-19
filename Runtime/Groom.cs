@@ -10,6 +10,8 @@ namespace Unity.DemoTeam.Hair
 	[ExecuteAlways]
 	public class Groom : MonoBehaviour
 	{
+		public static HashSet<Groom> s_instances = new HashSet<Groom>();
+
 		[Serializable]
 		public struct GroomContainer
 		{
@@ -22,8 +24,6 @@ namespace Unity.DemoTeam.Hair
 			public MeshFilter rootFilter;
 			//public SkinAttachment rootAttachment;
 		}
-
-		public static HashSet<Groom> s_instances = new HashSet<Groom>();
 
 		public GroomAsset groomAsset;
 		public GroomContainer[] groomContainers;
@@ -78,20 +78,6 @@ namespace Unity.DemoTeam.Hair
 			if (!InitializeRuntimeData())
 				return;
 
-			for (int i = 0; i != solverData.Length; i++)
-			{
-				if (groomContainers[i].lineRendererMPB == null)
-					groomContainers[i].lineRendererMPB = new MaterialPropertyBlock();
-
-				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
-				//TODO this visibly happens one frame after respawning the groom... need to also sync the properties on creation
-
-				groomContainers[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
-				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
-			}
-
-			return;
-
 			// apply settings
 			for (int i = 0; i != solverData.Length; i++)
 			{
@@ -107,7 +93,7 @@ namespace Unity.DemoTeam.Hair
 			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, boundaries);
 
 			// pre-step if resolution changed
-			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution))
+			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, false))
 			{
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
@@ -115,14 +101,17 @@ namespace Unity.DemoTeam.Hair
 			// perform time step
 			for (int i = 0; i != solverData.Length; i++)
 			{
+				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings[i], volumeData);
+
+				// update the renderer
 				if (groomContainers[i].lineRendererMPB == null)
 					groomContainers[i].lineRendererMPB = new MaterialPropertyBlock();
 
-				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings[i], volumeData);
-				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
+				//HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
 				//TODO this visibly happens one frame after respawning the groom... need to also sync the properties on creation
 
-				groomContainers[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
+				groomContainers[i].lineRendererMPB.SetBuffer(HairSim.UniformIDs._ParticlePosition, solverData[i].particlePosition);
+				groomContainers[i].lineRendererMPB.SetInt("_StrandCount", (int)solverData[i].cbuffer._StrandCount);
 				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
 			}
 
@@ -141,13 +130,6 @@ namespace Unity.DemoTeam.Hair
 
 			HairSim.DrawVolumeData(cmd, color, depth, volumeData, debugSettings);
 		}
-
-		// when to build runtime data?
-		//   1. on object enabled
-		//   2. on checksum changed
-
-		// when to clear runtime data?
-		//   1. on destroy
 
 		void InitializeContainers()
 		{
@@ -169,6 +151,13 @@ namespace Unity.DemoTeam.Hair
 				ReleaseRuntimeData();
 			}
 		}
+
+		// when to build runtime data?
+		//   1. on object enabled
+		//   2. on checksum changed
+
+		// when to clear runtime data?
+		//   1. on destroy
 
 		bool InitializeRuntimeData()
 		{
@@ -236,9 +225,11 @@ namespace Unity.DemoTeam.Hair
 					solverData[i].particleVelocity.SetData(tmpZero);
 					solverData[i].particleVelocityPrev.SetData(tmpZero);
 				}
+
+				solverData[i].memoryLayout = strandGroup.memoryLayout;
 			}
 
-			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution);
+			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, false);
 
 			return true;
 		}
@@ -311,7 +302,7 @@ namespace Unity.DemoTeam.Hair
 
 						var lineRenderer = linesContainer.AddComponent<MeshRenderer>();
 						{
-							lineRenderer.sharedMaterial = new Material(groomAsset.settingsBasic.material);
+							lineRenderer.sharedMaterial = groomAsset.settingsBasic.material;
 						}
 
 						groomContainer.lineFilter = lineFilter;

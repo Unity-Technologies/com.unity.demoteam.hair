@@ -11,10 +11,10 @@ void HairSimVertex_float(in float3 osPosition, in float2 uv, out float3 wsPositi
 
 	debugColor = ColorCycle(strandIndex, _StrandCount);
 
-#if HAIRSIMVERTEX_ENABLE_POSITION
-	wsPosition = _ParticlePosition[strandParticleIndex].xyz;
-#else
+#if HAIRSIMVERTEX_STATIC_PREVIEW
 	wsPosition = osPosition;
+#else
+	wsPosition = _ParticlePosition[strandParticleIndex].xyz;
 #endif
 }
 

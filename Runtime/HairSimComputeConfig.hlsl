@@ -1,10 +1,6 @@
 ﻿#ifndef __HAIRSIMCOMPUTE_CONFIG__
 #define __HAIRSIMCOMPUTE_CONFIG__
 
-#define LAYOUT_INTERLEAVED 0
-// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
-// 1 == particles grouped by index, i.e. root, root, root+1, root+1
-
 #define MAX_BOUNDARIES 8
 // N == max number of colliders
 
