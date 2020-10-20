@@ -1,5 +1,7 @@
-#ifndef __HAIRSIMCOMPUTE_BOUNDARIES__
-#define __HAIRSIMCOMPUTE_BOUNDARIES__
+#ifndef __HAIRSIMCOMPUTEBOUNDARIES_HLSL__
+#define __HAIRSIMCOMPUTEBOUNDARIES_HLSL__
+
+#include "HairSimData.hlsl"
 
 //-----------------
 // boundary shapes
@@ -138,9 +140,6 @@ float3 BoundaryNormal(const float3 p, const float d)
 		));
 }
 
-#endif//__HAIRSIMCOMPUTE_BOUNDARIES__
-
-
 /*
 float4 BoundaryDistance4(const float3 p0, const float3 p1, const float3 p2, const float3 p3)
 {
@@ -199,3 +198,5 @@ float4 BoundaryDistance4(const float3 p0, const float3 p1, const float3 p2, cons
 	return d;
 }
 //*/
+
+#endif//__HAIRSIMCOMPUTEBOUNDARIES_HLSL__

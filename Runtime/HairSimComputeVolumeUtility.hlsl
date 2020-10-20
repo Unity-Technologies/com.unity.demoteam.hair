@@ -1,5 +1,5 @@
-#ifndef __HAIRSIMCOMPUTE_VOLUMEUTILITY__
-#define __HAIRSIMCOMPUTE_VOLUMEUTILITY__
+#ifndef __HAIRSIMCOMPUTEVOLUMEUTILITY_HLSL__
+#define __HAIRSIMCOMPUTEVOLUMEUTILITY_HLSL__
 
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
@@ -158,4 +158,4 @@ float3 VolumeSampleVector(Texture3D<float4> volume, float3 uvw)
 	return VolumeSampleVector(volume, uvw, _Volume_trilinear_clamp);
 }
 
-#endif//__HAIRSIMCOMPUTE_VOLUMEUTILITY__
+#endif//__HAIRSIMCOMPUTEVOLUMEUTILITY_HLSL__

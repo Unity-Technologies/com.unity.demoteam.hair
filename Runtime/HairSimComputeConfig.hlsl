@@ -1,5 +1,5 @@
-﻿#ifndef __HAIRSIMCOMPUTE_CONFIG__
-#define __HAIRSIMCOMPUTE_CONFIG__
+﻿#ifndef __HAIRSIMCOMPUTECONFIG_HLSL__
+#define __HAIRSIMCOMPUTECONFIG_HLSL__
 
 #define MAX_BOUNDARIES 8
 // N == max number of colliders
@@ -28,4 +28,4 @@
 // 1 == on (full strands)
 // 2 == on (first segments)
 
-#endif//__HAIRSIMCOMPUTE_CONFIG__
+#endif//__HAIRSIMCOMPUTECONFIG_HLSL__

@@ -1,13 +1,22 @@
-﻿using UnityEngine;
-using UnityEngine.Profiling;
+﻿using System;
+using System.Reflection;
+using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
-using System.Reflection;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class HairSimDebugPass : CustomPass
+	public class HairDriverCustomPass : CustomPass
 	{
+		public Dispatch dispatch;
+
+		[Flags]
+		public enum Dispatch
+		{
+			Step = 1 << 0,
+			Draw = 1 << 1,
+		}
+
 		private int lastSimulationFrame = -1;
 
 		private RTHandle cameraMotionVectorBuffer;
@@ -33,40 +42,61 @@ namespace Unity.DemoTeam.Hair
 		protected override void Setup(ScriptableRenderContext renderContext, CommandBuffer cmd)
 		{
 			base.Setup(renderContext, cmd);
-			base.name = "GroomCustomPass";
+			base.name = "HairPass (" + dispatch + ")";
+
+			if (dispatch.HasFlag(Dispatch.Draw))
+			{
+				base.targetColorBuffer = TargetBuffer.Camera;
+				base.targetDepthBuffer = TargetBuffer.Camera;
+			}
+			else
+			{
+				base.targetColorBuffer = TargetBuffer.None;
+				base.targetDepthBuffer = TargetBuffer.None;
+			}
 
 			FindCameraMotionVectorBuffer();
 		}
 
 		protected override void Execute(CustomPassContext context)
 		{
-			int frame = Time.renderedFrameCount;
-			if (frame != lastSimulationFrame)
+			if (dispatch.HasFlag(Dispatch.Step))
 			{
-				var dt = Time.deltaTime;
-				if (dt != 0.0f)
+				int frame = Time.renderedFrameCount;
+				if (frame != lastSimulationFrame)
 				{
-					const float dtMin = 1.0f / 120.0f;
-					const float dtMax = 1.0f / 30.0f;
-
-					dt = Mathf.Clamp(dt, dtMin, dtMax);
-					dt = 1.0f / 60.0f;
-
-					foreach (var hair in Groom.s_instances)
+					var dt = Time.deltaTime;
+					if (dt != 0.0f)
 					{
-						if (hair != null && hair.isActiveAndEnabled)
-							hair.DispatchStep(context.cmd, dt);
-					}
-				}
+						const float dtMin = 1.0f / 120.0f;
+						const float dtMax = 1.0f / 30.0f;
 
-				lastSimulationFrame = frame;
+						dt = Mathf.Clamp(dt, dtMin, dtMax);
+						dt = 1.0f / 60.0f;
+
+						foreach (var hair in Groom.s_instances)
+						{
+							if (hair != null && hair.isActiveAndEnabled)
+								hair.DispatchStep(context.cmd, dt);
+						}
+					}
+
+					lastSimulationFrame = frame;
+				}
+			}
+			else
+			{
+				lastSimulationFrame = -1;
 			}
 
-			foreach (var hair in Groom.s_instances)
+			if (dispatch.HasFlag(Dispatch.Draw))
 			{
-				if (hair != null && hair.isActiveAndEnabled)
+				foreach (var hair in Groom.s_instances)
 				{
-					hair.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer, cameraMotionVectorBuffer);
+					if (hair != null && hair.isActiveAndEnabled)
+					{
+						hair.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer, cameraMotionVectorBuffer);
+					}
 				}
 			}
 		}

@@ -263,6 +263,10 @@ namespace Unity.DemoTeam.Hair
 					s_debugDrawMPB = new MaterialPropertyBlock();
 				}
 
+#if UNITY_EDITOR
+				UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ComponentSingleton<HairSim>.Release;
+#endif
+
 				InitializeStaticFields(typeof(MarkersCPU), (string s) => new ProfilerMarker("HairSim." + s.Replace('_', '.')));
 				InitializeStaticFields(typeof(MarkersGPU), (string s) => new ProfilingSampler("HairSim." + s.Replace('_', '.')));
 				InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
@@ -447,7 +451,7 @@ namespace Unity.DemoTeam.Hair
 					int boundaryTorusIndex = boundarySphereIndex + cbuffer._BoundarySphereCount;
 
 					int boundaryCount = cbuffer._BoundaryCapsuleCount + cbuffer._BoundarySphereCount + boundaryTorusIndex;
-					var boundaryHash = new Hash128(7, 13);
+					var boundaryHash = new Hash128();
 
 					foreach (HairSimBoundary boundary in boundaries)
 					{

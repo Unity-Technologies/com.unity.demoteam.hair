@@ -179,6 +179,7 @@ namespace Unity.DemoTeam.Hair
 		public void DrawSimulation(GroomAsset groom)
 		{
 			StructPropertyFieldsWithHeader(_settingsSolver);
+			EditorGUILayout.Space();
 			StructPropertyFieldsWithHeader(_settingsVolume);
 		}
 

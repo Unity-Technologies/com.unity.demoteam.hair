@@ -1,5 +1,5 @@
-#ifndef __HAIRSIMCOMPUTE_CONSTRAINTS__
-#define __HAIRSIMCOMPUTE_CONSTRAINTS__
+#ifndef __HAIRSIMCOMPUTECONSTRAINTS_HLSL__
+#define __HAIRSIMCOMPUTECONSTRAINTS_HLSL__
 
 #include "HairSimComputeSolverBoundaries.hlsl"
 
@@ -11,7 +11,7 @@
 //
 // E.g.:
 //   #define CONSTRAINTS_GUARD_DIVISION_BY_ZERO
-//   #include "HairSimComputeSlverConstraints.hlsl"
+//   #include "HairSimComputeSolverConstraints.hlsl"
 
 #ifdef CONSTRAINTS_GUARD_DIVISION_BY_ZERO
 #define GUARD(x) if (x)
@@ -472,4 +472,4 @@ void ApplyTriangleBendingMaxConstraint(
 	p2 += d2;
 }
 
-#endif//__HAIRSIMCOMPUTE_CONSTRAINTS__
+#endif//__HAIRSIMCOMPUTECONSTRAINTS_HLSL__

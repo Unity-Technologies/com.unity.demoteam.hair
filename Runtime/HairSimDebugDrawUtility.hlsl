@@ -1,5 +1,5 @@
-#ifndef __HAIRSIM_DEBUGDRAWUTILITY__
-#define __HAIRSIM_DEBUGDRAWUTILITY__
+#ifndef __HAIRSIMDEBUGDRAWUTILITY_HLSL__
+#define __HAIRSIMDEBUGDRAWUTILITY_HLSL__
 
 //---------
 // generic
@@ -66,4 +66,4 @@ float3 ColorVelocity(float3 v)
 	return saturate(abs(float3(v.x, 0.0, -v.z)));
 }
 
-#endif//__HAIRSIM_DEBUGDRAWUTILITY__
+#endif//__HAIRSIMDEBUGDRAWUTILITY_HLSL__
