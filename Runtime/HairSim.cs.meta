@@ -6,6 +6,7 @@ MonoImporter:
   defaultReferences:
   - solverCS: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
   - volumeCS: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
+  - solverRootsMat: {fileID: 2100000, guid: aab22033b1ea1de49aa3b5baf9ddcefe, type: 2}
   - volumeRasterMat: {fileID: 2100000, guid: 16357b555c6d5e5419cb484b4ffcb4d3, type: 2}
   - debugDrawMat: {fileID: 2100000, guid: 322a16a37ef3fe140ab2627a9e3bd121, type: 2}
   executionOrder: 0

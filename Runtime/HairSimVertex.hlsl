@@ -4,18 +4,18 @@
 #include "HairSimData.hlsl"
 #include "HairSimDebugDrawUtility.hlsl"
 
-void HairSimVertex_float(in float3 osPosition, in float2 uv, out float3 wsPosition, out float3 debugColor)
+void HairSimVertex_float(in float3 inPositionOS, in float2 inUV, out float3 outPositionOS, out float3 outDebugColor)
 {
-	int strandParticleIndex = (int)uv.x;
-	int strandIndex = (int)uv.y;
-
-	debugColor = ColorCycle(strandIndex, _StrandCount);
+	const int strandIndex = (int)inUV.y;
+	const int strandParticleIndex = (int)inUV.x;
 
 #if HAIRSIMVERTEX_STATIC_PREVIEW
-	wsPosition = osPosition;
+	outPositionOS = inPositionOS;
 #else
-	wsPosition = _ParticlePosition[strandParticleIndex].xyz;
+	outPositionOS = TransformWorldToObject(GetCameraRelativePositionWS(_ParticlePosition[strandParticleIndex].xyz));
 #endif
+
+	outDebugColor = ColorCycle(strandIndex, _StrandCount);
 }
 
 #endif//__HAIRSIMVERTEX_HLSL__

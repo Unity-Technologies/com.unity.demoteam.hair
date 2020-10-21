@@ -131,9 +131,9 @@ namespace Unity.DemoTeam.Hair
 			var bufferPos = curveSet.Positions;
 			var bufferPosOffset = curveSet.PositionsOffsetBuffer;
 
-			Debug.Log("curveSet: " + curveSet.name);
-			Debug.Log("bufferPos.Count = " + bufferPos.Count);
-			Debug.Log("bufferPosOffset.Count = " + bufferPosOffset.Count);
+			//Debug.Log("curveSet: " + curveSet.name);
+			//Debug.Log("bufferPos.Count = " + bufferPos.Count);
+			//Debug.Log("bufferPosOffset.Count = " + bufferPosOffset.Count);
 
 			// get curve counts
 			int curveCount = bufferPosOffset.Count;
@@ -312,6 +312,7 @@ namespace Unity.DemoTeam.Hair
 					// write index buffer
 					for (int i = 0; i != curveCount; i++)
 					{
+						//TODO pick different strategy for interleaved?
 						DeclareStrandIterator(strandGroup.memoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 						for (int j = 0; j != wireStrandLineCount; j++)
@@ -357,8 +358,21 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.meshAssetRoots = new Mesh();
 
 			// build roots mesh
-			strandGroup.meshAssetRoots.SetVertices(strandGroup.initialRootPosition);
-			strandGroup.meshAssetRoots.SetNormals(strandGroup.initialRootDirection);
+			using (var indices = new NativeArray<int>(curveCount, Allocator.Temp))
+			{
+				unsafe
+				{
+					var indicesPtr = (int*)indices.GetUnsafePtr();
+					for (int i = 0; i != curveCount; i++)
+					{
+						*(indicesPtr++) = i;
+					}
+				}
+
+				strandGroup.meshAssetRoots.SetVertices(strandGroup.initialRootPosition);
+				strandGroup.meshAssetRoots.SetNormals(strandGroup.initialRootDirection);
+				strandGroup.meshAssetRoots.SetIndices(indices, MeshTopology.Points, 0);
+			}
 		}
 
 		public struct IntermediateRoots : IDisposable

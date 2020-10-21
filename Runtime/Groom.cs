@@ -82,6 +82,7 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings[i], dt);
+				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, groomContainers[i].rootFilter.transform.localToWorldMatrix, solverData[i]);
 			}
 
 			var volumeBounds = groomAsset.GetBoundsForSquareCells();

@@ -11,8 +11,6 @@
 #pragma kernel KVolumePressureSolve
 #pragma kernel KVolumePressureGradient
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-
 #define HAIRSIM_WRITEABLE_VOLUMEDATA 1
 
 #include "HairSimData.hlsl"

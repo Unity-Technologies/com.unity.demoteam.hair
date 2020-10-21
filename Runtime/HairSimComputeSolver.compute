@@ -4,14 +4,10 @@
 #pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
 #pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
-#pragma kernel KUpdatePosition							THREAD_GROUP_SIZE=64
-#pragma kernel KUpdateVelocity							THREAD_GROUP_SIZE=64
 
 #pragma multi_compile_local __ LAYOUT_INTERLEAVED
 // 0 == particles grouped by strand, i.e. root, root+1, root, root+1
 // 1 == particles grouped by index, i.e. root, root, root+1, root+1
-
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 #define HAIRSIM_WRITEABLE_SOLVERDATA 1
 
@@ -81,8 +77,8 @@ float3 Integrate(float3 x0, float3 v0, float3 a0)
 	return x0 + _DT * (v0 * GetDampingDecay() + _DT * a0);
 }
 
-//---------
-// kernels
+//---------------
+// kernels solve
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void KSolveConstraints_GaussSeidelReference(
@@ -116,7 +112,7 @@ void KSolveConstraints_GaussSeidelReference(
 
 	// update positions
 	{
-		_ParticlePosition[strandParticleBegin].xyz = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
+		_ParticlePosition[strandParticleBegin].xyz = _RootPosition[strandIndex].xyz;
 
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
@@ -303,7 +299,7 @@ void KSolveConstraints_GaussSeidel(
 
 	// update position
 	{
-		_ParticlePosition[strandParticleBegin] = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0));
+		_ParticlePosition[strandParticleBegin].xyz = _RootPosition[strandIndex].xyz;
 
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
@@ -324,7 +320,7 @@ void KSolveConstraints_GaussSeidel(
 		float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 		float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
 		float3 p2 = _ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz;
-		float3 r0 = p0 - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * GetParticleInterval(strandIndex);
+		float3 r0 = p0 - _RootDirection[strandIndex].xyz * GetParticleInterval(strandIndex);
 
 		//      p1 <-- solve
 		//     /
@@ -468,8 +464,8 @@ void KSolveConstraints_Jacobi(
 	{
 		if (threadIdx == 0)
 		{
-			const float3 rootPosition = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
-			const float3 rootTangent = mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz;
+			const float3 rootPosition = _RootPosition[strandIndex].xyz;
+			const float3 rootTangent = _RootDirection[strandIndex].xyz;
 			{
 				gs_x[0] = float4(rootPosition - rootTangent * GetParticleInterval(strandIndex), 0.0);
 				gs_x[1] = float4(rootPosition, 0.0);
@@ -620,7 +616,7 @@ void KSolveConstraints_Jacobi(
 	const float3 a0 = float3(0.0, _Gravity, 0.0);
 	{
 		if (threadIdx == 0)
-			gs_x[threadIdx] = mul(_LocalToWorld, float4(_RootPosition[strandIndex].xyz, 1.0)).xyz;
+			gs_x[threadIdx] = _RootPosition[strandIndex].xyz;
 		else
 			gs_x[threadIdx] = Integrate(x0, v0, a0);
 	}
@@ -685,7 +681,7 @@ void KSolveConstraints_Jacobi(
 				if (threadIdx <= 1)
 				{
 					const uint j = threadIdx;
-					const float3 gs_x_rooted = gs_x[0] - mul(_LocalToWorldInvT, float4(_RootDirection[strandIndex].xyz, 0.0)).xyz * GetParticleInterval(strandIndex);
+					const float3 gs_x_rooted = gs_x[0] - _RootDirection[strandIndex].xyz * GetParticleInterval(strandIndex);
 
 					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 0.0, 0.0, 1.0, gs_x_rooted, gs_x[j - 1], gs_x[j], nop1, nop2, sum); count++;
 					SolveTriangleBendingConstraint(_BendingCurvature, 1.0, 0.0, 1.0, 1.0, gs_x[j - 1], gs_x[j], gs_x[j + 1], nop1, sum, nop2); count++;
@@ -744,44 +740,4 @@ void KSolveConstraints_Jacobi(
 			_ParticleVelocity[i].xyz = (gs_x[threadIdx] - x0) / _DT;
 	}
 #endif
-}
-
-[numthreads(THREAD_GROUP_SIZE, 1, 1)]
-void KUpdatePosition(
-	// SV_GroupID           execution group coords
-	// SV_GroupThreadID     thread coords within execution group
-	// SV_DispatchThreadID  thread coords (global)
-	// SV_GroupIndex        thread offset within execution group
-	uint3 groupIdx : SV_GroupID,
-	uint3 localIdx : SV_GroupThreadID,
-	uint3 worldIdx : SV_DispatchThreadID,
-	uint threadIdx : SV_GroupIndex)
-{
-	const uint i = worldIdx.x;
-	{
-		// update position
-		const float3 x0 = _ParticlePositionPrev[i].xyz;
-		const float3 v0 = _ParticleVelocityPrev[i].xyz;
-		const float3 a0 = float3(0.0, _Gravity, 0.0);
-
-		_ParticlePosition[i].xyz = Integrate(x0, v0, a0);
-	}
-}
-
-[numthreads(THREAD_GROUP_SIZE, 1, 1)]
-void KUpdateVelocity(
-	uint3 groupIdx : SV_GroupID,
-	uint3 localIdx : SV_GroupThreadID,
-	uint3 worldIdx : SV_DispatchThreadID,
-	uint threadIdx : SV_GroupIndex)
-	// SV_GroupID           execution group coords
-	// SV_GroupThreadID     thread coords within execution group
-	// SV_DispatchThreadID  thread coords (global)
-	// SV_GroupIndex        thread offset within execution group
-{
-	const uint i = worldIdx.x;
-	{
-		// derive velocity from change in position
-		_ParticleVelocity[i].xyz = (_ParticlePosition[i].xyz - _ParticlePositionPrev[i].xyz) / _DT;
-	}
 }

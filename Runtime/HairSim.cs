@@ -21,6 +21,9 @@ namespace Unity.DemoTeam.Hair
 		static ComputeShader s_solverCS;
 		static ComputeShader s_volumeCS;
 
+		static Material s_solverRootsMat;
+		static MaterialPropertyBlock s_solverRootsMPB;
+
 		static Material s_volumeRasterMat;
 		static MaterialPropertyBlock s_volumeRasterMPB;
 
@@ -101,8 +104,6 @@ namespace Unity.DemoTeam.Hair
 			public static int KSolveConstraints_Jacobi_32;
 			public static int KSolveConstraints_Jacobi_64;
 			public static int KSolveConstraints_Jacobi_128;
-			public static int KUpdatePosition;
-			public static int KUpdateVelocity;
 		}
 		static class VolumeKernels
 		{
@@ -232,6 +233,7 @@ namespace Unity.DemoTeam.Hair
 		[HideInInspector] public ComputeShader solverCS;
 		[HideInInspector] public ComputeShader volumeCS;
 
+		[HideInInspector] public Material solverRootsMat;
 		[HideInInspector] public Material volumeRasterMat;
 		[HideInInspector] public Material debugDrawMat;
 
@@ -253,6 +255,10 @@ namespace Unity.DemoTeam.Hair
 				{
 					s_solverCS = instance.solverCS;
 					s_volumeCS = instance.volumeCS;
+
+					s_solverRootsMat = new Material(instance.solverRootsMat);
+					s_solverRootsMat.hideFlags = HideFlags.HideAndDontSave;
+					s_solverRootsMPB = new MaterialPropertyBlock();
 
 					s_volumeRasterMat = new Material(instance.volumeRasterMat);
 					s_volumeRasterMat.hideFlags = HideFlags.HideAndDontSave;
@@ -377,6 +383,21 @@ namespace Unity.DemoTeam.Hair
 				volumeData.boundaryMatrixPrev.Dispose();
 
 			volumeData = new VolumeData();
+		}
+
+		public static void UpdateSolverRoots(CommandBuffer cmd, Mesh rootMesh, Matrix4x4 rootTransform, in SolverData solverData)
+		{
+			var solverDataCopy = solverData;
+
+			solverDataCopy.cbuffer._LocalToWorld = rootTransform;
+			solverDataCopy.cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
+
+			PushSolverData(cmd, s_solverRootsMat, s_solverRootsMPB, solverDataCopy);
+
+			cmd.SetRandomWriteTarget(1, solverData.rootPosition);
+			cmd.SetRandomWriteTarget(2, solverData.rootDirection);
+			cmd.DrawMesh(rootMesh, Matrix4x4.identity, s_solverRootsMat, 0, 0, s_solverRootsMPB);
+			cmd.ClearRandomWriteTargets();
 		}
 
 		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, float dt)

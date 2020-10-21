@@ -1,6 +1,8 @@
 #ifndef __HAIRSIMDATA_HLSL__
 #define __HAIRSIMDATA_HLSL__
 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
 #include "HairSimData.cs.hlsl"
 
 //-------------

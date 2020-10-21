@@ -254,6 +254,7 @@ namespace Unity.DemoTeam.Hair
 								}
 								else
 								{
+									s_previewMat.shader = groom.defaultMaterial.shader;
 									s_previewMat.CopyPropertiesFromMaterial(groom.defaultMaterial);
 									s_previewMat.EnableKeyword("HAIRSIMVERTEX_STATIC_PREVIEW");
 								}

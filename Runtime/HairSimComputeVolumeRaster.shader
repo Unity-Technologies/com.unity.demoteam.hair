@@ -4,8 +4,6 @@
 
 	#pragma target 5.0
 	
-	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-
 	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
@@ -18,11 +16,6 @@
 		nointerpolation float4 value : TEXCOORD1;// xyz = velocity, w = density
 	};
 
-	uint Vert(uint vertexID : SV_VertexID) : TEXCOORD0
-	{
-		return vertexID;
-	}
-
 	void MakeVertex(inout TriangleStream<Varyings> outStream, float2 pos, float4 value, float2 valuePos, uint slice)
 	{
 		Varyings output;
@@ -31,6 +24,11 @@
 		output.valuePos = valuePos;
 		output.value = value;
 		outStream.Append(output);
+	}
+
+	uint Vert(uint vertexID : SV_VertexID) : TEXCOORD0
+	{
+		return vertexID;
 	}
 
 	[maxvertexcount(8)]
