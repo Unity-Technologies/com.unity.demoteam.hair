@@ -309,17 +309,32 @@ namespace Unity.DemoTeam.Hair
 					var particleUVPtr = (Vector2*)particleUV.GetUnsafePtr();
 					var indicesPtr = (int*)indices.GetUnsafePtr();
 
-					// write index buffer
-					for (int i = 0; i != curveCount; i++)
+					// write index data
+					switch (strandGroup.memoryLayout)
 					{
-						//TODO pick different strategy for interleaved?
-						DeclareStrandIterator(strandGroup.memoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+						case GroomAsset.MemoryLayout.Interleaved:
+							for (int j = 0; j != wireStrandLineCount; j++)
+							{
+								for (int i = 0; i != curveCount; i++)
+								{
+									*(indicesPtr++) = j * curveCount + i;
+									*(indicesPtr++) = j * curveCount + i + curveCount;
+								}
+							}
+							break;
 
-						for (int j = 0; j != wireStrandLineCount; j++)
-						{
-							*(indicesPtr++) = strandParticleBegin + strandParticleStride * j;
-							*(indicesPtr++) = strandParticleBegin + strandParticleStride * (j + 1);
-						}
+						default:
+							for (int i = 0; i != curveCount; i++)
+							{
+								DeclareStrandIterator(strandGroup.memoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+								for (int j = 0; j != wireStrandLineCount; j++)
+								{
+									*(indicesPtr++) = strandParticleBegin + strandParticleStride * j;
+									*(indicesPtr++) = strandParticleBegin + strandParticleStride * (j + 1);
+								}
+							}
+							break;
 					}
 
 					// write tangents
@@ -339,11 +354,13 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					// write uvs
-					for (int i = 0, k = 0; i != curveCount; i++)
+					for (int i = 0; i != curveCount; i++)
 					{
-						for (int j = 0; j != curvePointCount; j++)
+						DeclareStrandIterator(strandGroup.memoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
 						{
-							*(particleUVPtr++) = new Vector2(k++, i);// strand particle index + strand index
+							particleUVPtr[j] = new Vector2(j, i);// strand particle index + strand index
 						}
 					}
 				}
@@ -363,6 +380,8 @@ namespace Unity.DemoTeam.Hair
 				unsafe
 				{
 					var indicesPtr = (int*)indices.GetUnsafePtr();
+
+					// write index data
 					for (int i = 0; i != curveCount; i++)
 					{
 						*(indicesPtr++) = i;

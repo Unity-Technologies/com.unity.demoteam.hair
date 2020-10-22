@@ -6,8 +6,8 @@
 
 void HairSimVertex_float(in float3 inPositionOS, in float2 inUV, out float3 outPositionOS, out float3 outDebugColor)
 {
-	const int strandIndex = (int)inUV.y;
 	const int strandParticleIndex = (int)inUV.x;
+	const int strandIndex = (int)inUV.y;
 
 #if HAIRSIMVERTEX_STATIC_PREVIEW
 	outPositionOS = inPositionOS;

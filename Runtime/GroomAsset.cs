@@ -16,8 +16,8 @@ namespace Unity.DemoTeam.Hair
 
 		public enum MemoryLayout
 		{
-			Interleaved,
 			Sequential,
+			Interleaved,
 		}
 
 		[Serializable]
