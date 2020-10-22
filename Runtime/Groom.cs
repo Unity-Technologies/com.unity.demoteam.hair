@@ -103,17 +103,7 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings[i], volumeData);
-
-				// update the renderer
-				if (groomContainers[i].lineRendererMPB == null)
-					groomContainers[i].lineRendererMPB = new MaterialPropertyBlock();
-
-				//HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
-				//TODO this visibly happens one frame after respawning the groom... need to also sync the properties on creation
-
-				groomContainers[i].lineRendererMPB.SetBuffer(HairSim.UniformIDs._ParticlePosition, solverData[i].particlePosition);
-				groomContainers[i].lineRendererMPB.SetInt("_StrandCount", (int)solverData[i].cbuffer._StrandCount);
-				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
+				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
 			}
 
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
@@ -142,6 +132,7 @@ namespace Unity.DemoTeam.Hair
 					groomChecksum = groomAsset.checksum;
 
 					ReleaseRuntimeData();
+					InitializeRuntimeData();
 				}
 			}
 			else
@@ -228,6 +219,14 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				solverData[i].memoryLayout = strandGroup.memoryLayout;
+
+				// initialize the renderer
+				if (groomContainers[i].lineRendererMPB == null)
+					groomContainers[i].lineRendererMPB = new MaterialPropertyBlock();
+
+				groomContainers[i].lineRendererMPB.SetBuffer(HairSim.UniformIDs._ParticlePosition, solverData[i].particlePosition);
+				groomContainers[i].lineRendererMPB.SetInt("_StrandCount", (int)solverData[i].cbuffer._StrandCount);
+				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
 			}
 
 			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, false);
@@ -295,39 +294,26 @@ namespace Unity.DemoTeam.Hair
 					{
 						linesContainer.name = "Lines:" + i;
 						linesContainer.transform.SetParent(group.transform, worldPositionStays: false);
+						linesContainer.transform.hideFlags |= HideFlags.NotEditable;
 
-						var lineFilter = linesContainer.AddComponent<MeshFilter>();
-						{
-							lineFilter.sharedMesh = strandGroups[i].meshAssetLines;
-						}
+						groomContainer.lineFilter = linesContainer.AddComponent<MeshFilter>();
+						groomContainer.lineFilter.sharedMesh = strandGroups[i].meshAssetLines;
 
-						var lineRenderer = linesContainer.AddComponent<MeshRenderer>();
-						{
-							lineRenderer.sharedMaterial = groomAsset.settingsBasic.material;
-						}
-
-						groomContainer.lineFilter = lineFilter;
-						groomContainer.lineRenderer = lineRenderer;
+						groomContainer.lineRenderer = linesContainer.AddComponent<MeshRenderer>();
+						groomContainer.lineRenderer.sharedMaterial = groomAsset.settingsBasic.material;
 					}
 
 					var rootsContainer = new GameObject();
 					{
 						rootsContainer.name = "Roots:" + i;
 						rootsContainer.transform.SetParent(group.transform, worldPositionStays: false);
+						rootsContainer.transform.hideFlags |= HideFlags.NotEditable;
 
-						var rootFilter = rootsContainer.AddComponent<MeshFilter>();
-						{
-							rootFilter.sharedMesh = strandGroups[i].meshAssetRoots;
-						}
-
-						//TODO
-						//var rootAttachment = rootObject.AddComponent<SkinAttachment>();
-						//{
-						//}
-
-						groomContainer.rootFilter = rootFilter;
+						groomContainer.rootFilter = rootsContainer.AddComponent<MeshFilter>();
+						groomContainer.rootFilter.sharedMesh = strandGroups[i].meshAssetRoots;
 
 						//TODO
+						//groomContainer.rootAttachment = rootObject.AddComponent<SkinAttachment>();
 						//groomContainer.rootAttachment = rootAttachment;
 					}
 				}

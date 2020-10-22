@@ -500,7 +500,7 @@ namespace Unity.DemoTeam.Hair
 
 					if (volumeData.boundaryHash != boundaryHash)
 					{
-						Debug.Log("boundary hash changed: " + boundaryHash);
+						//Debug.Log("boundary hash changed: " + boundaryHash);
 						volumeData.boundaryHash = boundaryHash;
 
 						for (int i = 0; i != boundaryCount; i++)
