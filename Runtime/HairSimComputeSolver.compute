@@ -183,6 +183,21 @@ void KSolveConstraints_GaussSeidelReference(
 			_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p1;
 		}
 
+		// solve long range distance constraints
+		if (ENABLE_DISTANCE_LRA)
+		{
+			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
+
+			for (uint i = strandParticleBegin + strandParticleStride, k = 0; i != strandParticleEnd; i += strandParticleStride, k++)
+			{
+				float3 p1 = _ParticlePosition[i].xyz;
+
+				ApplyDistanceLRAConstraint(k * GetParticleInterval(strandIndex), p0, p1);
+
+				_ParticlePosition[i].xyz = p1;
+			}
+		}
+
 		// solve triangle bending constraints
 		if (ENABLE_CURVATURE_EQ)
 		{
@@ -374,9 +389,10 @@ void KSolveConstraints_GaussSeidel(
 			else/* frictionless */			ApplyCollisionConstraint(p2);
 		}
 		if (ENABLE_DISTANCE)		ApplyDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, 0.5, 0.5, p1, p2);
+		if (ENABLE_DISTANCE_LRA)	ApplyDistanceLRAConstraint(2 * GetParticleInterval(strandIndex), _ParticlePosition[strandParticleBegin].xyz, p2);
 		if (ENABLE_CURVATURE_EQ)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
-		for (uint i = strandParticleBegin + strandParticleStride * 3; i != strandParticleEnd; i += strandParticleStride)
+		for (uint i = strandParticleBegin + strandParticleStride * 3, k = 0; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
 			r0 = p0;
 			p0 = p1;
@@ -398,6 +414,7 @@ void KSolveConstraints_GaussSeidel(
 				else/* frictionless */			ApplyCollisionConstraint(p2);
 			}
 			if (ENABLE_DISTANCE)		ApplyDistanceConstraint(GetParticleInterval(strandIndex), kStiffness, 0.5, 0.5, p1, p2);
+			if (ENABLE_DISTANCE_LRA)	ApplyDistanceLRAConstraint(k * GetParticleInterval(strandIndex), _ParticlePosition[strandParticleBegin].xyz, p2);
 			if (ENABLE_CURVATURE_EQ)	ApplyTriangleBendingConstraint(_BendingCurvature, kStiffness, 1.0, 1.0, 1.0, p0, p1, p2);
 			
 			if (ENABLE_DISTANCE_FTL)
@@ -507,7 +524,8 @@ void KSolveConstraints_Jacobi(
 	const uint n = max(1,
 		(ENABLE_BOUNDARY || ENABLE_BOUNDARY_FRICTION) +
 		(ENABLE_DISTANCE) * min(2, 1 + m) +
-		(ENABLE_CURVATURE_EQ) * min(3, 1 + m) +
+		//(ENABLE_DISTANCE_LRA) * min(2, 1 + m) +
+		(ENABLE_CURVATURE_EQ || ENABLE_CURVATURE_GEQ || ENABLE_CURVATURE_LEQ) * min(3, 1 + m) +
 #if SPLIT_FTL
 		0
 #else

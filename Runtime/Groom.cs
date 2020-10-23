@@ -32,7 +32,7 @@ namespace Unity.DemoTeam.Hair
 		private HairSim.SolverData[] solverData;
 		private HairSim.VolumeData volumeData;
 
-		public HairSim.SolverSettings[] solverSettings;
+		public HairSim.SolverSettings solverSettings = HairSim.SolverSettings.defaults;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
 		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.defaults;
 		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(HairSim.MAX_BOUNDARIES);
@@ -138,7 +138,7 @@ namespace Unity.DemoTeam.Hair
 			// apply settings
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings[i], dt);
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, dt);
 				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, groomContainers[i].rootFilter.transform.localToWorldMatrix, solverData[i]);
 			}
 
@@ -160,7 +160,7 @@ namespace Unity.DemoTeam.Hair
 			// perform time step
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings[i], volumeData);
+				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings, volumeData);
 				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
 			}
 
@@ -225,14 +225,10 @@ namespace Unity.DemoTeam.Hair
 				return true;
 
 			solverData = new HairSim.SolverData[strandGroups.Length];
-			solverSettings = new HairSim.SolverSettings[strandGroups.Length];
-			volumeSettings = groomAsset.settingsVolume;
 
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
 				ref var strandGroup = ref strandGroups[i];
-
-				solverSettings[i] = groomAsset.settingsSolver;
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 

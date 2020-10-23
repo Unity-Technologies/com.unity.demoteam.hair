@@ -183,7 +183,6 @@ namespace Unity.DemoTeam.Hair
 			[Tooltip("Particle-particle distance")]
 			public bool distance;
 			[Tooltip("Maximum particle-root distance")]
-			[Attributes.ReadOnly]
 			public bool distanceLRA;
 			[Tooltip("Follow the leader (hard particle-particle distance, non-physical)")]
 			public bool distanceFTL;
@@ -504,15 +503,15 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._BendingCurvature = solverSettings.curvatureCompareTo * 0.5f * cbuffer._StrandParticleInterval;
 
 			// update keywords
-			keywords.LAYOUT_INTERLEAVED = solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved;
+			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
 			keywords.ENABLE_DISTANCE = solverSettings.distance;
 			keywords.ENABLE_DISTANCE_LRA = solverSettings.distanceLRA;
 			keywords.ENABLE_DISTANCE_FTL = solverSettings.distanceFTL;
-			keywords.ENABLE_BOUNDARY = solverSettings.boundary && solverSettings.boundaryFriction == 0.0f;
-			keywords.ENABLE_BOUNDARY_FRICTION = solverSettings.boundary && solverSettings.boundaryFriction != 0.0f;
-			keywords.ENABLE_CURVATURE_EQ = solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.Equals;
-			keywords.ENABLE_CURVATURE_GEQ = solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.GreaterThan;
-			keywords.ENABLE_CURVATURE_LEQ = solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan;
+			keywords.ENABLE_BOUNDARY = (solverSettings.boundary && solverSettings.boundaryFriction == 0.0f);
+			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundary && solverSettings.boundaryFriction != 0.0f);
+			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.Equals);
+			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.GreaterThan);
+			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan);
 		}
 
 		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, List<HairSimBoundary> boundaries)
@@ -636,8 +635,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
 
-			CoreUtils.SetKeyword(cs, "LAYOUT_INTERLEAVED", solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
-
+			CoreUtils.SetKeyword(cs, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
 			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
 			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
 			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
@@ -662,7 +660,15 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
 
-			CoreUtils.SetKeyword(mat, "LAYOUT_INTERLEAVED", solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
+			CoreUtils.SetKeyword(mat, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
+			CoreUtils.SetKeyword(mat, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
+			CoreUtils.SetKeyword(mat, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
+			CoreUtils.SetKeyword(mat, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
+			CoreUtils.SetKeyword(mat, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
+			CoreUtils.SetKeyword(mat, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
+			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
+			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
+			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
 		}
 
 		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData)
