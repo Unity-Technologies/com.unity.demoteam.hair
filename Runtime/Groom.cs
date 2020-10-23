@@ -31,6 +31,7 @@ namespace Unity.DemoTeam.Hair
 
 		private HairSim.SolverData[] solverData;
 		private HairSim.VolumeData volumeData;
+
 		public HairSim.SolverSettings[] solverSettings;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
 		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.defaults;
@@ -39,7 +40,6 @@ namespace Unity.DemoTeam.Hair
 		void OnEnable()
 		{
 			InitializeContainers();
-			InitializeRuntimeData();
 
 			s_instances.Add(this);
 		}
@@ -59,7 +59,7 @@ namespace Unity.DemoTeam.Hair
 				boundaries.TrimExcess();
 			}
 
-			volumeSettings.volumeResolution = (Mathf.Max(8, volumeSettings.volumeResolution) / 8) * 8;
+			volumeSettings.gridResolution = (Mathf.Max(8, volumeSettings.gridResolution) / 8) * 8;
 		}
 
 		void OnDrawGizmos()
@@ -71,6 +71,63 @@ namespace Unity.DemoTeam.Hair
 		void Update()
 		{
 			InitializeContainers();
+		}
+
+		public static Bounds GetRootBounds(MeshFilter rootFilter)
+		{
+			var rootBounds = rootFilter.sharedMesh.bounds;
+			var rootTransform = rootFilter.transform;
+
+			var localCenter = rootBounds.center;
+			var localExtent = rootBounds.extents;
+
+			var worldCenter = rootTransform.TransformPoint(localCenter);
+			var worldExtent = rootTransform.TransformVector(localExtent);
+
+			worldExtent.x = Mathf.Abs(worldExtent.x);
+			worldExtent.y = Mathf.Abs(worldExtent.y);
+			worldExtent.z = Mathf.Abs(worldExtent.z);
+
+			return new Bounds(worldCenter, 2.0f * worldExtent);
+		}
+
+		public Bounds GetSimulationBounds()
+		{
+			Debug.Assert(groomAsset != null);
+			Debug.Assert(groomAsset.strandGroups != null);
+
+			var worldBounds = GetRootBounds(groomContainers[0].rootFilter);
+			var worldMargin = groomAsset.strandGroups[0].strandLengthMax;
+
+			for (int i = 1; i != groomContainers.Length; i++)
+			{
+				worldBounds.Encapsulate(GetRootBounds(groomContainers[i].rootFilter));
+				worldMargin = Mathf.Max(groomAsset.strandGroups[i].strandLengthMax, worldMargin);
+			}
+
+			worldMargin *= 1.5f;
+			worldBounds.Expand(2.0f * worldMargin);
+
+			return new Bounds(worldBounds.center, worldBounds.size);
+		}
+
+		public Bounds GetSimulationBoundsSquare()
+		{
+			var worldBounds = GetSimulationBounds();
+			var worldExtent = worldBounds.extents;
+
+			return new Bounds(worldBounds.center, Vector3.one * (2.0f * Mathf.Max(worldExtent.x, worldExtent.y, worldExtent.z)));
+		}
+
+		public Bounds GetSimulationBoundsForSquareCells()
+		{
+			var bounds = GetSimulationBounds();
+			{
+				var size = bounds.size;
+				var sizeMax = Mathf.Max(size.x, size.y, size.z);
+
+				return new Bounds(bounds.center, new Vector3(sizeMax, sizeMax, sizeMax));
+			}
 		}
 
 		public void DispatchStep(CommandBuffer cmd, float dt)
@@ -85,16 +142,17 @@ namespace Unity.DemoTeam.Hair
 				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, groomContainers[i].rootFilter.transform.localToWorldMatrix, solverData[i]);
 			}
 
-			var volumeBounds = groomAsset.GetBoundsForSquareCells();
+			var volumeBounds = GetSimulationBoundsForSquareCells();
 			{
-				volumeSettings.volumeWorldCenter = volumeBounds.center;
-				volumeSettings.volumeWorldExtent = volumeBounds.extents;
+				volumeSettings.worldCenter = volumeBounds.center;
+				volumeSettings.worldExtent = volumeBounds.extents;
 			}
 
 			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, boundaries);
+			//TODO this needs to happen after stepping solver
 
-			// pre-step if resolution changed
-			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, false))
+			// pre-step volume if resolution changed
+			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.gridResolution, halfPrecision: false))
 			{
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
@@ -122,6 +180,13 @@ namespace Unity.DemoTeam.Hair
 			HairSim.DrawVolumeData(cmd, color, depth, volumeData, debugSettings);
 		}
 
+		// when to build runtime data?
+		//   1. on object enabled
+		//   2. on checksum changed
+
+		// when to clear runtime data?
+		//   1. on destroy
+
 		void InitializeContainers()
 		{
 			if (groomAsset != null)
@@ -143,13 +208,6 @@ namespace Unity.DemoTeam.Hair
 				ReleaseRuntimeData();
 			}
 		}
-
-		// when to build runtime data?
-		//   1. on object enabled
-		//   2. on checksum changed
-
-		// when to clear runtime data?
-		//   1. on destroy
 
 		bool InitializeRuntimeData()
 		{
@@ -229,7 +287,7 @@ namespace Unity.DemoTeam.Hair
 				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
 			}
 
-			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, false);
+			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.gridResolution, halfPrecision: false);
 
 			return true;
 		}

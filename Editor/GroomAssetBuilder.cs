@@ -312,16 +312,17 @@ namespace Unity.DemoTeam.Hair
 					// write index data
 					switch (strandGroup.memoryLayout)
 					{
-						case GroomAsset.MemoryLayout.Interleaved:
-							for (int j = 0; j != wireStrandLineCount; j++)
-							{
-								for (int i = 0; i != curveCount; i++)
-								{
-									*(indicesPtr++) = j * curveCount + i;
-									*(indicesPtr++) = j * curveCount + i + curveCount;
-								}
-							}
-							break;
+						//TODO profile again, seems premature
+						//case GroomAsset.MemoryLayout.Interleaved:
+						//	for (int j = 0; j != wireStrandLineCount; j++)
+						//	{
+						//		for (int i = 0; i != curveCount; i++)
+						//		{
+						//			*(indicesPtr++) = j * curveCount + i;
+						//			*(indicesPtr++) = j * curveCount + i + curveCount;
+						//		}
+						//	}
+						//	break;
 
 						default:
 							for (int i = 0; i != curveCount; i++)

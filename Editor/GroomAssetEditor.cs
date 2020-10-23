@@ -3,6 +3,8 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
+	using static HairEditorGUI;
+
 	[CustomEditor(typeof(GroomAsset))]
 	public class GroomAssetEditor : Editor
 	{
@@ -25,45 +27,7 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _settingsSolver;
 		SerializedProperty _settingsVolume;
 
-		void StructPropertyFields(SerializedProperty settings)
-		{
-			if (settings.hasChildren)
-			{
-				var itSiblings = settings.Copy();
-				var itChildren = settings.Copy();
-
-				itSiblings.Next(enterChildren: false);
-
-				if (itChildren.NextVisible(enterChildren: true))
-				{
-					EditorGUILayout.PropertyField(itChildren, includeChildren: true);
-
-					while (itChildren.NextVisible(enterChildren: false))
-					{
-						if (SerializedProperty.EqualContents(itSiblings, itChildren))
-							break;
-
-						EditorGUILayout.PropertyField(itChildren, includeChildren: true);
-					}
-				}
-			}
-		}
-
-		void StructPropertyFieldsWithHeader(SerializedProperty settings, string label)
-		{
-			EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
-			using (new EditorGUI.IndentLevelScope())
-			{
-				StructPropertyFields(settings);
-			}
-		}
-
-		void StructPropertyFieldsWithHeader(SerializedProperty settings)
-		{
-			StructPropertyFieldsWithHeader(settings, settings.displayName);
-		}
-
-		private void OnEnable()
+		void OnEnable()
 		{
 			previewUtil = new PreviewRenderUtility();
 			previewUtilMPB = new MaterialPropertyBlock();
@@ -98,7 +62,7 @@ namespace Unity.DemoTeam.Hair
 			_settingsVolume = serializedObject.FindProperty("settingsVolume");
 		}
 
-		private void OnDisable()
+		void OnDisable()
 		{
 			previewUtil.Cleanup();
 		}
@@ -243,6 +207,10 @@ namespace Unity.DemoTeam.Hair
 								//	}
 								//	EditorUtility.SetDirty(groom);
 								//}
+
+								//var editor = Editor.CreateEditor(meshLines);
+								//editor.OnPreviewGUI(rect, GUIStyle.none);
+								//DestroyImmediate(editor);
 
 								var matrix = Matrix4x4.TRS(meshOffset * Vector3.forward, previewRotation, Vector3.one) * Matrix4x4.Translate(-meshCenter);
 

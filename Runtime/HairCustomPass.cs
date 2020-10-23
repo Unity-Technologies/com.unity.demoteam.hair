@@ -6,7 +6,7 @@ using UnityEngine.Rendering.HighDefinition;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class HairDriverCustomPass : CustomPass
+	public class HairCustomPass : CustomPass
 	{
 		public Dispatch dispatch;
 

@@ -121,37 +121,5 @@ namespace Unity.DemoTeam.Hair
 
 		public HairSim.SolverSettings settingsSolver = HairSim.SolverSettings.defaults;
 		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults;
-
-		public Bounds GetBounds()
-		{
-			Debug.Assert(strandGroups != null && strandGroups.Length != 0);
-
-			var strandBounds = strandGroups[0].meshAssetRoots.bounds;
-			var strandLength = strandGroups[0].strandLengthMax;
-
-			for (int i = 1; i != strandGroups.Length; i++)
-			{
-				strandBounds.Encapsulate(strandGroups[i].meshAssetRoots.bounds);
-				strandLength = Mathf.Max(strandGroups[i].strandLengthMax, strandLength);
-			}
-
-			strandBounds.Expand(1.5f * (2.0f * strandLength));
-
-			var extent = strandBounds.extents;
-			var extentMax = Mathf.Max(extent.x, extent.y, extent.z);
-
-			return new Bounds(strandBounds.center, Vector3.one * (2.0f * extentMax));
-		}
-
-		public Bounds GetBoundsForSquareCells()
-		{
-			var bounds = GetBounds();
-			{
-				var nonSquareExtent = bounds.extents;
-				var nonSquareExtentMax = Mathf.Max(nonSquareExtent.x, nonSquareExtent.y, nonSquareExtent.z);
-
-				return new Bounds(bounds.center, Vector3.one * (2.0f * nonSquareExtentMax));
-			}
-		}
 	}
 }

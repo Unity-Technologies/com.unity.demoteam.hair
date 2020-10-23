@@ -9,7 +9,7 @@ namespace Unity.DemoTeam.Hair
 	// HairCustomPass
 	// HairCustomPassSpawner
 
-	public class HairDriver : MonoBehaviour
+	public class HairCustomPassSpawner : MonoBehaviour
 	{
 		static bool s_initialized = false;
 
@@ -22,26 +22,26 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (s_initialized == false)
 			{
-				var instance = ComponentSingleton<HairDriver>.instance;
+				var instance = ComponentSingleton<HairCustomPassSpawner>.instance;
 				{
-					CreateCustomPass(instance.gameObject, HairDriverCustomPass.Dispatch.Step, CustomPassInjectionPoint.BeforeRendering);
-					CreateCustomPass(instance.gameObject, HairDriverCustomPass.Dispatch.Draw, CustomPassInjectionPoint.BeforePreRefraction);
+					CreateCustomPass(instance.gameObject, HairCustomPass.Dispatch.Step, CustomPassInjectionPoint.BeforeRendering);
+					CreateCustomPass(instance.gameObject, HairCustomPass.Dispatch.Draw, CustomPassInjectionPoint.BeforePreRefraction);
 
 					instance.gameObject.SetActive(true);
 				}
 
 #if UNITY_EDITOR
-				UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ComponentSingleton<HairDriver>.Release;
+				UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ComponentSingleton<HairCustomPassSpawner>.Release;
 #endif
 
 				s_initialized = true;
 			}
 		}
 
-		static void CreateCustomPass(GameObject container, HairDriverCustomPass.Dispatch dispatch, CustomPassInjectionPoint injectionPoint)
+		static void CreateCustomPass(GameObject container, HairCustomPass.Dispatch dispatch, CustomPassInjectionPoint injectionPoint)
 		{
 			var hairPassVolume = container.AddComponent<CustomPassVolume>();
-			var hairPass = hairPassVolume.AddPassOfType<HairDriverCustomPass>() as HairDriverCustomPass;
+			var hairPass = hairPassVolume.AddPassOfType<HairCustomPass>() as HairCustomPass;
 
 			hairPassVolume.injectionPoint = injectionPoint;
 			hairPassVolume.isGlobal = true;
