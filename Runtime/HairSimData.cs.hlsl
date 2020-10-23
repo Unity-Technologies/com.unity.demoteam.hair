@@ -18,23 +18,26 @@ CBUFFER_START(SolverParams)
     uint _Iterations;
     float _Stiffness;
     float _Relaxation;
-    float _Damping;
     float _Gravity;
-    float _Repulsion;
-    float _Friction;
-    float _BendingCurvature;
+    float _Damping;
+    float _VolumePressureScale;
+    float _VolumeFrictionScale;
     float _DampingFTL;
+    float _BoundaryFriction;
+    float _BendingCurvature;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeParams
 // PackingRules = Exact
 CBUFFER_START(VolumeParams)
     float3 _VolumeCells;
-    float _pad1;
+    uint __pad1;
     float3 _VolumeWorldMin;
-    float _pad2;
+    uint __pad2;
     float3 _VolumeWorldMax;
-    float _pad3;
+    uint __pad3;
+    float _PressureFromVelocity;
+    float _PressureFromDensity;
     int _BoundaryCapsuleCount;
     int _BoundarySphereCount;
     int _BoundaryTorusCount;

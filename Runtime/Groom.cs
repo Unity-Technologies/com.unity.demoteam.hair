@@ -59,7 +59,7 @@ namespace Unity.DemoTeam.Hair
 				boundaries.TrimExcess();
 			}
 
-			volumeSettings.gridResolution = (Mathf.Max(8, volumeSettings.gridResolution) / 8) * 8;
+			volumeSettings.volumeResolution = (Mathf.Max(8, volumeSettings.volumeResolution) / 8) * 8;
 		}
 
 		void OnDrawGizmos()
@@ -144,15 +144,15 @@ namespace Unity.DemoTeam.Hair
 
 			var volumeBounds = GetSimulationBoundsForSquareCells();
 			{
-				volumeSettings.worldCenter = volumeBounds.center;
-				volumeSettings.worldExtent = volumeBounds.extents;
+				volumeSettings.volumeWorldCenter = volumeBounds.center;
+				volumeSettings.volumeWorldExtent = volumeBounds.extents;
 			}
 
 			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, boundaries);
 			//TODO this needs to happen after stepping solver
 
 			// pre-step volume if resolution changed
-			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.gridResolution, halfPrecision: false))
+			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, halfPrecision: false))
 			{
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
@@ -287,7 +287,7 @@ namespace Unity.DemoTeam.Hair
 				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
 			}
 
-			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.gridResolution, halfPrecision: false);
+			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, halfPrecision: false);
 
 			return true;
 		}

@@ -8,6 +8,7 @@ using UnityEngine.Experimental.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
+using Unity.DemoTeam.Attributes;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -54,6 +55,7 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler DrawVolumeData;
 		}
 
+		//TODO remove public
 		public static class UniformIDs
 		{
 			// solver
@@ -121,6 +123,23 @@ namespace Unity.DemoTeam.Hair
 			public static int KVolumePressureGradient;
 		}
 
+		public struct SolverKeywords<T>
+		{
+			public T LAYOUT_INTERLEAVED;
+			public T ENABLE_DISTANCE;
+			public T ENABLE_DISTANCE_LRA;
+			public T ENABLE_DISTANCE_FTL;
+			public T ENABLE_BOUNDARY;
+			public T ENABLE_BOUNDARY_FRICTION;
+			public T ENABLE_CURVATURE_EQ;
+			public T ENABLE_CURVATURE_GEQ;
+			public T ENABLE_CURVATURE_LEQ;
+		}
+
+		public struct VolumeKeywords<T>
+		{
+		}
+
 		[Serializable] public struct StrandSettings
 		{
 			public float strandDiameter;
@@ -148,7 +167,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 1.0f)]
 			public float stiffness;
 			[Range(1.0f, 2.0f)]
-			public float SOR;
+			public float relaxation;
 
 			[Header("Forces")]
 			[Range(-1.0f, 1.0f)]
@@ -157,63 +176,51 @@ namespace Unity.DemoTeam.Hair
 			public float damping;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
 			public float volumePressure;
-			[Range(0.0f, 1.0f), Tooltip("Weighing factor for volume velocity impulse [0 == FLIP ... 1 == PIC]")]
+			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (0 == FLIP ... 1 == PIC)")]
 			public float volumeFriction;
 
 			[Header("Constraints")]
 			[Tooltip("Particle-particle distance")]
 			public bool distance;
 			[Tooltip("Maximum particle-root distance")]
+			[Attributes.ReadOnly]
 			public bool distanceLRA;
 			[Tooltip("Follow the leader (hard particle-particle distance, non-physical)")]
 			public bool distanceFTL;
 			[Range(0.0f, 1.0f), Tooltip("Follow the leader damping factor")]
-			public float distanceFTLCorrection;
-
-			[Space]
+			public float distanceFTLDamping;
 			[Tooltip("Boundary collisions")]
-			public bool boundaryCollision;
+			public bool boundary;
 			[Range(0.0f, 1.0f), Tooltip("Boundary friction")]
 			public float boundaryFriction;
-
-			[Space]
-			[Tooltip("Curvature constraint")]
 			public bool curvature;
 			public Compare curvatureCompare;
+			[Range(0.0f, 1.0f)]
 			public float curvatureCompareTo;
-
-			[Space]
-			public bool preserveShape;
-			[Range(0.0f, 1.0f)]
-			public float preserveShapeFactor;
-
-			[Space]
-			[Space]
-			[Space]
-			[Header("---OLD---")]
-
-			[Range(0.0f, 5.0f)]
-			public float repulsion;
-
-			[Range(0.0f, 1.0f)]
-			public float friction;
-			[Range(0.0f, 1.0f)]
-			public float bendingCurvature;
-			[Range(0.0f, 1.0f)]
-			public float dampingFTL;
+			[Attributes.ReadOnly] public bool preserveShape;
+			[Attributes.ReadOnly] public float preserveShapeFactor;
 
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
 				method = Method.GaussSeidel,
 				iterations = 3,
 				stiffness = 1.0f,
-				SOR = 1.0f,
-				damping = 0.0f,
+				relaxation = 1.0f,
+
 				gravity = 1.0f,
-				repulsion = 0.0f,
-				friction = 0.0f,
-				bendingCurvature = 0.0f,
-				dampingFTL = 0.8f,
+				damping = 0.0f,
+				volumePressure = 1.0f,
+				volumeFriction = 0.05f,
+
+				distance = true,
+				distanceLRA = false,
+				distanceFTL = false,
+				distanceFTLDamping = 0.8f,
+				boundary = true,
+				boundaryFriction = 0.2f,
+				curvature = false,
+				curvatureCompare = Compare.Equals,
+				curvatureCompareTo = 0.0f,
 			};
 		}
 		[Serializable] public struct VolumeSettings
@@ -228,51 +235,49 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			[Range(8, 160)]
-			public int gridResolution;
-			public bool gridStaggered;
-			public bool gridSquare;
+			public int volumeResolution;
+			[Attributes.ReadOnly] public bool volumeStaggered;
+			[Attributes.ReadOnly] public bool volumeSquare;
 
-			[HideInInspector]
-			public Vector3 worldCenter;
-			[HideInInspector]
-			public Vector3 worldExtent;
+			[HideInInspector] public Vector3 volumeWorldCenter;
+			[HideInInspector] public Vector3 volumeWorldExtent;
 
-			[Header("Construction")]
+			[Space]
 			public Method splatMethod;
 			public float splatDiameter;
 
-			[Header("Pressure")]
+			[Space]
+			[Attributes.ReadOnly]
+			public float pressureFromVelocity;
 			[Range(0.0f, 1.0f)]
 			public float pressureFromDensity;
-			[Range(0.0f, 1.0f)]
-			public float pressureFromVelocity;
 			[Range(0, 100)]
 			public int pressureIterations;
 
-			[Header("Debugging")]
-			[Range(-1.0f, 1.0f)]
-			public float cellNudgeX;
-			[Range(-1.0f, 1.0f)]
-			public float cellNudgeY;
-			[Range(-1.0f, 1.0f)]
-			public float cellNudgeZ;
+			//[Header("Debug")]
+			//[Range(-1.0f, 1.0f)]
+			//public float cellNudgeX;
+			//[Range(-1.0f, 1.0f)]
+			//public float cellNudgeY;
+			//[Range(-1.0f, 1.0f)]
+			//public float cellNudgeZ;
 
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
-				gridResolution = 48,
-				gridStaggered = false,
-				gridSquare = true,
+				volumeResolution = 48,
+				volumeStaggered = false,
+				volumeSquare = true,
 
 				splatMethod = Method.Compute,
 				splatDiameter = 1.0f,
 
-				pressureFromDensity = 1.0f,
 				pressureFromVelocity = 1.0f,
+				pressureFromDensity = 1.0f,
 				pressureIterations = 0,
 
-				cellNudgeX = 0.0f,
-				cellNudgeY = 0.0f,
-				cellNudgeZ = 0.0f,
+				//cellNudgeX = 0.0f,
+				//cellNudgeY = 0.0f,
+				//cellNudgeZ = 0.0f,
 			};
 		}
 		[Serializable] public struct DebugSettings
@@ -477,6 +482,7 @@ namespace Unity.DemoTeam.Hair
 		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, float dt)
 		{
 			ref var cbuffer = ref solverData.cbuffer;
+			ref var keywords = ref solverData.keywords;
 
 			// update strand parameters
 			cbuffer._LocalToWorld = Matrix4x4.identity;
@@ -486,23 +492,41 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._DT = dt;
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
-			cbuffer._Relaxation = solverSettings.SOR;
+			cbuffer._Relaxation = solverSettings.relaxation;
+
 			cbuffer._Damping = solverSettings.damping;
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
-			cbuffer._Repulsion = solverSettings.repulsion;
-			cbuffer._Friction = solverSettings.friction;
-			cbuffer._BendingCurvature = solverSettings.bendingCurvature * 0.5f * cbuffer._StrandParticleInterval;
-			cbuffer._DampingFTL = solverSettings.dampingFTL;
+			cbuffer._VolumePressureScale = solverSettings.volumePressure;
+			cbuffer._VolumeFrictionScale = solverSettings.volumeFriction;
+
+			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
+			cbuffer._BoundaryFriction = solverSettings.boundaryFriction;
+			cbuffer._BendingCurvature = solverSettings.curvatureCompareTo * 0.5f * cbuffer._StrandParticleInterval;
+
+			// update keywords
+			keywords.LAYOUT_INTERLEAVED = solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved;
+			keywords.ENABLE_DISTANCE = solverSettings.distance;
+			keywords.ENABLE_DISTANCE_LRA = solverSettings.distanceLRA;
+			keywords.ENABLE_DISTANCE_FTL = solverSettings.distanceFTL;
+			keywords.ENABLE_BOUNDARY = solverSettings.boundary && solverSettings.boundaryFriction == 0.0f;
+			keywords.ENABLE_BOUNDARY_FRICTION = solverSettings.boundary && solverSettings.boundaryFriction != 0.0f;
+			keywords.ENABLE_CURVATURE_EQ = solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.Equals;
+			keywords.ENABLE_CURVATURE_GEQ = solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.GreaterThan;
+			keywords.ENABLE_CURVATURE_LEQ = solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan;
 		}
 
 		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, List<HairSimBoundary> boundaries)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
+			ref var keywords = ref volumeData.keywords;
 
 			// update volume parameters
-			cbuffer._VolumeCells = volumeSettings.gridResolution * Vector3.one;
-			cbuffer._VolumeWorldMin = volumeSettings.worldCenter - volumeSettings.worldExtent;
-			cbuffer._VolumeWorldMax = volumeSettings.worldCenter + volumeSettings.worldExtent;
+			cbuffer._VolumeCells = volumeSettings.volumeResolution * Vector3.one;
+			cbuffer._VolumeWorldMin = volumeSettings.volumeWorldCenter - volumeSettings.volumeWorldExtent;
+			cbuffer._VolumeWorldMax = volumeSettings.volumeWorldCenter + volumeSettings.volumeWorldExtent;
+
+			cbuffer._PressureFromVelocity = volumeSettings.pressureFromVelocity;
+			cbuffer._PressureFromDensity = volumeSettings.pressureFromDensity;
 
 			// update boundary shapes
 			cbuffer._BoundaryCapsuleCount = 0;
@@ -613,6 +637,15 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
 
 			CoreUtils.SetKeyword(cs, "LAYOUT_INTERLEAVED", solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
+
+			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
+			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
+			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
+			CoreUtils.SetKeyword(cs, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
+			CoreUtils.SetKeyword(cs, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
+			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
+			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
+			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData)
@@ -750,9 +783,9 @@ namespace Unity.DemoTeam.Hair
 
 		private static void StepVolumeData_Clear(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings)
 		{
-			int numX = volumeSettings.gridResolution / 8;
-			int numY = volumeSettings.gridResolution / 8;
-			int numZ = volumeSettings.gridResolution;
+			int numX = volumeSettings.volumeResolution / 8;
+			int numY = volumeSettings.volumeResolution / 8;
+			int numZ = volumeSettings.volumeResolution;
 
 			// clear
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
@@ -838,9 +871,9 @@ namespace Unity.DemoTeam.Hair
 
 		private static void StepVolumeData_Resolve(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings)
 		{
-			int numX = volumeSettings.gridResolution / 8;
-			int numY = volumeSettings.gridResolution / 8;
-			int numZ = volumeSettings.gridResolution;
+			int numX = volumeSettings.volumeResolution / 8;
+			int numY = volumeSettings.volumeResolution / 8;
+			int numZ = volumeSettings.volumeResolution;
 
 			// resolve accumulated
 			switch (volumeSettings.splatMethod)

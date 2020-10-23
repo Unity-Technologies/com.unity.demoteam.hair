@@ -406,9 +406,9 @@ void KVolumeDivergence(
 		_VolumeDivergence[worldIdx] = 0.0;
 	#elif VOLUME_AIR_CELL_ZERO_DIVERGENCE
 	  #if VOLUME_REST_AT_ZERO
-		_VolumeDivergence[worldIdx] = 0.0 - max(0.0, rho / rho0 - 1.0) * (_Repulsion);
+		_VolumeDivergence[worldIdx] = 0.0 - max(0.0, rho / rho0 - 1.0) * (_PressureFromDensity);
 	  #else
-		_VolumeDivergence[worldIdx] = 0.0 - (rho / rho0 - 1.0) * (_Repulsion);
+		_VolumeDivergence[worldIdx] = 0.0 - (rho / rho0 - 1.0) * (_PressureFromDensity);
 	  #endif
 	#else
 		_VolumeDivergence[worldIdx] = div;
@@ -418,9 +418,9 @@ void KVolumeDivergence(
 #endif
 	{
 	  #if VOLUME_REST_AT_ZERO
-		_VolumeDivergence[worldIdx] = min(0.0, div - (rho / rho0 - 1.0) * (_Repulsion));
+		_VolumeDivergence[worldIdx] = min(0.0, div - (rho / rho0 - 1.0) * (_PressureFromDensity));
 	  #else
-		_VolumeDivergence[worldIdx] = div - (rho / rho0 - 1.0) * (_Repulsion);
+		_VolumeDivergence[worldIdx] = div - (rho / rho0 - 1.0) * (_PressureFromDensity);
 	  #endif
 	}
 }
@@ -451,9 +451,9 @@ void KVolumePressureEOS(
 #endif
 	{
 	  #if VOLUME_REST_AT_ZERO
-		_VolumePressure[worldIdx] = max(0.0, rho / rho0 - 1.0) * (_Repulsion * VolumeWorldCellSize().x * VolumeWorldCellSize().x);;
+		_VolumePressure[worldIdx] = max(0.0, rho / rho0 - 1.0) * (_PressureFromDensity * VolumeWorldCellSize().x * VolumeWorldCellSize().x);;
 	  #else
-		_VolumePressure[worldIdx] = (rho / rho0 - 1.0) * (_Repulsion * VolumeWorldCellSize().x * VolumeWorldCellSize().x);
+		_VolumePressure[worldIdx] = (rho / rho0 - 1.0) * (_PressureFromDensity * VolumeWorldCellSize().x * VolumeWorldCellSize().x);
 	  #endif
 	}
 }
