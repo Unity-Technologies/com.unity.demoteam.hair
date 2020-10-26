@@ -100,6 +100,8 @@ namespace Unity.DemoTeam.Hair
 
 		static class SolverKernels
 		{
+			public static int KInitRoots;
+			public static int KInitParticles;
 			public static int KSolveConstraints_GaussSeidelReference;
 			public static int KSolveConstraints_GaussSeidel;
 			public static int KSolveConstraints_Jacobi_16;
@@ -174,10 +176,10 @@ namespace Unity.DemoTeam.Hair
 			public float gravity;
 			[Range(0.0f, 1.0f)]
 			public float damping;
-			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
-			public float volumeImpulse;
-			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (0 == FLIP ... 1 == PIC)")]
+			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (0 == FLIP, 1 == PIC)")]
 			public float volumeFriction;
+			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
+			public float volumeResponse;
 
 			[Header("Constraints")]
 			[Tooltip("Particle-particle distance")]
@@ -208,8 +210,8 @@ namespace Unity.DemoTeam.Hair
 
 				gravity = 1.0f,
 				damping = 0.0f,
-				volumeImpulse = 1.0f,
 				volumeFriction = 0.05f,
+				volumeResponse = 1.0f,
 
 				distance = true,
 				distanceLRA = false,
@@ -495,12 +497,12 @@ namespace Unity.DemoTeam.Hair
 
 			cbuffer._Damping = solverSettings.damping;
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
-			cbuffer._VolumePressureScale = solverSettings.volumeImpulse;
+			cbuffer._VolumePressureScale = solverSettings.volumeResponse;
 			cbuffer._VolumeFrictionScale = solverSettings.volumeFriction;
 
-			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
 			cbuffer._BoundaryFriction = solverSettings.boundaryFriction;
 			cbuffer._BendingCurvature = solverSettings.curvatureCompareTo * 0.5f * cbuffer._StrandParticleInterval;
+			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
