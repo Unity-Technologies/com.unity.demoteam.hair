@@ -286,7 +286,6 @@ void KSolveConstraints_GaussSeidelReference(
 
 	// derive velocity from effective change in position
 	{
-		//TODO also add this line to Jacobi solver
 		_ParticleVelocity[strandParticleBegin].xyz = (_ParticlePosition[strandParticleBegin].xyz - _ParticlePositionPrev[strandParticleBegin].xyz) / _DT;
 
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
@@ -413,7 +412,7 @@ void KSolveConstraints_GaussSeidel(
 		if (ENABLE_DISTANCE_LRA)	ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * 2, _ParticlePosition[strandParticleBegin].xyz, p2);
 		if (ENABLE_CURVATURE)		ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
-		for (uint i = strandParticleBegin + strandParticleStride * 3, k = 0; i != strandParticleEnd; i += strandParticleStride, k++)
+		for (uint i = strandParticleBegin + strandParticleStride * 3, k = 3; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
 			r0 = p0;
 			p0 = p1;
@@ -539,23 +538,23 @@ void KSolveConstraints_Jacobi(
 		}
 	}
 
-	// count constraints
-	const uint m = (THREAD_GROUP_SIZE - 1) - threadIdx;
-	const uint n = max(1,
+	// count effective constraints
+	const uint num_particles_tailing = (THREAD_GROUP_SIZE - 1) - threadIdx;
+	const uint num_constraints = max(1,
 		(ENABLE_BOUNDARY || ENABLE_BOUNDARY_FRICTION) +
-		(ENABLE_DISTANCE) * min(2, 1 + m) +
-		//(ENABLE_DISTANCE_LRA) * min(2, 1 + m) +
-		(ENABLE_CURVATURE) * min(3, 1 + m) +
-#if SPLIT_FTL
+		ENABLE_DISTANCE * min(2, 1 + num_particles_tailing) +
+		ENABLE_DISTANCE_LRA +
+		ENABLE_CURVATURE * min(3, 1 + num_particles_tailing) +
+	#if SPLIT_FTL
 		0
-#else
+	#else
 		ENABLE_DISTANCE_FTL
-#endif
+	#endif
 		);
-	const float n_inv = 1.0 / n;
+
+	const float n_inv = 1.0 / num_constraints;
 
 	// solve constraints by Jacobi iteration
-
 	float3 d_ftl = 0;
 
 	for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
@@ -588,6 +587,12 @@ void KSolveConstraints_Jacobi(
 				{
 					SolveDistanceConstraint(GetParticleInterval(strandIndex), stiffness, gs_x[j], gs_x[j + 1], d, nop);
 				}
+			}
+
+			// solve long range distance constraints
+			if (ENABLE_DISTANCE_LRA)
+			{
+				SolveDistanceLRAConstraint(GetParticleInterval(strandIndex) * threadIdx, gs_x[1].xyz, gs_x[j].xyz, d);
 			}
 
 			// solve triangle bending constraints
@@ -646,7 +651,7 @@ void KSolveConstraints_Jacobi(
 
 	if (ENABLE_DISTANCE_FTL)
 	{
-		gs_d[j - 1] = d_ftl;
+		gs_d[j - 1] = d_ftl * min(1, threadIdx);
 	}
 
 	GroupMemoryBarrierWithGroupSync();
