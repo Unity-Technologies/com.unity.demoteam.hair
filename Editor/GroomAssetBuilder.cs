@@ -312,7 +312,7 @@ namespace Unity.DemoTeam.Hair
 					// write index data
 					switch (strandGroup.memoryLayout)
 					{
-						//TODO profile again, seems premature
+						//TODO profile this again, first looked indicated slower
 						//case GroomAsset.MemoryLayout.Interleaved:
 						//	for (int j = 0; j != wireStrandLineCount; j++)
 						//	{
@@ -361,7 +361,7 @@ namespace Unity.DemoTeam.Hair
 
 						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
 						{
-							particleUVPtr[j] = new Vector2(j, i);// strand particle index + strand index
+							particleUVPtr[j] = new Vector2(j, i);// particle index + strand index
 						}
 					}
 				}

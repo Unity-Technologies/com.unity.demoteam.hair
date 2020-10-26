@@ -8,6 +8,7 @@ using Unity.Collections.LowLevel.Unsafe;
 namespace Unity.DemoTeam.Hair
 {
 	[ExecuteAlways]
+	[SelectionBase]
 	public class Groom : MonoBehaviour
 	{
 		public static HashSet<Groom> s_instances = new HashSet<Groom>();
@@ -193,7 +194,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (groomChecksum != groomAsset.checksum)
 				{
-					GroomUtility.BuildGroomInstance(this, groomAsset);
+					GroomBuilder.BuildGroomInstance(this, groomAsset);
 					groomChecksum = groomAsset.checksum;
 
 					ReleaseRuntimeData();
@@ -202,7 +203,7 @@ namespace Unity.DemoTeam.Hair
 			}
 			else
 			{
-				GroomUtility.ClearGroomInstance(this);
+				GroomBuilder.ClearGroomInstance(this);
 				groomChecksum = string.Empty;
 
 				ReleaseRuntimeData();
@@ -305,7 +306,7 @@ namespace Unity.DemoTeam.Hair
 	}
 
 	//move to GroomEditorUtility ?
-	public static class GroomUtility
+	public static class GroomBuilder
 	{
 		public static void ClearGroomInstance(Groom groom)
 		{
@@ -316,7 +317,11 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (groomContainer.group != null)
 				{
+#if UNITY_EDITOR
 					GameObject.DestroyImmediate(groomContainer.group);
+#else
+					GameObject.Destroy(groomContainer.group);
+#endif
 				}
 			}
 
@@ -343,12 +348,13 @@ namespace Unity.DemoTeam.Hair
 				{
 					group.name = "Group:" + i;
 					group.transform.SetParent(groom.transform, worldPositionStays: false);
+					group.hideFlags = HideFlags.NotEditable;
 
 					var linesContainer = new GameObject();
 					{
 						linesContainer.name = "Lines:" + i;
 						linesContainer.transform.SetParent(group.transform, worldPositionStays: false);
-						linesContainer.transform.hideFlags |= HideFlags.NotEditable;
+						linesContainer.hideFlags = HideFlags.NotEditable;
 
 						groomContainer.lineFilter = linesContainer.AddComponent<MeshFilter>();
 						groomContainer.lineFilter.sharedMesh = strandGroups[i].meshAssetLines;
@@ -361,7 +367,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						rootsContainer.name = "Roots:" + i;
 						rootsContainer.transform.SetParent(group.transform, worldPositionStays: false);
-						rootsContainer.transform.hideFlags |= HideFlags.NotEditable;
+						rootsContainer.hideFlags = HideFlags.NotEditable;
 
 						groomContainer.rootFilter = rootsContainer.AddComponent<MeshFilter>();
 						groomContainer.rootFilter.sharedMesh = strandGroups[i].meshAssetRoots;
