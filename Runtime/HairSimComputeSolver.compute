@@ -311,7 +311,7 @@ void KSolveConstraints_GaussSeidelReference(
 			_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
 		}
 
-		// solve distance constraints along strand (FTL)
+		// solve hard distance constraints along strand (FTL)
 		if (ENABLE_DISTANCE_FTL)
 		{
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
@@ -528,8 +528,8 @@ void KSolveConstraints_GaussSeidel(
 
 #define NEW_JACOBI 1
 #if NEW_JACOBI
-groupshared float4 gs_x[THREAD_GROUP_SIZE + 1];// pad head
-groupshared float3 gs_d[THREAD_GROUP_SIZE + 1];// pad head
+groupshared float4 gs_x[THREAD_GROUP_SIZE + 1];// pad head so that 0 == root -1
+groupshared float3 gs_d[THREAD_GROUP_SIZE + 1];// pad head so that 0 == root -1
 #else
 groupshared float3 gs_x[THREAD_GROUP_SIZE];
 groupshared float3 gs_d[THREAD_GROUP_SIZE];
@@ -663,7 +663,7 @@ void KSolveConstraints_Jacobi(
 			// apply SOR
 			d *= _Relaxation;
 
-			// solve distance constraints along strand (FTL)
+			// solve hard distance constraints along strand (FTL)
 			if (ENABLE_DISTANCE_FTL)
 			{
 #if SPLIT_FTL
@@ -820,7 +820,7 @@ void KSolveConstraints_Jacobi(
 				n += count;
 			}
 
-			// solve distance constraints along strand (FTL)
+			// solve hard distance constraints along strand (FTL)
 			if (ENABLE_DISTANCE_FTL)
 			{
 				//TODO divide 'd' early to reduce averaging of FTL constraint?
