@@ -175,7 +175,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 1.0f)]
 			public float damping;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
-			public float volumePressure;
+			public float volumeImpulse;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (0 == FLIP ... 1 == PIC)")]
 			public float volumeFriction;
 
@@ -208,7 +208,7 @@ namespace Unity.DemoTeam.Hair
 
 				gravity = 1.0f,
 				damping = 0.0f,
-				volumePressure = 1.0f,
+				volumeImpulse = 1.0f,
 				volumeFriction = 0.05f,
 
 				distance = true,
@@ -495,7 +495,7 @@ namespace Unity.DemoTeam.Hair
 
 			cbuffer._Damping = solverSettings.damping;
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
-			cbuffer._VolumePressureScale = solverSettings.volumePressure;
+			cbuffer._VolumePressureScale = solverSettings.volumeImpulse;
 			cbuffer._VolumeFrictionScale = solverSettings.volumeFriction;
 
 			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;

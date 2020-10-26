@@ -151,6 +151,7 @@ namespace Unity.DemoTeam.Hair
 
 			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, boundaries);
 			//TODO this needs to happen after stepping solver
+			//TODO split boundary data update from volume data update
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, halfPrecision: false))
