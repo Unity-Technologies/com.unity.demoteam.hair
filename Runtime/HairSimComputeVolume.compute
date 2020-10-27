@@ -262,7 +262,7 @@ void KVolumeResolve(
 	const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
 	const float rho_unscaled = accu_n / (float)(1 << SPLAT_FRACTIONAL_BITS);
 
-#if STRAND_31_32_DEBUG
+#if DEBUG_STRAND_31_32
 	const float rho = pow(_StrandParticleContrib, 3.0) * rho_unscaled;
 #else
 	const float rho = rho_particle * rho_unscaled;
@@ -305,7 +305,7 @@ void KVolumeResolveFromRasterization(
 	{
 		const float rho_particle = _StrandParticleVolume / (1e+9 * VolumeWorldCellVolume());
 		const float rho_unscaled = splat.w;
-#if STRAND_31_32_DEBUG
+#if DEBUG_STRAND_31_32
 		const float rho = pow(_StrandParticleContrib, 3.0) * rho_unscaled;
 #else
 		const float rho = rho_particle * rho_unscaled;

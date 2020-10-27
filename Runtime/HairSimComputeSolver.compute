@@ -41,19 +41,7 @@
 #ifndef ENABLE_CURVATURE_LEQ
 #define ENABLE_CURVATURE_LEQ 0
 #endif
-
 #define ENABLE_CURVATURE (ENABLE_CURVATURE_EQ || ENABLE_CURVATURE_GEQ || ENABLE_CURVATURE_LEQ)
-
-#if ENABLE_CURVATURE_GEQ
-	#define ApplySelectTriangleBendingConstraint ApplyTriangleBendingMinConstraint
-	#define SolveSelectTriangleBendingConstraint SolveTriangleBendingMinConstraint
-#elif ENABLE_CURVATURE_LEQ
-	#define ApplySelectTriangleBendingConstraint ApplyTriangleBendingMaxConstraint
-	#define SolveSelectTriangleBendingConstraint SolveTriangleBendingMaxConstraint
-#else
-	#define ApplySelectTriangleBendingConstraint ApplyTriangleBendingConstraint
-	#define SolveSelectTriangleBendingConstraint SolveTriangleBendingConstraint
-#endif
 
 #define ENABLE_VOLUME_PRESSURE 1
 #define ENABLE_VOLUME_FRICTION 1
@@ -65,6 +53,53 @@
 #include "HairSimComputeSolverBoundaries.hlsl"
 #include "HairSimComputeSolverConstraints.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
+
+//--------
+// macros
+
+#if ENABLE_CURVATURE_GEQ
+  #define ApplySelectTriangleBendingConstraint ApplyTriangleBendingMinConstraint
+  #define SolveSelectTriangleBendingConstraint SolveTriangleBendingMinConstraint
+#elif ENABLE_CURVATURE_LEQ
+  #define ApplySelectTriangleBendingConstraint ApplyTriangleBendingMaxConstraint
+  #define SolveSelectTriangleBendingConstraint SolveTriangleBendingMaxConstraint
+#else
+  #define ApplySelectTriangleBendingConstraint ApplyTriangleBendingConstraint
+  #define SolveSelectTriangleBendingConstraint SolveTriangleBendingConstraint
+#endif
+
+#if ENABLE_CURVATURE
+  #define GS_LIVE_CONSTRAINTS 3
+#elif ENABLE_DISTANCE
+  #define GS_LIVE_CONSTRAINTS 2
+#else
+  #define GS_LIVE_CONSTRAINTS 1
+#endif
+
+#if ENABLE_DISTANCE_LRA
+  #define GS_LIVE_ROOT 1
+#else
+  #define GS_LIVE_ROOT 0
+#endif
+
+#if LAYOUT_INTERLEAVED
+  #define DECLARE_STRAND(x)							\
+	const uint strandIndex = x;						\
+	const uint strandParticleBegin = strandIndex;	\
+	const uint strandParticleStride = _StrandCount;	\
+	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
+#else
+  #define DECLARE_STRAND(x)													\
+	const uint strandIndex = x;												\
+	const uint strandParticleBegin = strandIndex * _StrandParticleCount;	\
+	const uint strandParticleStride = 1;									\
+	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
+#endif
+
+//#define STRAND_INDEX strandIndex
+//#define STRAND_PARTICLE_BEGIN strandParticleBegin
+//#define STRAND_PARTICLE_STRIDE strandParticleStride
+//#define STRAND_PARTICLE_END strandParticleEnd
 
 //---------
 // utility
@@ -176,24 +211,7 @@ void KSolveConstraints_GaussSeidelReference(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	const uint strandIndex = worldIdx.x;
-#if LAYOUT_INTERLEAVED
-	const uint strandParticleBegin = strandIndex;
-	const uint strandParticleStride = _StrandCount;
-#else
-	const uint strandParticleBegin = strandIndex * _StrandParticleCount;
-	const uint strandParticleStride = 1;
-#endif
-	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
-
-	// clear corrections
-	if (ENABLE_DISTANCE_FTL)
-	{
-		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
-		{
-			_ParticlePositionCorr[i].xyz = 0;
-		}
-	}
+	DECLARE_STRAND(worldIdx.x)
 
 	// update positions
 	{
@@ -207,6 +225,15 @@ void KSolveConstraints_GaussSeidelReference(
 			{
 				_ParticlePosition[i].xyz = IntegratePosition(x0, v0, a0);
 			}
+		}
+	}
+
+	// clear corrections
+	if (ENABLE_DISTANCE_FTL)
+	{
+		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
+		{
+			_ParticlePositionCorr[i].xyz = 0;
 		}
 	}
 
@@ -273,18 +300,18 @@ void KSolveConstraints_GaussSeidelReference(
 
 			//      p1 <-- solve
 			//     /
-			//--- p0 (fixed)
+			//--- p0 <-- fixed (root)
 			//    |
-			//    r0 (below)
+			//    r0 <-- fixed (root -1)
 			ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 0.0, 1.0, r0, p0, p1);
 
 			//      p2 <-- solve
 			//     /
 			//    p1 <-- solve
 			//    |
-			//--- p0 (fixed)
+			//--- p0 <-- fixed (root)
 			//    |
-			//    ## (below)
+			//    ##
 			ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
 			for (uint i = strandParticleBegin + strandParticleStride * 3; i != strandParticleEnd; i += strandParticleStride)
@@ -299,9 +326,7 @@ void KSolveConstraints_GaussSeidelReference(
 				//    |
 				//    p0 <-- solve
 				//    |
-				//--- ## (fixed)
-				//    |
-				//    ## (below)
+				//--- ##
 				ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 1.0, 1.0, 1.0, p0, p1, p2);
 
 				_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
@@ -356,17 +381,9 @@ void KSolveConstraints_GaussSeidel(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	const uint strandIndex = worldIdx.x;
-#if LAYOUT_INTERLEAVED
-	const uint strandParticleBegin = strandIndex;
-	const uint strandParticleStride = _StrandCount;
-#else
-	const uint strandParticleBegin = strandIndex * _StrandParticleCount;
-	const uint strandParticleStride = 1;
-#endif
-	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
+	DECLARE_STRAND(worldIdx.x)
 
-#if STRAND_31_32_DEBUG
+#if DEBUG_STRAND_31_32
 	if (strandIndex < 31 || strandIndex > 32)
 	{
 		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
@@ -387,15 +404,6 @@ void KSolveConstraints_GaussSeidel(
 	}
 #endif
 
-	// clear corrections
-	if (ENABLE_DISTANCE_FTL)
-	{
-		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
-		{
-			_ParticlePositionCorr[i] = 0;
-		}
-	}
-
 	// update position
 	{
 		_ParticlePosition[strandParticleBegin].xyz = _RootPosition[strandIndex].xyz;
@@ -411,6 +419,15 @@ void KSolveConstraints_GaussSeidel(
 		}
 	}
 
+	// clear corrections
+	if (ENABLE_DISTANCE_FTL)
+	{
+		for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
+		{
+			_ParticlePositionCorr[i] = 0;
+		}
+	}
+
 	// solve constraints by Gauss-Seidel iteration
 	for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
 	{
@@ -423,19 +440,20 @@ void KSolveConstraints_GaussSeidel(
 
 		//      p1 <-- solve
 		//     /
-		//--- p0 (fixed)
+		//--- p0 <-- fixed (root)
 		//    |
-		//    r0 (below)
-		if (ENABLE_BOUNDARY || ENABLE_BOUNDARY_FRICTION)
+		//    r0 <-- fixed (root -1)
+		if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p1);
+		if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride].xyz, p1);
+		if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.0, 1.0, p0, p1);
+		if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex), p0, p1);
+		if (ENABLE_CURVATURE)			ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 0.0, 1.0, r0, p0, p1);
+		if (ENABLE_DISTANCE_FTL)
 		{
-			if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride].xyz, p1);
-			else/* frictionless */			ApplyCollisionConstraint(p1);
+			if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleBegin].xyz);
 		}
-		if (ENABLE_DISTANCE)		ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.0, 1.0, p0, p1);
-		if (ENABLE_DISTANCE_LRA)	ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex), p0, p1);
-		if (ENABLE_CURVATURE)		ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 0.0, 1.0, r0, p0, p1);
 		
-#if STRAND_31_32_DEBUG == 2
+#if DEBUG_STRAND_31_32 == 2
 		{
 			_ParticlePosition[strandParticleBegin + strandParticleStride].xyz = p1;
 			_ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz = 1e+7;
@@ -444,21 +462,23 @@ void KSolveConstraints_GaussSeidel(
 #endif
 
 		//      p2 <-- solve
+		//      |
+		//      p1 <-- solve
 		//     /
-		//    p1 <-- solve
+		//--- p0 <-- fixed (root)
 		//    |
-		//--- p0 (fixed)
-		//    |
-		//    r0 (below)
-		if (ENABLE_BOUNDARY || ENABLE_BOUNDARY_FRICTION)
+		//    r0
+		if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p2);
+		if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride * 2].xyz, p2);
+		if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
+		if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * 2, _ParticlePosition[strandParticleBegin].xyz, p2);
+		if (ENABLE_CURVATURE)			ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
+		if (ENABLE_DISTANCE_FTL)
 		{
-			if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride * 2].xyz, p2);
-			else/* frictionless */			ApplyCollisionConstraint(p2);
+			if (GS_LIVE_CONSTRAINTS == 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleBegin].xyz);
+			if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[strandParticleBegin + strandParticleStride].xyz);
 		}
-		if (ENABLE_DISTANCE)		ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
-		if (ENABLE_DISTANCE_LRA)	ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * 2, _ParticlePosition[strandParticleBegin].xyz, p2);
-		if (ENABLE_CURVATURE)		ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
-
+		
 		for (uint i = strandParticleBegin + strandParticleStride * 3, k = 3; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
 			r0 = p0;
@@ -467,43 +487,36 @@ void KSolveConstraints_GaussSeidel(
 			p2 = _ParticlePosition[i].xyz;
 
 			//      p2 <-- solve
+			//      |
+			//      p1 <-- solve
 			//     /
-			//    p1 <-- solve
-			//    |
 			//    p0 <-- solve
 			//    |
-			//--- r0 (fixed)
-			//    |
-			//    ## (below)
-			if (ENABLE_BOUNDARY || ENABLE_BOUNDARY_FRICTION)
-			{
-				if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[i].xyz, p2);
-				else/* frictionless */			ApplyCollisionConstraint(p2);
-			}
-			if (ENABLE_DISTANCE)		ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
-			if (ENABLE_DISTANCE_LRA)	ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, _ParticlePosition[strandParticleBegin].xyz, p2);
-			if (ENABLE_CURVATURE)		ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 1.0, 1.0, 1.0, p0, p1, p2);
-
+			//--- r0
+			if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p2);
+			if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[i].xyz, p2);
+			if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
+			if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, _ParticlePosition[strandParticleBegin].xyz, p2);
+			if (ENABLE_CURVATURE)			ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 1.0, 1.0, 1.0, p0, p1, p2);
 			if (ENABLE_DISTANCE_FTL)
 			{
-				float3 d0 = 0;
-				ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), r0, p0, d0);
-				_ParticlePositionCorr[i - strandParticleStride * 3].xyz += d0;
+				if (GS_LIVE_CONSTRAINTS == 3) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), r0, p0, _ParticlePositionCorr[i - strandParticleStride * 3].xyz);
+				if (GS_LIVE_CONSTRAINTS == 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[i - strandParticleStride * 2].xyz);
+				if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[i - strandParticleStride * 1].xyz);
 			}
 
 			_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
 		}
 
-		//TODO figure out why this breaks when triangle bending constraint is disabled
+		//      p2 <-- solve (ftl)
+		//     /
+		//    p1 <-- solve (ftl)
+		//    |
+		//    p0
 		if (ENABLE_DISTANCE_FTL)
 		{
-			float3 d1 = 0;
-			ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, d1);
-			_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz += d1;
-
-			float3 d2 = 0;
-			ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, d2);
-			_ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz += d2;
+			if (GS_LIVE_CONSTRAINTS >= 3) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz);
+			if (GS_LIVE_CONSTRAINTS >= 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz);
 		}
 
 		_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
@@ -547,21 +560,13 @@ void KSolveConstraints_Jacobi(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	const uint strandIndex = groupIdx.x;
-#if LAYOUT_INTERLEAVED
-	const uint strandParticleBegin = strandIndex;
-	const uint strandParticleStride = _StrandCount;
-#else
-	const uint strandParticleBegin = strandIndex * _StrandParticleCount;
-	const uint strandParticleStride = 1;
-#endif
-	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
+	DECLARE_STRAND(groupIdx.x)
 
 	const uint i = strandParticleBegin + strandParticleStride * threadIdx;
 #if NEW_JACOBI
 
 	const uint j = threadIdx + 1;
-
+	
 	// update position
 	const float3 x0 = _ParticlePositionPrev[i].xyz;
 	{
@@ -698,7 +703,7 @@ void KSolveConstraints_Jacobi(
 
 	if (ENABLE_DISTANCE_FTL)
 	{
-		gs_d[j - 1] = d_ftl * min(1, threadIdx);
+		gs_d[j - 1] = d_ftl * min(1, threadIdx);//TODO fix this
 	}
 
 	GroupMemoryBarrierWithGroupSync();

@@ -55,7 +55,7 @@
 				const uint strandParticleStride = 1;
 #endif
 
-#if STRAND_31_32_DEBUG == 2
+#if DEBUG_STRAND_31_32 == 2
 				if (vertexID > 1)
 					vertexID = 1;
 #endif

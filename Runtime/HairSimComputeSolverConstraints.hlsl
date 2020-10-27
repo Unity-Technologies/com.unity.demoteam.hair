@@ -426,8 +426,10 @@ void ApplyDistanceLRAConstraint(const float distanceMax, const float3 p0, inout 
 
 void ApplyDistanceFTLConstraint(const float distance, const float3 p0, inout float3 p1, inout float3 d1)
 {
-	SolveDistanceFTLConstraint(distance, p0, p1, d1);
-	p1 += d1;
+	float3 d1_tmp = 0.0;
+	SolveDistanceFTLConstraint(distance, p0, p1, d1_tmp);
+	p1 += d1_tmp;
+	d1 += d1_tmp;
 }
 
 void ApplyTriangleBendingConstraint(

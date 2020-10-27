@@ -23,7 +23,7 @@
 // 0 == pressure is always positive
 // 1 == negative pressure causes contraction
 
-#define STRAND_31_32_DEBUG 0
+#define DEBUG_STRAND_31_32 0
 // 0 == off
 // 1 == on (full strands)
 // 2 == on (first segments)
