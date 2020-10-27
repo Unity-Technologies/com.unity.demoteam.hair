@@ -142,11 +142,20 @@ namespace Unity.DemoTeam.Hair
 		{
 		}
 
+		//TODO split these from SolverSettings?
 		[Serializable] public struct StrandSettings
 		{
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
-		}
+			[Range(0.0f, 9.0f)]
+			public float strandParticleContrib;
 
+			public static readonly StrandSettings defaults = new StrandSettings()
+			{
+				strandDiameter = 1.0f,
+				strandParticleContrib = 1.0f,
+			};
+		}
 		[Serializable] public struct SolverSettings
 		{
 			public enum Method
@@ -163,65 +172,77 @@ namespace Unity.DemoTeam.Hair
 				GreaterThan,
 			}
 
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
+			public float strandDiameter;
+			[Range(0.0f, 9.0f)]
+			public float strandParticleContrib;// TODO move elsewhere
+
+			[Space]
+
 			public Method method;
 			[Range(1, 100)]
 			public int iterations;
 			[Range(0.0f, 1.0f)]
 			public float stiffness;
 			[Range(1.0f, 2.0f)]
-			public float relaxation;
+			public float kSOR;
 
-			[Header("Forces")]
-			[Range(-1.0f, 1.0f)]
+			[Space]
+
+			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity")]
 			public float gravity;
-			[Range(0.0f, 1.0f)]
+			[Range(0.0f, 1.0f), Tooltip("Damping factor")]
 			public float damping;
-			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (0 == FLIP, 1 == PIC)")]
-			public float volumeFriction;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
 			public float volumeResponse;
+			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (0 == FLIP, 1 == PIC)")]
+			public float volumeFriction;
 
-			[Header("Constraints")]
-			[Tooltip("Particle-particle distance")]
+			[Space]
+
+			[Tooltip("Particle-particle distance constraint")]
 			public bool distance;
-			[Tooltip("Maximum particle-root distance")]
+			[Tooltip("Maximum particle-root distance constraint")]
 			public bool distanceLRA;
-			[Tooltip("Follow the leader (hard particle-particle distance, non-physical)")]
+			[Tooltip("Follow the leader (hard particle-particle distance constraint, non-physical)")]
 			public bool distanceFTL;
 			[Range(0.0f, 1.0f), Tooltip("Follow the leader damping factor")]
 			public float distanceFTLDamping;
-			[Tooltip("Boundary collisions")]
+			[Tooltip("Boundary collision constraint")]
 			public bool boundary;
 			[Range(0.0f, 1.0f), Tooltip("Boundary friction")]
 			public float boundaryFriction;
+			[Tooltip("Curvature constraint")]
 			public bool curvature;
+			[Tooltip("Curvature constraint mode (=, <, >)")]
 			public Compare curvatureCompare;
 			[Range(0.0f, 1.0f)]
 			public float curvatureCompareTo;
-			[Attributes.ReadOnly] public bool preserveShape;
-			[Attributes.ReadOnly] public float preserveShapeFactor;
 
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
+				strandDiameter = 1.0f,
+				strandParticleContrib = 1.0f,
+
 				method = Method.GaussSeidel,
 				iterations = 3,
 				stiffness = 1.0f,
-				relaxation = 1.0f,
+				kSOR = 1.0f,
 
 				gravity = 1.0f,
 				damping = 0.0f,
-				volumeFriction = 0.05f,
 				volumeResponse = 1.0f,
+				volumeFriction = 0.05f,
 
 				distance = true,
-				distanceLRA = false,
+				distanceLRA = true,
 				distanceFTL = false,
 				distanceFTLDamping = 0.8f,
 				boundary = true,
-				boundaryFriction = 0.2f,
+				boundaryFriction = 0.5f,
 				curvature = false,
-				curvatureCompare = Compare.Equals,
-				curvatureCompareTo = 0.0f,
+				curvatureCompare = Compare.LessThan,
+				curvatureCompareTo = 0.1f,
 			};
 		}
 		[Serializable] public struct VolumeSettings
@@ -237,48 +258,28 @@ namespace Unity.DemoTeam.Hair
 
 			[Range(8, 160)]
 			public int volumeResolution;
-			[Attributes.ReadOnly] public bool volumeStaggered;
-			[Attributes.ReadOnly] public bool volumeSquare;
+			public Method volumeSplatMethod;
+
+			[Range(0, 100)]
+			public int pressureIterations;
+
+			[Range(0.0f, 1.0f)]
+			public float weighIncompressibleFlow;
+			[Range(0.0f, 1.0f)]
+			public float weighTargetDensity;
 
 			[HideInInspector] public Vector3 volumeWorldCenter;
 			[HideInInspector] public Vector3 volumeWorldExtent;
 
-			[Space]
-			public Method splatMethod;
-			public float splatDiameter;
-
-			[Space]
-			[Attributes.ReadOnly]
-			public float pressureFromVelocity;
-			[Range(0.0f, 1.0f)]
-			public float pressureFromDensity;
-			[Range(0, 100)]
-			public int pressureIterations;
-
-			//[Header("Debug")]
-			//[Range(-1.0f, 1.0f)]
-			//public float cellNudgeX;
-			//[Range(-1.0f, 1.0f)]
-			//public float cellNudgeY;
-			//[Range(-1.0f, 1.0f)]
-			//public float cellNudgeZ;
-
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
 				volumeResolution = 48,
-				volumeStaggered = false,
-				volumeSquare = true,
+				volumeSplatMethod = Method.Compute,
 
-				splatMethod = Method.Compute,
-				splatDiameter = 1.0f,
+				pressureIterations = 10,
 
-				pressureFromVelocity = 1.0f,
-				pressureFromDensity = 1.0f,
-				pressureIterations = 0,
-
-				//cellNudgeX = 0.0f,
-				//cellNudgeY = 0.0f,
-				//cellNudgeZ = 0.0f,
+				weighIncompressibleFlow = 1.0f,
+				weighTargetDensity = 1.0f,
 			};
 		}
 		[Serializable] public struct DebugSettings
@@ -489,11 +490,17 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._LocalToWorld = Matrix4x4.identity;
 			cbuffer._LocalToWorldInvT = Matrix4x4.identity;
 
+			float strandCrossSectionArea = 0.25f * Mathf.PI * solverSettings.strandDiameter * solverSettings.strandDiameter;
+			float strandParticleVolume = (1000.0f * cbuffer._StrandParticleInterval) * strandCrossSectionArea;
+
+			cbuffer._StrandParticleVolume = strandParticleVolume;
+			cbuffer._StrandParticleContrib = solverSettings.strandParticleContrib;
+
 			// update solver parameters
 			cbuffer._DT = dt;
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
-			cbuffer._Relaxation = solverSettings.relaxation;
+			cbuffer._Relaxation = solverSettings.kSOR;
 
 			cbuffer._Damping = solverSettings.damping;
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
@@ -526,8 +533,8 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._VolumeWorldMin = volumeSettings.volumeWorldCenter - volumeSettings.volumeWorldExtent;
 			cbuffer._VolumeWorldMax = volumeSettings.volumeWorldCenter + volumeSettings.volumeWorldExtent;
 
-			cbuffer._PressureFromVelocity = volumeSettings.pressureFromVelocity;
-			cbuffer._PressureFromDensity = volumeSettings.pressureFromDensity;
+			cbuffer._PressureFromVelocity = volumeSettings.weighIncompressibleFlow;
+			cbuffer._PressureFromDensity = volumeSettings.weighTargetDensity;
 
 			// update boundary shapes
 			cbuffer._BoundaryCapsuleCount = 0;
@@ -812,7 +819,7 @@ namespace Unity.DemoTeam.Hair
 			int numZ = 1;
 
 			// accumulate
-			switch (volumeSettings.splatMethod)
+			switch (volumeSettings.volumeSplatMethod)
 			{
 				case VolumeSettings.Method.Compute:
 					{
@@ -884,7 +891,7 @@ namespace Unity.DemoTeam.Hair
 			int numZ = volumeSettings.volumeResolution;
 
 			// resolve accumulated
-			switch (volumeSettings.splatMethod)
+			switch (volumeSettings.volumeSplatMethod)
 			{
 				case VolumeSettings.Method.Compute:
 				case VolumeSettings.Method.ComputeSplit:

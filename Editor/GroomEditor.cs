@@ -11,14 +11,20 @@ namespace Unity.DemoTeam.Hair
 		Editor groomAssetEditor;
 
 		SerializedProperty _groomAsset;
+		SerializedProperty _groomAssetQuickEdit;
+
 		SerializedProperty _settingsSolver;
 		SerializedProperty _settingsVolume;
+		SerializedProperty _settingsDebug;
 
 		void OnEnable()
 		{
 			_groomAsset = serializedObject.FindProperty("groomAsset");
+			_groomAssetQuickEdit = serializedObject.FindProperty("groomAssetQuickEdit");
+
 			_settingsSolver = serializedObject.FindProperty("solverSettings");
 			_settingsVolume = serializedObject.FindProperty("volumeSettings");
+			_settingsDebug = serializedObject.FindProperty("debugSettings");
 		}
 
 		public override void OnInspectorGUI()
@@ -27,16 +33,26 @@ namespace Unity.DemoTeam.Hair
 			if (groom == null)
 				return;
 
-			EditorGUILayout.LabelField("Asset", EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.LabelField("Instance", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
 				EditorGUI.BeginChangeCheck();
 				{
 					EditorGUILayout.PropertyField(_groomAsset);
+					_groomAssetQuickEdit.boolValue = GUILayout.Toggle(_groomAssetQuickEdit.boolValue, "Quick Edit", EditorStyles.miniButton);
 				}
 				if (EditorGUI.EndChangeCheck())
 				{
 					serializedObject.ApplyModifiedProperties();
+				}
+
+				var groomAsset = groom.groomAsset;
+				if (groomAsset != null && _groomAssetQuickEdit.boolValue)
+				{
+					Editor.CreateCachedEditor(groomAsset, null, ref groomAssetEditor);
+					EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+					(groomAssetEditor as GroomAssetEditor).DrawImporterGUI(groomAsset);
+					EditorGUILayout.EndVertical();
 				}
 
 				if (GUILayout.Button("Reload"))
@@ -47,21 +63,26 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
+			EditorGUILayout.LabelField("Strand groups", EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+			{
+				GUILayout.Label("[ + summary ]");
+				GUILayout.Label("[ + root attachments ]");
+				GUILayout.Label("[ + per group overrides? ]");
+			}
+			EditorGUILayout.EndVertical();
+
 			EditorGUI.BeginChangeCheck();
 			{
-				EditorGUILayout.LabelField("Strands", EditorStyles.centeredGreyMiniLabel);
-				EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-				{
-				}
-				EditorGUILayout.EndVertical();
-
 				EditorGUILayout.Space();
-				EditorGUILayout.LabelField("Simulation", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.LabelField("Simulation settings", EditorStyles.centeredGreyMiniLabel);
 				EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 				{
-					StructPropertyFieldsWithHeader(_settingsSolver);
+					StructPropertyFieldsWithHeader(_settingsSolver, "Settings Solver");
 					EditorGUILayout.Space();
-					StructPropertyFieldsWithHeader(_settingsVolume);
+					StructPropertyFieldsWithHeader(_settingsVolume, "Settings Volume");
+					EditorGUILayout.Space();
+					StructPropertyFieldsWithHeader(_settingsDebug, "Settings Debug");
 				}
 				EditorGUILayout.EndVertical();
 			}

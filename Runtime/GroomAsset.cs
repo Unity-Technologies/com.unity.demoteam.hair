@@ -29,17 +29,11 @@ namespace Unity.DemoTeam.Hair
 			public Material material;
 			[Tooltip("Memory layout for the strands")]
 			public MemoryLayout memoryLayout;
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
-			public float strandDiameter;//TODO move elsewhere
-			[Range(0.0f, 9.0f)]
-			public float strandParticleContrib;// TODO move elsewhere
 
 			public static readonly SettingsBasic defaults = new SettingsBasic()
 			{
 				type = Type.Procedural,
 				memoryLayout = MemoryLayout.Interleaved,
-				strandDiameter = 2.0f,
-				strandParticleContrib = 1.0f,
 			};
 		}
 

@@ -27,7 +27,9 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		public GroomAsset groomAsset;
+		public bool groomAssetQuickEdit;
 		public GroomContainer[] groomContainers;
+
 		[HideInInspector] public string groomChecksum;
 
 		private HairSim.SolverData[] solverData;
@@ -234,15 +236,12 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 
-				float strandCrossSectionArea = 0.25f * Mathf.PI * groomAsset.settingsBasic.strandDiameter * groomAsset.settingsBasic.strandDiameter;
+				//TODO couple this with a scaling factor
 				float strandParticleInterval = strandGroup.strandLengthAvg / (strandGroup.strandParticleCount - 1);
-				float strandParticleVolume = (1000.0f * strandParticleInterval) * strandCrossSectionArea;
 
 				solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 				solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
 				solverData[i].cbuffer._StrandParticleInterval = strandParticleInterval;
-				solverData[i].cbuffer._StrandParticleVolume = strandParticleVolume;
-				solverData[i].cbuffer._StrandParticleContrib = groomAsset.settingsBasic.strandParticleContrib;
 
 				int particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 

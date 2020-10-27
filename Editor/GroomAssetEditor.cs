@@ -24,9 +24,6 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _strandGroups;
 		SerializedProperty _strandGroupsAutoBuild;
 
-		SerializedProperty _settingsSolver;
-		SerializedProperty _settingsVolume;
-
 		void OnEnable()
 		{
 			previewUtil = new PreviewRenderUtility();
@@ -57,9 +54,6 @@ namespace Unity.DemoTeam.Hair
 
 			_strandGroups = serializedObject.FindProperty("strandGroups");
 			_strandGroupsAutoBuild = serializedObject.FindProperty("strandGroupsAutoBuild");
-
-			_settingsSolver = serializedObject.FindProperty("settingsSolver");
-			_settingsVolume = serializedObject.FindProperty("settingsVolume");
 		}
 
 		void OnDisable()
@@ -76,7 +70,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
-				DrawImporter(groom);
+				DrawImporterGUI(groom);
 			}
 			EditorGUILayout.EndVertical();
 
@@ -84,15 +78,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField("Strand groups", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
-				DrawStrandGroups(groom);
-			}
-			EditorGUILayout.EndVertical();
-
-			EditorGUILayout.Space();
-			EditorGUILayout.LabelField("Simulation defaults (TODO)", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-			{
-				DrawSimulation(groom);
+				DrawStrandGroupsGUI(groom);
 			}
 			EditorGUILayout.EndVertical();
 
@@ -100,7 +86,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField(groom.checksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
-		public void DrawImporter(GroomAsset groom)
+		public void DrawImporterGUI(GroomAsset groom)
 		{
 			EditorGUI.BeginChangeCheck();
 			{
@@ -140,14 +126,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndHorizontal();
 		}
 
-		public void DrawSimulation(GroomAsset groom)
-		{
-			StructPropertyFieldsWithHeader(_settingsSolver);
-			EditorGUILayout.Space();
-			StructPropertyFieldsWithHeader(_settingsVolume);
-		}
-
-		public void DrawStrandGroups(GroomAsset groom)
+		public void DrawStrandGroupsGUI(GroomAsset groom)
 		{
 			if (groom.strandGroups == null || groom.strandGroups.Length == 0)
 			{
@@ -245,9 +224,12 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				EditorGUILayout.Space();
-				if (GUILayout.Button("Save changes"))
+				using (new EditorGUI.DisabledScope(true))
 				{
-					// TODO
+					if (GUILayout.Button("Save changes"))
+					{
+						// TODO
+					}
 				}
 			}
 		}
