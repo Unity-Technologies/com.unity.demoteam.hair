@@ -7,6 +7,9 @@
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
 #pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
 
+//----------
+// features
+
 #pragma multi_compile_local __ LAYOUT_INTERLEAVED
 // 0 == particles grouped by strand, i.e. root, root+1, root, root+1
 // 1 == particles grouped by index, i.e. root, root, root+1, root+1
@@ -16,6 +19,9 @@
 #pragma multi_compile_local __ ENABLE_DISTANCE_FTL
 #pragma multi_compile_local __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
 #pragma multi_compile_local __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
+
+#define ENABLE_VOLUME_PRESSURE 1
+#define ENABLE_VOLUME_FRICTION 1
 
 #ifndef ENABLE_DISTANCE
 #define ENABLE_DISTANCE 0
@@ -41,10 +47,9 @@
 #ifndef ENABLE_CURVATURE_LEQ
 #define ENABLE_CURVATURE_LEQ 0
 #endif
-#define ENABLE_CURVATURE (ENABLE_CURVATURE_EQ || ENABLE_CURVATURE_GEQ || ENABLE_CURVATURE_LEQ)
 
-#define ENABLE_VOLUME_PRESSURE 1
-#define ENABLE_VOLUME_FRICTION 1
+//---------
+// include
 
 #define HAIRSIM_WRITEABLE_SOLVERDATA 1
 
@@ -56,6 +61,8 @@
 
 //--------
 // macros
+
+#define ENABLE_CURVATURE (ENABLE_CURVATURE_EQ || ENABLE_CURVATURE_GEQ || ENABLE_CURVATURE_LEQ)
 
 #if ENABLE_CURVATURE_GEQ
   #define ApplySelectTriangleBendingConstraint ApplyTriangleBendingMinConstraint

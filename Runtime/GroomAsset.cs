@@ -16,8 +16,8 @@ namespace Unity.DemoTeam.Hair
 
 		public enum MemoryLayout
 		{
-			Sequential,
 			Interleaved,
+			Sequential,
 		}
 
 		[Serializable]
@@ -25,10 +25,10 @@ namespace Unity.DemoTeam.Hair
 		{
 			[Tooltip("Type of generator")]
 			public Type type;
+			[Tooltip("Memory layout for the generated strands")]
+			public MemoryLayout memoryLayout;
 			[Tooltip("Material applied to the generated groups")]
 			public Material material;
-			[Tooltip("Memory layout for the strands")]
-			public MemoryLayout memoryLayout;
 
 			public static readonly SettingsBasic defaults = new SettingsBasic()
 			{
@@ -41,7 +41,6 @@ namespace Unity.DemoTeam.Hair
 		public struct SettingsAlembic
 		{
 			public AlembicStreamPlayer sourceAsset;
-
 			public bool resampleCurves;
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
 			public int resampleParticleCount;

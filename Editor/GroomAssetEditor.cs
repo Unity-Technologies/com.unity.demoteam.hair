@@ -73,7 +73,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
-				DrawImporterGUI(groom);
+				DrawImporterGUI();
 			}
 			EditorGUILayout.EndVertical();
 
@@ -81,7 +81,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField("Strand groups", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
-				DrawStrandGroupsGUI(groom);
+				DrawStrandGroupsGUI();
 			}
 			EditorGUILayout.EndVertical();
 
@@ -89,8 +89,12 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField(groom.checksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
-		public void DrawImporterGUI(GroomAsset groom)
+		public void DrawImporterGUI()
 		{
+			var groom = target as GroomAsset;
+			if (groom == null)
+				return;
+
 			EditorGUI.BeginChangeCheck();
 			{
 				StructPropertyFieldsWithHeader(_settingsBasic);
@@ -129,8 +133,12 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndHorizontal();
 		}
 
-		public void DrawStrandGroupsGUI(GroomAsset groom)
+		public void DrawStrandGroupsGUI()
 		{
+			var groom = target as GroomAsset;
+			if (groom == null)
+				return;
+
 			if (groom.strandGroups == null || groom.strandGroups.Length == 0)
 			{
 				EditorGUILayout.LabelField("None");
@@ -154,10 +162,10 @@ namespace Unity.DemoTeam.Hair
 					EditorGUILayout.IntField("Total particles", numParticles, EditorStyles.label);
 				}
 
-				for (int i = 0; i != _strandGroups.arraySize; i++)
+				for (int i = 0; i != groom.strandGroups.Length; i++)
 				{
 					EditorGUILayout.Space();
-					EditorGUILayout.LabelField("Group 0", EditorStyles.miniBoldLabel);
+					EditorGUILayout.LabelField("Group:" + i, EditorStyles.miniBoldLabel);
 					using (new EditorGUI.IndentLevelScope())
 					{
 						EditorGUILayout.BeginVertical();
@@ -196,23 +204,14 @@ namespace Unity.DemoTeam.Hair
 
 								var matrix = Matrix4x4.TRS(meshOffset * Vector3.forward, previewRotation, Vector3.one) * Matrix4x4.Translate(-meshCenter);
 
-								if (s_previewMat == null)
-								{
-									s_previewMat = new Material(groom.defaultMaterial);
-									s_previewMat.hideFlags = HideFlags.HideAndDontSave;
-									s_previewMat.EnableKeyword("HAIRSIMVERTEX_STATIC_PREVIEW");
-								}
-								else
-								{
-									s_previewMat.shader = groom.defaultMaterial.shader;
-									s_previewMat.CopyPropertiesFromMaterial(groom.defaultMaterial);
-									s_previewMat.EnableKeyword("HAIRSIMVERTEX_STATIC_PREVIEW");
-								}
+								var material = _material.objectReferenceValue as Material;
+								if (material == null)
+									material = groom.defaultMaterial;
 
 								previewUtilMPB.SetInt("_StrandCount", groom.strandGroups[i].strandCount);
 
 								previewUtil.BeginPreview(rect, GUIStyle.none);
-								previewUtil.DrawMesh(meshLines, matrix, s_previewMat, 0, previewUtilMPB);
+								previewUtil.DrawMesh(meshLines, matrix, material, 0, previewUtilMPB);
 								previewUtil.Render(true, true);
 								previewUtil.EndAndDrawPreview(rect);
 							}

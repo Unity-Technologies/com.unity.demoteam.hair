@@ -9,10 +9,10 @@ void HairSimVertex_float(in float3 inPositionOS, in float2 inUV, out float3 outP
 	const int strandParticleIndex = (int)inUV.x;
 	const int strandIndex = (int)inUV.y;
 
-#if HAIRSIMVERTEX_STATIC_PREVIEW
-	outPositionOS = inPositionOS;
-#else
+#if HAIRSIMVERTEX_ENABLE_POSITION
 	outPositionOS = TransformWorldToObject(GetCameraRelativePositionWS(_ParticlePosition[strandParticleIndex].xyz));
+#else
+	outPositionOS = inPositionOS;
 #endif
 
 	outDebugColor = ColorCycle(strandIndex, _StrandCount);

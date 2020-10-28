@@ -9,7 +9,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: HairMaterial
   m_Shader: {fileID: -6465566751694194690, guid: 2fa8c2da3a58a3b49be5441117c20876, type: 3}
-  m_ShaderKeywords: ENABLE_DISTANCE ENABLE_DISTANCE_LRA _DISABLE_SSR_TRANSPARENT
+  m_ShaderKeywords: _DISABLE_SSR_TRANSPARENT
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -112,7 +112,7 @@ Material:
     m_Floats:
     - BOOLEAN_58B50922201C4296ADCD3604F1135012: 1
     - BOOLEAN_69B014B20E2848539F679A29B317D5BD: 0
-    - Boolean_f904f09dbf504d518c3d225aff57a5df: 1
+    - Boolean_f904f09dbf504d518c3d225aff57a5df: 0
     - Vector1_20a47d405fd34354a347258fdfeff805: 0
     - Vector1_2e12ccf506a14853b660778272a7d4f1: 0
     - Vector1_3c480a7375e14916a17cfbcc2326c547: 0

@@ -11,11 +11,28 @@
 #pragma kernel KVolumePressureSolve
 #pragma kernel KVolumePressureGradient
 
+//----------
+// features
+
+#pragma multi_compile_local __  VOLUME_SUPPORT_CONTRACTION
+// 0 == pressure is always positive
+// 1 == negative pressure causes contraction
+
+#ifndef VOLUME_SUPPORT_CONTRACTION
+#define VOLUME_SUPPORT_CONTRACTION 0
+#endif
+
+//---------
+// include
+
 #define HAIRSIM_WRITEABLE_VOLUMEDATA 1
 
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
+
+//--------
+// macros
 
 #define PARTICLE_NUM_X 64
 #define PARTICLE_NUM_Y 1
@@ -24,8 +41,6 @@
 #define VOLUME_NUM_X 8
 #define VOLUME_NUM_Y 8
 #define VOLUME_NUM_Z 1
-
-#define VOLUME_SUPPORT_CONTRACTION 1
 
 #if VOLUME_SUPPORT_CONTRACTION
 	#define VOLUME_REST_AT_ZERO					0

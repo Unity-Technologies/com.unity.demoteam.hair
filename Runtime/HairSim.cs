@@ -137,25 +137,25 @@ namespace Unity.DemoTeam.Hair
 			public T ENABLE_CURVATURE_GEQ;
 			public T ENABLE_CURVATURE_LEQ;
 		}
-
 		public struct VolumeKeywords<T>
 		{
+			public T VOLUME_SUPPORT_CONTRACTION;
 		}
 
 		//TODO split these from SolverSettings?
-		[Serializable] public struct StrandSettings
-		{
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
-			public float strandDiameter;
-			[Range(0.0f, 9.0f)]
-			public float strandParticleContrib;
+		//[Serializable] public struct StrandSettings
+		//{
+		//	[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
+		//	public float strandDiameter;
+		//	[Range(0.0f, 9.0f)]
+		//	public float strandParticleContrib;
+		//	public static readonly StrandSettings defaults = new StrandSettings()
+		//	{
+		//		strandDiameter = 1.0f,
+		//		strandParticleContrib = 1.0f,
+		//	};
+		//}
 
-			public static readonly StrandSettings defaults = new StrandSettings()
-			{
-				strandDiameter = 1.0f,
-				strandParticleContrib = 1.0f,
-			};
-		}
 		[Serializable] public struct SolverSettings
 		{
 			public enum Method
@@ -259,14 +259,13 @@ namespace Unity.DemoTeam.Hair
 			[Range(8, 160)]
 			public int volumeResolution;
 			public Method volumeSplatMethod;
-
 			[Range(0, 100)]
 			public int pressureIterations;
-
 			[Range(0.0f, 1.0f)]
 			public float weighIncompressibleFlow;
 			[Range(0.0f, 1.0f)]
 			public float weighTargetDensity;
+			public bool supportContraction;
 
 			[HideInInspector] public Vector3 volumeWorldCenter;
 			[HideInInspector] public Vector3 volumeWorldExtent;
@@ -275,11 +274,10 @@ namespace Unity.DemoTeam.Hair
 			{
 				volumeResolution = 48,
 				volumeSplatMethod = Method.Compute,
-
 				pressureIterations = 10,
-
 				weighIncompressibleFlow = 1.0f,
 				weighTargetDensity = 1.0f,
+				supportContraction = true,
 			};
 		}
 		[Serializable] public struct DebugSettings
@@ -628,6 +626,9 @@ namespace Unity.DemoTeam.Hair
 					volumeData.boundaryMatrixPrev.CopyFrom(tmpMatrix);
 				}
 			}
+
+			// update keywords
+			keywords.VOLUME_SUPPORT_CONTRACTION = volumeSettings.supportContraction;
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData)
@@ -701,6 +702,8 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressure, volumeData.volumePressure);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
+
+			CoreUtils.SetKeyword(cs, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
 		}
 
 		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData)
@@ -724,6 +727,8 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetTexture(UniformIDs._VolumePressure, volumeData.volumePressure);
 			mpb.SetTexture(UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
 			mpb.SetTexture(UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
+
+			CoreUtils.SetKeyword(mat, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
 		}
 
 		public static void StepSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in VolumeData volumeData)

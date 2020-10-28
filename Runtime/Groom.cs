@@ -26,14 +26,27 @@ namespace Unity.DemoTeam.Hair
 			//public SkinAttachment rootAttachment;
 		}
 
+		[Serializable] public struct SettingsRoots
+		{
+			public GameObject rootsTarget;
+			public bool rootsAttached;
+		}
+		[Serializable] public struct SettingsRender
+		{
+			public Material material;
+		}
+
 		public GroomAsset groomAsset;
 		public bool groomAssetQuickEdit;
+
 		public GroomContainer[] groomContainers;
+		public string groomContainersChecksum;
 
-		[HideInInspector] public string groomChecksum;
+		public SettingsRoots settingsRoots;
+		public SettingsRoots settingsRender;
 
-		private HairSim.SolverData[] solverData;
-		private HairSim.VolumeData volumeData;
+		public HairSim.SolverData[] solverData;
+		public HairSim.VolumeData volumeData;
 
 		public HairSim.SolverSettings solverSettings = HairSim.SolverSettings.defaults;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
@@ -56,13 +69,13 @@ namespace Unity.DemoTeam.Hair
 
 		void OnValidate()
 		{
+			volumeSettings.volumeResolution = (Mathf.Max(8, volumeSettings.volumeResolution) / 8) * 8;
+
 			if (boundaries.Count > HairSim.MAX_BOUNDARIES)
 			{
 				boundaries.RemoveRange(HairSim.MAX_BOUNDARIES, boundaries.Count - HairSim.MAX_BOUNDARIES);
 				boundaries.TrimExcess();
 			}
-
-			volumeSettings.volumeResolution = (Mathf.Max(8, volumeSettings.volumeResolution) / 8) * 8;
 		}
 
 		void OnDrawGizmos()
@@ -122,17 +135,6 @@ namespace Unity.DemoTeam.Hair
 			return new Bounds(worldBounds.center, Vector3.one * (2.0f * Mathf.Max(worldExtent.x, worldExtent.y, worldExtent.z)));
 		}
 
-		public Bounds GetSimulationBoundsForSquareCells()
-		{
-			var bounds = GetSimulationBounds();
-			{
-				var size = bounds.size;
-				var sizeMax = Mathf.Max(size.x, size.y, size.z);
-
-				return new Bounds(bounds.center, new Vector3(sizeMax, sizeMax, sizeMax));
-			}
-		}
-
 		public void DispatchStep(CommandBuffer cmd, float dt)
 		{
 			if (!InitializeRuntimeData())
@@ -145,7 +147,7 @@ namespace Unity.DemoTeam.Hair
 				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, groomContainers[i].rootFilter.transform.localToWorldMatrix, solverData[i]);
 			}
 
-			var volumeBounds = GetSimulationBoundsForSquareCells();
+			var volumeBounds = GetSimulationBoundsSquare();
 			{
 				volumeSettings.volumeWorldCenter = volumeBounds.center;
 				volumeSettings.volumeWorldExtent = volumeBounds.extents;
@@ -165,6 +167,10 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings, volumeData);
+
+				groomContainers[i].lineRenderer.sharedMaterial.CopyPropertiesFromMaterial(groomAsset.settingsBasic.material);
+				groomContainers[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
+
 				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
 			}
 
@@ -195,10 +201,10 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (groomAsset != null)
 			{
-				if (groomChecksum != groomAsset.checksum)
+				if (groomContainersChecksum != groomAsset.checksum)
 				{
 					GroomBuilder.BuildGroomInstance(this, groomAsset);
-					groomChecksum = groomAsset.checksum;
+					groomContainersChecksum = groomAsset.checksum;
 
 					ReleaseRuntimeData();
 					InitializeRuntimeData();
@@ -207,7 +213,7 @@ namespace Unity.DemoTeam.Hair
 			else
 			{
 				GroomBuilder.ClearGroomInstance(this);
-				groomChecksum = string.Empty;
+				groomContainersChecksum = string.Empty;
 
 				ReleaseRuntimeData();
 			}
@@ -218,7 +224,7 @@ namespace Unity.DemoTeam.Hair
 			if (groomAsset == null)
 				return false;
 
-			if (groomAsset.checksum != groomChecksum)
+			if (groomAsset.checksum != groomContainersChecksum)
 				return false;
 
 			var strandGroups = groomAsset.strandGroups;
@@ -360,7 +366,8 @@ namespace Unity.DemoTeam.Hair
 						groomContainer.lineFilter.sharedMesh = strandGroups[i].meshAssetLines;
 
 						groomContainer.lineRenderer = linesContainer.AddComponent<MeshRenderer>();
-						groomContainer.lineRenderer.sharedMaterial = groomAsset.settingsBasic.material;
+						groomContainer.lineRenderer.sharedMaterial = new Material(groomAsset.settingsBasic.material);
+						groomContainer.lineRenderer.sharedMaterial.hideFlags = HideFlags.NotEditable;
 					}
 
 					var rootsContainer = new GameObject();

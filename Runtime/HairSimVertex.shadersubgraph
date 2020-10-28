@@ -482,9 +482,9 @@
     "m_Guid": {
         "m_GuidSerialized": "d1bc055d-9dba-44e7-aefb-12d255ab383f"
     },
-    "m_Name": "HAIRSIMVERTEX_STATIC_PREVIEW",
+    "m_Name": "HAIRSIMVERTEX_ENABLE_POSITION",
     "m_DefaultReferenceName": "BOOLEAN_3C76AAD244F3485BB3A72C0EEC3C84F1_ON",
-    "m_OverrideReferenceName": "HAIRSIMVERTEX_STATIC_PREVIEW",
+    "m_OverrideReferenceName": "HAIRSIMVERTEX_ENABLE_POSITION",
     "m_GeneratePropertyBlock": true,
     "m_KeywordType": 0,
     "m_KeywordDefinition": 1,
