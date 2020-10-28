@@ -27,6 +27,14 @@ namespace Unity.DemoTeam.Hair
 			_settingsDebug = serializedObject.FindProperty("debugSettings");
 		}
 
+		void OnDisable()
+		{
+			if (groomAssetEditor != null)
+			{
+				DestroyImmediate(groomAssetEditor);
+			}
+		}
+
 		public override void OnInspectorGUI()
 		{
 			var groom = target as Groom;

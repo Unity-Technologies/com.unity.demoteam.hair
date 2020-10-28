@@ -26,6 +26,9 @@ namespace Unity.DemoTeam.Hair
 
 		void OnEnable()
 		{
+			if (previewUtil != null)
+				previewUtil.Cleanup();
+
 			previewUtil = new PreviewRenderUtility();
 			previewUtilMPB = new MaterialPropertyBlock();
 			previewRotation = Quaternion.identity;
