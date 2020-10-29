@@ -27,7 +27,7 @@ namespace Unity.DemoTeam.Hair
 			public Type type;
 			[Tooltip("Memory layout for the generated strands")]
 			public MemoryLayout memoryLayout;
-			[Tooltip("Material applied to the generated groups")]
+			[Tooltip("Material applied to the generated strand groups")]
 			public Material material;
 
 			public static readonly SettingsBasic defaults = new SettingsBasic()
@@ -40,7 +40,9 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsAlembic
 		{
+			[Tooltip("Alembic asset containing at least one set of curves")]
 			public AlembicStreamPlayer sourceAsset;
+			[Tooltip("Resample curves to ensure a specific number of particles along each strand")]
 			public bool resampleCurves;
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
 			public int resampleParticleCount;

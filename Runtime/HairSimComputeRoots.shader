@@ -8,8 +8,8 @@
 
 	#include "HairSimData.cs.hlsl"
 
-	RWStructuredBuffer<float4> _UpdateRootPosition : register(u1);
-	RWStructuredBuffer<float4> _UpdateRootDirection : register(u2);
+	RWStructuredBuffer<float4> _UpdatedRootPosition : register(u1);
+	RWStructuredBuffer<float4> _UpdatedRootDirection : register(u2);
 
 	struct RootAttribs
 	{
@@ -19,8 +19,8 @@
 
 	void RootVert(RootAttribs attribs, uint i : SV_VertexID)
 	{
-		_UpdateRootPosition[i].xyz = mul(_LocalToWorld, float4(attribs.positionOS, 1.0)).xyz;
-		_UpdateRootDirection[i].xyz = mul(_LocalToWorldInvT, float4(attribs.directionOS, 0.0)).xyz;
+		_UpdatedRootPosition[i].xyz = mul(_LocalToWorld, float4(attribs.positionOS, 1.0)).xyz;
+		_UpdatedRootDirection[i].xyz = normalize(mul(_LocalToWorldInvT, float4(attribs.directionOS, 0.0)).xyz);
 	}
 
 	void RootFragDiscard()

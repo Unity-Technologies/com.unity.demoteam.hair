@@ -100,7 +100,6 @@ namespace Unity.DemoTeam.Hair
 
 		static class SolverKernels
 		{
-			public static int KInitRoots;
 			public static int KInitParticles;
 			public static int KSolveConstraints_GaussSeidelReference;
 			public static int KSolveConstraints_GaussSeidel;
@@ -467,9 +466,10 @@ namespace Unity.DemoTeam.Hair
 		public static void UpdateSolverRoots(CommandBuffer cmd, Mesh rootMesh, Matrix4x4 rootTransform, in SolverData solverData)
 		{
 			var solverDataCopy = solverData;
-
-			solverDataCopy.cbuffer._LocalToWorld = rootTransform;
-			solverDataCopy.cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
+			{
+				solverDataCopy.cbuffer._LocalToWorld = rootTransform;
+				solverDataCopy.cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
+			}
 
 			PushSolverData(cmd, s_solverRootsMat, s_solverRootsMPB, solverDataCopy);
 
@@ -731,6 +731,22 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.SetKeyword(mat, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
 		}
 
+		public static void InitSolverData(CommandBuffer cmd, ref SolverData solverData, Matrix4x4 rootTransform)
+		{
+			var solverDataCopy = solverData;
+			{
+				solverDataCopy.cbuffer._LocalToWorld = rootTransform;
+				solverDataCopy.cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
+			}
+
+			int numX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE;
+			int numY = 1;
+			int numZ = 1;
+
+			PushSolverData(cmd, s_solverCS, SolverKernels.KInitParticles, solverDataCopy);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KInitParticles, numX, numY, numZ);
+		}
+
 		public static void StepSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in VolumeData volumeData)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
@@ -781,7 +797,6 @@ namespace Unity.DemoTeam.Hair
 
 				PushVolumeData(cmd, s_solverCS, solveKernel, volumeData);
 				PushSolverData(cmd, s_solverCS, solveKernel, solverData);
-
 				cmd.DispatchCompute(s_solverCS, solveKernel, groupCountX, groupCountY, groupCountZ);
 			}
 		}

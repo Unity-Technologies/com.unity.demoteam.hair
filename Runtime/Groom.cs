@@ -89,30 +89,37 @@ namespace Unity.DemoTeam.Hair
 			InitializeContainers();
 		}
 
-		public static Bounds GetRootBounds(MeshFilter rootFilter)
+		public static Bounds GetRootBounds(MeshFilter rootFilter, Space space = Space.World)
 		{
-			var rootBounds = rootFilter.sharedMesh.bounds;
-			var rootTransform = rootFilter.transform;
+			if (space == Space.World)
+			{
+				var rootBounds = rootFilter.sharedMesh.bounds;
+				var rootTransform = rootFilter.transform;
 
-			var localCenter = rootBounds.center;
-			var localExtent = rootBounds.extents;
+				var localCenter = rootBounds.center;
+				var localExtent = rootBounds.extents;
 
-			var worldCenter = rootTransform.TransformPoint(localCenter);
-			var worldExtent = rootTransform.TransformVector(localExtent);
+				var worldCenter = rootTransform.TransformPoint(localCenter);
+				var worldExtent = rootTransform.TransformVector(localExtent);
 
-			worldExtent.x = Mathf.Abs(worldExtent.x);
-			worldExtent.y = Mathf.Abs(worldExtent.y);
-			worldExtent.z = Mathf.Abs(worldExtent.z);
+				worldExtent.x = Mathf.Abs(worldExtent.x);
+				worldExtent.y = Mathf.Abs(worldExtent.y);
+				worldExtent.z = Mathf.Abs(worldExtent.z);
 
-			return new Bounds(worldCenter, 2.0f * worldExtent);
+				return new Bounds(worldCenter, 2.0f * worldExtent);
+			}
+			else
+			{
+				return rootFilter.sharedMesh.bounds;
+			}
 		}
 
-		public Bounds GetSimulationBounds()
+		public Bounds GetSimulationBounds(Space space = Space.World)
 		{
 			Debug.Assert(groomAsset != null);
 			Debug.Assert(groomAsset.strandGroups != null);
 
-			var worldBounds = GetRootBounds(groomContainers[0].rootFilter);
+			var worldBounds = GetRootBounds(groomContainers[0].rootFilter, space);
 			var worldMargin = groomAsset.strandGroups[0].strandLengthMax;
 
 			for (int i = 1; i != groomContainers.Length; i++)
@@ -127,9 +134,9 @@ namespace Unity.DemoTeam.Hair
 			return new Bounds(worldBounds.center, worldBounds.size);
 		}
 
-		public Bounds GetSimulationBoundsSquare()
+		public Bounds GetSimulationBoundsSquare(Space space = Space.World)
 		{
-			var worldBounds = GetSimulationBounds();
+			var worldBounds = GetSimulationBounds(space);
 			var worldExtent = worldBounds.extents;
 
 			return new Bounds(worldBounds.center, Vector3.one * (2.0f * Mathf.Max(worldExtent.x, worldExtent.y, worldExtent.z)));
@@ -137,7 +144,7 @@ namespace Unity.DemoTeam.Hair
 
 		public void DispatchStep(CommandBuffer cmd, float dt)
 		{
-			if (!InitializeRuntimeData())
+			if (!InitializeRuntimeData(cmd))
 				return;
 
 			// apply settings
@@ -179,7 +186,7 @@ namespace Unity.DemoTeam.Hair
 
 		public void DispatchDraw(CommandBuffer cmd, RTHandle color, RTHandle depth, RTHandle movec)
 		{
-			if (!InitializeRuntimeData())
+			if (!InitializeRuntimeData(cmd))
 				return;
 
 			for (int i = 0; i != solverData.Length; i++)
@@ -207,7 +214,13 @@ namespace Unity.DemoTeam.Hair
 					groomContainersChecksum = groomAsset.checksum;
 
 					ReleaseRuntimeData();
-					InitializeRuntimeData();
+
+					var cmd = CommandBufferPool.Get();
+					{
+						InitializeRuntimeData(cmd);
+						Graphics.ExecuteCommandBuffer(cmd);
+						CommandBufferPool.Release(cmd);
+					}
 				}
 			}
 			else
@@ -219,7 +232,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		bool InitializeRuntimeData()
+		bool InitializeRuntimeData(CommandBuffer cmd)
 		{
 			if (groomAsset == null)
 				return false;
@@ -281,12 +294,24 @@ namespace Unity.DemoTeam.Hair
 
 				solverData[i].memoryLayout = strandGroup.memoryLayout;
 
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, 1.0f);
+				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, groomContainers[i].rootFilter.transform.localToWorldMatrix, solverData[i]);
+				{
+					var rootFilter = groomContainers[i].rootFilter;
+					var rootTransformNoScaling = Matrix4x4.TRS(rootFilter.transform.position, rootFilter.transform.rotation, Vector3.one);
+
+					HairSim.InitSolverData(cmd, ref solverData[i], rootTransformNoScaling);
+				}
+
 				// initialize the renderer
 				if (groomContainers[i].lineRendererMPB == null)
 					groomContainers[i].lineRendererMPB = new MaterialPropertyBlock();
 
-				groomContainers[i].lineRendererMPB.SetBuffer(HairSim.UniformIDs._ParticlePosition, solverData[i].particlePosition);
-				groomContainers[i].lineRendererMPB.SetInt("_StrandCount", (int)solverData[i].cbuffer._StrandCount);
+				groomContainers[i].lineRenderer.sharedMaterial.CopyPropertiesFromMaterial(groomAsset.settingsBasic.material);
+				groomContainers[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
+
+				HairSim.PushSolverData(cmd, groomContainers[i].lineRenderer.sharedMaterial, groomContainers[i].lineRendererMPB, solverData[i]);
+
 				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
 			}
 

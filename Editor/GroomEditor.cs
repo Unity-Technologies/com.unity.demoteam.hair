@@ -133,36 +133,39 @@ namespace Unity.DemoTeam.Hair
 			if (groom == null)
 				return;
 
-			var strandSolver = groom.solverSettings.method;
-			var strandMemoryLayout = groom.solverData[0].memoryLayout;
-			var strandParticleCount = groom.solverData[0].cbuffer._StrandParticleCount;
-
-			switch (strandSolver)
+			if (groom.solverData != null && groom.solverData.Length > 0)
 			{
-				case HairSim.SolverSettings.Method.GaussSeidelReference:
-					EditorGUILayout.HelpBox("Performance warning: Using slow reference solver.", MessageType.Warning, wide: true);
-					break;
+				var strandSolver = groom.solverSettings.method;
+				var strandMemoryLayout = groom.solverData[0].memoryLayout;
+				var strandParticleCount = groom.solverData[0].cbuffer._StrandParticleCount;
 
-				case HairSim.SolverSettings.Method.GaussSeidel:
-					if (strandMemoryLayout != GroomAsset.MemoryLayout.Interleaved)
-					{
-						EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'.\nConsider changing memory layout in the asset.", MessageType.Warning, wide: true);
-					}
-					break;
+				switch (strandSolver)
+				{
+					case HairSim.SolverSettings.Method.GaussSeidelReference:
+						EditorGUILayout.HelpBox("Performance warning: Using slow reference solver.", MessageType.Warning, wide: true);
+						break;
 
-				case HairSim.SolverSettings.Method.Jacobi:
-					if (strandParticleCount != 16 &&
-						strandParticleCount != 32 &&
-						strandParticleCount != 64 &&
-						strandParticleCount != 128)
-					{
-						EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64 or 128.\nUsing slow reference solver as fallback. Consider resampling curves in asset.", MessageType.Error, wide: true);
-					}
-					else if (strandMemoryLayout != GroomAsset.MemoryLayout.Sequential)
-					{
-						EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'.\nConsider changing memory layout in the asset.", MessageType.Warning, wide: true);
-					}
-					break;
+					case HairSim.SolverSettings.Method.GaussSeidel:
+						if (strandMemoryLayout != GroomAsset.MemoryLayout.Interleaved)
+						{
+							EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'.\nConsider changing memory layout in the asset.", MessageType.Warning, wide: true);
+						}
+						break;
+
+					case HairSim.SolverSettings.Method.Jacobi:
+						if (strandParticleCount != 16 &&
+							strandParticleCount != 32 &&
+							strandParticleCount != 64 &&
+							strandParticleCount != 128)
+						{
+							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64 or 128.\nUsing slow reference solver as fallback. Consider resampling curves in asset.", MessageType.Error, wide: true);
+						}
+						else if (strandMemoryLayout != GroomAsset.MemoryLayout.Sequential)
+						{
+							EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'.\nConsider changing memory layout in the asset.", MessageType.Warning, wide: true);
+						}
+						break;
+				}
 			}
 
 			EditorGUI.BeginChangeCheck();
