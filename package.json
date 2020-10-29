@@ -6,7 +6,8 @@
   "description": "Strand based hair simulation and rendering.",
   "dependencies": {
     "com.unity.demoteam.attributes": "0.1.1-preview",
-    "com.unity.mathematics": "1.1.0",
-    "com.unity.render-pipelines.high-definition": "9.0.0-preview.33"
+    "com.unity.mathematics": "1.2.1",
+    "com.unity.render-pipelines.high-definition": "10.1.0",
+	"com.unity.formats.alembic": "2.0.1-preview.1"
   }
 }
