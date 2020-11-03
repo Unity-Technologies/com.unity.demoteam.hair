@@ -51,6 +51,8 @@ namespace Unity.DemoTeam.Hair
 		public HairSim.SolverSettings solverSettings = HairSim.SolverSettings.defaults;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
 		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.defaults;
+
+		[NonReorderable]
 		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(HairSim.MAX_BOUNDARIES);
 
 		void OnEnable()
@@ -184,14 +186,14 @@ namespace Unity.DemoTeam.Hair
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 		}
 
-		public void DispatchDraw(CommandBuffer cmd, RTHandle color, RTHandle depth, RTHandle movec)
+		public void DispatchDraw(CommandBuffer cmd, RTHandle color, RTHandle depth)
 		{
 			if (!InitializeRuntimeData(cmd))
 				return;
 
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				HairSim.DrawSolverData(cmd, color, depth, movec, solverData[i], debugSettings);
+				HairSim.DrawSolverData(cmd, color, depth, solverData[i], debugSettings);
 			}
 
 			HairSim.DrawVolumeData(cmd, color, depth, volumeData, debugSettings);

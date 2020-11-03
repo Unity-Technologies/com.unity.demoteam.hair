@@ -1,8 +1,8 @@
 #ifndef __HAIRSIMDEBUGDRAWUTILITY_HLSL__
 #define __HAIRSIMDEBUGDRAWUTILITY_HLSL__
 
-//---------
-// generic
+//----------------
+// colors generic
 
 float3 ColorCycle(uint index, uint count)
 {
@@ -22,8 +22,8 @@ float3 ColorRamp(uint index, uint count)
 	return 1.0 - c * c;
 }
 
-//------------
-// quantities
+//-------------------
+// colors quantities
 
 float3 ColorDensity(float rho)
 {

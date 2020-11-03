@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using UnityEngine;
+using UnityEditor;
 
 public static class HairEditorGUI
 {
@@ -31,6 +32,8 @@ public static class HairEditorGUI
 		EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
 		using (new EditorGUI.IndentLevelScope())
 		{
+			//EditorGUILayout.PropertyField(settings);
+			// settings.isExpanded
 			StructPropertyFields(settings);
 		}
 	}

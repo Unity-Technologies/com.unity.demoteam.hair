@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
@@ -19,26 +18,6 @@ namespace Unity.DemoTeam.Hair
 
 		private int lastSimulationFrame = -1;
 
-		private RTHandle cameraMotionVectorBuffer;
-		private void FindCameraMotionVectorBuffer()
-		{
-			var fieldInfo_m_SharedRTManager = typeof(HDRenderPipeline).GetField("m_SharedRTManager", BindingFlags.NonPublic | BindingFlags.Instance);
-			if (fieldInfo_m_SharedRTManager != null)
-			{
-				//Debug.Log("FindMotionVectorsRT : " + fieldInfo_m_SharedRTManager);
-				var m_SharedRTManager = fieldInfo_m_SharedRTManager.GetValue(RenderPipelineManager.currentPipeline as HDRenderPipeline);
-				if (m_SharedRTManager != null)
-				{
-					var fieldInfo_m_MotionVectorsRT = m_SharedRTManager.GetType().GetField("m_MotionVectorsRT", BindingFlags.NonPublic | BindingFlags.Instance);
-					if (fieldInfo_m_MotionVectorsRT != null)
-					{
-						//Debug.Log("FindMotionVectorsRT : " + fieldInfo_m_MotionVectorsRT);
-						cameraMotionVectorBuffer = fieldInfo_m_MotionVectorsRT.GetValue(m_SharedRTManager) as RTHandle;
-					}
-				}
-			}
-		}
-
 		protected override void Setup(ScriptableRenderContext renderContext, CommandBuffer cmd)
 		{
 			base.Setup(renderContext, cmd);
@@ -54,8 +33,6 @@ namespace Unity.DemoTeam.Hair
 				base.targetColorBuffer = TargetBuffer.None;
 				base.targetDepthBuffer = TargetBuffer.None;
 			}
-
-			FindCameraMotionVectorBuffer();
 		}
 
 		protected override void Execute(CustomPassContext context)
@@ -95,7 +72,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					if (hair != null && hair.isActiveAndEnabled)
 					{
-						hair.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer, cameraMotionVectorBuffer);
+						hair.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);
 					}
 				}
 			}

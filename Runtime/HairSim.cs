@@ -35,6 +35,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public static ProfilerMarker Dummy;
 		}
+
 		static class MarkersGPU
 		{
 			public static ProfilingSampler Solver;
@@ -96,6 +97,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _DebugSliceAxis;
 			public static int _DebugSliceOffset;
 			public static int _DebugSliceDivider;
+			public static int _DebugSliceOpacity;
 		}
 
 		static class SolverKernels
@@ -284,6 +286,7 @@ namespace Unity.DemoTeam.Hair
 			public bool drawParticles;
 			public bool drawStrands;
 			public bool drawDensity;
+			public bool drawGradient;
 			public bool drawSliceX;
 			public bool drawSliceY;
 			public bool drawSliceZ;
@@ -296,7 +299,7 @@ namespace Unity.DemoTeam.Hair
 			public static readonly DebugSettings defaults = new DebugSettings()
 			{
 				drawParticles = false,
-				drawStrands = true,
+				drawStrands = false,
 				drawDensity = false,
 				drawSliceX = false,
 				drawSliceY = false,
@@ -972,7 +975,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void DrawSolverData(CommandBuffer cmd, RTHandle color, RTHandle depth, RTHandle movec, in SolverData solverData, in DebugSettings debugSettings)
+		public static void DrawSolverData(CommandBuffer cmd, RTHandle color, RTHandle depth, in SolverData solverData, in DebugSettings debugSettings)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawSolverData))
 			{
@@ -990,13 +993,10 @@ namespace Unity.DemoTeam.Hair
 					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
 				}
 
-				// solver strands + movecs
+				// solver strands
 				if (debugSettings.drawStrands)
 				{
 					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.LineStrip, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
-
-					CoreUtils.SetRenderTarget(cmd, movec, depth);
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.LineStrip, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
 				}
 			}
 		}
@@ -1006,19 +1006,26 @@ namespace Unity.DemoTeam.Hair
 			using (new ProfilingScope(cmd, MarkersGPU.DrawVolumeData))
 			{
 				if (!debugSettings.drawDensity &&
+					!debugSettings.drawGradient &&
 					!debugSettings.drawSliceX &&
 					!debugSettings.drawSliceY &&
 					!debugSettings.drawSliceZ)
 					return;
 
-				PushVolumeData(cmd, s_debugDrawMat, s_debugDrawMPB, volumeData);
-
 				CoreUtils.SetRenderTarget(cmd, color, depth);
+
+				PushVolumeData(cmd, s_debugDrawMat, s_debugDrawMPB, volumeData);
 
 				// volume density
 				if (debugSettings.drawDensity)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 1, MeshTopology.Points, GetCellCount(volumeData.cbuffer), 1);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 2, MeshTopology.Points, GetCellCount(volumeData.cbuffer), 1, s_debugDrawMPB);
+				}
+
+				// volume gradient
+				if (debugSettings.drawGradient)
+				{
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Lines, 2 * GetCellCount(volumeData.cbuffer), 1, s_debugDrawMPB);
 				}
 
 				// volume slices
@@ -1030,19 +1037,31 @@ namespace Unity.DemoTeam.Hair
 					{
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 0);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetX);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.9f);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 					}
 					if (debugSettings.drawSliceY)
 					{
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 1);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetY);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.9f);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 					}
 					if (debugSettings.drawSliceZ)
 					{
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 2);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetZ);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.9f);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 					}
 				}
 			}
