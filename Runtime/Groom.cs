@@ -18,22 +18,39 @@ namespace Unity.DemoTeam.Hair
 		{
 			public GameObject group;
 
+			public MeshFilter rootFilter;
+			//public SkinAttachment rootAttachment;
+
 			public MeshFilter lineFilter;
 			public MeshRenderer lineRenderer;
 			public MaterialPropertyBlock lineRendererMPB;
-
-			public MeshFilter rootFilter;
-			//public SkinAttachment rootAttachment;
 		}
 
-		[Serializable] public struct SettingsRoots
+		[Serializable]
+		public struct SettingsRoots
 		{
 			public GameObject rootsTarget;
 			public bool rootsAttached;
 		}
-		[Serializable] public struct SettingsRender
+
+		[Serializable]
+		public struct SettingsStrands
 		{
-			public Material material;
+			public enum Renderer
+			{
+				Lines1px,
+			}
+
+			public enum Scaling
+			{
+				NoScaling,
+				LocalUniformScaling,
+			}
+
+			public Scaling strandScaling;
+			public float strandDiameter;
+			public Material strandMaterial;
+			public Renderer strandRenderer;
 		}
 
 		public GroomAsset groomAsset;
@@ -43,10 +60,7 @@ namespace Unity.DemoTeam.Hair
 		public string groomContainersChecksum;
 
 		public SettingsRoots settingsRoots;
-		public SettingsRoots settingsRender;
-
-		public HairSim.SolverData[] solverData;
-		public HairSim.VolumeData volumeData;
+		public SettingsStrands settingsStrands;
 
 		public HairSim.SolverSettings solverSettings = HairSim.SolverSettings.defaults;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
@@ -54,6 +68,9 @@ namespace Unity.DemoTeam.Hair
 
 		[NonReorderable]
 		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(HairSim.MAX_BOUNDARIES);
+
+		public HairSim.SolverData[] solverData;
+		public HairSim.VolumeData volumeData;
 
 		void OnEnable()
 		{
@@ -255,6 +272,27 @@ namespace Unity.DemoTeam.Hair
 			{
 				ref var strandGroup = ref strandGroups[i];
 
+				var rootFilter = groomContainers[i].rootFilter;
+				var rootTransform = rootFilter.transform.localToWorldMatrix;
+
+				var strandTransform = Matrix4x4.TRS(rootFilter.transform.position, rootFilter.transform.rotation, Vector3.one);
+				var strandScale = 1.0f;
+
+				switch (settingsStrands.strandScaling)
+				{
+					case SettingsStrands.Scaling.NoScaling:
+						break;
+
+					case SettingsStrands.Scaling.LocalUniformScaling:
+						{
+							var localScale = rootFilter.transform.localScale;
+							var localScaleMin = Mathf.Min(localScale.x, localScale.y, localScale.z);
+							strandTransform = strandTransform * Matrix4x4.Scale(Vector3.one * localScaleMin);
+							strandScale = localScaleMin;
+						}
+						break;
+				}
+
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 
 				//TODO couple this with a scaling factor
@@ -262,7 +300,7 @@ namespace Unity.DemoTeam.Hair
 
 				solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 				solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
-				solverData[i].cbuffer._StrandParticleInterval = strandParticleInterval;
+				solverData[i].cbuffer._StrandParticleInterval = strandParticleInterval * strandScale;
 
 				int particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 
@@ -297,12 +335,9 @@ namespace Unity.DemoTeam.Hair
 				solverData[i].memoryLayout = strandGroup.memoryLayout;
 
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, 1.0f);
-				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, groomContainers[i].rootFilter.transform.localToWorldMatrix, solverData[i]);
+				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, rootTransform, solverData[i]);
 				{
-					var rootFilter = groomContainers[i].rootFilter;
-					var rootTransformNoScaling = Matrix4x4.TRS(rootFilter.transform.position, rootFilter.transform.rotation, Vector3.one);
-
-					HairSim.InitSolverData(cmd, ref solverData[i], rootTransformNoScaling);
+					HairSim.InitSolverData(cmd, ref solverData[i], strandTransform);
 				}
 
 				// initialize the renderer

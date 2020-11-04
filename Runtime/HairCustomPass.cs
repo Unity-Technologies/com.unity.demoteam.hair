@@ -71,9 +71,7 @@ namespace Unity.DemoTeam.Hair
 				foreach (var hair in Groom.s_instances)
 				{
 					if (hair != null && hair.isActiveAndEnabled)
-					{
 						hair.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);
-					}
 				}
 			}
 		}

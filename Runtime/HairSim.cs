@@ -1038,7 +1038,7 @@ namespace Unity.DemoTeam.Hair
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 0);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetX);
 
-						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.9f);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
@@ -1048,7 +1048,7 @@ namespace Unity.DemoTeam.Hair
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 1);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetY);
 
-						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.9f);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
@@ -1058,7 +1058,7 @@ namespace Unity.DemoTeam.Hair
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 2);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetZ);
 
-						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.9f);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);

@@ -258,7 +258,6 @@
 
 		Pass// 4 == VOLUME SLICE
 		{
-			ZWrite On
 			ZTest LEqual
 			Blend SrcAlpha OneMinusSrcAlpha
 
@@ -272,6 +271,7 @@
 
 		Pass// 5 == VOLUME SLICE (BELOW)
 		{
+			ZWrite Off
 			ZTest Greater
 			Blend SrcAlpha OneMinusSrcAlpha
 

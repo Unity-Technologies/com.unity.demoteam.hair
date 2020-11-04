@@ -19,7 +19,8 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _boundaries;//replace with overlapbox
 
 		SerializedProperty _settingsRoots;
-		SerializedProperty _settingsRender;
+		SerializedProperty _settingsRoots_rootsAttached;
+		SerializedProperty _settingsStrands;
 
 		void OnEnable()
 		{
@@ -27,7 +28,8 @@ namespace Unity.DemoTeam.Hair
 			_groomAssetQuickEdit = serializedObject.FindProperty("groomAssetQuickEdit");
 
 			_settingsRoots = serializedObject.FindProperty("settingsRoots");
-			_settingsRender = serializedObject.FindProperty("settingsRender");
+			_settingsRoots_rootsAttached = _settingsRoots.FindPropertyRelative("rootsAttached");
+			_settingsStrands = serializedObject.FindProperty("settingsStrands");
 
 			_settingsSolver = serializedObject.FindProperty("solverSettings");
 			_settingsVolume = serializedObject.FindProperty("volumeSettings");
@@ -60,7 +62,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField("Strand settings", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 			{
-				DrawStrandGroupsGUI();
+				DrawStrandSettingsGUI();
 			}
 			EditorGUILayout.EndVertical();
 
@@ -110,7 +112,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public void DrawStrandGroupsGUI()
+		public void DrawStrandSettingsGUI()
 		{
 			var groom = target as Groom;
 			if (groom == null)
@@ -119,6 +121,8 @@ namespace Unity.DemoTeam.Hair
 			EditorGUI.BeginChangeCheck();
 			{
 				StructPropertyFieldsWithHeader(_settingsRoots);
+				EditorGUILayout.Space();
+				StructPropertyFieldsWithHeader(_settingsStrands);
 			}
 
 			if (EditorGUI.EndChangeCheck())
@@ -181,6 +185,43 @@ namespace Unity.DemoTeam.Hair
 
 				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsDebug, "Settings Debug");
+				using (new EditorGUI.IndentLevelScope())
+				{
+					var rect = GUILayoutUtility.GetRect(100.0f, 20.0f);
+
+					rect = EditorGUI.IndentedRect(rect);
+
+					var divider = _settingsDebug.FindPropertyRelative("drawSliceDivider").floatValue;
+					var dividerBase = Mathf.Floor(divider);
+					var dividerFrac = divider - Mathf.Floor(divider);
+
+					var rect0 = new Rect(rect);
+					var rect1 = new Rect(rect);
+
+					rect0.width = (rect.width) * (1.0f - dividerFrac);
+					rect1.width = (rect.width) * dividerFrac;
+					rect1.x += rect0.width;
+
+					string DividerLabel(int index)
+					{
+						switch (index)
+						{
+							case 0: return "density";
+							case 1: return "velocity";
+							case 2: return "divergence";
+							case 3: return "pressure";
+							case 4: return "grad(pressure)";
+						}
+						return "unknown";
+					}
+
+					EditorGUILayout.BeginHorizontal();
+					{
+						GUI.Box(rect0, DividerLabel((int)dividerBase + 0), EditorStyles.helpBox);
+						GUI.Box(rect1, DividerLabel((int)dividerBase + 1), EditorStyles.helpBox);
+					}
+					EditorGUILayout.EndHorizontal();
+				}
 			}
 
 			if (EditorGUI.EndChangeCheck())
