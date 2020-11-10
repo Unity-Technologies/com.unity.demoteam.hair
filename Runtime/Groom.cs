@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -38,19 +39,18 @@ namespace Unity.DemoTeam.Hair
 		{
 			public enum Renderer
 			{
-				Lines1px,
+				PrimitiveLines,
 			}
 
 			public enum Scaling
 			{
-				NoScaling,
-				LocalUniformScaling,
+				PreserveScale,
+				ApplyUniformScale,
 			}
 
-			public Scaling strandScaling;
-			public float strandDiameter;
-			public Material strandMaterial;
 			public Renderer strandRenderer;
+			public Scaling strandScaling;
+			public bool simulate;
 		}
 
 		public GroomAsset groomAsset;
@@ -88,7 +88,7 @@ namespace Unity.DemoTeam.Hair
 
 		void OnValidate()
 		{
-			volumeSettings.volumeResolution = (Mathf.Max(8, volumeSettings.volumeResolution) / 8) * 8;
+			volumeSettings.volumeGridResolution = (Mathf.Max(8, volumeSettings.volumeGridResolution) / 8) * 8;
 
 			if (boundaries.Count > HairSim.MAX_BOUNDARIES)
 			{
@@ -108,37 +108,30 @@ namespace Unity.DemoTeam.Hair
 			InitializeContainers();
 		}
 
-		public static Bounds GetRootBounds(MeshFilter rootFilter, Space space = Space.World)
+		public static Bounds GetRootBounds(MeshFilter rootFilter)
 		{
-			if (space == Space.World)
-			{
-				var rootBounds = rootFilter.sharedMesh.bounds;
-				var rootTransform = rootFilter.transform;
+			var rootBounds = rootFilter.sharedMesh.bounds;
+			var rootTransform = rootFilter.transform;
 
-				var localCenter = rootBounds.center;
-				var localExtent = rootBounds.extents;
+			var localCenter = rootBounds.center;
+			var localExtent = rootBounds.extents;
 
-				var worldCenter = rootTransform.TransformPoint(localCenter);
-				var worldExtent = rootTransform.TransformVector(localExtent);
+			var worldCenter = rootTransform.TransformPoint(localCenter);
+			var worldExtent = rootTransform.TransformVector(localExtent);
 
-				worldExtent.x = Mathf.Abs(worldExtent.x);
-				worldExtent.y = Mathf.Abs(worldExtent.y);
-				worldExtent.z = Mathf.Abs(worldExtent.z);
+			worldExtent.x = Mathf.Abs(worldExtent.x);
+			worldExtent.y = Mathf.Abs(worldExtent.y);
+			worldExtent.z = Mathf.Abs(worldExtent.z);
 
-				return new Bounds(worldCenter, 2.0f * worldExtent);
-			}
-			else
-			{
-				return rootFilter.sharedMesh.bounds;
-			}
+			return new Bounds(worldCenter, 2.0f * worldExtent);
 		}
 
-		public Bounds GetSimulationBounds(Space space = Space.World)
+		public Bounds GetSimulationBounds()
 		{
 			Debug.Assert(groomAsset != null);
 			Debug.Assert(groomAsset.strandGroups != null);
 
-			var worldBounds = GetRootBounds(groomContainers[0].rootFilter, space);
+			var worldBounds = GetRootBounds(groomContainers[0].rootFilter);
 			var worldMargin = groomAsset.strandGroups[0].strandLengthMax;
 
 			for (int i = 1; i != groomContainers.Length; i++)
@@ -153,12 +146,25 @@ namespace Unity.DemoTeam.Hair
 			return new Bounds(worldBounds.center, worldBounds.size);
 		}
 
-		public Bounds GetSimulationBoundsSquare(Space space = Space.World)
+		public Bounds GetSimulationBoundsSquare()
 		{
-			var worldBounds = GetSimulationBounds(space);
+			var worldBounds = GetSimulationBounds();
 			var worldExtent = worldBounds.extents;
 
 			return new Bounds(worldBounds.center, Vector3.one * (2.0f * Mathf.Max(worldExtent.x, worldExtent.y, worldExtent.z)));
+		}
+
+		public float GetSimulationStrandScale()
+		{
+			switch (settingsStrands.strandScaling)
+			{
+				default:
+				case SettingsStrands.Scaling.PreserveScale:
+					return 1.0f;
+
+				case SettingsStrands.Scaling.ApplyUniformScale:
+					return math.cmin(this.transform.localScale);
+			}
 		}
 
 		public void DispatchStep(CommandBuffer cmd, float dt)
@@ -167,24 +173,24 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			// apply settings
+			var strandScale = GetSimulationStrandScale();
+			var volumeBounds = GetSimulationBoundsSquare();
+
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, dt);
 				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, groomContainers[i].rootFilter.transform.localToWorldMatrix, solverData[i]);
 			}
 
-			var volumeBounds = GetSimulationBoundsSquare();
-			{
-				volumeSettings.volumeWorldCenter = volumeBounds.center;
-				volumeSettings.volumeWorldExtent = volumeBounds.extents;
-			}
+			volumeSettings.volumeWorldCenter = volumeBounds.center;
+			volumeSettings.volumeWorldExtent = volumeBounds.extents;
 
 			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, boundaries);
-			//TODO this needs to happen after stepping solver
+			//TODO ^^ this needs to happen after stepping solver
 			//TODO split boundary data update from volume data update
 
 			// pre-step volume if resolution changed
-			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, halfPrecision: false))
+			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
 			{
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
@@ -275,23 +281,8 @@ namespace Unity.DemoTeam.Hair
 				var rootFilter = groomContainers[i].rootFilter;
 				var rootTransform = rootFilter.transform.localToWorldMatrix;
 
-				var strandTransform = Matrix4x4.TRS(rootFilter.transform.position, rootFilter.transform.rotation, Vector3.one);
-				var strandScale = 1.0f;
-
-				switch (settingsStrands.strandScaling)
-				{
-					case SettingsStrands.Scaling.NoScaling:
-						break;
-
-					case SettingsStrands.Scaling.LocalUniformScaling:
-						{
-							var localScale = rootFilter.transform.localScale;
-							var localScaleMin = Mathf.Min(localScale.x, localScale.y, localScale.z);
-							strandTransform = strandTransform * Matrix4x4.Scale(Vector3.one * localScaleMin);
-							strandScale = localScaleMin;
-						}
-						break;
-				}
+				var strandScale = GetSimulationStrandScale();
+				var strandTransform = Matrix4x4.TRS(rootFilter.transform.position, rootFilter.transform.rotation, Vector3.one * strandScale);
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 
@@ -337,7 +328,7 @@ namespace Unity.DemoTeam.Hair
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, 1.0f);
 				HairSim.UpdateSolverRoots(cmd, groomContainers[i].rootFilter.sharedMesh, rootTransform, solverData[i]);
 				{
-					HairSim.InitSolverData(cmd, ref solverData[i], strandTransform);
+					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);
 				}
 
 				// initialize the renderer
@@ -352,7 +343,7 @@ namespace Unity.DemoTeam.Hair
 				groomContainers[i].lineRenderer.SetPropertyBlock(groomContainers[i].lineRendererMPB);
 			}
 
-			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeResolution, halfPrecision: false);
+			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false);
 
 			return true;
 		}

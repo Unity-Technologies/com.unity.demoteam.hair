@@ -9,7 +9,7 @@ namespace Unity.DemoTeam.Hair
 	{
 		public struct SolverData
 		{
-			public SolverParams cbuffer;
+			public SolverCBuffer cbuffer;
 
 			public ComputeBuffer length;
 			public ComputeBuffer rootPosition;
@@ -28,7 +28,7 @@ namespace Unity.DemoTeam.Hair
 
 		public struct VolumeData
 		{
-			public VolumeParams cbuffer;
+			public VolumeCBuffer cbuffer;
 
 			public RenderTexture accuDensity;
 			public RenderTexture accuVelocityX;
@@ -55,7 +55,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
-		public struct SolverParams
+		public struct SolverCBuffer
 		{
 			public Matrix4x4 _LocalToWorld;
 			public Matrix4x4 _LocalToWorldInvT;
@@ -82,7 +82,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
-		public struct VolumeParams
+		public struct VolumeCBuffer
 		{
 			public Vector3 _VolumeCells;
 			public uint __pad1;
@@ -107,8 +107,7 @@ namespace Unity.DemoTeam.Hair
 				_VolumeWorldMax = Q
 			*/
 
-			public float _PressureFromVelocity;
-			public float _PressureFromDensity;
+			public float _TargetDensityFactor;
 
 			public int _BoundaryCapsuleCount;
 			public int _BoundarySphereCount;

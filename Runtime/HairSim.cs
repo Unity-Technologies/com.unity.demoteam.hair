@@ -56,11 +56,10 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler DrawVolumeData;
 		}
 
-		//TODO remove public
-		public static class UniformIDs
+		static class UniformIDs
 		{
 			// solver
-			public static int SolverParams;
+			public static int SolverCBuffer;
 
 			public static int _Length;
 			public static int _RootPosition;
@@ -73,7 +72,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _ParticleVelocityPrev;
 
 			// volume
-			public static int VolumeParams;
+			public static int VolumeCBuffer;
 
 			public static int _AccuDensity;
 			public static int _AccuVelocityX;
@@ -169,14 +168,17 @@ namespace Unity.DemoTeam.Hair
 			public enum Compare
 			{
 				Equals,
-				LessThan,
-				GreaterThan,
+				EqualsOrLessThan,
+				EqualsOrGreaterThan,
 			}
 
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
 			[Range(0.0f, 9.0f)]
 			public float strandParticleContrib;// TODO move elsewhere
+
+			[Space]
+
 
 			[Space]
 
@@ -190,14 +192,14 @@ namespace Unity.DemoTeam.Hair
 
 			[Space]
 
-			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity")]
-			public float gravity;
-			[Range(0.0f, 1.0f), Tooltip("Damping factor")]
-			public float damping;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
-			public float volumeResponse;
+			public float cellPressure;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (0 == FLIP, 1 == PIC)")]
-			public float volumeFriction;
+			public float cellVelocity;
+			[Range(0.0f, 1.0f), Tooltip("Velocity damping factor")]
+			public float damping;
+			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
+			public float gravity;
 
 			[Space]
 
@@ -230,10 +232,10 @@ namespace Unity.DemoTeam.Hair
 				stiffness = 1.0f,
 				kSOR = 1.0f,
 
-				gravity = 1.0f,
+				cellPressure = 1.0f,
+				cellVelocity = 0.05f,
 				damping = 0.0f,
-				volumeResponse = 1.0f,
-				volumeFriction = 0.05f,
+				gravity = 1.0f,
 
 				distance = true,
 				distanceLRA = true,
@@ -242,13 +244,13 @@ namespace Unity.DemoTeam.Hair
 				boundary = true,
 				boundaryFriction = 0.5f,
 				curvature = false,
-				curvatureCompare = Compare.LessThan,
+				curvatureCompare = Compare.EqualsOrLessThan,
 				curvatureCompareTo = 0.1f,
 			};
 		}
 		[Serializable] public struct VolumeSettings
 		{
-			public enum Method : uint
+			public enum SplatMethod
 			{
 				None,
 				Compute,
@@ -257,28 +259,49 @@ namespace Unity.DemoTeam.Hair
 				RasterizationNoGS,
 			}
 
-			[Range(8, 160)]
-			public int volumeResolution;
-			public Method volumeSplatMethod;
-			[Range(0, 100)]
-			public int pressureIterations;
-			[Range(0.0f, 1.0f)]
-			public float weighIncompressibleFlow;
-			[Range(0.0f, 1.0f)]
-			public float weighTargetDensity;
-			public bool supportContraction;
+			//public enum PressureMode
+			//{
+			//	Repulsion,
+			//	RepulsionAndAttraction,
+			//}
+
+			public enum TargetDensity
+			{
+				Uniform,
+				//InitialPose,
+				//InitialPoseInParticles,
+			}
 
 			[HideInInspector] public Vector3 volumeWorldCenter;
 			[HideInInspector] public Vector3 volumeWorldExtent;
 
+			public SplatMethod volumeSplatMethod;
+			[Range(8, 160)]
+			public int volumeGridResolution;
+
+			[Space]
+
+			[Range(0, 100)]
+			public int pressureIterations;
+			[Tooltip("Enable this to support attraction of strands")]
+			public bool pressureAllowsAttraction;
+			public TargetDensity targetDensity;
+			[Range(0.0f, 2.0f)]
+			public float targetDensityFactor;
+
+			[Space]
+
+			public bool boundariesFromPhysics;
+
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
-				volumeResolution = 48,
-				volumeSplatMethod = Method.Compute,
+				volumeGridResolution = 48,
+				volumeSplatMethod = SplatMethod.Compute,
 				pressureIterations = 10,
-				weighIncompressibleFlow = 1.0f,
-				weighTargetDensity = 1.0f,
-				supportContraction = true,
+				pressureAllowsAttraction = true,
+				targetDensity = TargetDensity.Uniform,
+				targetDensityFactor = 1.0f,
+				boundariesFromPhysics = false,
 			};
 		}
 		[Serializable] public struct DebugSettings
@@ -501,12 +524,12 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._DT = dt;
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
+			cbuffer._Damping = solverSettings.damping;
 			cbuffer._Relaxation = solverSettings.kSOR;
 
-			cbuffer._Damping = solverSettings.damping;
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
-			cbuffer._VolumePressureScale = solverSettings.volumeResponse;
-			cbuffer._VolumeFrictionScale = solverSettings.volumeFriction;
+			cbuffer._VolumePressureScale = solverSettings.cellPressure;
+			cbuffer._VolumeFrictionScale = solverSettings.cellVelocity;
 
 			cbuffer._BoundaryFriction = solverSettings.boundaryFriction;
 			cbuffer._BendingCurvature = solverSettings.curvatureCompareTo * 0.5f * cbuffer._StrandParticleInterval;
@@ -520,8 +543,8 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_BOUNDARY = (solverSettings.boundary && solverSettings.boundaryFriction == 0.0f);
 			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundary && solverSettings.boundaryFriction != 0.0f);
 			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.Equals);
-			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.GreaterThan);
-			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan);
+			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.EqualsOrGreaterThan);
+			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.EqualsOrLessThan);
 		}
 
 		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, List<HairSimBoundary> boundaries)
@@ -530,12 +553,11 @@ namespace Unity.DemoTeam.Hair
 			ref var keywords = ref volumeData.keywords;
 
 			// update volume parameters
-			cbuffer._VolumeCells = volumeSettings.volumeResolution * Vector3.one;
+			cbuffer._VolumeCells = volumeSettings.volumeGridResolution * Vector3.one;
 			cbuffer._VolumeWorldMin = volumeSettings.volumeWorldCenter - volumeSettings.volumeWorldExtent;
 			cbuffer._VolumeWorldMax = volumeSettings.volumeWorldCenter + volumeSettings.volumeWorldExtent;
 
-			cbuffer._PressureFromVelocity = volumeSettings.weighIncompressibleFlow;
-			cbuffer._PressureFromDensity = volumeSettings.weighTargetDensity;
+			cbuffer._TargetDensityFactor = volumeSettings.targetDensityFactor;
 
 			// update boundary shapes
 			cbuffer._BoundaryCapsuleCount = 0;
@@ -631,12 +653,12 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// update keywords
-			keywords.VOLUME_SUPPORT_CONTRACTION = volumeSettings.supportContraction;
+			keywords.VOLUME_SUPPORT_CONTRACTION = volumeSettings.pressureAllowsAttraction;
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData)
 		{
-			ConstantBuffer.Push(cmd, solverData.cbuffer, cs, UniformIDs.SolverParams);
+			ConstantBuffer.Push(cmd, solverData.cbuffer, cs, UniformIDs.SolverCBuffer);
 
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._Length, solverData.length);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, solverData.rootPosition);
@@ -661,7 +683,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData)
 		{
-			ConstantBuffer.Push(cmd, solverData.cbuffer, mat, UniformIDs.SolverParams);
+			ConstantBuffer.Push(cmd, solverData.cbuffer, mat, UniformIDs.SolverCBuffer);
 
 			mpb.SetBuffer(UniformIDs._Length, solverData.length);
 			mpb.SetBuffer(UniformIDs._RootPosition, solverData.rootPosition);
@@ -686,7 +708,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData)
 		{
-			ConstantBuffer.Push(cmd, volumeData.cbuffer, cs, UniformIDs.VolumeParams);
+			ConstantBuffer.Push(cmd, volumeData.cbuffer, cs, UniformIDs.VolumeCBuffer);
 
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryPack, volumeData.boundaryPack);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
@@ -711,7 +733,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData)
 		{
-			ConstantBuffer.Push(cmd, volumeData.cbuffer, mat, UniformIDs.VolumeParams);
+			ConstantBuffer.Push(cmd, volumeData.cbuffer, mat, UniformIDs.VolumeCBuffer);
 
 			mpb.SetBuffer(UniformIDs._BoundaryPack, volumeData.boundaryPack);
 			mpb.SetBuffer(UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
@@ -734,7 +756,7 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.SetKeyword(mat, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
 		}
 
-		public static void InitSolverData(CommandBuffer cmd, ref SolverData solverData, Matrix4x4 rootTransform)
+		public static void InitSolverParticles(CommandBuffer cmd, in SolverData solverData, Matrix4x4 rootTransform)
 		{
 			var solverDataCopy = solverData;
 			{
@@ -821,9 +843,9 @@ namespace Unity.DemoTeam.Hair
 
 		private static void StepVolumeData_Clear(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings)
 		{
-			int numX = volumeSettings.volumeResolution / 8;
-			int numY = volumeSettings.volumeResolution / 8;
-			int numZ = volumeSettings.volumeResolution;
+			int numX = volumeSettings.volumeGridResolution / 8;
+			int numY = volumeSettings.volumeGridResolution / 8;
+			int numZ = volumeSettings.volumeGridResolution;
 
 			// clear
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
@@ -844,7 +866,7 @@ namespace Unity.DemoTeam.Hair
 			// accumulate
 			switch (volumeSettings.volumeSplatMethod)
 			{
-				case VolumeSettings.Method.Compute:
+				case VolumeSettings.SplatMethod.Compute:
 					{
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat))
 						{
@@ -855,7 +877,7 @@ namespace Unity.DemoTeam.Hair
 					}
 					break;
 
-				case VolumeSettings.Method.ComputeSplit:
+				case VolumeSettings.SplatMethod.ComputeSplit:
 					{
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatDensity))
 						{
@@ -881,7 +903,7 @@ namespace Unity.DemoTeam.Hair
 					}
 					break;
 
-				case VolumeSettings.Method.Rasterization:
+				case VolumeSettings.SplatMethod.Rasterization:
 					{
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterization))
 						{
@@ -893,7 +915,7 @@ namespace Unity.DemoTeam.Hair
 					}
 					break;
 
-				case VolumeSettings.Method.RasterizationNoGS:
+				case VolumeSettings.SplatMethod.RasterizationNoGS:
 					{
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterizationNoGS))
 						{
@@ -909,15 +931,15 @@ namespace Unity.DemoTeam.Hair
 
 		private static void StepVolumeData_Resolve(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings)
 		{
-			int numX = volumeSettings.volumeResolution / 8;
-			int numY = volumeSettings.volumeResolution / 8;
-			int numZ = volumeSettings.volumeResolution;
+			int numX = volumeSettings.volumeGridResolution / 8;
+			int numY = volumeSettings.volumeGridResolution / 8;
+			int numZ = volumeSettings.volumeGridResolution;
 
 			// resolve accumulated
 			switch (volumeSettings.volumeSplatMethod)
 			{
-				case VolumeSettings.Method.Compute:
-				case VolumeSettings.Method.ComputeSplit:
+				case VolumeSettings.SplatMethod.Compute:
+				case VolumeSettings.SplatMethod.ComputeSplit:
 					{
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_2_Resolve))
 						{
@@ -927,8 +949,8 @@ namespace Unity.DemoTeam.Hair
 					}
 					break;
 
-				case VolumeSettings.Method.Rasterization:
-				case VolumeSettings.Method.RasterizationNoGS:
+				case VolumeSettings.SplatMethod.Rasterization:
+				case VolumeSettings.SplatMethod.RasterizationNoGS:
 					{
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_2_ResolveFromRasterization))
 						{
@@ -1070,7 +1092,7 @@ namespace Unity.DemoTeam.Hair
 		//TODO move elsewhere
 		//maybe 'HairSimDataUtility' ?
 
-		public static Vector3 GetCellSize(in VolumeParams volumeParams)
+		public static Vector3 GetCellSize(in VolumeCBuffer volumeParams)
 		{
 			var cellSize = new Vector3(
 				(volumeParams._VolumeWorldMax.x - volumeParams._VolumeWorldMin.x) / volumeParams._VolumeCells.x,
@@ -1079,23 +1101,23 @@ namespace Unity.DemoTeam.Hair
 			return cellSize;
 		}
 
-		public static float GetCellVolume(in VolumeParams volumeParams)
+		public static float GetCellVolume(in VolumeCBuffer volumeParams)
 		{
 			var cellSize = GetCellSize(volumeParams);
 			return cellSize.x * cellSize.y * cellSize.z;
 		}
 
-		public static int GetCellCount(in VolumeParams volumeParams)
+		public static int GetCellCount(in VolumeCBuffer volumeParams)
 		{
 			return (int)volumeParams._VolumeCells.x * (int)volumeParams._VolumeCells.y * (int)volumeParams._VolumeCells.z;
 		}
 
-		public static Vector3 GetVolumeCenter(in VolumeParams volumeParams)
+		public static Vector3 GetVolumeCenter(in VolumeCBuffer volumeParams)
 		{
 			return (volumeParams._VolumeWorldMax + volumeParams._VolumeWorldMin) * 0.5f;
 		}
 
-		public static Vector3 GetVolumeExtent(in VolumeParams volumeParams)
+		public static Vector3 GetVolumeExtent(in VolumeCBuffer volumeParams)
 		{
 			return (volumeParams._VolumeWorldMax - volumeParams._VolumeWorldMin) * 0.5f;
 		}

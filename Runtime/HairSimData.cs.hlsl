@@ -4,9 +4,9 @@
 
 #ifndef HAIRSIMDATA_CS_HLSL
 #define HAIRSIMDATA_CS_HLSL
-// Generated from Unity.DemoTeam.Hair.HairSim+SolverParams
+// Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer
 // PackingRules = Exact
-CBUFFER_START(SolverParams)
+CBUFFER_START(SolverCBuffer)
     float4x4 _LocalToWorld;
     float4x4 _LocalToWorldInvT;
     uint _StrandCount;
@@ -27,17 +27,16 @@ CBUFFER_START(SolverParams)
     float _BendingCurvature;
 CBUFFER_END
 
-// Generated from Unity.DemoTeam.Hair.HairSim+VolumeParams
+// Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer
 // PackingRules = Exact
-CBUFFER_START(VolumeParams)
+CBUFFER_START(VolumeCBuffer)
     float3 _VolumeCells;
     uint __pad1;
     float3 _VolumeWorldMin;
     uint __pad2;
     float3 _VolumeWorldMax;
     uint __pad3;
-    float _PressureFromVelocity;
-    float _PressureFromDensity;
+    float _TargetDensityFactor;
     int _BoundaryCapsuleCount;
     int _BoundarySphereCount;
     int _BoundaryTorusCount;
