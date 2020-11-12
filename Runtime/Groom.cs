@@ -5,11 +5,201 @@ using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using Unity.DemoTeam.Attributes;
+#if UNITY_EDITOR
+using UnityEditor;
+using System.Reflection;
+#endif
 
 namespace Unity.DemoTeam.Hair
 {
-	[ExecuteAlways]
-	[SelectionBase]
+	public class LineHeaderAttribute : PropertyAttribute { }
+
+	[CustomPropertyDrawer(typeof(LineHeaderAttribute))]
+	public class LineHeaderAttributeDrawer : DecoratorDrawer
+	{
+		public override float GetHeight() => 6.0f;
+		public override void OnGUI(Rect position)
+		{
+			position.yMin += 3.0f;
+			position.yMax -= 2.0f;
+			EditorGUI.LabelField(position, "", GUI.skin.button);
+		}
+	}
+
+	public class ToggleGroupItemAttribute : PropertyAttribute
+	{
+		public bool withLabel;
+		public ToggleGroupItemAttribute(bool withLabel = false)
+		{
+			this.withLabel = withLabel;
+		}
+	}
+
+	public class ToggleGroupAttribute : PropertyAttribute { }
+
+#if UNITY_EDITOR
+	[CustomPropertyDrawer(typeof(ToggleGroupItemAttribute))]
+	public class ToggleGroupItemAttributeDrawer : PropertyDrawer
+	{
+		public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => -EditorGUIUtility.standardVerticalSpacing;
+		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) { }
+	}
+
+	[CustomPropertyDrawer(typeof(ToggleGroupAttribute))]
+	public class ToggleGroupAttributeDrawer : PropertyDrawer
+	{
+		public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => -EditorGUIUtility.standardVerticalSpacing;
+		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		{
+			EditorGUI.BeginProperty(position, label, property);
+			EditorGUILayout.BeginHorizontal();
+
+			if (TryGetTooltipAttribute(fieldInfo, out var tooltip))
+			{
+				label.tooltip = tooltip;
+			}
+
+			property.boolValue = EditorGUILayout.Toggle(label, property.boolValue);
+
+			using (new EditorGUI.DisabledGroupScope(!property.boolValue))
+			{
+				while (property.Next(false))
+				{
+					var target = property.serializedObject.targetObject;
+					if (target == null)
+						continue;
+
+					var field = GetFieldByPropertyPath(target.GetType(), property.propertyPath);
+					if (field == null)
+						continue;
+
+					var groupItem = field.GetCustomAttribute<ToggleGroupItemAttribute>();
+					if (groupItem == null)
+						break;
+
+					if (groupItem.withLabel)
+					{
+						var fieldLabelText = property.displayName;
+						if (fieldLabelText.StartsWith(label.text))
+							fieldLabelText = fieldLabelText.Substring(label.text.Length);
+
+						TryGetTooltipAttribute(field, out var fieldLabelTooltip);
+
+						var fieldLabel = new GUIContent(fieldLabelText, fieldLabelTooltip);
+						var fieldLabelPad = 18.0f;// ...
+						var fieldLabelWidth = EditorStyles.label.CalcSize(fieldLabel).x + fieldLabelPad;
+
+						EditorGUILayout.LabelField(fieldLabel, GUILayout.Width(fieldLabelWidth));
+					}
+
+					switch (property.propertyType)
+					{
+						case SerializedPropertyType.Enum:
+							{
+								var enumValue = (Enum)Enum.GetValues(field.FieldType).GetValue(property.enumValueIndex);
+								var enumValueSelected = EditorGUILayout.EnumPopup(enumValue);
+								property.enumValueIndex = Convert.ToInt32(enumValueSelected);
+							}
+							break;
+
+						case SerializedPropertyType.Float:
+							{
+								if (TryGetRangeAttribute(field, out var min, out var max))
+									property.floatValue = EditorGUILayout.Slider(property.floatValue, min, max);
+								else
+									property.floatValue = EditorGUILayout.FloatField(property.floatValue);
+							}
+							break;
+
+						case SerializedPropertyType.Integer:
+							{
+								if (TryGetRangeAttribute(field, out var min, out var max))
+									property.intValue = EditorGUILayout.IntSlider(property.intValue, (int)min, (int)max);
+								else
+									property.intValue = EditorGUILayout.IntField(property.intValue);
+							}
+							break;
+
+						case SerializedPropertyType.Boolean:
+							{
+								property.boolValue = EditorGUILayout.ToggleLeft(property.displayName, property.boolValue);
+							}
+							break;
+					}
+
+					if (!groupItem.withLabel)
+					{
+						if (TryGetTooltipAttribute(field, out var fieldTooltip))
+						{
+							GUI.Label(GUILayoutUtility.GetLastRect(), new GUIContent(string.Empty, fieldTooltip));
+						}
+					}
+				}
+			}
+
+			EditorGUILayout.EndHorizontal();
+			EditorGUI.EndProperty();
+		}
+
+		static FieldInfo GetFieldByPropertyPath(Type type, string path)
+		{
+			var start = 0;
+			var delim = path.IndexOf('.', start);
+
+			while (delim != -1)
+			{
+				var field = type.GetField(path.Substring(start, delim - start));
+				if (field != null)
+				{
+					type = field.FieldType;
+					start = delim + 1;
+					delim = path.IndexOf('.', start);
+				}
+				else
+				{
+					return null;
+				}
+			}
+
+			return type.GetField(path.Substring(start));
+		}
+
+		static bool TryGetRangeAttribute(FieldInfo field, out float min, out float max)
+		{
+			var a = field.GetCustomAttribute<RangeAttribute>();
+			if (a != null)
+			{
+				min = a.min;
+				max = a.max;
+				return true;
+			}
+			else
+			{
+				min = 0.0f;
+				max = 0.0f;
+				return false;
+			}
+		}
+
+		static bool TryGetTooltipAttribute(FieldInfo field, out string tooltip)
+		{
+			var a = field.GetCustomAttribute<TooltipAttribute>();
+			if (a != null)
+			{
+				tooltip = a.tooltip;
+				return true;
+			}
+			else
+			{
+				tooltip = string.Empty;
+				return false;
+			}
+		}
+	}
+#endif
+
+	[ExecuteAlways, SelectionBase]
 	public class Groom : MonoBehaviour
 	{
 		public static HashSet<Groom> s_instances = new HashSet<Groom>();
@@ -40,17 +230,20 @@ namespace Unity.DemoTeam.Hair
 			public enum Renderer
 			{
 				PrimitiveLines,
+				VFXGraph,
 			}
 
-			public enum Scaling
+			public enum Scale
 			{
-				PreserveScale,
-				ApplyUniformScale,
+				Fixed,
+				UniformFromHierarchy,
 			}
 
+			public Scale strandScale;
 			public Renderer strandRenderer;
-			public Scaling strandScaling;
-			public bool simulate;
+			[VisibleIf(nameof(strandRenderer), Renderer.VFXGraph)]
+			public GameObject strandOutputGraph;
+			public Material strandMaterial;
 		}
 
 		public GroomAsset groomAsset;
@@ -65,7 +258,6 @@ namespace Unity.DemoTeam.Hair
 		public HairSim.SolverSettings solverSettings = HairSim.SolverSettings.defaults;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
 		public HairSim.DebugSettings debugSettings = HairSim.DebugSettings.defaults;
-
 		[NonReorderable]
 		public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(HairSim.MAX_BOUNDARIES);
 
@@ -131,13 +323,14 @@ namespace Unity.DemoTeam.Hair
 			Debug.Assert(groomAsset != null);
 			Debug.Assert(groomAsset.strandGroups != null);
 
+			var scaleFactor = GetSimulationStrandScale();
 			var worldBounds = GetRootBounds(groomContainers[0].rootFilter);
-			var worldMargin = groomAsset.strandGroups[0].strandLengthMax;
+			var worldMargin = groomAsset.strandGroups[0].strandLengthMax * scaleFactor;
 
 			for (int i = 1; i != groomContainers.Length; i++)
 			{
 				worldBounds.Encapsulate(GetRootBounds(groomContainers[i].rootFilter));
-				worldMargin = Mathf.Max(groomAsset.strandGroups[i].strandLengthMax, worldMargin);
+				worldMargin = Mathf.Max(groomAsset.strandGroups[i].strandLengthMax * scaleFactor, worldMargin);
 			}
 
 			worldMargin *= 1.5f;
@@ -156,14 +349,14 @@ namespace Unity.DemoTeam.Hair
 
 		public float GetSimulationStrandScale()
 		{
-			switch (settingsStrands.strandScaling)
+			switch (settingsStrands.strandScale)
 			{
 				default:
-				case SettingsStrands.Scaling.PreserveScale:
+				case SettingsStrands.Scale.Fixed:
 					return 1.0f;
 
-				case SettingsStrands.Scaling.ApplyUniformScale:
-					return math.cmin(this.transform.localScale);
+				case SettingsStrands.Scale.UniformFromHierarchy:
+					return math.cmin(this.transform.lossyScale);
 			}
 		}
 

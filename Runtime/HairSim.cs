@@ -8,7 +8,6 @@ using UnityEngine.Experimental.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
-using Unity.DemoTeam.Attributes;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -142,20 +141,6 @@ namespace Unity.DemoTeam.Hair
 			public T VOLUME_SUPPORT_CONTRACTION;
 		}
 
-		//TODO split these from SolverSettings?
-		//[Serializable] public struct StrandSettings
-		//{
-		//	[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
-		//	public float strandDiameter;
-		//	[Range(0.0f, 9.0f)]
-		//	public float strandParticleContrib;
-		//	public static readonly StrandSettings defaults = new StrandSettings()
-		//	{
-		//		strandDiameter = 1.0f,
-		//		strandParticleContrib = 1.0f,
-		//	};
-		//}
-
 		[Serializable] public struct SolverSettings
 		{
 			public enum Method
@@ -168,8 +153,8 @@ namespace Unity.DemoTeam.Hair
 			public enum Compare
 			{
 				Equals,
-				EqualsOrLessThan,
-				EqualsOrGreaterThan,
+				LessThan,
+				GreaterThan,
 			}
 
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
@@ -177,20 +162,18 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 9.0f)]
 			public float strandParticleContrib;// TODO move elsewhere
 
-			[Space]
+			[LineHeader]
 
-
-			[Space]
-
+			[Tooltip("Constraint solver")]
 			public Method method;
-			[Range(1, 100)]
+			[Range(1, 100), Tooltip("Constraint iterations")]
 			public int iterations;
-			[Range(0.0f, 1.0f)]
+			[Range(0.0f, 1.0f), Tooltip("Constraint stiffness")]
 			public float stiffness;
-			[Range(1.0f, 2.0f)]
+			[Range(1.0f, 2.0f), Tooltip("Successive-over-relaxation factor")]
 			public float kSOR;
 
-			[Space]
+			[LineHeader]
 
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
 			public float cellPressure;
@@ -201,26 +184,28 @@ namespace Unity.DemoTeam.Hair
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
 
-			[Space]
+			[LineHeader]
 
-			[Tooltip("Particle-particle distance constraint")]
+			[Tooltip("Enable particle-particle distance constraint")]
 			public bool distance;
-			[Tooltip("Maximum particle-root distance constraint")]
+			[Tooltip("Enable max root-particle distance constraint")]
 			public bool distanceLRA;
-			[Tooltip("Follow the leader (hard particle-particle distance constraint, non-physical)")]
+			[ToggleGroup, Tooltip("Enable 'Follow the leader' constraint (hard particle-particle distance, non-physical)")]
 			public bool distanceFTL;
-			[Range(0.0f, 1.0f), Tooltip("Follow the leader damping factor")]
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("FTL correction / damping factor")]
 			public float distanceFTLDamping;
-			[Tooltip("Boundary collision constraint")]
-			public bool boundary;
-			[Range(0.0f, 1.0f), Tooltip("Boundary friction")]
-			public float boundaryFriction;
-			[Tooltip("Curvature constraint")]
+
+			[ToggleGroup, Tooltip("Enable boundary shape collision constraint")]
+			public bool boundaryCollision;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Boundary shape friction")]
+			public float boundaryCollisionFriction;
+
+			[ToggleGroup, Tooltip("Enable curvature constraint")]
 			public bool curvature;
-			[Tooltip("Curvature constraint mode (=, <, >)")]
+			[ToggleGroupItem, Tooltip("Curvature constraint mode (=, <, >)")]
 			public Compare curvatureCompare;
-			[Range(0.0f, 1.0f)]
-			public float curvatureCompareTo;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Scales to [0 .. 90] degrees")]
+			public float curvatureCompareValue;
 
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
@@ -241,11 +226,11 @@ namespace Unity.DemoTeam.Hair
 				distanceLRA = true,
 				distanceFTL = false,
 				distanceFTLDamping = 0.8f,
-				boundary = true,
-				boundaryFriction = 0.5f,
+				boundaryCollision = true,
+				boundaryCollisionFriction = 0.5f,
 				curvature = false,
-				curvatureCompare = Compare.EqualsOrLessThan,
-				curvatureCompareTo = 0.1f,
+				curvatureCompare = Compare.LessThan,
+				curvatureCompareValue = 0.1f,
 			};
 		}
 		[Serializable] public struct VolumeSettings
@@ -259,15 +244,16 @@ namespace Unity.DemoTeam.Hair
 				RasterizationNoGS,
 			}
 
-			//public enum PressureMode
-			//{
-			//	Repulsion,
-			//	RepulsionAndAttraction,
-			//}
+			public enum PressureSolution
+			{
+				RepelAndAttract,
+				Repel,
+			}
 
 			public enum TargetDensity
 			{
 				Uniform,
+				//TODO below
 				//InitialPose,
 				//InitialPoseInParticles,
 			}
@@ -278,15 +264,20 @@ namespace Unity.DemoTeam.Hair
 			public SplatMethod volumeSplatMethod;
 			[Range(8, 160)]
 			public int volumeGridResolution;
+			[Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
+			[HideInInspector]//TODO
+			public bool volumeGridStaggered;
+
+			[Space]
+			
+			public PressureSolution pressureSolution;
+			[Range(0, 100), Tooltip("0 = EOS, [1 .. *] = Jacobi iteration")]
+			public int pressureIterations;
 
 			[Space]
 
-			[Range(0, 100)]
-			public int pressureIterations;
-			[Tooltip("Enable this to support attraction of strands")]
-			public bool pressureAllowsAttraction;
 			public TargetDensity targetDensity;
-			[Range(0.0f, 2.0f)]
+			[Range(0.0f, 1.0f)]
 			public float targetDensityFactor;
 
 			[Space]
@@ -295,12 +286,16 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
-				volumeGridResolution = 48,
 				volumeSplatMethod = SplatMethod.Compute,
-				pressureIterations = 10,
-				pressureAllowsAttraction = true,
+				volumeGridResolution = 32,
+				volumeGridStaggered = false,
+
+				pressureSolution = PressureSolution.RepelAndAttract,
+				pressureIterations = 3,
+
 				targetDensity = TargetDensity.Uniform,
 				targetDensityFactor = 1.0f,
+
 				boundariesFromPhysics = false,
 			};
 		}
@@ -308,28 +303,29 @@ namespace Unity.DemoTeam.Hair
 		{
 			public bool drawParticles;
 			public bool drawStrands;
-			public bool drawDensity;
-			public bool drawGradient;
-			public bool drawSliceX;
-			public bool drawSliceY;
-			public bool drawSliceZ;
+			public bool drawCellDensity;
+			public bool drawCellGradient;
+			[ToggleGroup] public bool drawSliceX;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along X")] public float drawSliceXOffset;
+			[ToggleGroup] public bool drawSliceY;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Y")] public float drawSliceYOffset;
+			[ToggleGroup] public bool drawSliceZ;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Z")] public float drawSliceZOffset;
 
-			[Range(0.0f, 1.0f)] public float drawSliceOffsetX;
-			[Range(0.0f, 1.0f)] public float drawSliceOffsetY;
-			[Range(0.0f, 1.0f)] public float drawSliceOffsetZ;
-			[Range(0.0f, 4.0f)] public float drawSliceDivider;
+			[Range(0.0f, 4.0f), Tooltip("Scrubs between different layers")] public float drawSliceDivider;
 
 			public static readonly DebugSettings defaults = new DebugSettings()
 			{
 				drawParticles = false,
 				drawStrands = false,
-				drawDensity = false,
+				drawCellDensity = false,
+				drawCellGradient = false,
 				drawSliceX = false,
+				drawSliceXOffset = 0.4f,
 				drawSliceY = false,
+				drawSliceYOffset = 0.4f,
 				drawSliceZ = false,
-				drawSliceOffsetX = 0.4f,
-				drawSliceOffsetY = 0.4f,
-				drawSliceOffsetZ = 0.4f,
+				drawSliceZOffset = 0.4f,
 				drawSliceDivider = 0.0f,
 			};
 		}
@@ -524,15 +520,15 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._DT = dt;
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
+			cbuffer._SOR = solverSettings.kSOR;
+
+			cbuffer._CellPressure = solverSettings.cellPressure;
+			cbuffer._CellVelocity = solverSettings.cellVelocity;
 			cbuffer._Damping = solverSettings.damping;
-			cbuffer._Relaxation = solverSettings.kSOR;
-
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
-			cbuffer._VolumePressureScale = solverSettings.cellPressure;
-			cbuffer._VolumeFrictionScale = solverSettings.cellVelocity;
 
-			cbuffer._BoundaryFriction = solverSettings.boundaryFriction;
-			cbuffer._BendingCurvature = solverSettings.curvatureCompareTo * 0.5f * cbuffer._StrandParticleInterval;
+			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
+			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f * cbuffer._StrandParticleInterval;
 			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
 
 			// update keywords
@@ -540,11 +536,11 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_DISTANCE = solverSettings.distance;
 			keywords.ENABLE_DISTANCE_LRA = solverSettings.distanceLRA;
 			keywords.ENABLE_DISTANCE_FTL = solverSettings.distanceFTL;
-			keywords.ENABLE_BOUNDARY = (solverSettings.boundary && solverSettings.boundaryFriction == 0.0f);
-			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundary && solverSettings.boundaryFriction != 0.0f);
+			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
+			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction != 0.0f);
 			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.Equals);
-			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.EqualsOrGreaterThan);
-			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.EqualsOrLessThan);
+			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.GreaterThan);
+			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan);
 		}
 
 		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, List<HairSimBoundary> boundaries)
@@ -653,7 +649,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// update keywords
-			keywords.VOLUME_SUPPORT_CONTRACTION = volumeSettings.pressureAllowsAttraction;
+			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.RepelAndAttract);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData)
@@ -1027,8 +1023,8 @@ namespace Unity.DemoTeam.Hair
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawVolumeData))
 			{
-				if (!debugSettings.drawDensity &&
-					!debugSettings.drawGradient &&
+				if (!debugSettings.drawCellDensity &&
+					!debugSettings.drawCellGradient &&
 					!debugSettings.drawSliceX &&
 					!debugSettings.drawSliceY &&
 					!debugSettings.drawSliceZ)
@@ -1039,13 +1035,13 @@ namespace Unity.DemoTeam.Hair
 				PushVolumeData(cmd, s_debugDrawMat, s_debugDrawMPB, volumeData);
 
 				// volume density
-				if (debugSettings.drawDensity)
+				if (debugSettings.drawCellDensity)
 				{
 					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 2, MeshTopology.Points, GetCellCount(volumeData.cbuffer), 1, s_debugDrawMPB);
 				}
 
 				// volume gradient
-				if (debugSettings.drawGradient)
+				if (debugSettings.drawCellGradient)
 				{
 					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Lines, 2 * GetCellCount(volumeData.cbuffer), 1, s_debugDrawMPB);
 				}
@@ -1058,7 +1054,7 @@ namespace Unity.DemoTeam.Hair
 					if (debugSettings.drawSliceX)
 					{
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 0);
-						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetX);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceXOffset);
 
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
@@ -1068,7 +1064,7 @@ namespace Unity.DemoTeam.Hair
 					if (debugSettings.drawSliceY)
 					{
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 1);
-						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetY);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceYOffset);
 
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
@@ -1078,7 +1074,7 @@ namespace Unity.DemoTeam.Hair
 					if (debugSettings.drawSliceZ)
 					{
 						s_debugDrawMPB.SetInt(UniformIDs._DebugSliceAxis, 2);
-						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceOffsetZ);
+						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceZOffset);
 
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);

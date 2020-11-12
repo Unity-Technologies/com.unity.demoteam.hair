@@ -69,12 +69,12 @@ namespace Unity.DemoTeam.Hair
 			public float _DT;
 			public uint _Iterations;
 			public float _Stiffness;
-			public float _Relaxation;
+			public float _SOR;
 
-			public float _Gravity;
+			public float _CellPressure;
+			public float _CellVelocity;
 			public float _Damping;
-			public float _VolumePressureScale;
-			public float _VolumeFrictionScale;
+			public float _Gravity;
 
 			public float _DampingFTL;
 			public float _BoundaryFriction;

@@ -13,14 +13,14 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _groomAsset;
 		SerializedProperty _groomAssetQuickEdit;
 
+		SerializedProperty _settingsRoots;
+		SerializedProperty _settingsRoots_rootsAttached;
+		SerializedProperty _settingsStrands;
+
 		SerializedProperty _settingsSolver;
 		SerializedProperty _settingsVolume;
 		SerializedProperty _settingsDebug;
 		SerializedProperty _boundaries;//replace with overlapbox
-
-		SerializedProperty _settingsRoots;
-		SerializedProperty _settingsRoots_rootsAttached;
-		SerializedProperty _settingsStrands;
 
 		void OnEnable()
 		{

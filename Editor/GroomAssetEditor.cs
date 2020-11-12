@@ -14,10 +14,9 @@ namespace Unity.DemoTeam.Hair
 		MaterialPropertyBlock previewUtilMPB;
 		Quaternion previewRotation;
 
-		SerializedProperty _type;
-		SerializedProperty _material;
-
 		SerializedProperty _settingsBasic;
+		SerializedProperty _settingsBasic_type;
+		SerializedProperty _settingsBasic_material;
 		SerializedProperty _settingsAlembic;
 		SerializedProperty _settingsProcedural;
 
@@ -49,11 +48,10 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			_settingsBasic = serializedObject.FindProperty("settingsBasic");
+			_settingsBasic_type = _settingsBasic.FindPropertyRelative("type");
+			_settingsBasic_material = _settingsBasic.FindPropertyRelative("material");
 			_settingsAlembic = serializedObject.FindProperty("settingsAlembic");
 			_settingsProcedural = serializedObject.FindProperty("settingsProcedural");
-
-			_type = _settingsBasic.FindPropertyRelative("type");
-			_material = _settingsBasic.FindPropertyRelative("material");
 
 			_strandGroups = serializedObject.FindProperty("strandGroups");
 			_strandGroupsAutoBuild = serializedObject.FindProperty("strandGroupsAutoBuild");
@@ -99,12 +97,12 @@ namespace Unity.DemoTeam.Hair
 			{
 				StructPropertyFieldsWithHeader(_settingsBasic);
 
-				if (_material.objectReferenceValue == null)
-					_material.objectReferenceValue = groom.defaultMaterial;
+				if (_settingsBasic_material.objectReferenceValue == null)
+					_settingsBasic_material.objectReferenceValue = groom.defaultMaterial;
 
 				EditorGUILayout.Space();
 
-				switch ((GroomAsset.Type)_type.enumValueIndex)
+				switch ((GroomAsset.Type)_settingsBasic_type.enumValueIndex)
 				{
 					case GroomAsset.Type.Alembic:
 						StructPropertyFieldsWithHeader(_settingsAlembic);
@@ -204,7 +202,7 @@ namespace Unity.DemoTeam.Hair
 
 								var matrix = Matrix4x4.TRS(meshOffset * Vector3.forward, previewRotation, Vector3.one) * Matrix4x4.Translate(-meshCenter);
 
-								var material = _material.objectReferenceValue as Material;
+								var material = _settingsBasic_material.objectReferenceValue as Material;
 								if (material == null)
 									material = groom.defaultMaterial;
 

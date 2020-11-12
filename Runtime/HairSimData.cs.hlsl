@@ -17,11 +17,11 @@ CBUFFER_START(SolverCBuffer)
     float _DT;
     uint _Iterations;
     float _Stiffness;
-    float _Relaxation;
-    float _Gravity;
+    float _SOR;
+    float _CellPressure;
+    float _CellVelocity;
     float _Damping;
-    float _VolumePressureScale;
-    float _VolumeFrictionScale;
+    float _Gravity;
     float _DampingFTL;
     float _BoundaryFriction;
     float _BendingCurvature;
