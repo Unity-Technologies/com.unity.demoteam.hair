@@ -8,6 +8,7 @@ using UnityEngine.Experimental.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
+using Unity.DemoTeam.Attributes;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -108,6 +109,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KSolveConstraints_Jacobi_64;
 			public static int KSolveConstraints_Jacobi_128;
 		}
+
 		static class VolumeKernels
 		{
 			public static int KVolumeClear;
@@ -141,7 +143,8 @@ namespace Unity.DemoTeam.Hair
 			public T VOLUME_SUPPORT_CONTRACTION;
 		}
 
-		[Serializable] public struct SolverSettings
+		[Serializable]
+		public struct SolverSettings
 		{
 			public enum Method
 			{
@@ -162,18 +165,18 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 9.0f)]
 			public float strandParticleContrib;// TODO move elsewhere
 
-			[LineHeader]
+			[LineHeader("Solver")]
 
 			[Tooltip("Constraint solver")]
 			public Method method;
-			[Range(1, 100), Tooltip("Constraint iterations")]
+			[Range(1, 100), Tooltip("Global constraint iterations")]
 			public int iterations;
-			[Range(0.0f, 1.0f), Tooltip("Constraint stiffness")]
+			[Range(0.0f, 1.0f), Tooltip("Global constraint stiffness")]
 			public float stiffness;
 			[Range(1.0f, 2.0f), Tooltip("Successive-over-relaxation factor")]
 			public float kSOR;
 
-			[LineHeader]
+			[LineHeader("Integration")]
 
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
 			public float cellPressure;
@@ -184,7 +187,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
 
-			[LineHeader]
+			[LineHeader("Constraints")]
 
 			[Tooltip("Enable particle-particle distance constraint")]
 			public bool distance;
@@ -233,7 +236,9 @@ namespace Unity.DemoTeam.Hair
 				curvatureCompareValue = 0.1f,
 			};
 		}
-		[Serializable] public struct VolumeSettings
+
+		[Serializable]
+		public struct VolumeSettings
 		{
 			public enum SplatMethod
 			{
@@ -246,14 +251,14 @@ namespace Unity.DemoTeam.Hair
 
 			public enum PressureSolution
 			{
-				RepelAndAttract,
-				Repel,
+				DensityEquals,
+				DensityGreaterThan,
 			}
 
 			public enum TargetDensity
 			{
 				Uniform,
-				//TODO below
+				//TODO add these
 				//InitialPose,
 				//InitialPoseInParticles,
 			}
@@ -264,23 +269,19 @@ namespace Unity.DemoTeam.Hair
 			public SplatMethod volumeSplatMethod;
 			[Range(8, 160)]
 			public int volumeGridResolution;
-			[Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
-			[HideInInspector]//TODO
+			[HideInInspector, Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
 			public bool volumeGridStaggered;
 
-			[Space]
-			
-			public PressureSolution pressureSolution;
+			[LineHeader("Pressure")]
+
 			[Range(0, 100), Tooltip("0 = EOS, [1 .. *] = Jacobi iteration")]
 			public int pressureIterations;
-
-			[Space]
-
+			public PressureSolution pressureSolution;
 			public TargetDensity targetDensity;
 			[Range(0.0f, 1.0f)]
 			public float targetDensityFactor;
 
-			[Space]
+			[LineHeader("Boundaries")]
 
 			public bool boundariesFromPhysics;
 
@@ -290,16 +291,17 @@ namespace Unity.DemoTeam.Hair
 				volumeGridResolution = 32,
 				volumeGridStaggered = false,
 
-				pressureSolution = PressureSolution.RepelAndAttract,
 				pressureIterations = 3,
-
+				pressureSolution = PressureSolution.DensityEquals,
 				targetDensity = TargetDensity.Uniform,
 				targetDensityFactor = 1.0f,
 
 				boundariesFromPhysics = false,
 			};
 		}
-		[Serializable] public struct DebugSettings
+
+		[Serializable]
+		public struct DebugSettings
 		{
 			public bool drawParticles;
 			public bool drawStrands;
@@ -649,7 +651,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// update keywords
-			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.RepelAndAttract);
+			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData)

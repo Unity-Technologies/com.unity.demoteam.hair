@@ -1,8 +1,15 @@
 ﻿using UnityEngine;
 using UnityEditor;
 
-public static class HairEditorGUI
+public static class HairGUI
 {
+	public static readonly GUIStyle settingsBox;
+
+	static HairGUI()
+	{
+		settingsBox = new GUIStyle(EditorStyles.helpBox);
+	}
+
 	public static void StructPropertyFields(SerializedProperty settings)
 	{
 		if (settings.hasChildren)

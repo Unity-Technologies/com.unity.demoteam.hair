@@ -3,7 +3,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	using static HairEditorGUI;
+	using static HairGUI;
 
 	[CustomEditor(typeof(Groom))]
 	public class GroomEditor : Editor
@@ -19,8 +19,10 @@ namespace Unity.DemoTeam.Hair
 
 		SerializedProperty _settingsSolver;
 		SerializedProperty _settingsVolume;
+		SerializedProperty _settingsVolume_boundariesFromPhysics;
 		SerializedProperty _settingsDebug;
-		SerializedProperty _boundaries;//replace with overlapbox
+
+		SerializedProperty _boundaries;
 
 		void OnEnable()
 		{
@@ -33,6 +35,7 @@ namespace Unity.DemoTeam.Hair
 
 			_settingsSolver = serializedObject.FindProperty("solverSettings");
 			_settingsVolume = serializedObject.FindProperty("volumeSettings");
+			_settingsVolume_boundariesFromPhysics = _settingsVolume.FindPropertyRelative("boundariesFromPhysics");
 			_settingsDebug = serializedObject.FindProperty("debugSettings");
 			_boundaries = serializedObject.FindProperty("boundaries");
 		}
@@ -52,7 +55,7 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			EditorGUILayout.LabelField("Instance", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+			EditorGUILayout.BeginVertical(HairGUI.settingsBox);
 			{
 				DrawAssetGUI();
 			}
@@ -60,7 +63,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Strand settings", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+			EditorGUILayout.BeginVertical(HairGUI.settingsBox);
 			{
 				DrawStrandSettingsGUI();
 			}
@@ -68,14 +71,14 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Simulation settings", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+			EditorGUILayout.BeginVertical(HairGUI.settingsBox);
 			{
 				DrawSimulationSettingsGUI();
 			}
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
-			EditorGUILayout.LabelField(groom.groomContainersChecksum, EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.LabelField(groom.componentGroupsChecksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
 		public void DrawAssetGUI()
@@ -99,7 +102,7 @@ namespace Unity.DemoTeam.Hair
 			if (groomAsset != null && _groomAssetQuickEdit.boolValue)
 			{
 				Editor.CreateCachedEditor(groomAsset, null, ref groomAssetEditor);
-				EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+				EditorGUILayout.BeginVertical(HairGUI.settingsBox);
 				{
 					(groomAssetEditor as GroomAssetEditor).DrawImporterGUI();
 				}
@@ -108,7 +111,7 @@ namespace Unity.DemoTeam.Hair
 
 			if (GUILayout.Button("Reload"))
 			{
-				groom.groomContainersChecksum = string.Empty;
+				groom.componentGroupsChecksum = string.Empty;
 			}
 		}
 
@@ -121,6 +124,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUI.BeginChangeCheck();
 			{
 				StructPropertyFieldsWithHeader(_settingsRoots);
+
 				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsStrands);
 			}
@@ -178,6 +182,7 @@ namespace Unity.DemoTeam.Hair
 
 				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsVolume, "Settings Volume");
+				using (new EditorGUI.DisabledGroupScope(_settingsVolume_boundariesFromPhysics.boolValue))
 				using (new EditorGUI.IndentLevelScope())
 				{
 					EditorGUILayout.PropertyField(_boundaries);

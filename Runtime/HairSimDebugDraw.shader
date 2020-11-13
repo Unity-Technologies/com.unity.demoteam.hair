@@ -134,14 +134,15 @@
 		float3 uvw = input.color.xyz;
 
 		float3 localPos = VolumeUVWToLocal(uvw);
-		float3 localPosFloor = floor(localPos);
+		float3 localPosFloor = round(0.5 + localPos);
 
-		float3 gridDist = abs(localPos - localPosFloor);
-		float3 gridWidth = fwidth(localPos);
-		
+		float3 gridAxis = float3(_DebugSliceAxis != 0, _DebugSliceAxis != 1, _DebugSliceAxis != 2);
+		float3 gridDist = gridAxis * abs(localPos - localPosFloor);
+		float3 gridWidth = gridAxis * fwidth(localPos);
+
 		if (any(gridDist < gridWidth))
 		{
-			uint i = (uint)localPosFloor[_DebugSliceAxis] % 3;
+			uint i = ((uint)localPosFloor[_DebugSliceAxis]) % 3;
 			return float4(0.2 * float3(i == 0, i == 1, i == 2), _DebugSliceOpacity);
 		}
 
@@ -151,7 +152,7 @@
 		float volumePressure = VolumeSampleScalar(_VolumePressure, uvw);
 		float3 volumePressureGrad = VolumeSampleVector(_VolumePressureGrad, uvw);
 
-		// TEST LEVEL-SET
+		// test fake level-set
 		/*
 		if (_DebugSliceDivider == 2.0)
 		{
