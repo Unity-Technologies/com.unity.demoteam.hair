@@ -19,7 +19,7 @@ namespace Unity.DemoTeam.Attributes
 	public class LineHeaderAttributeDrawer : DecoratorDrawer
 	{
 		const float lineWidth = 2.0f;
-		const float paddingTop = 7.0f + 4.0f;//8.0f;
+		const float paddingTop = 11.0f;
 		const float paddingBottom = 4.0f;
 
 		const float headerAlign = 0.05f;

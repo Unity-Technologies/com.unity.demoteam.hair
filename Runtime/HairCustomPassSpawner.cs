@@ -4,11 +4,7 @@ using UnityEngine.Rendering.HighDefinition;
 
 namespace Unity.DemoTeam.Hair
 {
-	// Hair
-	// HairAsset
-	// HairCustomPass
-	// HairCustomPassSpawner
-
+	[AddComponentMenu("")]
 	public class HairCustomPassSpawner : MonoBehaviour
 	{
 		static bool s_initialized = false;

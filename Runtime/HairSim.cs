@@ -35,7 +35,6 @@ namespace Unity.DemoTeam.Hair
 		{
 			public static ProfilerMarker Dummy;
 		}
-
 		static class MarkersGPU
 		{
 			public static ProfilingSampler Solver;
@@ -109,7 +108,6 @@ namespace Unity.DemoTeam.Hair
 			public static int KSolveConstraints_Jacobi_64;
 			public static int KSolveConstraints_Jacobi_128;
 		}
-
 		static class VolumeKernels
 		{
 			public static int KVolumeClear;
@@ -236,7 +234,6 @@ namespace Unity.DemoTeam.Hair
 				curvatureCompareValue = 0.1f,
 			};
 		}
-
 		[Serializable]
 		public struct VolumeSettings
 		{
@@ -263,9 +260,6 @@ namespace Unity.DemoTeam.Hair
 				//InitialPoseInParticles,
 			}
 
-			[HideInInspector] public Vector3 volumeWorldCenter;
-			[HideInInspector] public Vector3 volumeWorldExtent;
-
 			public SplatMethod volumeSplatMethod;
 			[Range(8, 160)]
 			public int volumeGridResolution;
@@ -279,7 +273,7 @@ namespace Unity.DemoTeam.Hair
 			public PressureSolution pressureSolution;
 			public TargetDensity targetDensity;
 			[Range(0.0f, 1.0f)]
-			public float targetDensityFactor;
+			public float targetDensityTerm;
 
 			[LineHeader("Boundaries")]
 
@@ -294,7 +288,7 @@ namespace Unity.DemoTeam.Hair
 				pressureIterations = 3,
 				pressureSolution = PressureSolution.DensityEquals,
 				targetDensity = TargetDensity.Uniform,
-				targetDensityFactor = 1.0f,
+				targetDensityTerm = 1.0f,
 
 				boundariesFromPhysics = false,
 			};
@@ -437,11 +431,6 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref volumeData.boundaryMatrixInv, "BoundaryMatrixInv", MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref volumeData.boundaryMatrixW2PrevW, "BoundaryMatrixW2PrevW", MAX_BOUNDARIES, sizeof(Matrix4x4));
 
-				if (volumeData.boundaryMatrixPrev.IsCreated && volumeData.boundaryMatrixPrev.Length != MAX_BOUNDARIES)
-					volumeData.boundaryMatrixPrev.Dispose();
-				if (volumeData.boundaryMatrixPrev.IsCreated == false)
-					volumeData.boundaryMatrixPrev = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
-
 				return changed;
 			}
 		}
@@ -545,17 +534,9 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan);
 		}
 
-		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, List<HairSimBoundary> boundaries)
+		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, List<HairSimBoundary> boundaries)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
-			ref var keywords = ref volumeData.keywords;
-
-			// update volume parameters
-			cbuffer._VolumeCells = volumeSettings.volumeGridResolution * Vector3.one;
-			cbuffer._VolumeWorldMin = volumeSettings.volumeWorldCenter - volumeSettings.volumeWorldExtent;
-			cbuffer._VolumeWorldMax = volumeSettings.volumeWorldCenter + volumeSettings.volumeWorldExtent;
-
-			cbuffer._TargetDensityFactor = volumeSettings.targetDensityFactor;
 
 			// update boundary shapes
 			cbuffer._BoundaryCapsuleCount = 0;
@@ -567,6 +548,11 @@ namespace Unity.DemoTeam.Hair
 			using (NativeArray<Matrix4x4> tmpMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (NativeArray<Matrix4x4> tmpMatrixW2PrevW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
+				if (volumeData.boundaryMatrixPrev.IsCreated && volumeData.boundaryMatrixPrev.Length != MAX_BOUNDARIES)
+					volumeData.boundaryMatrixPrev.Dispose();
+				if (volumeData.boundaryMatrixPrev.IsCreated == false)
+					volumeData.boundaryMatrixPrev = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+
 				unsafe
 				{
 					var ptrPack = (HairSimBoundary.BoundaryPack*)tmpPack.GetUnsafePtr();
@@ -649,6 +635,19 @@ namespace Unity.DemoTeam.Hair
 					volumeData.boundaryMatrixPrev.CopyFrom(tmpMatrix);
 				}
 			}
+		}
+
+		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, Bounds volumeBounds)
+		{
+			ref var cbuffer = ref volumeData.cbuffer;
+			ref var keywords = ref volumeData.keywords;
+
+			// update volume parameters
+			cbuffer._VolumeCells = volumeSettings.volumeGridResolution * Vector3.one;
+			cbuffer._VolumeWorldMin = volumeBounds.min;
+			cbuffer._VolumeWorldMax = volumeBounds.max;
+
+			cbuffer._TargetDensityFactor = volumeSettings.targetDensityTerm;
 
 			// update keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
@@ -774,42 +773,42 @@ namespace Unity.DemoTeam.Hair
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
-				int solveKernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
-				int groupCountX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE;
-				int groupCountY = 1;
-				int groupCountZ = 1;
+				int kernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
+				int numX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE;
+				int numY = 1;
+				int numZ = 1;
 
 				switch (solverSettings.method)
 				{
 					case SolverSettings.Method.GaussSeidelReference:
-						solveKernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
+						kernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
 						break;
 
 					case SolverSettings.Method.GaussSeidel:
-						solveKernel = SolverKernels.KSolveConstraints_GaussSeidel;
+						kernel = SolverKernels.KSolveConstraints_GaussSeidel;
 						break;
 
 					case SolverSettings.Method.Jacobi:
 						switch (solverData.cbuffer._StrandParticleCount)
 						{
 							case 16:
-								solveKernel = SolverKernels.KSolveConstraints_Jacobi_16;
-								groupCountX = (int)solverData.cbuffer._StrandCount;
+								kernel = SolverKernels.KSolveConstraints_Jacobi_16;
+								numX = (int)solverData.cbuffer._StrandCount;
 								break;
 
 							case 32:
-								solveKernel = SolverKernels.KSolveConstraints_Jacobi_32;
-								groupCountX = (int)solverData.cbuffer._StrandCount;
+								kernel = SolverKernels.KSolveConstraints_Jacobi_32;
+								numX = (int)solverData.cbuffer._StrandCount;
 								break;
 
 							case 64:
-								solveKernel = SolverKernels.KSolveConstraints_Jacobi_64;
-								groupCountX = (int)solverData.cbuffer._StrandCount;
+								kernel = SolverKernels.KSolveConstraints_Jacobi_64;
+								numX = (int)solverData.cbuffer._StrandCount;
 								break;
 
 							case 128:
-								solveKernel = SolverKernels.KSolveConstraints_Jacobi_128;
-								groupCountX = (int)solverData.cbuffer._StrandCount;
+								kernel = SolverKernels.KSolveConstraints_Jacobi_128;
+								numX = (int)solverData.cbuffer._StrandCount;
 								break;
 						}
 						break;
@@ -818,9 +817,9 @@ namespace Unity.DemoTeam.Hair
 				SwapBuffers(ref solverData.particlePosition, ref solverData.particlePositionPrev);
 				SwapBuffers(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
 
-				PushVolumeData(cmd, s_solverCS, solveKernel, volumeData);
-				PushSolverData(cmd, s_solverCS, solveKernel, solverData);
-				cmd.DispatchCompute(s_solverCS, solveKernel, groupCountX, groupCountY, groupCountZ);
+				PushVolumeData(cmd, s_solverCS, kernel, volumeData);
+				PushSolverData(cmd, s_solverCS, kernel, solverData);
+				cmd.DispatchCompute(s_solverCS, kernel, numX, numY, numZ);
 			}
 		}
 

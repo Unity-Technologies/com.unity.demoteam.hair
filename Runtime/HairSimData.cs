@@ -48,8 +48,9 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer boundaryMatrixInv;
 			public ComputeBuffer boundaryMatrixW2PrevW;
 
+			public Hash128 boundaryHash;//TODO remove
+			public NativeArray<Hash128> boundaryHashPrev;
 			public NativeArray<Matrix4x4> boundaryMatrixPrev;
-			public Hash128 boundaryHash;
 
 			public VolumeKeywords<bool> keywords;
 		}

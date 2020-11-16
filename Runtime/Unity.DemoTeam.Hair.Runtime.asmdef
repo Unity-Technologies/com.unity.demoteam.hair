@@ -1,10 +1,12 @@
 {
     "name": "Unity.DemoTeam.Hair.Runtime",
+    "rootNamespace": "",
     "references": [
         "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:df380645f10b7bc4b97d4f5eb6303d95",
         "GUID:457756d89b35d2941b3e7b37b4ece6f1",
         "GUID:f430d943acec4664388d12e0bbff46de",
+        "GUID:7e9d95a3be8cd654ba8a8d2bb2409223",
         "GUID:22f31b74491fb45d5b598e0b935deb31"
     ],
     "includePlatforms": [],
@@ -14,6 +16,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.demoteam.digital-human",
+            "expression": "0.1.1-preview",
+            "define": "UNITY_DEMOTEAM_DIGITALHUMAN"
+        }
+    ],
     "noEngineReferences": false
 }
