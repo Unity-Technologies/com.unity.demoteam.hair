@@ -3,7 +3,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	using static HairGUI;
+	using static HairGUILayout;
 
 	[CustomEditor(typeof(Groom))]
 	public class GroomEditor : Editor
@@ -19,10 +19,7 @@ namespace Unity.DemoTeam.Hair
 
 		SerializedProperty _settingsSolver;
 		SerializedProperty _settingsVolume;
-		SerializedProperty _settingsVolume_boundariesFromPhysics;
 		SerializedProperty _settingsDebug;
-
-		SerializedProperty _boundaries;
 
 		void OnEnable()
 		{
@@ -35,9 +32,7 @@ namespace Unity.DemoTeam.Hair
 
 			_settingsSolver = serializedObject.FindProperty("solverSettings");
 			_settingsVolume = serializedObject.FindProperty("volumeSettings");
-			_settingsVolume_boundariesFromPhysics = _settingsVolume.FindPropertyRelative("boundariesFromPhysics");
 			_settingsDebug = serializedObject.FindProperty("debugSettings");
-			_boundaries = serializedObject.FindProperty("boundaries");
 		}
 
 		void OnDisable()
@@ -55,7 +50,7 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			EditorGUILayout.LabelField("Instance", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUI.settingsBox);
+			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
 				DrawAssetGUI();
 			}
@@ -63,7 +58,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Strand settings", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUI.settingsBox);
+			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
 				DrawStrandSettingsGUI();
 			}
@@ -71,7 +66,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Simulation settings", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUI.settingsBox);
+			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
 				DrawSimulationSettingsGUI();
 			}
@@ -102,7 +97,7 @@ namespace Unity.DemoTeam.Hair
 			if (groomAsset != null && _groomAssetQuickEdit.boolValue)
 			{
 				Editor.CreateCachedEditor(groomAsset, null, ref groomAssetEditor);
-				EditorGUILayout.BeginVertical(HairGUI.settingsBox);
+				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 				{
 					(groomAssetEditor as GroomAssetEditor).DrawImporterGUI();
 				}
@@ -124,6 +119,13 @@ namespace Unity.DemoTeam.Hair
 			EditorGUI.BeginChangeCheck();
 			{
 				StructPropertyFieldsWithHeader(_settingsRoots);
+				if (_settingsRoots_rootsAttached == null)
+				{
+					using (new EditorGUI.IndentLevelScope())
+					{
+						EditorGUILayout.HelpBox("Root attachments require package: 'com.demoteam.digital-human'.", MessageType.None, wide: true);
+					}
+				}
 
 				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsStrands);
@@ -182,23 +184,33 @@ namespace Unity.DemoTeam.Hair
 
 				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsVolume, "Settings Volume");
-				using (new EditorGUI.DisabledGroupScope(_settingsVolume_boundariesFromPhysics.boolValue))
 				using (new EditorGUI.IndentLevelScope())
 				{
-					EditorGUILayout.PropertyField(_boundaries);
+					var countCapsule = groom.volumeData.cbuffer._BoundaryCapsuleCount;
+					var countSphere = groom.volumeData.cbuffer._BoundarySphereCount;
+					var countTorus = groom.volumeData.cbuffer._BoundaryTorusCount;
+					var countPack = countCapsule + countSphere + countTorus;
+					var countTxt = countPack + " active shapes (" + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus)";
+
+					var rect = GUILayoutUtility.GetRect(0f, 20.0f, GUILayout.ExpandWidth(true));
+
+					var color = GUI.color;
+					GUI.color = Color.white;
+					GUI.Box(EditorGUI.IndentedRect(rect), countTxt);
+					GUI.color = color;
 				}
 
 				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsDebug, "Settings Debug");
 				using (new EditorGUI.IndentLevelScope())
 				{
-					var rect = GUILayoutUtility.GetRect(100.0f, 20.0f);
-
-					rect = EditorGUI.IndentedRect(rect);
-
 					var divider = _settingsDebug.FindPropertyRelative("drawSliceDivider").floatValue;
 					var dividerBase = Mathf.Floor(divider);
 					var dividerFrac = divider - Mathf.Floor(divider);
+
+					var rect = GUILayoutUtility.GetRect(0.0f, EditorGUIUtility.singleLineHeight, GUILayout.ExpandWidth(true));
+
+					rect = EditorGUI.IndentedRect(rect);
 
 					var rect0 = new Rect(rect);
 					var rect1 = new Rect(rect);

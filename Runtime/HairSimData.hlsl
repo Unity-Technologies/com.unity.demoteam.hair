@@ -21,6 +21,7 @@ HAIRSIM_SOLVERDATA<float4> _RootDirection;
 HAIRSIM_SOLVERDATA<float4> _ParticlePosition;
 HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;
 HAIRSIM_SOLVERDATA<float4> _ParticlePositionCorr;
+HAIRSIM_SOLVERDATA<float4> _ParticlePositionPose;
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;
 

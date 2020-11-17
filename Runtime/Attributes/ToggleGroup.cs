@@ -3,7 +3,9 @@ using System.Reflection;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
+using UnityEditorInternal;
 #endif
+using Unity.Mathematics;
 
 namespace Unity.DemoTeam.Attributes
 {
@@ -113,6 +115,24 @@ namespace Unity.DemoTeam.Attributes
 							{
 								property.objectReferenceValue = EditorGUILayout.ObjectField(property.objectReferenceValue, field.FieldType, false);
 							}
+							break;
+
+						case SerializedPropertyType.LayerMask:
+							{
+								var concatName = InternalEditorUtility.layers;
+								var concatMask = (property.intValue == -1) ? -1 : InternalEditorUtility.LayerMaskToConcatenatedLayersMask(property.intValue);
+
+								concatMask = EditorGUILayout.MaskField(concatMask, concatName);
+
+								if (concatMask == -1)
+									property.intValue = -1;
+								else
+									property.intValue = InternalEditorUtility.ConcatenatedLayersMaskToLayerMask(concatMask);
+							}
+							break;
+
+						default:
+							Debug.Log("unsupported [ToggleGroupItem] " + property.propertyPath + ": " + property.propertyType.ToString());
 							break;
 					}
 

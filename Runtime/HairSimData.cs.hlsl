@@ -25,6 +25,7 @@ CBUFFER_START(SolverCBuffer)
     float _DampingFTL;
     float _BoundaryFriction;
     float _BendingCurvature;
+    float _ShapeStiffness;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

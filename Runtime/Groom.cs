@@ -11,12 +11,18 @@ using Unity.DemoTeam.Attributes;
 using Unity.DemoTeam.DigitalHuman;
 #endif
 
+#if UNITY_VISUALEFFECTGRAPH
+using UnityEngine.VFX;
+#endif
+
 namespace Unity.DemoTeam.Hair
 {
 	[ExecuteAlways, SelectionBase]
 	public class Groom : MonoBehaviour
 	{
 		public static HashSet<Groom> s_instances = new HashSet<Groom>();
+
+		static List<HairSimBoundary> s_boundaries = new List<HairSimBoundary>();
 
 		[Serializable]
 		public struct ComponentGroup
@@ -49,7 +55,9 @@ namespace Unity.DemoTeam.Hair
 			{
 				PrimitiveLines,
 				InstancedMesh,//TODO
+#if UNITY_VISUALEFFECTGRAPH
 				VFXGraph,//TODO
+#endif
 			}
 
 			public enum Scale
@@ -64,15 +72,17 @@ namespace Unity.DemoTeam.Hair
 			public Mesh strandMesh;
 			[VisibleIf(nameof(strandRenderer), Renderer.InstancedMesh)]
 			public bool strandMeshRigid;
+#if UNITY_VISUALEFFECTGRAPH
 			[VisibleIf(nameof(strandRenderer), Renderer.VFXGraph)]
-			public GameObject strandOutputGraph;
+			public VisualEffect strandOutputGraph;
+#endif
 
 			[LineHeader("Overrides")]
 
 			[ToggleGroup]
 			public bool material;
 			[ToggleGroupItem]
-			public Material materialOverride;
+			public Material materialValue;
 		}
 
 		public GroomAsset groomAsset;
@@ -91,7 +101,6 @@ namespace Unity.DemoTeam.Hair
 		public HairSim.SolverData[] solverData;
 		public HairSim.VolumeData volumeData;
 
-		[NonReorderable] public List<HairSimBoundary> boundaries = new List<HairSimBoundary>(HairSim.MAX_BOUNDARIES);
 		[NonReorderable] public static Collider[] boundariesOverlapResult = new Collider[64];
 
 		void OnEnable()
@@ -111,12 +120,6 @@ namespace Unity.DemoTeam.Hair
 		void OnValidate()
 		{
 			volumeSettings.volumeGridResolution = (Mathf.Max(8, volumeSettings.volumeGridResolution) / 8) * 8;
-
-			if (boundaries.Count > HairSim.MAX_BOUNDARIES)
-			{
-				boundaries.RemoveRange(HairSim.MAX_BOUNDARIES, boundaries.Count - HairSim.MAX_BOUNDARIES);
-				boundaries.TrimExcess();
-			}
 		}
 
 		void OnDrawGizmos()
@@ -128,30 +131,6 @@ namespace Unity.DemoTeam.Hair
 		void Update()
 		{
 			InitializeComponents();
-
-			if (volumeSettings.boundariesFromPhysics)
-			{
-				var queryBounds = GetSimulationBoundsSquare();
-				var queryResult = boundariesOverlapResult;
-				var queryResultCount = Physics.OverlapBoxNonAlloc(queryBounds.center, queryBounds.extents, queryResult, Quaternion.identity);
-
-				boundaries.Clear();
-
-				for (int i = 0; i != queryResultCount; i++)
-				{
-					var boundary = queryResult[i].GetComponent<HairSimBoundary>();
-					if (boundary != null)
-					{
-						boundaries.Add(boundary);
-					}
-				}
-
-				if (boundaries.Count > HairSim.MAX_BOUNDARIES)
-				{
-					boundaries.RemoveRange(HairSim.MAX_BOUNDARIES, boundaries.Count - HairSim.MAX_BOUNDARIES);
-					boundaries.TrimExcess();
-				}
-			}
 		}
 
 		public static Bounds GetRootBounds(MeshFilter rootFilter)
@@ -214,14 +193,30 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public Material GetStrandMaterial()
+		{
+			if (settingsStrands.material)
+				return settingsStrands.materialValue;
+			else
+				return groomAsset.settingsBasic.material;
+		}
+
+		//public float GetStrandDiameter()
+		//{
+		//	if (settingsStrands.strandDiameter)
+		//		return settingsStrands.strandDiameterValue;
+		//	else
+		//		return groomAsset.settingsBasic.strandDiameter;
+		//}
+
 		public void DispatchStep(CommandBuffer cmd, float dt)
 		{
 			if (!InitializeRuntimeData(cmd))
 				return;
 
 			// get bounds
-			var strandBounds = GetSimulationBoundsSquare();
-			var strandScale = GetSimulationStrandScale();
+			var simulationBounds = GetSimulationBoundsSquare();
+			var simulationScale = GetSimulationStrandScale();
 
 			// update solver roots
 			for (int i = 0; i != solverData.Length; i++)
@@ -233,12 +228,43 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// update volume boundaries
-			HairSim.UpdateVolumeBoundaries(ref volumeData, boundaries);
+			s_boundaries.Clear();
+			{
+				foreach (var shape in volumeSettings.boundaryShapesResident)
+				{
+					if (shape != null)
+					{
+						s_boundaries.Add(shape);
+					}
+				}
+
+				if (volumeSettings.boundaryShapes)
+				{
+					var result = boundariesOverlapResult;
+					var resultCount = Physics.OverlapBoxNonAlloc(simulationBounds.center, simulationBounds.extents, result, Quaternion.identity);
+
+					for (int i = 0; i != resultCount; i++)
+					{
+						var shape = result[i].GetComponent<HairSimBoundary>();
+						if (shape != null)
+						{
+							s_boundaries.Add(shape);
+						}
+					}
+				}
+
+				if (volumeSettings.boundarySDF)
+				{
+					//TODO
+				}
+			}
+
+			HairSim.UpdateVolumeBoundaries(ref volumeData, s_boundaries);
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
 			{
-				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, strandBounds);
+				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
 
@@ -250,18 +276,13 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// step volume data
-			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, strandBounds);
+			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds);
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 			// update renderers
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				componentGroups[i].lineRenderer.sharedMaterial.CopyPropertiesFromMaterial(groomAsset.settingsBasic.material);
-				componentGroups[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
-
-				HairSim.PushSolverData(cmd, componentGroups[i].lineRenderer.sharedMaterial, componentGroups[i].lineRendererMPB, solverData[i]);
-
-				componentGroups[i].lineRenderer.SetPropertyBlock(componentGroups[i].lineRendererMPB);
+				UpdateRenderer(cmd, componentGroups[i], solverData[i]);
 			}
 		}
 
@@ -270,12 +291,31 @@ namespace Unity.DemoTeam.Hair
 			if (!InitializeRuntimeData(cmd))
 				return;
 
+			// draw solver data
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				HairSim.DrawSolverData(cmd, color, depth, solverData[i], debugSettings);
 			}
 
+			// draw volume data
 			HairSim.DrawVolumeData(cmd, color, depth, volumeData, debugSettings);
+		}
+
+		public void UpdateRenderer(CommandBuffer cmd, ComponentGroup componentGroup, in HairSim.SolverData solverData)
+		{
+			var mat = GetStrandMaterial();
+			if (mat != null)
+			{
+				if (componentGroup.lineRenderer.sharedMaterial.shader != mat.shader)
+					componentGroup.lineRenderer.sharedMaterial.shader = mat.shader;
+
+				componentGroup.lineRenderer.sharedMaterial.CopyPropertiesFromMaterial(mat);
+			}
+
+			HairSim.PushSolverData(cmd, componentGroup.lineRenderer.sharedMaterial, componentGroup.lineRendererMPB, solverData);
+
+			componentGroup.lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
+			componentGroup.lineRenderer.SetPropertyBlock(componentGroup.lineRendererMPB);
 		}
 
 		// when to build runtime data?
@@ -374,6 +414,7 @@ namespace Unity.DemoTeam.Hair
 
 					solverData[i].particlePosition.SetData(tmpPosition);
 					solverData[i].particlePositionPrev.SetData(tmpPosition);
+					solverData[i].particlePositionPose.SetData(tmpZero);
 					solverData[i].particlePositionCorr.SetData(tmpZero);
 					solverData[i].particleVelocity.SetData(tmpZero);
 					solverData[i].particleVelocityPrev.SetData(tmpZero);
@@ -381,22 +422,17 @@ namespace Unity.DemoTeam.Hair
 
 				solverData[i].memoryLayout = strandGroup.memoryLayout;
 
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, 1.0f);
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, 0.0f);
 				HairSim.UpdateSolverRoots(cmd, componentGroups[i].rootFilter.sharedMesh, rootTransform, solverData[i]);
 				{
 					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);
 				}
 
-				// initialize the renderer
+				// initialize renderer
 				if (componentGroups[i].lineRendererMPB == null)
 					componentGroups[i].lineRendererMPB = new MaterialPropertyBlock();
 
-				componentGroups[i].lineRenderer.sharedMaterial.CopyPropertiesFromMaterial(groomAsset.settingsBasic.material);
-				componentGroups[i].lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
-
-				HairSim.PushSolverData(cmd, componentGroups[i].lineRenderer.sharedMaterial, componentGroups[i].lineRendererMPB, solverData[i]);
-
-				componentGroups[i].lineRenderer.SetPropertyBlock(componentGroups[i].lineRendererMPB);
+				UpdateRenderer(cmd, componentGroups[i], solverData[i]);
 			}
 
 			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false);
@@ -475,7 +511,7 @@ namespace Unity.DemoTeam.Hair
 						componentGroup.lineFilter.sharedMesh = strandGroups[i].meshAssetLines;
 
 						componentGroup.lineRenderer = linesContainer.AddComponent<MeshRenderer>();
-						componentGroup.lineRenderer.sharedMaterial = new Material(groomAsset.settingsBasic.material);
+						componentGroup.lineRenderer.sharedMaterial = new Material(groom.GetStrandMaterial());
 						componentGroup.lineRenderer.sharedMaterial.hideFlags = HideFlags.NotEditable;
 					}
 

@@ -3,7 +3,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	using static HairGUI;
+	using static HairGUILayout;
 
 	[CustomEditor(typeof(GroomAsset))]
 	public class GroomAssetEditor : Editor
@@ -69,7 +69,7 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUI.settingsBox);
+			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
 				DrawImporterGUI();
 			}
@@ -77,7 +77,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Strand groups", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUI.settingsBox);
+			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
 				DrawStrandGroupsGUI();
 			}
@@ -228,7 +228,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					if (GUILayout.Button("Save changes"))
 					{
-						// TODO
+						//TODO
 					}
 				}
 			}

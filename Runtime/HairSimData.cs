@@ -18,6 +18,7 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particlePosition;
 			public ComputeBuffer particlePositionPrev;
 			public ComputeBuffer particlePositionCorr;
+			public ComputeBuffer particlePositionPose;
 			public ComputeBuffer particleVelocity;
 			public ComputeBuffer particleVelocityPrev;
 
@@ -48,9 +49,14 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer boundaryMatrixInv;
 			public ComputeBuffer boundaryMatrixW2PrevW;
 
-			public Hash128 boundaryHash;//TODO remove
-			public NativeArray<Hash128> boundaryHashPrev;
-			public NativeArray<Matrix4x4> boundaryMatrixPrev;
+			public struct BoundaryInfo
+			{
+				public int instanceID;
+				public Matrix4x4 matrix;
+			}
+
+			public NativeArray<BoundaryInfo> boundaryPrev;
+			public int boundaryPrevCount;
 
 			public VolumeKeywords<bool> keywords;
 		}
@@ -80,6 +86,7 @@ namespace Unity.DemoTeam.Hair
 			public float _DampingFTL;
 			public float _BoundaryFriction;
 			public float _BendingCurvature;
+			public float _ShapeStiffness;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]

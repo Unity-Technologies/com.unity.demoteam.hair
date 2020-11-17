@@ -18,6 +18,7 @@
 #pragma multi_compile_local __ ENABLE_DISTANCE_FTL
 #pragma multi_compile_local __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
 #pragma multi_compile_local __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
+#pragma multi_compile_local __ ENABLE_GLOBAL_SHAPE
 
 #define ENABLE_VOLUME_PRESSURE 1
 #define ENABLE_VOLUME_FRICTION 1
@@ -45,6 +46,9 @@
 #endif
 #ifndef ENABLE_CURVATURE_LEQ
 #define ENABLE_CURVATURE_LEQ 0
+#endif
+#ifndef ENABLE_GLOBAL_SHAPE
+#define ENABLE_GLOBAL_SHAPE 0
 #endif
 
 //---------
@@ -145,7 +149,7 @@ float GetDampingDecay()
 
 float GetIterationStiffness(uint iteration)
 {
-	return 1.0 - pow(abs(1.0 - _Stiffness), 1.0 / (iteration + 1));
+	return 1.0;//1.0 - pow(abs(1.0 - _Stiffness), 1.0 / (iteration + 1));
 }
 
 float GetParticleInterval(uint strandIndex)
@@ -184,6 +188,7 @@ void KInitParticles(
 		
 		_ParticlePosition[i].xyz = p;
 		_ParticlePositionPrev[i].xyz = p;
+		_ParticlePositionPose[i].xyz = _ParticlePosition[i].xyz;
 		_ParticlePositionCorr[i].xyz = 0.0;
 		_ParticleVelocity[i].xyz = 0.0;
 		_ParticleVelocityPrev[i].xyz = 0.0;
@@ -328,6 +333,19 @@ void KSolveConstraints_GaussSeidelReference(
 			_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
 			_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
 		}
+		
+		// solve global shape constraints
+		if (ENABLE_GLOBAL_SHAPE)
+		{
+			for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
+			{
+				float3 p = _ParticlePosition[i].xyz;
+				
+				ApplyDistanceConstraint(0.0f, _ShapeStiffness * stiffness, 0.0, 1.0, _ParticlePositionPose[i].xyz, p);
+				
+				_ParticlePosition[i].xyz = p;
+			}
+		}
 
 		// solve hard distance constraints along strand (FTL)
 		if (ENABLE_DISTANCE_FTL)
@@ -441,6 +459,7 @@ void KSolveConstraints_GaussSeidel(
 		if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.0, 1.0, p0, p1);
 		if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex), p0, p1);
 		if (ENABLE_CURVATURE)			ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 0.0, 1.0, r0, p0, p1);
+		if (ENABLE_GLOBAL_SHAPE)		ApplyDistanceConstraint(0.0, _ShapeStiffness * stiffness, 0.0, 1.0, _ParticlePositionPose[strandParticleBegin + strandParticleStride].xyz, p1);
 		if (ENABLE_DISTANCE_FTL)
 		{
 			if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleBegin].xyz);
@@ -466,6 +485,7 @@ void KSolveConstraints_GaussSeidel(
 		if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
 		if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * 2, _ParticlePosition[strandParticleBegin].xyz, p2);
 		if (ENABLE_CURVATURE)			ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
+		if (ENABLE_GLOBAL_SHAPE)		ApplyDistanceConstraint(0.0, _ShapeStiffness * stiffness, 0.0, 1.0, _ParticlePositionPose[strandParticleBegin + strandParticleStride * 2].xyz, p2);
 		if (ENABLE_DISTANCE_FTL)
 		{
 			if (GS_LIVE_CONSTRAINTS == 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleBegin].xyz);
@@ -491,6 +511,7 @@ void KSolveConstraints_GaussSeidel(
 			if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
 			if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, _ParticlePosition[strandParticleBegin].xyz, p2);
 			if (ENABLE_CURVATURE)			ApplySelectTriangleBendingConstraint(_BendingCurvature, stiffness, 1.0, 1.0, 1.0, p0, p1, p2);
+			if (ENABLE_GLOBAL_SHAPE)		ApplyDistanceConstraint(0.0, _ShapeStiffness * stiffness, 0.0, 1.0, _ParticlePositionPose[i].xyz, p2);
 			if (ENABLE_DISTANCE_FTL)
 			{
 				if (GS_LIVE_CONSTRAINTS == 3) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), r0, p0, _ParticlePositionCorr[i - strandParticleStride * 3].xyz);
@@ -658,6 +679,12 @@ void KSolveConstraints_Jacobi(
 				}
 			}
 
+			// solve global shape constraints
+			if (ENABLE_GLOBAL_SHAPE)
+			{
+				//TODO	
+			}
+			
 			// apply SOR
 			d *= _SOR;
 

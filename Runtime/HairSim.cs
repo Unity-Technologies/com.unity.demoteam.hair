@@ -67,6 +67,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _ParticlePosition;
 			public static int _ParticlePositionPrev;
 			public static int _ParticlePositionCorr;
+			public static int _ParticlePositionPose;
 			public static int _ParticleVelocity;
 			public static int _ParticleVelocityPrev;
 
@@ -135,6 +136,7 @@ namespace Unity.DemoTeam.Hair
 			public T ENABLE_CURVATURE_EQ;
 			public T ENABLE_CURVATURE_GEQ;
 			public T ENABLE_CURVATURE_LEQ;
+			public T ENABLE_GLOBAL_SHAPE;
 		}
 		public struct VolumeKeywords<T>
 		{
@@ -161,7 +163,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
 			[Range(0.0f, 9.0f)]
-			public float strandParticleContrib;// TODO move elsewhere
+			public float strandParticleContrib;//TODO move elsewhere
 
 			[LineHeader("Solver")]
 
@@ -208,13 +210,18 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Scales to [0 .. 90] degrees")]
 			public float curvatureCompareValue;
 
+			[ToggleGroup, Tooltip("Global shape preservation constraint")]
+			public bool shape;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 0.1f), Tooltip("Global shape preservation stiffness")]
+			public float shapeStiffness;
+
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
 				strandDiameter = 1.0f,
 				strandParticleContrib = 1.0f,
 
 				method = Method.GaussSeidel,
-				iterations = 3,
+				iterations = 5,
 				stiffness = 1.0f,
 				kSOR = 1.0f,
 
@@ -232,6 +239,8 @@ namespace Unity.DemoTeam.Hair
 				curvature = false,
 				curvatureCompare = Compare.LessThan,
 				curvatureCompareValue = 0.1f,
+				shape = false,
+				shapeStiffness = 0.5f,
 			};
 		}
 		[Serializable]
@@ -255,9 +264,8 @@ namespace Unity.DemoTeam.Hair
 			public enum TargetDensity
 			{
 				Uniform,
-				//TODO add these
-				//InitialPose,
-				//InitialPoseInParticles,
+				//InitialPose,//TODO
+				//InitialPoseInParticles,//TODO
 			}
 
 			public SplatMethod volumeSplatMethod;
@@ -277,7 +285,16 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Boundaries")]
 
-			public bool boundariesFromPhysics;
+			[ToggleGroup]
+			public bool boundarySDF;
+			[ToggleGroupItem(withLabel = true)]
+			public Texture3D boundarySDFTexture;
+			[ToggleGroup]
+			public bool boundaryShapes;
+			[ToggleGroupItem(withLabel = true)]
+			public LayerMask boundaryShapesLayerMask;
+			[NonReorderable]
+			public HairSimBoundary[] boundaryShapesResident;
 
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
@@ -290,7 +307,11 @@ namespace Unity.DemoTeam.Hair
 				targetDensity = TargetDensity.Uniform,
 				targetDensityTerm = 1.0f,
 
-				boundariesFromPhysics = false,
+				boundaryShapes = true,
+				boundaryShapesLayerMask = Physics.AllLayers,
+				boundaryShapesResident = new HairSimBoundary[0],
+				boundarySDF = false,
+				boundarySDFTexture = null,
 			};
 		}
 
@@ -307,8 +328,8 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Y")] public float drawSliceYOffset;
 			[ToggleGroup] public bool drawSliceZ;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Z")] public float drawSliceZOffset;
-
-			[Range(0.0f, 4.0f), Tooltip("Scrubs between different layers")] public float drawSliceDivider;
+			[Range(0.0f, 4.0f), Tooltip("Scrubs between different layers")]
+			public float drawSliceDivider;
 
 			public static readonly DebugSettings defaults = new DebugSettings()
 			{
@@ -317,11 +338,11 @@ namespace Unity.DemoTeam.Hair
 				drawCellDensity = false,
 				drawCellGradient = false,
 				drawSliceX = false,
-				drawSliceXOffset = 0.4f,
+				drawSliceXOffset = 0.5f,
 				drawSliceY = false,
-				drawSliceYOffset = 0.4f,
+				drawSliceYOffset = 0.5f,
 				drawSliceZ = false,
-				drawSliceZOffset = 0.4f,
+				drawSliceZOffset = 0.5f,
 				drawSliceDivider = 0.0f,
 			};
 		}
@@ -395,6 +416,7 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, particleStride);
+				changed |= CreateBuffer(ref solverData.particlePositionPose, "ParticlePositionPose", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStride);
@@ -443,6 +465,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref solverData.particlePosition);
 			ReleaseBuffer(ref solverData.particlePositionPrev);
+			ReleaseBuffer(ref solverData.particlePositionPose);
 			ReleaseBuffer(ref solverData.particlePositionCorr);
 			ReleaseBuffer(ref solverData.particleVelocity);
 			ReleaseBuffer(ref solverData.particleVelocityPrev);
@@ -470,8 +493,8 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref volumeData.boundaryMatrixInv);
 			ReleaseBuffer(ref volumeData.boundaryMatrixW2PrevW);
 
-			if (volumeData.boundaryMatrixPrev.IsCreated)
-				volumeData.boundaryMatrixPrev.Dispose();
+			if (volumeData.boundaryPrev.IsCreated)
+				volumeData.boundaryPrev.Dispose();
 
 			volumeData = new VolumeData();
 		}
@@ -518,9 +541,10 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._Damping = solverSettings.damping;
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
 
+			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
 			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f * cbuffer._StrandParticleInterval;
-			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
+			cbuffer._ShapeStiffness = solverSettings.shapeStiffness;
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
@@ -528,10 +552,11 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_DISTANCE_LRA = solverSettings.distanceLRA;
 			keywords.ENABLE_DISTANCE_FTL = solverSettings.distanceFTL;
 			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
-			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction != 0.0f);
+			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f);
 			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.Equals);
 			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.GreaterThan);
 			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan);
+			keywords.ENABLE_GLOBAL_SHAPE = (solverSettings.shape && solverSettings.shapeStiffness > 0.0f);
 		}
 
 		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, List<HairSimBoundary> boundaries)
@@ -543,15 +568,16 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._BoundarySphereCount = 0;
 			cbuffer._BoundaryTorusCount = 0;
 
-			using (NativeArray<HairSimBoundary.BoundaryPack> tmpPack = new NativeArray<HairSimBoundary.BoundaryPack>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (NativeArray<Matrix4x4> tmpMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (NativeArray<Matrix4x4> tmpMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (NativeArray<Matrix4x4> tmpMatrixW2PrevW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var tmpPack = new NativeArray<HairSimBoundary.BoundaryPack>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var tmpMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var tmpMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var tmpMatrixW2PrevW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var tmpInfo = new NativeArray<VolumeData.BoundaryInfo>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
-				if (volumeData.boundaryMatrixPrev.IsCreated && volumeData.boundaryMatrixPrev.Length != MAX_BOUNDARIES)
-					volumeData.boundaryMatrixPrev.Dispose();
-				if (volumeData.boundaryMatrixPrev.IsCreated == false)
-					volumeData.boundaryMatrixPrev = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+				if (volumeData.boundaryPrev.IsCreated && volumeData.boundaryPrev.Length != MAX_BOUNDARIES)
+					volumeData.boundaryPrev.Dispose();
+				if (volumeData.boundaryPrev.IsCreated == false)
+					volumeData.boundaryPrev = new NativeArray<VolumeData.BoundaryInfo>(MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
 				unsafe
 				{
@@ -559,7 +585,11 @@ namespace Unity.DemoTeam.Hair
 					var ptrMatrix = (Matrix4x4*)tmpMatrix.GetUnsafePtr();
 					var ptrMatrixInv = (Matrix4x4*)tmpMatrixInv.GetUnsafePtr();
 					var ptrMatrixW2PrevW = (Matrix4x4*)tmpMatrixW2PrevW.GetUnsafePtr();
-					var ptrMatrixPrev = (Matrix4x4*)volumeData.boundaryMatrixPrev.GetUnsafePtr();
+					var ptrInfo = (VolumeData.BoundaryInfo*)tmpInfo.GetUnsafePtr();
+					var ptrInfoPrev = (VolumeData.BoundaryInfo*)volumeData.boundaryPrev.GetUnsafePtr();
+
+					// count boundaries
+					int boundaryCount = 0;
 
 					foreach (HairSimBoundary boundary in boundaries)
 					{
@@ -578,14 +608,16 @@ namespace Unity.DemoTeam.Hair
 								cbuffer._BoundaryTorusCount++;
 								break;
 						}
+
+						if ((boundaryCount++) == MAX_BOUNDARIES)
+							break;
 					}
 
+					// pack boundaries
 					int boundaryCapsuleIndex = 0;
 					int boundarySphereIndex = boundaryCapsuleIndex + cbuffer._BoundaryCapsuleCount;
 					int boundaryTorusIndex = boundarySphereIndex + cbuffer._BoundarySphereCount;
-
-					int boundaryCount = cbuffer._BoundaryCapsuleCount + cbuffer._BoundarySphereCount + boundaryTorusIndex;
-					var boundaryHash = new Hash128();
+					int boundaryCountPack = 0;
 
 					foreach (HairSimBoundary boundary in boundaries)
 					{
@@ -595,44 +627,57 @@ namespace Unity.DemoTeam.Hair
 						switch (boundary.type)
 						{
 							case HairSimBoundary.Type.Capsule:
-								ptrMatrix[boundaryCapsuleIndex] = boundary.transform.localToWorldMatrix;
+								ptrInfo[boundaryCapsuleIndex] = new VolumeData.BoundaryInfo{ instanceID = boundary.transform.GetInstanceID(), matrix = boundary.transform.localToWorldMatrix };
 								ptrPack[boundaryCapsuleIndex++] = HairSimBoundary.Pack(boundary.GetCapsule());
 								break;
 							case HairSimBoundary.Type.Sphere:
-								ptrMatrix[boundarySphereIndex] = boundary.transform.localToWorldMatrix;
+								ptrInfo[boundarySphereIndex] = new VolumeData.BoundaryInfo { instanceID = boundary.transform.GetInstanceID(), matrix = boundary.transform.localToWorldMatrix };
 								ptrPack[boundarySphereIndex++] = HairSimBoundary.Pack(boundary.GetSphere());
 								break;
 							case HairSimBoundary.Type.Torus:
-								ptrMatrix[boundaryTorusIndex] = boundary.transform.localToWorldMatrix;
+								ptrInfo[boundaryTorusIndex] = new VolumeData.BoundaryInfo { instanceID = boundary.transform.GetInstanceID(), matrix = boundary.transform.localToWorldMatrix };
 								ptrPack[boundaryTorusIndex++] = HairSimBoundary.Pack(boundary.GetTorus());
 								break;
 						}
 
-						boundaryHash.Append(boundary.GetInstanceID());
+						if ((boundaryCountPack++) == MAX_BOUNDARIES)
+							break;
 					}
 
-					if (volumeData.boundaryHash != boundaryHash)
-					{
-						//Debug.Log("boundary hash changed: " + boundaryHash);
-						volumeData.boundaryHash = boundaryHash;
-
-						for (int i = 0; i != boundaryCount; i++)
-						{
-							ptrMatrixPrev[i] = ptrMatrix[i];
-						}
-					}
-
+					// finalize
 					for (int i = 0; i != boundaryCount; i++)
 					{
+						int ptrInfoPrevIndex = -1;
+
+						for (int j = 0; j != volumeData.boundaryPrevCount; j++)
+						{
+							if (ptrInfoPrev[j].instanceID == ptrInfo[i].instanceID)
+							{
+								ptrInfoPrevIndex = j;
+								break;
+							}
+						}
+
+						ptrMatrix[i] = ptrInfo[i].matrix;
 						ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i]);
-						ptrMatrixW2PrevW[i] = ptrMatrixPrev[i] * ptrMatrixInv[i];
+
+						if (ptrInfoPrevIndex != -1)
+						{
+							ptrMatrixW2PrevW[i] = ptrInfoPrev[ptrInfoPrevIndex].matrix * ptrMatrixInv[i];
+						}
+						else
+						{
+							ptrMatrixW2PrevW[i] = Matrix4x4.identity;
+						}
 					}
 
 					volumeData.boundaryPack.SetData(tmpPack, 0, 0, boundaryCount);
 					volumeData.boundaryMatrix.SetData(tmpMatrix, 0, 0, boundaryCount);
 					volumeData.boundaryMatrixInv.SetData(tmpMatrixInv, 0, 0, boundaryCount);
 					volumeData.boundaryMatrixW2PrevW.SetData(tmpMatrixW2PrevW, 0, 0, boundaryCount);
-					volumeData.boundaryMatrixPrev.CopyFrom(tmpMatrix);
+
+					volumeData.boundaryPrev.CopyFrom(tmpInfo);
+					volumeData.boundaryPrevCount = boundaryCount;
 				}
 			}
 		}
@@ -642,11 +687,12 @@ namespace Unity.DemoTeam.Hair
 			ref var cbuffer = ref volumeData.cbuffer;
 			ref var keywords = ref volumeData.keywords;
 
-			// update volume parameters
+			// update grid parameters
 			cbuffer._VolumeCells = volumeSettings.volumeGridResolution * Vector3.one;
 			cbuffer._VolumeWorldMin = volumeBounds.min;
 			cbuffer._VolumeWorldMax = volumeBounds.max;
 
+			// update pressure parameters
 			cbuffer._TargetDensityFactor = volumeSettings.targetDensityTerm;
 
 			// update keywords
@@ -663,6 +709,7 @@ namespace Unity.DemoTeam.Hair
 
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePosition, solverData.particlePosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionPose, solverData.particlePositionPose);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
@@ -676,6 +723,7 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
+			CoreUtils.SetKeyword(cs, "ENABLE_GLOBAL_SHAPE", solverData.keywords.ENABLE_GLOBAL_SHAPE);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData)
@@ -688,6 +736,7 @@ namespace Unity.DemoTeam.Hair
 
 			mpb.SetBuffer(UniformIDs._ParticlePosition, solverData.particlePosition);
 			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
+			mpb.SetBuffer(UniformIDs._ParticlePositionPose, solverData.particlePositionPose);
 			mpb.SetBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			mpb.SetBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
@@ -701,6 +750,7 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
+			CoreUtils.SetKeyword(mat, "ENABLE_GLOBAL_SHAPE", solverData.keywords.ENABLE_GLOBAL_SHAPE);
 		}
 
 		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData)

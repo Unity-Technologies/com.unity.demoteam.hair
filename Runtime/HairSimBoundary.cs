@@ -114,7 +114,7 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
-		// TODO support this?
+		//TODO support this?
 		//public static BoundaryPack Pack(in BoundarySphere sphereA, in BoundarySphere sphereB)
 		//{
 		//	return new BoundaryPack()

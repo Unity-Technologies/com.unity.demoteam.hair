@@ -312,7 +312,7 @@ namespace Unity.DemoTeam.Hair
 					// write index data
 					switch (strandGroup.memoryLayout)
 					{
-						//TODO profile this again, first looked indicated slower
+						//TODO profile this again, first look indicated slower
 						//case GroomAsset.MemoryLayout.Interleaved:
 						//	for (int j = 0; j != wireStrandLineCount; j++)
 						//	{

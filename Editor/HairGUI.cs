@@ -1,51 +1,49 @@
 ﻿using UnityEngine;
 using UnityEditor;
 
-public static class HairGUI
+public static class HairGUIStyles
 {
-	public static readonly GUIStyle settingsBox;
+	public static readonly GUIStyle settingsBox = new GUIStyle(EditorStyles.helpBox);
+}
 
-	static HairGUI()
+public static class HairGUILayout
+{
+	public static void StructPropertyFields(SerializedProperty property)
 	{
-		settingsBox = new GUIStyle(EditorStyles.helpBox);
-	}
-
-	public static void StructPropertyFields(SerializedProperty settings)
-	{
-		if (settings.hasChildren)
+		if (property.hasChildren)
 		{
-			var itSiblings = settings.Copy();
-			var itChildren = settings.Copy();
+			var nextSibling = property.Copy();
+			var nextChild = property.Copy();
 
-			itSiblings.Next(enterChildren: false);
+			nextSibling.Next(enterChildren: false);
 
-			if (itChildren.NextVisible(enterChildren: true))
+			if (nextChild.NextVisible(enterChildren: true))
 			{
-				EditorGUILayout.PropertyField(itChildren, includeChildren: true);
+				EditorGUILayout.PropertyField(nextChild, includeChildren: true);
 
-				while (itChildren.NextVisible(enterChildren: false))
+				while (nextChild.NextVisible(enterChildren: false))
 				{
-					if (SerializedProperty.EqualContents(itSiblings, itChildren))
+					if (SerializedProperty.EqualContents(nextSibling, nextChild))
 						break;
 
-					EditorGUILayout.PropertyField(itChildren, includeChildren: true);
+					EditorGUILayout.PropertyField(nextChild, includeChildren: true);
 				}
 			}
 		}
 	}
 
-	public static void StructPropertyFieldsWithHeader(SerializedProperty settings, string label)
+	public static void StructPropertyFieldsWithHeader(SerializedProperty property, string label)
 	{
 		EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
 		using (new EditorGUI.IndentLevelScope())
 		{
 			// settings.isExpanded
-			StructPropertyFields(settings);
+			StructPropertyFields(property);
 		}
 	}
 
-	public static void StructPropertyFieldsWithHeader(SerializedProperty settings)
+	public static void StructPropertyFieldsWithHeader(SerializedProperty property)
 	{
-		StructPropertyFieldsWithHeader(settings, settings.displayName);
+		StructPropertyFieldsWithHeader(property, property.displayName);
 	}
 }

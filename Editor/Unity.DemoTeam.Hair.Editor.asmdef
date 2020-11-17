@@ -1,8 +1,9 @@
 {
     "name": "Unity.DemoTeam.Hair.Editor",
+    "rootNamespace": "",
     "references": [
-        "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:f9dedde5eec30c2468e14d8a7b14626e",
+        "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:78bd2ddd6e276394a9615c203e574844",
         "GUID:22f31b74491fb45d5b598e0b935deb31"
     ],
