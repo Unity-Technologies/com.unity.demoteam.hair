@@ -158,7 +158,7 @@ namespace Unity.DemoTeam.Hair
 					case HairSim.SolverSettings.Method.GaussSeidel:
 						if (strandMemoryLayout != GroomAsset.MemoryLayout.Interleaved)
 						{
-							EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'.\nConsider changing memory layout in the asset.", MessageType.Warning, wide: true);
+							EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'. This is fixable by changing memory layout in the asset.", MessageType.Warning, wide: true);
 						}
 						break;
 
@@ -168,11 +168,11 @@ namespace Unity.DemoTeam.Hair
 							strandParticleCount != 64 &&
 							strandParticleCount != 128)
 						{
-							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64 or 128.\nUsing slow reference solver as fallback.\nConsider resampling curves in asset.", MessageType.Error, wide: true);
+							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64, 128. Using slow reference solver as fallback. This is fixable by resampling curves in the asset.", MessageType.Error, wide: true);
 						}
-						else if (strandMemoryLayout != GroomAsset.MemoryLayout.Sequential)
+						if (strandMemoryLayout != GroomAsset.MemoryLayout.Sequential)
 						{
-							EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'.\nConsider changing memory layout in the asset.", MessageType.Warning, wide: true);
+							EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'.  This is fixable by changing memory layout in the asset.", MessageType.Warning, wide: true);
 						}
 						break;
 				}
@@ -201,7 +201,7 @@ namespace Unity.DemoTeam.Hair
 					GUI.color = color;
 
 					var discarded = groom.volumeData.boundaryPrevCountDiscarded;
-					if (discarded > -1)
+					if (discarded > 0)
 					{
 						rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
 

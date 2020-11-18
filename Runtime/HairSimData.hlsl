@@ -14,9 +14,9 @@
 #define HAIRSIM_SOLVERDATA StructuredBuffer
 #endif
 
-HAIRSIM_SOLVERDATA<float> _Length;
-HAIRSIM_SOLVERDATA<float4> _RootPosition;
-HAIRSIM_SOLVERDATA<float4> _RootDirection;
+StructuredBuffer<float> _Length;
+StructuredBuffer<float4> _RootPosition;
+StructuredBuffer<float4> _RootDirection;
 
 HAIRSIM_SOLVERDATA<float4> _ParticlePosition;
 HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;

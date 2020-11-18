@@ -236,7 +236,12 @@ namespace Unity.DemoTeam.Hair
 			// step solver data
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, dt);
+				var rootFilter = componentGroups[i].rootFilter;
+
+				var strandScale = GetSimulationStrandScale();
+				var strandTransform = Matrix4x4.TRS(rootFilter.transform.position, rootFilter.transform.rotation, Vector3.one * strandScale);
+
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, dt);
 				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings, volumeData);
 			}
 
@@ -387,7 +392,7 @@ namespace Unity.DemoTeam.Hair
 
 				solverData[i].memoryLayout = strandGroup.memoryLayout;
 
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, 0.0f);
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, rootTransform, 0.0f);
 				HairSim.UpdateSolverRoots(cmd, componentGroups[i].rootFilter.sharedMesh, rootTransform, solverData[i]);
 				{
 					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);

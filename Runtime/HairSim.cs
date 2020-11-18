@@ -139,7 +139,7 @@ namespace Unity.DemoTeam.Hair
 			public T ENABLE_CURVATURE_EQ;
 			public T ENABLE_CURVATURE_GEQ;
 			public T ENABLE_CURVATURE_LEQ;
-			public T ENABLE_GLOBAL_SHAPE;
+			public T ENABLE_SHAPE_GLOBAL;
 		}
 		public struct VolumeKeywords<T>
 		{
@@ -172,9 +172,9 @@ namespace Unity.DemoTeam.Hair
 
 			[Tooltip("Constraint solver")]
 			public Method method;
-			[Range(1, 100), Tooltip("Global constraint iterations")]
+			[Range(1, 100), Tooltip("Constraint iterations")]
 			public int iterations;
-			[Range(0.0f, 1.0f), Tooltip("Global constraint stiffness")]
+			[Range(0.0f, 1.0f), Tooltip("Constraint stiffness")]
 			public float stiffness;
 			[Range(1.0f, 2.0f), Tooltip("Successive-over-relaxation factor")]
 			public float kSOR;
@@ -215,7 +215,7 @@ namespace Unity.DemoTeam.Hair
 
 			[ToggleGroup, Tooltip("Global shape preservation constraint")]
 			public bool shape;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 0.1f), Tooltip("Global shape preservation stiffness")]
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Global shape preservation stiffness")]
 			public float shapeStiffness;
 
 			public static readonly SolverSettings defaults = new SolverSettings()
@@ -502,7 +502,7 @@ namespace Unity.DemoTeam.Hair
 			volumeData = new VolumeData();
 		}
 
-		public static void UpdateSolverRoots(CommandBuffer cmd, Mesh rootMesh, Matrix4x4 rootTransform, in SolverData solverData)
+		public static void UpdateSolverRoots(CommandBuffer cmd, Mesh rootMesh, in Matrix4x4 rootTransform, in SolverData solverData)
 		{
 			var solverDataCopy = solverData;
 			{
@@ -518,14 +518,14 @@ namespace Unity.DemoTeam.Hair
 			cmd.ClearRandomWriteTargets();
 		}
 
-		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, float dt)
+		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, float dt)
 		{
 			ref var cbuffer = ref solverData.cbuffer;
 			ref var keywords = ref solverData.keywords;
 
 			// update strand parameters
-			cbuffer._LocalToWorld = Matrix4x4.identity;
-			cbuffer._LocalToWorldInvT = Matrix4x4.identity;
+			cbuffer._LocalToWorld = rootTransform;
+			cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
 
 			float strandCrossSectionArea = 0.25f * Mathf.PI * solverSettings.strandDiameter * solverSettings.strandDiameter;
 			float strandParticleVolume = (1000.0f * cbuffer._StrandParticleInterval) * strandCrossSectionArea;
@@ -559,7 +559,7 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.Equals);
 			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.GreaterThan);
 			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan);
-			keywords.ENABLE_GLOBAL_SHAPE = (solverSettings.shape && solverSettings.shapeStiffness > 0.0f);
+			keywords.ENABLE_SHAPE_GLOBAL = (solverSettings.shape && solverSettings.shapeStiffness > 0.0f);
 		}
 
 		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds overlapBounds)
@@ -760,7 +760,7 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			CoreUtils.SetKeyword(cs, "ENABLE_GLOBAL_SHAPE", solverData.keywords.ENABLE_GLOBAL_SHAPE);
+			CoreUtils.SetKeyword(cs, "ENABLE_SHAPE_GLOBAL", solverData.keywords.ENABLE_SHAPE_GLOBAL);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData)
@@ -787,7 +787,7 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			CoreUtils.SetKeyword(mat, "ENABLE_GLOBAL_SHAPE", solverData.keywords.ENABLE_GLOBAL_SHAPE);
+			CoreUtils.SetKeyword(mat, "ENABLE_SHAPE_GLOBAL", solverData.keywords.ENABLE_SHAPE_GLOBAL);
 		}
 
 		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData)
