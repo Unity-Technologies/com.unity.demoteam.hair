@@ -19,6 +19,9 @@ namespace Unity.DemoTeam.Hair
 	{
 		static bool s_initialized = false;
 
+		static Collider[] s_boundariesOverlapResult = new Collider[64];
+		static List<HairSimBoundary> s_boundariesTemp = new List<HairSimBoundary>();
+
 		static ComputeShader s_solverCS;
 		static ComputeShader s_volumeCS;
 
@@ -559,9 +562,45 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_GLOBAL_SHAPE = (solverSettings.shape && solverSettings.shapeStiffness > 0.0f);
 		}
 
-		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, List<HairSimBoundary> boundaries)
+		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds overlapBounds)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
+
+			// gather distinct boundaries
+			s_boundariesTemp.Clear();
+			{
+				foreach (var shape in volumeSettings.boundaryShapesResident)
+				{
+					if (shape != null)
+					{
+						if (s_boundariesTemp.Contains(shape) == false)
+							s_boundariesTemp.Add(shape);
+					}
+				}
+
+				if (volumeSettings.boundaryShapes)
+				{
+					var result = s_boundariesOverlapResult;
+					var resultCount = Physics.OverlapBoxNonAlloc(overlapBounds.center, overlapBounds.extents, result, Quaternion.identity);
+
+					for (int i = 0; i != resultCount; i++)
+					{
+						var shape = result[i].GetComponent<HairSimBoundary>();
+						if (shape != null)
+						{
+							if (s_boundariesTemp.Contains(shape) == false)
+								s_boundariesTemp.Add(shape);
+						}
+					}
+				}
+
+				s_boundariesTemp.Sort((a, b) => a.GetInstanceID().CompareTo(b.GetInstanceID()));
+
+				if (volumeSettings.boundarySDF)
+				{
+					//TODO
+				}
+			}
 
 			// update boundary shapes
 			cbuffer._BoundaryCapsuleCount = 0;
@@ -588,10 +627,10 @@ namespace Unity.DemoTeam.Hair
 					var ptrInfo = (VolumeData.BoundaryInfo*)tmpInfo.GetUnsafePtr();
 					var ptrInfoPrev = (VolumeData.BoundaryInfo*)volumeData.boundaryPrev.GetUnsafePtr();
 
-					// count boundaries
+					// count boundary shapes
 					int boundaryCount = 0;
 
-					foreach (HairSimBoundary boundary in boundaries)
+					foreach (HairSimBoundary boundary in s_boundariesTemp)
 					{
 						if (boundary == null || !boundary.isActiveAndEnabled)
 							continue;
@@ -613,13 +652,13 @@ namespace Unity.DemoTeam.Hair
 							break;
 					}
 
-					// pack boundaries
+					// pack boundary shapes
 					int boundaryCapsuleIndex = 0;
 					int boundarySphereIndex = boundaryCapsuleIndex + cbuffer._BoundaryCapsuleCount;
 					int boundaryTorusIndex = boundarySphereIndex + cbuffer._BoundarySphereCount;
 					int boundaryCountPack = 0;
 
-					foreach (HairSimBoundary boundary in boundaries)
+					foreach (HairSimBoundary boundary in s_boundariesTemp)
 					{
 						if (boundary == null || !boundary.isActiveAndEnabled)
 							continue;
@@ -644,7 +683,7 @@ namespace Unity.DemoTeam.Hair
 							break;
 					}
 
-					// finalize
+					// update matrices
 					for (int i = 0; i != boundaryCount; i++)
 					{
 						int ptrInfoPrevIndex = -1;
@@ -661,14 +700,11 @@ namespace Unity.DemoTeam.Hair
 						ptrMatrix[i] = ptrInfo[i].matrix;
 						ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i]);
 
+						// world to previous world
 						if (ptrInfoPrevIndex != -1)
-						{
 							ptrMatrixW2PrevW[i] = ptrInfoPrev[ptrInfoPrevIndex].matrix * ptrMatrixInv[i];
-						}
 						else
-						{
 							ptrMatrixW2PrevW[i] = Matrix4x4.identity;
-						}
 					}
 
 					volumeData.boundaryPack.SetData(tmpPack, 0, 0, boundaryCount);
@@ -678,11 +714,12 @@ namespace Unity.DemoTeam.Hair
 
 					volumeData.boundaryPrev.CopyFrom(tmpInfo);
 					volumeData.boundaryPrevCount = boundaryCount;
+					volumeData.boundaryPrevCountDiscarded = s_boundariesTemp.Count - boundaryCount;
 				}
 			}
 		}
 
-		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, Bounds volumeBounds)
+		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
 			ref var keywords = ref volumeData.keywords;

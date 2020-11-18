@@ -2721,7 +2721,7 @@ MonoBehaviour:
   solverSettings:
     strandDiameter: 44.8
     strandParticleContrib: 1
-    method: 1
+    method: 2
     iterations: 1
     stiffness: 1
     kSOR: 1

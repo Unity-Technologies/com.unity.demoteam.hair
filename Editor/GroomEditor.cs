@@ -123,7 +123,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					using (new EditorGUI.IndentLevelScope())
 					{
-						EditorGUILayout.HelpBox("Root attachments require package: 'com.demoteam.digital-human'.", MessageType.None, wide: true);
+						EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human'.", MessageType.None, wide: true);
 					}
 				}
 
@@ -168,7 +168,7 @@ namespace Unity.DemoTeam.Hair
 							strandParticleCount != 64 &&
 							strandParticleCount != 128)
 						{
-							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64 or 128.\nUsing slow reference solver as fallback. Consider resampling curves in asset.", MessageType.Error, wide: true);
+							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64 or 128.\nUsing slow reference solver as fallback.\nConsider resampling curves in asset.", MessageType.Error, wide: true);
 						}
 						else if (strandMemoryLayout != GroomAsset.MemoryLayout.Sequential)
 						{
@@ -192,12 +192,23 @@ namespace Unity.DemoTeam.Hair
 					var countPack = countCapsule + countSphere + countTorus;
 					var countTxt = countPack + " active shapes (" + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus)";
 
-					var rect = GUILayoutUtility.GetRect(0f, 20.0f, GUILayout.ExpandWidth(true));
+					var rectHeight = GUI.skin.box.CalcHeight(new GUIContent(string.Empty), 0.0f);
+					var rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
 
 					var color = GUI.color;
 					GUI.color = Color.white;
 					GUI.Box(EditorGUI.IndentedRect(rect), countTxt);
 					GUI.color = color;
+
+					var discarded = groom.volumeData.boundaryPrevCountDiscarded;
+					if (discarded > -1)
+					{
+						rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
+
+						GUI.color = Color.red;
+						GUI.Box(EditorGUI.IndentedRect(rect), discarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")");
+						GUI.color = color;
+					}
 				}
 
 				EditorGUILayout.Space();

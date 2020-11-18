@@ -57,6 +57,7 @@ namespace Unity.DemoTeam.Hair
 
 			public NativeArray<BoundaryInfo> boundaryPrev;
 			public int boundaryPrevCount;
+			public int boundaryPrevCountDiscarded;
 
 			public VolumeKeywords<bool> keywords;
 		}

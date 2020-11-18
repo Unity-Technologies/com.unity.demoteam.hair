@@ -22,8 +22,6 @@ namespace Unity.DemoTeam.Hair
 	{
 		public static HashSet<Groom> s_instances = new HashSet<Groom>();
 
-		static List<HairSimBoundary> s_boundaries = new List<HairSimBoundary>();
-
 		[Serializable]
 		public struct ComponentGroup
 		{
@@ -100,8 +98,6 @@ namespace Unity.DemoTeam.Hair
 
 		public HairSim.SolverData[] solverData;
 		public HairSim.VolumeData volumeData;
-
-		[NonReorderable] public static Collider[] boundariesOverlapResult = new Collider[64];
 
 		void OnEnable()
 		{
@@ -228,38 +224,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// update volume boundaries
-			s_boundaries.Clear();
-			{
-				foreach (var shape in volumeSettings.boundaryShapesResident)
-				{
-					if (shape != null)
-					{
-						s_boundaries.Add(shape);
-					}
-				}
-
-				if (volumeSettings.boundaryShapes)
-				{
-					var result = boundariesOverlapResult;
-					var resultCount = Physics.OverlapBoxNonAlloc(simulationBounds.center, simulationBounds.extents, result, Quaternion.identity);
-
-					for (int i = 0; i != resultCount; i++)
-					{
-						var shape = result[i].GetComponent<HairSimBoundary>();
-						if (shape != null)
-						{
-							s_boundaries.Add(shape);
-						}
-					}
-				}
-
-				if (volumeSettings.boundarySDF)
-				{
-					//TODO
-				}
-			}
-
-			HairSim.UpdateVolumeBoundaries(ref volumeData, s_boundaries);
+			HairSim.UpdateVolumeBoundaries(ref volumeData, volumeSettings, simulationBounds);
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
