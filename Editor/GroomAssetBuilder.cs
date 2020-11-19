@@ -83,9 +83,12 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			// save the asset
+			// dirty the asset
 			EditorUtility.SetDirty(groom);
+
+			// save and re-import
 			AssetDatabase.SaveAssets();
+			AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(groom));
 		}
 
 		public static void BuildGroomAsset(GroomAsset groom, in GroomAsset.SettingsAlembic settings, GroomAsset.MemoryLayout memoryLayout)

@@ -12,9 +12,11 @@ namespace Unity.DemoTeam.Attributes
 	public class ToggleGroupItemAttribute : PropertyAttribute
 	{
 		public bool withLabel;
-		public ToggleGroupItemAttribute(bool withLabel = false)
+		public bool allowSceneObjects;
+		public ToggleGroupItemAttribute(bool withLabel = false, bool allowSceneObjects = true)
 		{
 			this.withLabel = withLabel;
+			this.allowSceneObjects = allowSceneObjects;
 		}
 	}
 
@@ -113,7 +115,7 @@ namespace Unity.DemoTeam.Attributes
 
 						case SerializedPropertyType.ObjectReference:
 							{
-								property.objectReferenceValue = EditorGUILayout.ObjectField(property.objectReferenceValue, field.FieldType, false);
+								property.objectReferenceValue = EditorGUILayout.ObjectField(property.objectReferenceValue, field.FieldType, allowSceneObjects: groupItem.allowSceneObjects);
 							}
 							break;
 

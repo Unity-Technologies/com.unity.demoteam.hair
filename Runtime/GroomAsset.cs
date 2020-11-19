@@ -4,8 +4,7 @@ using UnityEngine.Formats.Alembic.Importer;
 
 namespace Unity.DemoTeam.Hair
 {
-	[CreateAssetMenu]
-	[PreferBinarySerialization]
+	[PreferBinarySerialization, CreateAssetMenu]
 	public class GroomAsset : ScriptableObject
 	{
 		public enum Type
@@ -43,9 +42,9 @@ namespace Unity.DemoTeam.Hair
 			[Tooltip("Alembic asset containing at least one set of curves")]
 			public AlembicStreamPlayer sourceAsset;
 			[Tooltip("Resample curves to ensure a specific number of particles along each strand")]
-			public bool resampleCurves;
+			public bool resampleCurves;//TODO
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
-			public int resampleParticleCount;
+			public int resampleParticleCount;//TODO
 
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
 			{

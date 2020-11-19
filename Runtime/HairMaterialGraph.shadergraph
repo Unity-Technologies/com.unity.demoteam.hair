@@ -4,6 +4,9 @@
     "m_ObjectId": "72f98e211c5d47b9b4fca984ffc882a6",
     "m_Properties": [
         {
+            "m_Id": "ba5153f044094f5889aba034d1efd4c9"
+        },
+        {
             "m_Id": "62c64135deeb4c0f8f8dd2dd4d258618"
         },
         {
@@ -1863,6 +1866,23 @@
     "m_Labels": [
         "X"
     ]
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Internal.BooleanShaderProperty",
+    "m_ObjectId": "ba5153f044094f5889aba034d1efd4c9",
+    "m_Guid": {
+        "m_GuidSerialized": "1dd0ff41-6875-44ca-82e3-f72f8da0b51a"
+    },
+    "m_Name": "HAIRMATERIALTAG",
+    "m_DefaultReferenceName": "Boolean_ba5153f044094f5889aba034d1efd4c9",
+    "m_OverrideReferenceName": "HAIRMATERIALTAG",
+    "m_GeneratePropertyBlock": true,
+    "m_Precision": 0,
+    "m_GPUInstanced": false,
+    "m_Hidden": false,
+    "m_Value": false
 }
 
 {

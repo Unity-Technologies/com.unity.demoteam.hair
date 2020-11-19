@@ -39,10 +39,10 @@ namespace Unity.DemoTeam.Hair
 		public struct SettingsRoots
 		{
 #if UNITY_DEMOTEAM_DIGITALHUMAN
-			[HideInInspector]
-			public SkinAttachmentTarget rootsTargetActive;
-			public SkinAttachmentTarget rootsTarget;
+			[ToggleGroup]
 			public bool rootsAttached;
+			[ToggleGroupItem]
+			public SkinAttachmentTarget rootsAttachedTarget;
 #endif
 		}
 
@@ -127,6 +127,34 @@ namespace Unity.DemoTeam.Hair
 		void Update()
 		{
 			InitializeComponents();
+
+#if UNITY_DEMOTEAM_DIGITALHUMAN
+			var subjectsChanged = false;
+			{
+				foreach (var componentGroup in componentGroups)
+				{
+					var subject = componentGroup.rootAttachment;
+					if (subject != null && (subject.target != settingsRoots.rootsAttachedTarget || subject.attached != settingsRoots.rootsAttached))
+					{
+						subject.target = settingsRoots.rootsAttachedTarget;
+
+						if (subject.target != null && settingsRoots.rootsAttached)
+							subject.Attach(storePositionRotation: false);
+						else
+							subject.Detach(revertPositionRotation: false);
+
+						subjectsChanged = true;
+					}
+				}
+			}
+			if (subjectsChanged && settingsRoots.rootsAttachedTarget != null)
+			{
+				settingsRoots.rootsAttachedTarget.CommitSubjectsIfRequired();
+	#if UNITY_EDITOR
+				UnityEditor.EditorUtility.SetDirty(settingsRoots.rootsAttachedTarget);
+	#endif
+			}
+#endif
 		}
 
 		public static Bounds GetRootBounds(MeshFilter rootFilter)
@@ -338,6 +366,17 @@ namespace Unity.DemoTeam.Hair
 			if (solverData != null && solverData.Length == strandGroups.Length)
 				return true;
 
+			/*if (settingsRoots.rootsAttached && settingsRoots.rootsAttachedTarget)
+			{
+				Debug.Log("---init---");
+				Debug.Log("original bounds: " + strandGroups[0].meshAssetRoots.bounds);
+				Debug.Log("rootFilter bounds: " + componentGroups[0].rootFilter.sharedMesh.bounds);
+				Debug.Log("rootFilter position: " + componentGroups[0].rootFilter.transform.position);
+				Debug.Log("attachment bounds: " + componentGroups[0].rootAttachment.meshInstance.bounds);
+				Debug.Log("attachment position: " + componentGroups[0].rootAttachment.transform.position);
+				Debug.Log("attachmentTarget position: " + settingsRoots.rootsAttachedTarget.transform.position);
+			}*/
+
 			solverData = new HairSim.SolverData[strandGroups.Length];
 
 			for (int i = 0; i != strandGroups.Length; i++)
@@ -495,8 +534,8 @@ namespace Unity.DemoTeam.Hair
 						componentGroup.rootFilter.sharedMesh = strandGroups[i].meshAssetRoots;
 
 #if UNITY_DEMOTEAM_DIGITALHUMAN
-						//componentGroup.rootAttachment = rootsContainer.AddComponent<SkinAttachment>();
-						//componentGroup.rootAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
+						componentGroup.rootAttachment = rootsContainer.AddComponent<SkinAttachment>();
+						componentGroup.rootAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
 #endif
 					}
 				}

@@ -3,7 +3,17 @@ using UnityEditor;
 
 public static class HairGUIStyles
 {
-	public static readonly GUIStyle settingsBox = new GUIStyle(EditorStyles.helpBox);
+	public static readonly GUIStyle settingsBox;
+
+	public static readonly GUIStyle statusBox;
+
+	static HairGUIStyles()
+	{
+		settingsBox = new GUIStyle(EditorStyles.helpBox);
+
+		statusBox = new GUIStyle(GUI.skin.box);
+		statusBox.normal.textColor = statusBox.hover.textColor;
+	}
 }
 
 public static class HairGUILayout

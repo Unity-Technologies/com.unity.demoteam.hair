@@ -116,6 +116,12 @@ namespace Unity.DemoTeam.Hair
 			if (groom == null)
 				return;
 
+			var material = groom.GetStrandMaterial();
+			if (material != null && !material.HasProperty("HAIRMATERIALTAG"))
+			{
+				EditorGUILayout.HelpBox("Configuration warning: Active material does not define property 'HAIRMATERIALTAG'.", MessageType.Warning, wide: true);
+			}
+
 			EditorGUI.BeginChangeCheck();
 			{
 				StructPropertyFieldsWithHeader(_settingsRoots);
@@ -170,7 +176,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64, 128. Using slow reference solver as fallback. This is fixable by resampling curves in the asset.", MessageType.Error, wide: true);
 						}
-						if (strandMemoryLayout != GroomAsset.MemoryLayout.Sequential)
+						else if (strandMemoryLayout != GroomAsset.MemoryLayout.Sequential)
 						{
 							EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'.  This is fixable by changing memory layout in the asset.", MessageType.Warning, wide: true);
 						}
@@ -197,7 +203,7 @@ namespace Unity.DemoTeam.Hair
 
 					var color = GUI.color;
 					GUI.color = Color.white;
-					GUI.Box(EditorGUI.IndentedRect(rect), countTxt);
+					GUI.Box(EditorGUI.IndentedRect(rect), countTxt, HairGUIStyles.statusBox);
 					GUI.color = color;
 
 					var discarded = groom.volumeData.boundaryPrevCountDiscarded;
@@ -206,7 +212,7 @@ namespace Unity.DemoTeam.Hair
 						rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
 
 						GUI.color = Color.red;
-						GUI.Box(EditorGUI.IndentedRect(rect), discarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")");
+						GUI.Box(EditorGUI.IndentedRect(rect), discarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox);
 						GUI.color = color;
 					}
 				}
