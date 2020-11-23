@@ -43,6 +43,8 @@ namespace Unity.DemoTeam.Hair
 			public bool rootsAttached;
 			[ToggleGroupItem]
 			public SkinAttachmentTarget rootsAttachedTarget;
+			[HideInInspector]
+			public PrimarySkinningBone rootsAttachedTargetBone;//TODO move to ComponentGroup?
 #endif
 		}
 
@@ -139,17 +141,25 @@ namespace Unity.DemoTeam.Hair
 						subject.target = settingsRoots.rootsAttachedTarget;
 
 						if (subject.target != null && settingsRoots.rootsAttached)
+						{
 							subject.Attach(storePositionRotation: false);
+						}
 						else
+						{
 							subject.Detach(revertPositionRotation: false);
+							subject.checksum0 = 0;
+							subject.checksum1 = 0;
+						}
 
 						subjectsChanged = true;
 					}
 				}
 			}
+
 			if (subjectsChanged && settingsRoots.rootsAttachedTarget != null)
 			{
 				settingsRoots.rootsAttachedTarget.CommitSubjectsIfRequired();
+				settingsRoots.rootsAttachedTargetBone = new PrimarySkinningBone(settingsRoots.rootsAttachedTarget.transform);
 	#if UNITY_EDITOR
 				UnityEditor.EditorUtility.SetDirty(settingsRoots.rootsAttachedTarget);
 	#endif
@@ -157,10 +167,21 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
-		public static Bounds GetRootBounds(MeshFilter rootFilter)
+		public Quaternion GetRootRotation(in ComponentGroup group)
 		{
-			var rootBounds = rootFilter.sharedMesh.bounds;
-			var rootTransform = rootFilter.transform;
+#if UNITY_DEMOTEAM_DIGITALHUMAN
+			if (settingsRoots.rootsAttached && settingsRoots.rootsAttachedTarget != null)
+			{
+				return settingsRoots.rootsAttachedTargetBone.skinningBone.rotation;
+			}
+#endif
+			return group.rootFilter.transform.rotation;
+		}
+
+		public static Bounds GetRootBounds(in ComponentGroup group)
+		{
+			var rootBounds = group.rootFilter.sharedMesh.bounds;
+			var rootTransform = group.rootFilter.transform;
 
 			var localCenter = rootBounds.center;
 			var localExtent = rootBounds.extents;
@@ -181,12 +202,12 @@ namespace Unity.DemoTeam.Hair
 			Debug.Assert(groomAsset.strandGroups != null);
 
 			var scaleFactor = GetSimulationStrandScale();
-			var worldBounds = GetRootBounds(componentGroups[0].rootFilter);
+			var worldBounds = GetRootBounds(componentGroups[0]);
 			var worldMargin = groomAsset.strandGroups[0].strandLengthMax * scaleFactor;
 
 			for (int i = 1; i != componentGroups.Length; i++)
 			{
-				worldBounds.Encapsulate(GetRootBounds(componentGroups[i].rootFilter));
+				worldBounds.Encapsulate(GetRootBounds(componentGroups[i]));
 				worldMargin = Mathf.Max(groomAsset.strandGroups[i].strandLengthMax * scaleFactor, worldMargin);
 			}
 
@@ -267,7 +288,7 @@ namespace Unity.DemoTeam.Hair
 				var rootFilter = componentGroups[i].rootFilter;
 
 				var strandScale = GetSimulationStrandScale();
-				var strandTransform = Matrix4x4.TRS(rootFilter.transform.position, rootFilter.transform.rotation, Vector3.one * strandScale);
+				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, dt);
 				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings, volumeData);
@@ -366,17 +387,6 @@ namespace Unity.DemoTeam.Hair
 			if (solverData != null && solverData.Length == strandGroups.Length)
 				return true;
 
-			/*if (settingsRoots.rootsAttached && settingsRoots.rootsAttachedTarget)
-			{
-				Debug.Log("---init---");
-				Debug.Log("original bounds: " + strandGroups[0].meshAssetRoots.bounds);
-				Debug.Log("rootFilter bounds: " + componentGroups[0].rootFilter.sharedMesh.bounds);
-				Debug.Log("rootFilter position: " + componentGroups[0].rootFilter.transform.position);
-				Debug.Log("attachment bounds: " + componentGroups[0].rootAttachment.meshInstance.bounds);
-				Debug.Log("attachment position: " + componentGroups[0].rootAttachment.transform.position);
-				Debug.Log("attachmentTarget position: " + settingsRoots.rootsAttachedTarget.transform.position);
-			}*/
-
 			solverData = new HairSim.SolverData[strandGroups.Length];
 
 			for (int i = 0; i != strandGroups.Length; i++)
@@ -387,7 +397,7 @@ namespace Unity.DemoTeam.Hair
 				var rootTransform = rootFilter.transform.localToWorldMatrix;
 
 				var strandScale = GetSimulationStrandScale();
-				var strandTransform = Matrix4x4.TRS(rootFilter.transform.position, rootFilter.transform.rotation, Vector3.one * strandScale);
+				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 
@@ -431,7 +441,7 @@ namespace Unity.DemoTeam.Hair
 
 				solverData[i].memoryLayout = strandGroup.memoryLayout;
 
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, rootTransform, 0.0f);
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, 0.0f);
 				HairSim.UpdateSolverRoots(cmd, componentGroups[i].rootFilter.sharedMesh, rootTransform, solverData[i]);
 				{
 					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);
@@ -536,12 +546,73 @@ namespace Unity.DemoTeam.Hair
 #if UNITY_DEMOTEAM_DIGITALHUMAN
 						componentGroup.rootAttachment = rootsContainer.AddComponent<SkinAttachment>();
 						componentGroup.rootAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
+						componentGroup.rootAttachment.forceRecalculateBounds = true;
 #endif
 					}
 				}
 
 				groom.componentGroups[i].container = container;
 			}
+		}
+	}
+
+	[Serializable]
+	public struct PrimarySkinningBone
+	{
+		public Transform skinningBone;
+		public Matrix4x4 skinningBoneBindPose;
+		public Matrix4x4 skinningBoneBindPoseInverse;
+
+		public PrimarySkinningBone(Transform transform)
+		{
+			this.skinningBone = transform;
+			this.skinningBoneBindPose = Matrix4x4.identity;
+			this.skinningBoneBindPoseInverse = Matrix4x4.identity;
+
+			// search for skinning bone
+			var smr = transform.GetComponent<SkinnedMeshRenderer>();
+			if (smr != null)
+			{
+				var skinningBoneIndex = -1;
+				var skinningBoneWeight = 0.0f;
+
+				unsafe
+				{
+					var boneWeights = smr.sharedMesh.GetAllBoneWeights();
+					var boneWeightPtr = (BoneWeight1*)boneWeights.GetUnsafeReadOnlyPtr();
+
+					for (int i = 0; i != boneWeights.Length; i++)
+					{
+						if (skinningBoneWeight < boneWeightPtr[i].weight)
+						{
+							skinningBoneWeight = boneWeightPtr[i].weight;
+							skinningBoneIndex = boneWeightPtr[i].boneIndex;
+						}
+					}
+				}
+
+				if (skinningBoneIndex != -1)
+				{
+					this.skinningBone = smr.bones[skinningBoneIndex];
+					this.skinningBoneBindPose = smr.sharedMesh.bindposes[skinningBoneIndex];
+					this.skinningBoneBindPoseInverse = skinningBoneBindPose.inverse;
+					//Debug.Log("discovered skinning bone for " + smr.name + " : " + skinningBone.name);
+				}
+				else if (smr.rootBone != null)
+				{
+					this.skinningBone = smr.rootBone;
+				}
+			}
+		}
+
+		public Matrix4x4 GetWorldToLocalSkinning()
+		{
+			return skinningBoneBindPoseInverse * skinningBone.worldToLocalMatrix;
+		}
+
+		public Matrix4x4 GetLocalSkinningToWorld()
+		{
+			return skinningBone.localToWorldMatrix * skinningBoneBindPose;
 		}
 	}
 }

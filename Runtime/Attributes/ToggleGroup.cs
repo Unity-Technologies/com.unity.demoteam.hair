@@ -39,9 +39,12 @@ namespace Unity.DemoTeam.Attributes
 			EditorGUI.BeginProperty(position, label, property);
 			EditorGUILayout.BeginHorizontal();
 
-			if (TryGetTooltipAttribute(fieldInfo, out var tooltip))
+			var labelText = label.text;
+			var labelTooltip = label.tooltip;
+
+			if (TryGetTooltipAttribute(fieldInfo, out labelTooltip))
 			{
-				label.tooltip = tooltip;
+				label.tooltip = labelTooltip;
 			}
 
 			property.boolValue = EditorGUILayout.Toggle(label, property.boolValue);
@@ -65,8 +68,8 @@ namespace Unity.DemoTeam.Attributes
 					if (groupItem.withLabel)
 					{
 						var fieldLabelText = property.displayName;
-						if (fieldLabelText.StartsWith(label.text))
-							fieldLabelText = fieldLabelText.Substring(label.text.Length);
+						if (fieldLabelText.StartsWith(labelText))
+							fieldLabelText = fieldLabelText.Substring(labelText.Length).TrimStart();
 
 						TryGetTooltipAttribute(field, out var fieldLabelTooltip);
 
@@ -109,7 +112,7 @@ namespace Unity.DemoTeam.Attributes
 
 						case SerializedPropertyType.Boolean:
 							{
-								property.boolValue = EditorGUILayout.ToggleLeft(property.displayName, property.boolValue);
+								property.boolValue = EditorGUILayout.Toggle(property.boolValue, GUILayout.Width(30.0f));
 							}
 							break;
 

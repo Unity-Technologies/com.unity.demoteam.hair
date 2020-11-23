@@ -1,4 +1,6 @@
-﻿using System;
+﻿//#define ENABLE_VISIBLE_SUBASSETS
+
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Formats.Alembic.Importer;
@@ -86,9 +88,11 @@ namespace Unity.DemoTeam.Hair
 			// dirty the asset
 			EditorUtility.SetDirty(groom);
 
-			// save and re-import
+#if ENABLE_VISIBLE_SUBASSETS
+			// save and re-import to force hierearchy update
 			AssetDatabase.SaveAssets();
-			AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(groom));
+			AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(groom), ImportAssetOptions.ForceUpdate);
+#endif
 		}
 
 		public static void BuildGroomAsset(GroomAsset groom, in GroomAsset.SettingsAlembic settings, GroomAsset.MemoryLayout memoryLayout)
@@ -297,6 +301,9 @@ namespace Unity.DemoTeam.Hair
 			// prep lines mesh
 			strandGroup.meshAssetLines = new Mesh();
 			strandGroup.meshAssetLines.indexFormat = (curveCount * curvePointCount > 65535) ? IndexFormat.UInt32 : IndexFormat.UInt16;
+#if !ENABLE_VISIBLE_SUBASSETS
+			strandGroup.meshAssetLines.hideFlags |= HideFlags.HideInHierarchy;
+#endif
 
 			// build lines mesh
 			var wireStrandLineCount = curvePointCount - 1;
@@ -377,6 +384,9 @@ namespace Unity.DemoTeam.Hair
 
 			// prep roots mesh
 			strandGroup.meshAssetRoots = new Mesh();
+#if !ENABLE_VISIBLE_SUBASSETS
+			strandGroup.meshAssetRoots.hideFlags |= HideFlags.HideInHierarchy;
+#endif
 
 			// build roots mesh
 			using (var indices = new NativeArray<int>(curveCount, Allocator.Temp))

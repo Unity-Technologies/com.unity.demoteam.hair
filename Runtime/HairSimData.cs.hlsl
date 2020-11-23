@@ -26,6 +26,7 @@ CBUFFER_START(SolverCBuffer)
     float _BoundaryFriction;
     float _BendingCurvature;
     float _ShapeStiffness;
+    float _ShapeFalloff;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

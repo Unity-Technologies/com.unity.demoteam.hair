@@ -88,6 +88,7 @@ namespace Unity.DemoTeam.Hair
 			public float _BoundaryFriction;
 			public float _BendingCurvature;
 			public float _ShapeStiffness;
+			public float _ShapeFalloff;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]

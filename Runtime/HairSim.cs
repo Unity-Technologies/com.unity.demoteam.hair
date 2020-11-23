@@ -163,6 +163,13 @@ namespace Unity.DemoTeam.Hair
 				GreaterThan,
 			}
 
+			public enum Falloff
+			{
+				Constant,
+				FadeLinear,
+				FadeSquared,
+			}
+
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
 			[Range(0.0f, 9.0f)]
@@ -217,6 +224,8 @@ namespace Unity.DemoTeam.Hair
 			public bool shape;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Global shape preservation stiffness")]
 			public float shapeStiffness;
+			[ToggleGroupItem]
+			public Falloff shapeFalloff;
 
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
@@ -244,6 +253,7 @@ namespace Unity.DemoTeam.Hair
 				curvatureCompareValue = 0.1f,
 				shape = false,
 				shapeStiffness = 0.5f,
+				shapeFalloff = Falloff.Constant,
 			};
 		}
 		[Serializable]
@@ -548,6 +558,22 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
 			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f * cbuffer._StrandParticleInterval;
 			cbuffer._ShapeStiffness = solverSettings.shapeStiffness;
+
+			switch (solverSettings.shapeFalloff)
+			{
+				default:
+				case SolverSettings.Falloff.Constant:
+					cbuffer._ShapeFalloff = 0.0f;
+					break;
+
+				case SolverSettings.Falloff.FadeLinear:
+					cbuffer._ShapeFalloff = 1.0f;
+					break;
+
+				case SolverSettings.Falloff.FadeSquared:
+					cbuffer._ShapeFalloff = 2.0f;
+					break;
+			}
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
