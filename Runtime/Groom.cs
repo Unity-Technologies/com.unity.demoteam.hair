@@ -40,12 +40,18 @@ namespace Unity.DemoTeam.Hair
 		{
 #if UNITY_DEMOTEAM_DIGITALHUMAN
 			[ToggleGroup]
-			public bool rootsAttached;
+			public bool rootsAttach;
 			[ToggleGroupItem]
-			public SkinAttachmentTarget rootsAttachedTarget;
+			public SkinAttachmentTarget rootsAttachTarget;
 			[HideInInspector]
-			public PrimarySkinningBone rootsAttachedTargetBone;//TODO move to ComponentGroup?
+			public PrimarySkinningBone rootsAttachTargetBone;//TODO move to ComponentGroup?
 #endif
+
+			public static readonly SettingsRoots defaults = new SettingsRoots()
+			{
+				rootsAttach = false,
+				rootsAttachTarget = null,
+			};
 		}
 
 		[Serializable]
@@ -70,12 +76,11 @@ namespace Unity.DemoTeam.Hair
 			public Renderer strandRenderer;
 			[VisibleIf(nameof(strandRenderer), Renderer.InstancedMesh)]
 			public Mesh strandMesh;
-			[VisibleIf(nameof(strandRenderer), Renderer.InstancedMesh)]
-			public bool strandMeshRigid;
 #if UNITY_VISUALEFFECTGRAPH
 			[VisibleIf(nameof(strandRenderer), Renderer.VFXGraph)]
 			public VisualEffect strandOutputGraph;
 #endif
+			public ShadowCastingMode strandShadows;
 
 			[LineHeader("Overrides")]
 
@@ -83,6 +88,13 @@ namespace Unity.DemoTeam.Hair
 			public bool material;
 			[ToggleGroupItem]
 			public Material materialValue;
+
+			public static readonly SettingsStrands defaults = new SettingsStrands()
+			{
+				strandScale = Scale.Fixed,
+				strandRenderer = Renderer.PrimitiveLines,
+				strandShadows = ShadowCastingMode.On,
+			};
 		}
 
 		public GroomAsset groomAsset;
@@ -91,8 +103,8 @@ namespace Unity.DemoTeam.Hair
 		public ComponentGroup[] componentGroups;
 		public string componentGroupsChecksum;
 
-		public SettingsRoots settingsRoots;
-		public SettingsStrands settingsStrands;
+		public SettingsRoots settingsRoots = SettingsRoots.defaults;
+		public SettingsStrands settingsStrands = SettingsStrands.defaults;
 
 		public HairSim.SolverSettings solverSettings = HairSim.SolverSettings.defaults;
 		public HairSim.VolumeSettings volumeSettings = HairSim.VolumeSettings.defaults;
@@ -131,16 +143,24 @@ namespace Unity.DemoTeam.Hair
 			InitializeComponents();
 
 #if UNITY_DEMOTEAM_DIGITALHUMAN
-			var subjectsChanged = false;
+ #if UNITY_EDITOR
+			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
+			if (isPrefabInstance)
+				return;
+ #endif
+
+			if (componentGroups != null)
 			{
+				var subjectsChanged = false;
+
 				foreach (var componentGroup in componentGroups)
 				{
 					var subject = componentGroup.rootAttachment;
-					if (subject != null && (subject.target != settingsRoots.rootsAttachedTarget || subject.attached != settingsRoots.rootsAttached))
+					if (subject != null && (subject.target != settingsRoots.rootsAttachTarget || subject.attached != settingsRoots.rootsAttach))
 					{
-						subject.target = settingsRoots.rootsAttachedTarget;
+						subject.target = settingsRoots.rootsAttachTarget;
 
-						if (subject.target != null && settingsRoots.rootsAttached)
+						if (subject.target != null && settingsRoots.rootsAttach)
 						{
 							subject.Attach(storePositionRotation: false);
 						}
@@ -154,15 +174,15 @@ namespace Unity.DemoTeam.Hair
 						subjectsChanged = true;
 					}
 				}
-			}
 
-			if (subjectsChanged && settingsRoots.rootsAttachedTarget != null)
-			{
-				settingsRoots.rootsAttachedTarget.CommitSubjectsIfRequired();
-				settingsRoots.rootsAttachedTargetBone = new PrimarySkinningBone(settingsRoots.rootsAttachedTarget.transform);
-	#if UNITY_EDITOR
-				UnityEditor.EditorUtility.SetDirty(settingsRoots.rootsAttachedTarget);
-	#endif
+				if (subjectsChanged && settingsRoots.rootsAttachTarget != null)
+				{
+					settingsRoots.rootsAttachTarget.CommitSubjectsIfRequired();
+					settingsRoots.rootsAttachTargetBone = new PrimarySkinningBone(settingsRoots.rootsAttachTarget.transform);
+ #if UNITY_EDITOR
+					UnityEditor.EditorUtility.SetDirty(settingsRoots.rootsAttachTarget);
+ #endif
+				}
 			}
 #endif
 		}
@@ -170,9 +190,9 @@ namespace Unity.DemoTeam.Hair
 		public Quaternion GetRootRotation(in ComponentGroup group)
 		{
 #if UNITY_DEMOTEAM_DIGITALHUMAN
-			if (settingsRoots.rootsAttached && settingsRoots.rootsAttachedTarget != null)
+			if (settingsRoots.rootsAttach && settingsRoots.rootsAttachTarget != null)
 			{
-				return settingsRoots.rootsAttachedTargetBone.skinningBone.rotation;
+				return settingsRoots.rootsAttachTargetBone.skinningBone.rotation;
 			}
 #endif
 			return group.rootFilter.transform.rotation;
@@ -241,9 +261,17 @@ namespace Unity.DemoTeam.Hair
 		public Material GetStrandMaterial()
 		{
 			if (settingsStrands.material)
+			{
 				return settingsStrands.materialValue;
-			else
+			}
+			else if (groomAsset != null)
+			{
 				return groomAsset.settingsBasic.material;
+			}
+			else
+			{
+				return null;
+			}
 		}
 
 		//public float GetStrandDiameter()
@@ -320,21 +348,38 @@ namespace Unity.DemoTeam.Hair
 			HairSim.DrawVolumeData(cmd, color, depth, volumeData, debugSettings);
 		}
 
-		public void UpdateRenderer(CommandBuffer cmd, ComponentGroup componentGroup, in HairSim.SolverData solverData)
+		public void UpdateRenderer(CommandBuffer cmd, in ComponentGroup componentGroup, in HairSim.SolverData solverData)
 		{
-			var mat = GetStrandMaterial();
-			if (mat != null)
-			{
-				if (componentGroup.lineRenderer.sharedMaterial.shader != mat.shader)
-					componentGroup.lineRenderer.sharedMaterial.shader = mat.shader;
+			var lineRenderer = componentGroup.lineRenderer;
+			var lineRendererMPB = componentGroup.lineRendererMPB;
 
-				componentGroup.lineRenderer.sharedMaterial.CopyPropertiesFromMaterial(mat);
+			var material = GetStrandMaterial();
+			if (material != null)
+			{
+				if (lineRenderer.sharedMaterial == null)
+				{
+					lineRenderer.sharedMaterial = new Material(material);
+					lineRenderer.sharedMaterial.name += "(Instance)";
+					lineRenderer.sharedMaterial.hideFlags = HideFlags.DontSave | HideFlags.NotEditable;
+				}
+				else
+				{
+					if (lineRenderer.sharedMaterial.shader != material.shader)
+						lineRenderer.sharedMaterial.shader = material.shader;
+
+					lineRenderer.sharedMaterial.CopyPropertiesFromMaterial(material);
+				}
 			}
 
-			HairSim.PushSolverData(cmd, componentGroup.lineRenderer.sharedMaterial, componentGroup.lineRendererMPB, solverData);
+			if (lineRenderer.sharedMaterial != null)
+			{
+				HairSim.PushSolverData(cmd, lineRenderer.sharedMaterial, lineRendererMPB, solverData);
 
-			componentGroup.lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
-			componentGroup.lineRenderer.SetPropertyBlock(componentGroup.lineRendererMPB);
+				lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
+				lineRenderer.SetPropertyBlock(componentGroup.lineRendererMPB);
+			}
+
+			lineRenderer.shadowCastingMode = settingsStrands.strandShadows;
 		}
 
 		// when to build runtime data?
@@ -346,6 +391,12 @@ namespace Unity.DemoTeam.Hair
 
 		void InitializeComponents()
 		{
+#if UNITY_EDITOR
+			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
+			if (isPrefabInstance)
+				return;
+#endif
+
 			if (groomAsset != null)
 			{
 				if (componentGroupsChecksum != groomAsset.checksum)
@@ -485,17 +536,32 @@ namespace Unity.DemoTeam.Hair
 
 			foreach (var componentGroup in groom.componentGroups)
 			{
-				if (componentGroup.container != null)
+				var material = componentGroup.lineRenderer.sharedMaterial;
+				if (material != null)
 				{
 #if UNITY_EDITOR
-					GameObject.DestroyImmediate(componentGroup.container);
+					GameObject.DestroyImmediate(material);
 #else
-					GameObject.Destroy(groomContainer.group);
+					GameObject.Destroy(material);
+#endif
+				}
+
+				var container = componentGroup.container;
+				if (container != null)
+				{
+#if UNITY_EDITOR
+					GameObject.DestroyImmediate(container);
+#else
+					GameObject.Destroy(container);
 #endif
 				}
 			}
 
 			groom.componentGroups = null;
+
+#if UNITY_EDITOR
+			UnityEditor.EditorUtility.SetDirty(groom);
+#endif
 		}
 
 		public static void BuildGroomInstance(Groom groom, GroomAsset groomAsset)
@@ -530,8 +596,14 @@ namespace Unity.DemoTeam.Hair
 						componentGroup.lineFilter.sharedMesh = strandGroups[i].meshAssetLines;
 
 						componentGroup.lineRenderer = linesContainer.AddComponent<MeshRenderer>();
-						componentGroup.lineRenderer.sharedMaterial = new Material(groom.GetStrandMaterial());
-						componentGroup.lineRenderer.sharedMaterial.hideFlags = HideFlags.NotEditable;
+
+						var material = groom.GetStrandMaterial();
+						if (material != null)
+						{
+							componentGroup.lineRenderer.sharedMaterial = new Material(material);
+							componentGroup.lineRenderer.sharedMaterial.name += "(Instance)";
+							componentGroup.lineRenderer.sharedMaterial.hideFlags = HideFlags.DontSave | HideFlags.NotEditable;
+						}
 					}
 
 					var rootsContainer = new GameObject();
@@ -553,6 +625,10 @@ namespace Unity.DemoTeam.Hair
 
 				groom.componentGroups[i].container = container;
 			}
+
+#if UNITY_EDITOR
+			UnityEditor.EditorUtility.SetDirty(groom);
+#endif
 		}
 	}
 

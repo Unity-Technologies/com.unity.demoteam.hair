@@ -49,7 +49,7 @@ namespace Unity.DemoTeam.Attributes
 
 			property.boolValue = EditorGUILayout.Toggle(label, property.boolValue);
 
-			using (new EditorGUI.DisabledGroupScope(!property.boolValue))
+			using (new EditorGUI.DisabledScope(!property.boolValue))
 			{
 				while (property.Next(false))
 				{

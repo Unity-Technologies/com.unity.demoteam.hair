@@ -14,7 +14,7 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _groomAssetQuickEdit;
 
 		SerializedProperty _settingsRoots;
-		SerializedProperty _settingsRoots_rootsAttached;
+		SerializedProperty _settingsRoots_rootsAttach;
 		SerializedProperty _settingsStrands;
 
 		SerializedProperty _settingsSolver;
@@ -27,7 +27,7 @@ namespace Unity.DemoTeam.Hair
 			_groomAssetQuickEdit = serializedObject.FindProperty("groomAssetQuickEdit");
 
 			_settingsRoots = serializedObject.FindProperty("settingsRoots");
-			_settingsRoots_rootsAttached = _settingsRoots.FindPropertyRelative("rootsAttached");
+			_settingsRoots_rootsAttach = _settingsRoots.FindPropertyRelative("rootsAttach");
 			_settingsStrands = serializedObject.FindProperty("settingsStrands");
 
 			_settingsSolver = serializedObject.FindProperty("solverSettings");
@@ -82,31 +82,34 @@ namespace Unity.DemoTeam.Hair
 			if (groom == null)
 				return;
 
-			EditorGUI.BeginChangeCheck();
+			using (new GovernedByPrefabScope(groom))
 			{
-				EditorGUILayout.PropertyField(_groomAsset);
-				_groomAssetQuickEdit.boolValue = GUILayout.Toggle(_groomAssetQuickEdit.boolValue, "Quick Edit", EditorStyles.miniButton);
-			}
-
-			if (EditorGUI.EndChangeCheck())
-			{
-				serializedObject.ApplyModifiedProperties();
-			}
-
-			var groomAsset = groom.groomAsset;
-			if (groomAsset != null && _groomAssetQuickEdit.boolValue)
-			{
-				Editor.CreateCachedEditor(groomAsset, null, ref groomAssetEditor);
-				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+				EditorGUI.BeginChangeCheck();
 				{
-					(groomAssetEditor as GroomAssetEditor).DrawImporterGUI();
+					EditorGUILayout.PropertyField(_groomAsset);
+					_groomAssetQuickEdit.boolValue = GUILayout.Toggle(_groomAssetQuickEdit.boolValue, "Quick Edit", EditorStyles.miniButton);
 				}
-				EditorGUILayout.EndVertical();
-			}
 
-			if (GUILayout.Button("Reload"))
-			{
-				groom.componentGroupsChecksum = string.Empty;
+				if (EditorGUI.EndChangeCheck())
+				{
+					serializedObject.ApplyModifiedProperties();
+				}
+
+				var groomAsset = groom.groomAsset;
+				if (groomAsset != null && _groomAssetQuickEdit.boolValue)
+				{
+					Editor.CreateCachedEditor(groomAsset, null, ref groomAssetEditor);
+					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+					{
+						(groomAssetEditor as GroomAssetEditor).DrawImporterGUI();
+					}
+					EditorGUILayout.EndVertical();
+				}
+
+				if (GUILayout.Button("Reload"))
+				{
+					groom.componentGroupsChecksum = string.Empty;
+				}
 			}
 		}
 
@@ -124,8 +127,11 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 			{
-				StructPropertyFieldsWithHeader(_settingsRoots);
-				if (_settingsRoots_rootsAttached == null)
+				using (new GovernedByPrefabScope(groom))
+				{
+					StructPropertyFieldsWithHeader(_settingsRoots);
+				}
+				if (_settingsRoots_rootsAttach == null)
 				{
 					using (new EditorGUI.IndentLevelScope())
 					{
@@ -201,19 +207,20 @@ namespace Unity.DemoTeam.Hair
 					var rectHeight = GUI.skin.box.CalcHeight(new GUIContent(string.Empty), 0.0f);
 					var rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
 
-					var color = GUI.color;
-					GUI.color = Color.white;
-					GUI.Box(EditorGUI.IndentedRect(rect), countTxt, HairGUIStyles.statusBox);
-					GUI.color = color;
+					using (new ColorScope(Color.white))
+					{
+						GUI.Box(EditorGUI.IndentedRect(rect), countTxt, HairGUIStyles.statusBox);
+					}
 
 					var discarded = groom.volumeData.boundaryPrevCountDiscarded;
 					if (discarded > 0)
 					{
 						rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
 
-						GUI.color = Color.red;
-						GUI.Box(EditorGUI.IndentedRect(rect), discarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox);
-						GUI.color = color;
+						using (new ColorScope(Color.red))
+						{
+							GUI.Box(EditorGUI.IndentedRect(rect), discarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox);
+						}
 					}
 				}
 
