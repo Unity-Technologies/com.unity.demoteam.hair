@@ -166,6 +166,7 @@ namespace Unity.DemoTeam.Hair
 			public enum Falloff
 			{
 				Constant,
+				FadeSlow,
 				FadeLinear,
 				FadeSquared,
 			}
@@ -222,7 +223,7 @@ namespace Unity.DemoTeam.Hair
 
 			[ToggleGroup, Tooltip("Global shape preservation constraint")]
 			public bool shape;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Global shape preservation stiffness")]
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 5.0f), Tooltip("Global shape preservation stiffness")]
 			public float shapeStiffness;
 			[ToggleGroupItem]
 			public Falloff shapeFalloff;
@@ -331,8 +332,8 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct DebugSettings
 		{
-			public bool drawParticles;
-			public bool drawStrands;
+			public bool drawStrandRoots;
+			public bool drawStrandParticles;
 			public bool drawCellDensity;
 			public bool drawCellGradient;
 			[ToggleGroup] public bool drawSliceX;
@@ -346,8 +347,8 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly DebugSettings defaults = new DebugSettings()
 			{
-				drawParticles = false,
-				drawStrands = false,
+				drawStrandRoots = false,
+				drawStrandParticles = false,
 				drawCellDensity = false,
 				drawCellGradient = false,
 				drawSliceX = false,
@@ -564,6 +565,10 @@ namespace Unity.DemoTeam.Hair
 				default:
 				case SolverSettings.Falloff.Constant:
 					cbuffer._ShapeFalloff = 0.0f;
+					break;
+
+				case SolverSettings.Falloff.FadeSlow:
+					cbuffer._ShapeFalloff = 0.1f;
 					break;
 
 				case SolverSettings.Falloff.FadeLinear:
@@ -1111,24 +1116,24 @@ namespace Unity.DemoTeam.Hair
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawSolverData))
 			{
-				if (!debugSettings.drawParticles &&
-					!debugSettings.drawStrands)
+				if (!debugSettings.drawStrandRoots &&
+					!debugSettings.drawStrandParticles)
 					return;
 
 				PushSolverData(cmd, s_debugDrawMat, s_debugDrawMPB, solverData);
 
 				CoreUtils.SetRenderTarget(cmd, color, depth);
 
-				// solver particles
-				if (debugSettings.drawParticles)
+				// strand roots
+				if (debugSettings.drawStrandRoots)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Lines, 2, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
 				}
 
-				// solver strands
-				if (debugSettings.drawStrands)
+				// strand particles
+				if (debugSettings.drawStrandParticles)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.LineStrip, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
 				}
 			}
 		}
@@ -1148,13 +1153,13 @@ namespace Unity.DemoTeam.Hair
 
 				PushVolumeData(cmd, s_debugDrawMat, s_debugDrawMPB, volumeData);
 
-				// volume density
+				// cell density
 				if (debugSettings.drawCellDensity)
 				{
 					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 2, MeshTopology.Points, GetCellCount(volumeData.cbuffer), 1, s_debugDrawMPB);
 				}
 
-				// volume gradient
+				// cell gradient
 				if (debugSettings.drawCellGradient)
 				{
 					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Lines, 2 * GetCellCount(volumeData.cbuffer), 1, s_debugDrawMPB);
