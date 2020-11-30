@@ -395,7 +395,23 @@ namespace Unity.DemoTeam.Hair
 #if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
+			{
+				if (groomAsset != null)
+				{
+					// did the underlying asset change since prefab was built?
+					if (componentGroupsChecksum != groomAsset.checksum)
+					{
+						var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+						var prefabContents = UnityEditor.PrefabUtility.LoadPrefabContents(prefabPath);
+
+						Debug.Log("... rebuilding underlying prefab");
+
+						UnityEditor.PrefabUtility.SaveAsPrefabAsset(prefabContents, prefabPath);
+						UnityEditor.PrefabUtility.UnloadPrefabContents(prefabContents);
+					}
+				}
 				return;
+			}
 #endif
 
 			if (groomAsset != null)
