@@ -116,6 +116,7 @@ namespace Unity.DemoTeam.Hair
 		void OnEnable()
 		{
 			InitializeComponents();
+			InitializeComponentsHideFlags();
 
 			s_instances.Add(this);
 		}
@@ -143,11 +144,11 @@ namespace Unity.DemoTeam.Hair
 			InitializeComponents();
 
 #if UNITY_DEMOTEAM_DIGITALHUMAN
- #if UNITY_EDITOR
+  #if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
 				return;
- #endif
+  #endif
 
 			if (componentGroups != null)
 			{
@@ -179,9 +180,9 @@ namespace Unity.DemoTeam.Hair
 				{
 					settingsRoots.rootsAttachTarget.CommitSubjectsIfRequired();
 					settingsRoots.rootsAttachTargetBone = new PrimarySkinningBone(settingsRoots.rootsAttachTarget.transform);
- #if UNITY_EDITOR
+  #if UNITY_EDITOR
 					UnityEditor.EditorUtility.SetDirty(settingsRoots.rootsAttachTarget);
- #endif
+  #endif
 				}
 			}
 #endif
@@ -421,6 +422,21 @@ namespace Unity.DemoTeam.Hair
 
 				ReleaseRuntimeData();
 			}
+		}
+
+		void InitializeComponentsHideFlags()
+		{
+#if UNITY_EDITOR
+			if (componentGroups != null)
+			{
+				foreach (var componentGroup in componentGroups)
+				{
+					componentGroup.container.hideFlags = HideFlags.NotEditable;
+					componentGroup.lineFilter.gameObject.hideFlags = HideFlags.NotEditable;
+					componentGroup.rootFilter.gameObject.hideFlags = HideFlags.NotEditable;
+				}
+			}
+#endif
 		}
 
 		bool InitializeRuntimeData(CommandBuffer cmd)
