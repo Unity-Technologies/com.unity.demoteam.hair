@@ -879,7 +879,7 @@ namespace Unity.DemoTeam.Hair
 				solverDataCopy.cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
 			}
 
-			int numX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE;
+			int numX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % MAX_GROUP_SIZE);
 			int numY = 1;
 			int numZ = 1;
 
@@ -892,7 +892,7 @@ namespace Unity.DemoTeam.Hair
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
 				int kernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
-				int numX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE;
+				int numX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % MAX_GROUP_SIZE);
 				int numY = 1;
 				int numZ = 1;
 
@@ -974,7 +974,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			int particleCount = (int)solverData.cbuffer._StrandCount * (int)solverData.cbuffer._StrandParticleCount;
 
-			int numX = particleCount / MAX_GROUP_SIZE;
+			int numX = particleCount / MAX_GROUP_SIZE + Mathf.Min(1, particleCount % MAX_GROUP_SIZE);
 			int numY = 1;
 			int numZ = 1;
 

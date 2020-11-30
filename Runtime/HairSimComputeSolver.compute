@@ -94,12 +94,14 @@
 
 #if LAYOUT_INTERLEAVED
   #define DECLARE_STRAND(x)							\
+	if (x >= _StrandCount) return;					\
 	const uint strandIndex = x;						\
 	const uint strandParticleBegin = strandIndex;	\
 	const uint strandParticleStride = _StrandCount;	\
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
 #else
   #define DECLARE_STRAND(x)													\
+	if (x >= _StrandCount) return;											\
 	const uint strandIndex = x;												\
 	const uint strandParticleBegin = strandIndex * _StrandParticleCount;	\
 	const uint strandParticleStride = 1;									\

@@ -71,6 +71,9 @@
 	#define VOLUME_VOF							0
 #endif
 
+#define CHECK_PARTICLE_INDEX(x)	\
+	if (x >= _StrandCount * _StrandParticleCount) return;
+
 //---------
 // utility
 
@@ -174,6 +177,8 @@ void KVolumeSplat(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+	CHECK_PARTICLE_INDEX(worldIdx.x)
+
 	//TODO remap and pack according to max velocity within volume?
 	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
 	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
@@ -201,6 +206,8 @@ void KVolumeSplatDensity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+	CHECK_PARTICLE_INDEX(worldIdx.x)
+
 	InterlockedAddParticleContribution(worldIdx.x, 1.0, _AccuDensity);
 }
 
@@ -215,6 +222,8 @@ void KVolumeSplatVelocityX(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+	CHECK_PARTICLE_INDEX(worldIdx.x)
+
 #if VOLUME_STAGGERED_GRID
 	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _AccuVelocityX, float3(0.0, 0.5, 0.5));
 #else
@@ -233,6 +242,8 @@ void KVolumeSplatVelocityY(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+	CHECK_PARTICLE_INDEX(worldIdx.x)
+
 #if VOLUME_STAGGERED_GRID
 	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _AccuVelocityY, float3(0.5, 0.0, 0.5));
 #else
@@ -251,6 +262,8 @@ void KVolumeSplatVelocityZ(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
+	CHECK_PARTICLE_INDEX(worldIdx.x)
+
 #if VOLUME_STAGGERED_GRID
 	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _AccuVelocityZ, float3(0.5, 0.5, 0.0));
 #else
