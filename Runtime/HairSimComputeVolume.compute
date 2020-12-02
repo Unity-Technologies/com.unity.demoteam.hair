@@ -177,21 +177,23 @@ void KVolumeSplat(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x)
+	CHECK_PARTICLE_INDEX(worldIdx.x);
 
 	//TODO remap and pack according to max velocity within volume?
 	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
 	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
 
-	InterlockedAddParticleContribution(worldIdx.x, 1.0, _AccuDensity);
+	const float4 v = _ParticleVelocity[worldIdx.x];
+
+	InterlockedAddParticleContribution(worldIdx.x, (v.w), _AccuDensity);
 #if VOLUME_STAGGERED_GRID
-	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _AccuVelocityX, float3(0.0, 0.5, 0.5));
-	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _AccuVelocityY, float3(0.5, 0.0, 0.5));
-	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _AccuVelocityZ, float3(0.5, 0.5, 0.0));
+	InterlockedAddParticleContributionPackedW(worldIdx.x, (v.x * v.w), _AccuVelocityX, float3(0.0, 0.5, 0.5));
+	InterlockedAddParticleContributionPackedW(worldIdx.x, (v.y * v.w), _AccuVelocityY, float3(0.5, 0.0, 0.5));
+	InterlockedAddParticleContributionPackedW(worldIdx.x, (v.z * v.w), _AccuVelocityZ, float3(0.5, 0.5, 0.0));
 #else
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _AccuVelocityX);
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _AccuVelocityY);
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _AccuVelocityZ);
+	InterlockedAddParticleContribution(worldIdx.x, (v.x * v.w), _AccuVelocityX);
+	InterlockedAddParticleContribution(worldIdx.x, (v.y * v.w), _AccuVelocityY);
+	InterlockedAddParticleContribution(worldIdx.x, (v.z * v.w), _AccuVelocityZ);
 #endif
 }
 
@@ -206,9 +208,11 @@ void KVolumeSplatDensity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x)
+	CHECK_PARTICLE_INDEX(worldIdx.x);
 
-	InterlockedAddParticleContribution(worldIdx.x, 1.0, _AccuDensity);
+	const float4 v = _ParticleVelocity[worldIdx.x];
+
+	InterlockedAddParticleContribution(worldIdx.x, (v.w), _AccuDensity);
 }
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
@@ -222,12 +226,14 @@ void KVolumeSplatVelocityX(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x)
+	CHECK_PARTICLE_INDEX(worldIdx.x);
+	
+	const float4 v = _ParticleVelocity[worldIdx.x];
 
 #if VOLUME_STAGGERED_GRID
-	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _AccuVelocityX, float3(0.0, 0.5, 0.5));
+	InterlockedAddParticleContributionPackedW(worldIdx.x, (v.x * v.w), _AccuVelocityX, float3(0.0, 0.5, 0.5));
 #else
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].x, _AccuVelocityX);
+	InterlockedAddParticleContribution(worldIdx.x, (v.x * v.w), _AccuVelocityX);
 #endif
 }
 
@@ -242,12 +248,14 @@ void KVolumeSplatVelocityY(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x)
+	CHECK_PARTICLE_INDEX(worldIdx.x);
+
+	const float4 v = _ParticleVelocity[worldIdx.x];
 
 #if VOLUME_STAGGERED_GRID
-	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _AccuVelocityY, float3(0.5, 0.0, 0.5));
+	InterlockedAddParticleContributionPackedW(worldIdx.x, (v.y * v.w), _AccuVelocityY, float3(0.5, 0.0, 0.5));
 #else
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].y, _AccuVelocityY);
+	InterlockedAddParticleContribution(worldIdx.x, (v.y * v.w), _AccuVelocityY);
 #endif
 }
 
@@ -262,12 +270,14 @@ void KVolumeSplatVelocityZ(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x)
+	CHECK_PARTICLE_INDEX(worldIdx.x);
+
+	const float4 v = _ParticleVelocity[worldIdx.x];
 
 #if VOLUME_STAGGERED_GRID
-	InterlockedAddParticleContributionPackedW(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _AccuVelocityZ, float3(0.5, 0.5, 0.0));
+	InterlockedAddParticleContributionPackedW(worldIdx.x, (v.z * v.w), _AccuVelocityZ, float3(0.5, 0.5, 0.0));
 #else
-	InterlockedAddParticleContribution(worldIdx.x, _ParticleVelocity[worldIdx.x].z, _AccuVelocityZ);
+	InterlockedAddParticleContribution(worldIdx.x, (v.z * v.w), _AccuVelocityZ);
 #endif
 }
 

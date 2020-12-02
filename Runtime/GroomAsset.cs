@@ -87,16 +87,14 @@ namespace Unity.DemoTeam.Hair
 			public int strandCount;
 			public int strandParticleCount;
 
-			[HideInInspector] public float[] initialLength;
-			[HideInInspector] public Vector3[] initialPosition;
-			[HideInInspector] public Vector3[] initialRootPosition;
-			[HideInInspector] public Vector3[] initialRootDirection;
+			public float maxStrandLength;
 
-			[HideInInspector] public MemoryLayout memoryLayout;
+			[HideInInspector] public float[] rootScale;
+			[HideInInspector] public Vector3[] rootPosition;
+			[HideInInspector] public Vector3[] rootDirection;
 
-			[HideInInspector] public float strandLengthMin;
-			[HideInInspector] public float strandLengthMax;
-			[HideInInspector] public float strandLengthAvg;
+			[HideInInspector] public Vector3[] particlePosition;
+			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetRoots;

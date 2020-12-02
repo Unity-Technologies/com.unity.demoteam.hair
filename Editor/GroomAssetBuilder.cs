@@ -62,7 +62,7 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != groom.strandGroups.Length; i++)
 				{
 					hash.Append(groom.strandGroups[i].meshAssetLines.GetInstanceID());
-					hash.Append(groom.strandGroups[i].initialPosition);
+					hash.Append(groom.strandGroups[i].particlePosition);
 				}
 
 				groom.checksum = hash.ToString();
@@ -163,21 +163,21 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.strandParticleCount = curvePointCount;
 
 			// prep curve buffers
-			strandGroup.initialLength = new float[curveCount];
-			strandGroup.initialPosition = new Vector3[curveCount * curvePointCount];
-			strandGroup.initialRootPosition = new Vector3[curveCount];
-			strandGroup.initialRootDirection = new Vector3[curveCount];
+			strandGroup.rootScale = new float[curveCount];
+			strandGroup.rootPosition = new Vector3[curveCount];
+			strandGroup.rootDirection = new Vector3[curveCount];
+			strandGroup.particlePosition = new Vector3[curveCount * curvePointCount];
 
 			// build curve buffers
-			bufferPos.CopyTo(strandGroup.initialPosition);
+			bufferPos.CopyTo(strandGroup.particlePosition);
 
 			for (int i = 0; i != curveCount; i++)
 			{
-				ref var p0 = ref strandGroup.initialPosition[i * curvePointCount];
-				ref var p1 = ref strandGroup.initialPosition[i * curvePointCount + 1];
+				ref var p0 = ref strandGroup.particlePosition[i * curvePointCount];
+				ref var p1 = ref strandGroup.particlePosition[i * curvePointCount + 1];
 
-				strandGroup.initialRootPosition[i] = p0;
-				strandGroup.initialRootDirection[i] = Vector3.Normalize(p1 - p0);
+				strandGroup.rootPosition[i] = p0;
+				strandGroup.rootDirection[i] = Vector3.Normalize(p1 - p0);
 			}
 
 			// apply memory layout
@@ -192,13 +192,13 @@ namespace Unity.DemoTeam.Hair
 				case GroomAsset.MemoryLayout.Interleaved:
 					unsafe
 					{
-						using (var src = new NativeArray<Vector3>(strandGroup.initialPosition, Allocator.Temp))
+						using (var src = new NativeArray<Vector3>(strandGroup.particlePosition, Allocator.Temp))
 						{
 							var srcBase = (Vector3*)src.GetUnsafePtr();
 							var srcStride = sizeof(Vector3);
 							var dstStride = sizeof(Vector3) * strandGroup.strandCount;
 
-							fixed (Vector3* dstBase = strandGroup.initialPosition)
+							fixed (Vector3* dstBase = strandGroup.particlePosition)
 							{
 								for (int i = 0; i != curveCount; i++)
 								{
@@ -213,10 +213,10 @@ namespace Unity.DemoTeam.Hair
 					break;
 			}
 
-			strandGroup.memoryLayout = memoryLayout;
+			strandGroup.particleMemoryLayout = memoryLayout;
 
-			// build derivative mesh assets
-			BuildGroomAssetStrandGroupMeshAssets(ref strandGroup);
+			// finalize (calc derivative fields, create mesh assets)
+			FinalizeStrandGroup(ref strandGroup);
 		}
 
 		public static void BuildGroomAssetStrandGroup(ref GroomAsset.StrandGroup strandGroup, in GroomAsset.SettingsProcedural settings, GroomAsset.MemoryLayout memoryLayout)
@@ -242,60 +242,72 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.strandParticleCount = curvePointCount;
 
 			// prep curve buffers
-			strandGroup.initialLength = new float[curveCount];
-			strandGroup.initialPosition = new Vector3[curveCount * curvePointCount];
-			strandGroup.initialRootPosition = new Vector3[curveCount];
-			strandGroup.initialRootDirection = new Vector3[curveCount];
+			strandGroup.rootScale = new float[curveCount];
+			strandGroup.rootPosition = new Vector3[curveCount];
+			strandGroup.rootDirection = new Vector3[curveCount];
+			strandGroup.particlePosition = new Vector3[curveCount * curvePointCount];
 
 			// build curve buffers
 			using (var tmpRoots = GenerateRoots(settings))
 			using (var tmpStrands = GenerateStrands(settings, tmpRoots, memoryLayout))
 			{
-				tmpStrands.position.CopyTo(strandGroup.initialPosition);
-				tmpRoots.rootPosition.CopyTo(strandGroup.initialRootPosition);
-				tmpRoots.rootDirection.CopyTo(strandGroup.initialRootDirection);
+				tmpRoots.rootPosition.CopyTo(strandGroup.rootPosition);
+				tmpRoots.rootDirection.CopyTo(strandGroup.rootDirection);
+				tmpStrands.particlePosition.CopyTo(strandGroup.particlePosition);
 			}
 
 			// apply memory layout
-			strandGroup.memoryLayout = memoryLayout;
+			strandGroup.particleMemoryLayout = memoryLayout;
 
-			// build derivative mesh assets
-			BuildGroomAssetStrandGroupMeshAssets(ref strandGroup);
+			// calc derivative fields, create mesh assets)
+			FinalizeStrandGroup(ref strandGroup);
 		}
 
-		public static void BuildGroomAssetStrandGroupMeshAssets(ref GroomAsset.StrandGroup strandGroup)
+		static void FinalizeStrandGroup(ref GroomAsset.StrandGroup strandGroup)
 		{
 			// get curve counts
 			var curveCount = strandGroup.strandCount;
 			var curvePointCount = strandGroup.strandParticleCount;
 
-			// find min/max/avg strand length
-			strandGroup.strandLengthAvg = 0.0f;
-			strandGroup.strandLengthMin = float.PositiveInfinity;
-			strandGroup.strandLengthMax = float.NegativeInfinity;
+			// find strand lengths
+			using (var strandLength = new NativeArray<float>(curveCount, Allocator.Temp))
 			{
-				for (int i = 0; i != curveCount; i++)
+				unsafe
 				{
-					float strandLength = 0.0f;
+					// calc piece-wise length
+					var strandLengthPtr = (float*)strandLength.GetUnsafePtr();
 
-					DeclareStrandIterator(strandGroup.memoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-					for (int j = strandParticleBegin + strandParticleStride; j != strandParticleEnd; j += strandParticleStride)
+					for (int i = 0; i != curveCount; i++)
 					{
-						ref var p0 = ref strandGroup.initialPosition[j - strandParticleStride];
-						ref var p1 = ref strandGroup.initialPosition[j];
+						float accumulatedLength = 0.0f;
 
-						strandLength += Vector3.Distance(p0, p1);
+						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+						for (int j = strandParticleBegin + strandParticleStride; j != strandParticleEnd; j += strandParticleStride)
+						{
+							ref var p0 = ref strandGroup.particlePosition[j - strandParticleStride];
+							ref var p1 = ref strandGroup.particlePosition[j];
+
+							accumulatedLength += Vector3.Distance(p0, p1);
+						}
+
+						strandLengthPtr[i] = accumulatedLength;
 					}
 
-					strandGroup.strandLengthAvg += strandLength;
-					strandGroup.strandLengthMin = Mathf.Min(strandLength, strandGroup.strandLengthMin);
-					strandGroup.strandLengthMax = Mathf.Max(strandLength, strandGroup.strandLengthMax);
+					// find maximum length in group
+					strandGroup.maxStrandLength = 0.0f;
 
-					strandGroup.initialLength[i] = strandLength;
+					for (int i = 0; i != curveCount; i++)
+					{
+						strandGroup.maxStrandLength = Mathf.Max(strandLengthPtr[i], strandGroup.maxStrandLength);
+					}
+
+					// find relative length to group maximum
+					for (int i = 0; i != curveCount; i++)
+					{
+						strandGroup.rootScale[i] = strandLengthPtr[i] / strandGroup.maxStrandLength;
+					}
 				}
-
-				strandGroup.strandLengthAvg /= curveCount;
 			}
 
 			// prep lines mesh
@@ -320,7 +332,7 @@ namespace Unity.DemoTeam.Hair
 					var indicesPtr = (int*)indices.GetUnsafePtr();
 
 					// write index data
-					switch (strandGroup.memoryLayout)
+					switch (strandGroup.particleMemoryLayout)
 					{
 						//TODO profile this again, first look indicated slower
 						//case GroomAsset.MemoryLayout.Interleaved:
@@ -337,7 +349,7 @@ namespace Unity.DemoTeam.Hair
 						default:
 							for (int i = 0; i != curveCount; i++)
 							{
-								DeclareStrandIterator(strandGroup.memoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+								DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 								for (int j = 0; j != wireStrandLineCount; j++)
 								{
@@ -351,12 +363,12 @@ namespace Unity.DemoTeam.Hair
 					// write tangents
 					for (int i = 0; i != curveCount; i++)
 					{
-						DeclareStrandIterator(strandGroup.memoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 						for (int j = strandParticleBegin; j != strandParticleEnd - strandParticleStride; j += strandParticleStride)
 						{
-							ref var p0 = ref strandGroup.initialPosition[j];
-							ref var p1 = ref strandGroup.initialPosition[j + strandParticleStride];
+							ref var p0 = ref strandGroup.particlePosition[j];
+							ref var p1 = ref strandGroup.particlePosition[j + strandParticleStride];
 
 							particleTangentPtr[j] = Vector3.Normalize(p1 - p0);
 						}
@@ -367,7 +379,7 @@ namespace Unity.DemoTeam.Hair
 					// write uvs
 					for (int i = 0; i != curveCount; i++)
 					{
-						DeclareStrandIterator(strandGroup.memoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
 						{
@@ -376,7 +388,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				strandGroup.meshAssetLines.SetVertices(strandGroup.initialPosition);
+				strandGroup.meshAssetLines.SetVertices(strandGroup.particlePosition);
 				strandGroup.meshAssetLines.SetNormals(particleTangent);
 				strandGroup.meshAssetLines.SetUVs(0, particleUV);
 				strandGroup.meshAssetLines.SetIndices(indices, MeshTopology.Lines, 0);
@@ -402,8 +414,8 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				strandGroup.meshAssetRoots.SetVertices(strandGroup.initialRootPosition);
-				strandGroup.meshAssetRoots.SetNormals(strandGroup.initialRootDirection);
+				strandGroup.meshAssetRoots.SetVertices(strandGroup.rootPosition);
+				strandGroup.meshAssetRoots.SetNormals(strandGroup.rootDirection);
 				strandGroup.meshAssetRoots.SetIndices(indices, MeshTopology.Points, 0);
 			}
 		}
@@ -430,18 +442,18 @@ namespace Unity.DemoTeam.Hair
 		{
 			public int strandCount;
 			public int strandParticleCount;
-			public NativeArray<Vector3> position;
+			public NativeArray<Vector3> particlePosition;
 
 			public IntermediateStrands(int strandCount, int strandParticleCount)
 			{
 				this.strandCount = strandCount;
 				this.strandParticleCount = strandParticleCount;
-				position = new NativeArray<Vector3>(strandCount * strandParticleCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+				particlePosition = new NativeArray<Vector3>(strandCount * strandParticleCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 			}
 
 			public void Dispose()
 			{
-				position.Dispose();
+				particlePosition.Dispose();
 			}
 		}
 
@@ -537,7 +549,7 @@ namespace Unity.DemoTeam.Hair
 
 			unsafe
 			{
-				var pos = (Vector3*)tmpStrands.position.GetUnsafePtr();
+				var pos = (Vector3*)tmpStrands.particlePosition.GetUnsafePtr();
 				var rootPos = (Vector3*)tmpRoots.rootPosition.GetUnsafePtr();
 				var rootDir = (Vector3*)tmpRoots.rootDirection.GetUnsafePtr();
 

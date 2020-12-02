@@ -161,12 +161,12 @@ float GetIterationStiffness(uint iteration)
 
 float GetParticleInterval(uint strandIndex)
 {
-	return _Length[strandIndex] / (_StrandParticleCount - 1);
+	return _StrandParticleInterval * _RootScale[strandIndex];
 }
 
-float GetShapeStiffness(uint linearIndex)
+float GetShapeStiffness(uint strandIndex, uint linearParticleIndex)
 {
-	float t = linearIndex / (float)(_StrandParticleCount - 1);
+	float t = (_RootScale[strandIndex] * linearParticleIndex) / (float)(_StrandParticleCount - 1);
 	return _ShapeStiffness * pow(abs(1.0 - t), _ShapeFalloff);
 }
 
@@ -189,7 +189,7 @@ void KInitParticles(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x)
+	DECLARE_STRAND(worldIdx.x);
 	
 	float3 rootPos = _RootPosition[strandIndex].xyz;
 	float3 rootPosPrev = _ParticlePosition[strandParticleBegin].xyz;
@@ -203,8 +203,13 @@ void KInitParticles(
 		_ParticlePositionPrev[i].xyz = p;
 		_ParticlePositionCorr[i].xyz = 0.0;
 		_ParticlePositionPose[i].xyz = v;
-		_ParticleVelocity[i].xyz = 0.0;
-		_ParticleVelocityPrev[i].xyz = 0.0;
+#if 1
+		_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _RootScale[strandIndex]);
+		_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _RootScale[strandIndex]);
+#else
+		_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, 1.0);
+		_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, 1.0);
+#endif
 	}
 }
 
@@ -222,7 +227,7 @@ void KSolveConstraints_GaussSeidelReference(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x)
+	DECLARE_STRAND(worldIdx.x);
 
 	// update positions
 	{
@@ -249,7 +254,7 @@ void KSolveConstraints_GaussSeidelReference(
 			float3 v1 = _ParticlePosition[i].xyz - p0;
 			float3 w1 = mul(_LocalToWorldInvT, float4(_ParticlePositionPose[i].xyz, 0.0)).xyz;
 
-			_ParticlePosition[i].xyz = p0 + lerp(v1, w1, 1.0 - GetDecay(1.0 - GetShapeStiffness(k)));
+			_ParticlePosition[i].xyz = p0 + lerp(v1, w1, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, k)));
 		}
 	}
 
@@ -406,7 +411,7 @@ void KSolveConstraints_GaussSeidel(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x)
+	DECLARE_STRAND(worldIdx.x);
 
 #if DEBUG_STRAND_31_32
 	if (strandIndex < 31 || strandIndex > 32)
@@ -454,7 +459,7 @@ void KSolveConstraints_GaussSeidel(
 			float3 v1 = _ParticlePosition[i].xyz - p0;
 			float3 w1 = mul(_LocalToWorldInvT, float4(_ParticlePositionPose[i].xyz, 0.0)).xyz;
 
-			_ParticlePosition[i].xyz = p0 + lerp(v1, w1, 1.0 - GetDecay(1.0 - GetShapeStiffness(k)));
+			_ParticlePosition[i].xyz = p0 + lerp(v1, w1, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, k)));
 		}
 	}
 
@@ -599,7 +604,7 @@ void KSolveConstraints_Jacobi(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(groupIdx.x)
+	DECLARE_STRAND(groupIdx.x);
 
 	const uint i = strandParticleBegin + strandParticleStride * threadIdx;
 #if NEW_JACOBI
@@ -639,7 +644,7 @@ void KSolveConstraints_Jacobi(
 			float3 v = gs_x[j].xyz - gs_x[1].xyz;
 			float3 w = mul(_LocalToWorldInvT, float4(_ParticlePositionPose[i].xyz, 0.0)).xyz;
 
-			gs_x[j].xyz = gs_x[1].xyz + lerp(v, w, 1.0 - GetDecay(1.0 - GetShapeStiffness(threadIdx)));
+			gs_x[j].xyz = gs_x[1].xyz + lerp(v, w, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, threadIdx)));
 		}
 	}
 

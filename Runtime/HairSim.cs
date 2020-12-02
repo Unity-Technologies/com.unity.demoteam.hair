@@ -20,7 +20,7 @@ namespace Unity.DemoTeam.Hair
 		static bool s_initialized = false;
 
 		static Collider[] s_boundariesOverlapResult = new Collider[64];
-		static List<HairSimBoundary> s_boundariesTemp = new List<HairSimBoundary>();
+		static List<HairSimBoundary> s_boundariesTmp = new List<HairSimBoundary>();
 
 		static ComputeShader s_solverCS;
 		static ComputeShader s_volumeCS;
@@ -38,6 +38,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public static ProfilerMarker Dummy;
 		}
+
 		static class MarkersGPU
 		{
 			public static ProfilingSampler Solver;
@@ -63,7 +64,7 @@ namespace Unity.DemoTeam.Hair
 			// solver
 			public static int SolverCBuffer;
 
-			public static int _Length;
+			public static int _RootScale;
 			public static int _RootPosition;
 			public static int _RootDirection;
 
@@ -112,6 +113,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KSolveConstraints_Jacobi_64;
 			public static int KSolveConstraints_Jacobi_128;
 		}
+
 		static class VolumeKernels
 		{
 			public static int KVolumeClear;
@@ -141,6 +143,7 @@ namespace Unity.DemoTeam.Hair
 			public T ENABLE_CURVATURE_LEQ;
 			public T ENABLE_SHAPE_GLOBAL;
 		}
+
 		public struct VolumeKeywords<T>
 		{
 			public T VOLUME_SUPPORT_CONTRACTION;
@@ -257,6 +260,7 @@ namespace Unity.DemoTeam.Hair
 				shapeFalloff = Falloff.Constant,
 			};
 		}
+
 		[Serializable]
 		public struct VolumeSettings
 		{
@@ -336,12 +340,20 @@ namespace Unity.DemoTeam.Hair
 			public bool drawStrandParticles;
 			public bool drawCellDensity;
 			public bool drawCellGradient;
-			[ToggleGroup] public bool drawSliceX;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along X")] public float drawSliceXOffset;
-			[ToggleGroup] public bool drawSliceY;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Y")] public float drawSliceYOffset;
-			[ToggleGroup] public bool drawSliceZ;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Z")] public float drawSliceZOffset;
+
+			[ToggleGroup]
+			public bool drawSliceX;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along X")]
+			public float drawSliceXOffset;
+			[ToggleGroup]
+			public bool drawSliceY;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Y")]
+			public float drawSliceYOffset;
+			[ToggleGroup]
+			public bool drawSliceZ;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Z")]
+			public float drawSliceZOffset;
+
 			[Range(0.0f, 4.0f), Tooltip("Scrubs between different layers")]
 			public float drawSliceDivider;
 
@@ -368,7 +380,8 @@ namespace Unity.DemoTeam.Hair
 		[HideInInspector] public Material volumeRasterMat;
 		[HideInInspector] public Material debugDrawMat;
 
-		public const int MAX_GROUP_SIZE = 64;
+		public const int PARTICLE_GROUP_SIZE = 64;
+
 		public const int MAX_BOUNDARIES = 8;
 		public const int MAX_STRAND_COUNT = 64000;
 		public const int MAX_STRAND_PARTICLE_COUNT = 128;
@@ -424,7 +437,7 @@ namespace Unity.DemoTeam.Hair
 				int particleCount = strandCount * strandParticleCount;
 				int particleStride = sizeof(Vector4);
 
-				changed |= CreateBuffer(ref solverData.length, "Length", strandCount, sizeof(float));
+				changed |= CreateBuffer(ref solverData.rootScale, "RootScale", strandCount, sizeof(float));
 				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStride);
 				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStride);
 
@@ -473,7 +486,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void ReleaseSolverData(ref SolverData solverData)
 		{
-			ReleaseBuffer(ref solverData.length);
+			ReleaseBuffer(ref solverData.rootScale);
 			ReleaseBuffer(ref solverData.rootPosition);
 			ReleaseBuffer(ref solverData.rootDirection);
 
@@ -598,14 +611,14 @@ namespace Unity.DemoTeam.Hair
 			ref var cbuffer = ref volumeData.cbuffer;
 
 			// gather distinct boundaries
-			s_boundariesTemp.Clear();
+			s_boundariesTmp.Clear();
 			{
 				foreach (var shape in volumeSettings.boundaryShapesResident)
 				{
 					if (shape != null)
 					{
-						if (s_boundariesTemp.Contains(shape) == false)
-							s_boundariesTemp.Add(shape);
+						if (s_boundariesTmp.Contains(shape) == false)
+							s_boundariesTmp.Add(shape);
 					}
 				}
 
@@ -619,13 +632,13 @@ namespace Unity.DemoTeam.Hair
 						var shape = result[i].GetComponent<HairSimBoundary>();
 						if (shape != null)
 						{
-							if (s_boundariesTemp.Contains(shape) == false)
-								s_boundariesTemp.Add(shape);
+							if (s_boundariesTmp.Contains(shape) == false)
+								s_boundariesTmp.Add(shape);
 						}
 					}
 				}
 
-				s_boundariesTemp.Sort((a, b) => a.GetInstanceID().CompareTo(b.GetInstanceID()));
+				s_boundariesTmp.Sort((a, b) => a.GetInstanceID().CompareTo(b.GetInstanceID()));
 
 				if (volumeSettings.boundarySDF)
 				{
@@ -661,7 +674,7 @@ namespace Unity.DemoTeam.Hair
 					// count boundary shapes
 					int boundaryCount = 0;
 
-					foreach (HairSimBoundary boundary in s_boundariesTemp)
+					foreach (HairSimBoundary boundary in s_boundariesTmp)
 					{
 						if (boundary == null || !boundary.isActiveAndEnabled)
 							continue;
@@ -689,7 +702,7 @@ namespace Unity.DemoTeam.Hair
 					int boundaryTorusIndex = boundarySphereIndex + cbuffer._BoundarySphereCount;
 					int boundaryCountPack = 0;
 
-					foreach (HairSimBoundary boundary in s_boundariesTemp)
+					foreach (HairSimBoundary boundary in s_boundariesTmp)
 					{
 						if (boundary == null || !boundary.isActiveAndEnabled)
 							continue;
@@ -745,7 +758,7 @@ namespace Unity.DemoTeam.Hair
 
 					volumeData.boundaryPrev.CopyFrom(tmpInfo);
 					volumeData.boundaryPrevCount = boundaryCount;
-					volumeData.boundaryPrevCountDiscarded = s_boundariesTemp.Count - boundaryCount;
+					volumeData.boundaryPrevCountDiscarded = s_boundariesTmp.Count - boundaryCount;
 				}
 			}
 		}
@@ -771,7 +784,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			ConstantBuffer.Push(cmd, solverData.cbuffer, cs, UniformIDs.SolverCBuffer);
 
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._Length, solverData.length);
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootScale, solverData.rootScale);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, solverData.rootPosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootDirection, solverData.rootDirection);
 
@@ -798,7 +811,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			ConstantBuffer.Push(cmd, solverData.cbuffer, mat, UniformIDs.SolverCBuffer);
 
-			mpb.SetBuffer(UniformIDs._Length, solverData.length);
+			mpb.SetBuffer(UniformIDs._RootScale, solverData.rootScale);
 			mpb.SetBuffer(UniformIDs._RootPosition, solverData.rootPosition);
 			mpb.SetBuffer(UniformIDs._RootDirection, solverData.rootDirection);
 
@@ -879,7 +892,7 @@ namespace Unity.DemoTeam.Hair
 				solverDataCopy.cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
 			}
 
-			int numX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % MAX_GROUP_SIZE);
+			int numX = (int)solverData.cbuffer._StrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % PARTICLE_GROUP_SIZE);
 			int numY = 1;
 			int numZ = 1;
 
@@ -892,7 +905,7 @@ namespace Unity.DemoTeam.Hair
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
 				int kernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
-				int numX = (int)solverData.cbuffer._StrandCount / MAX_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % MAX_GROUP_SIZE);
+				int numX = (int)solverData.cbuffer._StrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % PARTICLE_GROUP_SIZE);
 				int numY = 1;
 				int numZ = 1;
 
@@ -974,7 +987,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			int particleCount = (int)solverData.cbuffer._StrandCount * (int)solverData.cbuffer._StrandParticleCount;
 
-			int numX = particleCount / MAX_GROUP_SIZE + Mathf.Min(1, particleCount % MAX_GROUP_SIZE);
+			int numX = particleCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, particleCount % PARTICLE_GROUP_SIZE);
 			int numY = 1;
 			int numZ = 1;
 

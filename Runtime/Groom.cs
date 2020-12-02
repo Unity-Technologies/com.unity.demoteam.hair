@@ -224,12 +224,12 @@ namespace Unity.DemoTeam.Hair
 
 			var scaleFactor = GetSimulationStrandScale();
 			var worldBounds = GetRootBounds(componentGroups[0]);
-			var worldMargin = groomAsset.strandGroups[0].strandLengthMax * scaleFactor;
+			var worldMargin = groomAsset.strandGroups[0].maxStrandLength * scaleFactor;
 
 			for (int i = 1; i != componentGroups.Length; i++)
 			{
 				worldBounds.Encapsulate(GetRootBounds(componentGroups[i]));
-				worldMargin = Mathf.Max(groomAsset.strandGroups[i].strandLengthMax * scaleFactor, worldMargin);
+				worldMargin = Mathf.Max(groomAsset.strandGroups[i].maxStrandLength * scaleFactor, worldMargin);
 			}
 
 			worldMargin *= 1.5f;
@@ -484,45 +484,43 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 
-				//TODO couple this with a scaling factor
-				float strandParticleInterval = strandGroup.strandLengthAvg / (strandGroup.strandParticleCount - 1);
-
 				solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 				solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
-				solverData[i].cbuffer._StrandParticleInterval = strandParticleInterval * strandScale;
+				solverData[i].cbuffer._StrandParticleInterval = strandGroup.maxStrandLength / (strandGroup.strandParticleCount - 1);
 
 				int particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 
-				using (var tmpZero = new NativeArray<Vector4>(particleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (var tmpPosition = new NativeArray<Vector4>(particleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var tmpRootPosition = new NativeArray<Vector4>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var tmpRootDirection = new NativeArray<Vector4>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var tmpParticlePosition = new NativeArray<Vector4>(particleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
 					unsafe
 					{
-						fixed (void* srcPosition = strandGroup.initialPosition)
-						fixed (void* srcRootPosition = strandGroup.initialRootPosition)
-						fixed (void* srcRootDirection = strandGroup.initialRootDirection)
+						fixed (void* srcRootPosition = strandGroup.rootPosition)
+						fixed (void* srcRootDirection = strandGroup.rootDirection)
+						fixed (void* srcParticlePosition = strandGroup.particlePosition)
 						{
-							UnsafeUtility.MemCpyStride(tmpPosition.GetUnsafePtr(), sizeof(Vector4), srcPosition, sizeof(Vector3), sizeof(Vector3), particleCount);
 							UnsafeUtility.MemCpyStride(tmpRootPosition.GetUnsafePtr(), sizeof(Vector4), srcRootPosition, sizeof(Vector3), sizeof(Vector3), strandGroup.strandCount);
 							UnsafeUtility.MemCpyStride(tmpRootDirection.GetUnsafePtr(), sizeof(Vector4), srcRootDirection, sizeof(Vector3), sizeof(Vector3), strandGroup.strandCount);
+							UnsafeUtility.MemCpyStride(tmpParticlePosition.GetUnsafePtr(), sizeof(Vector4), srcParticlePosition, sizeof(Vector3), sizeof(Vector3), particleCount);
 						}
 					}
 
-					solverData[i].length.SetData(strandGroup.initialLength);
+					solverData[i].rootScale.SetData(strandGroup.rootScale);
 					solverData[i].rootPosition.SetData(tmpRootPosition);
 					solverData[i].rootDirection.SetData(tmpRootDirection);
 
-					solverData[i].particlePosition.SetData(tmpPosition);
-					solverData[i].particlePositionPrev.SetData(tmpPosition);
-					solverData[i].particlePositionPose.SetData(tmpZero);
-					solverData[i].particlePositionCorr.SetData(tmpZero);
-					solverData[i].particleVelocity.SetData(tmpZero);
-					solverData[i].particleVelocityPrev.SetData(tmpZero);
+					solverData[i].particlePosition.SetData(tmpParticlePosition);
+
+					// note: the rest are initialized by HairSim.InitSolverParticles
+					//solverData[i].particlePositionPrev.SetData(tmpParticlePosition);
+					//solverData[i].particlePositionPose.SetData(tmpZero);
+					//solverData[i].particlePositionCorr.SetData(tmpZero);
+					//solverData[i].particleVelocity.SetData(tmpZero);
+					//solverData[i].particleVelocityPrev.SetData(tmpZero);
 				}
 
-				solverData[i].memoryLayout = strandGroup.memoryLayout;
+				solverData[i].memoryLayout = strandGroup.particleMemoryLayout;
 
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, 0.0f);
 				HairSim.UpdateSolverRoots(cmd, componentGroups[i].rootFilter.sharedMesh, rootTransform, solverData[i]);

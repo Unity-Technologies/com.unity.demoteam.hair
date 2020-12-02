@@ -5,7 +5,7 @@ namespace Unity.DemoTeam.Hair
 {
 	using static HairGUILayout;
 
-	[CustomEditor(typeof(Groom))]
+	[CustomEditor(typeof(Groom)), CanEditMultipleObjects]
 	public class GroomEditor : Editor
 	{
 		Editor groomAssetEditor;

@@ -11,7 +11,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public SolverCBuffer cbuffer;
 
-			public ComputeBuffer length;
+			public ComputeBuffer rootScale;
 			public ComputeBuffer rootPosition;
 			public ComputeBuffer rootDirection;
 
@@ -72,6 +72,8 @@ namespace Unity.DemoTeam.Hair
 			public uint _StrandParticleCount;
 			public float _StrandParticleInterval;
 			public float _StrandParticleVolume;
+			public float _StrandParticleScale;
+
 			public float _StrandParticleContrib;//TODO remove
 
 			public float _DT;

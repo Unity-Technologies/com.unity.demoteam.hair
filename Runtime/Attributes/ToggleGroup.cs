@@ -5,7 +5,6 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditorInternal;
 #endif
-using Unity.Mathematics;
 
 namespace Unity.DemoTeam.Attributes
 {
