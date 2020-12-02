@@ -76,7 +76,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
-			EditorGUILayout.LabelField("Strand groups", EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.LabelField("Strand Groups", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
 				DrawStrandGroupsGUI();

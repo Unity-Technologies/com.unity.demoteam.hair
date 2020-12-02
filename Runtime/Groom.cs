@@ -81,6 +81,8 @@ namespace Unity.DemoTeam.Hair
 			public VisualEffect strandOutputGraph;
 #endif
 			public ShadowCastingMode strandShadows;
+			[RenderingLayerMask]
+			public int strandLayer;
 
 			[LineHeader("Overrides")]
 
@@ -94,6 +96,7 @@ namespace Unity.DemoTeam.Hair
 				strandScale = Scale.Fixed,
 				strandRenderer = Renderer.PrimitiveLines,
 				strandShadows = ShadowCastingMode.On,
+				strandLayer = 0x0101,//TODO decide based on active pipeline asset
 			};
 		}
 
@@ -381,6 +384,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			lineRenderer.shadowCastingMode = settingsStrands.strandShadows;
+			lineRenderer.renderingLayerMask = (uint)settingsStrands.strandLayer;
 		}
 
 		// when to build runtime data?

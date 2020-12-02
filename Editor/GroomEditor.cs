@@ -52,12 +52,12 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField("Instance", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
-				DrawAssetGUI();
+				DrawInstanceGUI();
 			}
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
-			EditorGUILayout.LabelField("Strand settings", EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.LabelField("Strand Settings", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
 				DrawStrandSettingsGUI();
@@ -65,7 +65,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
-			EditorGUILayout.LabelField("Simulation settings", EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.LabelField("Simulation Settings", EditorStyles.centeredGreyMiniLabel);
 			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 			{
 				DrawSimulationSettingsGUI();
@@ -76,7 +76,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField(groom.componentGroupsChecksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
-		public void DrawAssetGUI()
+		public void DrawInstanceGUI()
 		{
 			var groom = target as Groom;
 			if (groom == null)
@@ -106,10 +106,28 @@ namespace Unity.DemoTeam.Hair
 					EditorGUILayout.EndVertical();
 				}
 
-				if (GUILayout.Button("Reload"))
+				EditorGUILayout.BeginHorizontal();
 				{
-					groom.componentGroupsChecksum = string.Empty;
+					if (GUILayout.Button("Reload"))
+					{
+						groom.componentGroupsChecksum = string.Empty;
+					}
+
+					if (GUILayout.Button("Unlock", GUILayout.Width(60.0f)))
+					{
+						var componentGroups = groom.componentGroups;
+						if (componentGroups != null)
+						{
+							foreach (var componentGroup in groom.componentGroups)
+							{
+								componentGroup.container.hideFlags &= ~HideFlags.NotEditable;
+								componentGroup.lineFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
+								componentGroup.rootFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
+							}
+						}
+					}
 				}
+				EditorGUILayout.EndHorizontal();
 			}
 		}
 

@@ -68,7 +68,8 @@
 		const float w1 = localPos.z - localPosFloor.z;
 		const float w0 = 1.0 - w1;
 
-		const float4 value = float4(_ParticleVelocity[vertexID[0]].xyz, 1.0);
+		const float4 v = _ParticleVelocity[vertexID[0]];
+		const float4 value = float4((v.xyz * v.w), v.w);
 
 		MakeVertex(outStream, ndc0 + ndcH.zz, value * w0, localPos.xy, slice0);
 		MakeVertex(outStream, ndc0 + ndcH.xz, value * w0, localPos.xy, slice0);
@@ -112,11 +113,13 @@
 		const float w1 = localPos.z - localPosFloor.z;
 		const float w0 = 1.0 - w1;
 
+		const float4 v = _ParticleVelocity[i];
+
 		Varyings output;
 		output.volumePos = float4(ndc0 + ndcH * uv, 0.0, 1.0);
 		output.volumeSlice = localPosFloor.z + j;
 		output.valuePos = localPos.xy;
-		output.value = float4(_ParticleVelocity[i].xyz, 1.0) * lerp(w0, w1, j);
+		output.value = float4((v.xyz * v.w), v.w) * lerp(w0, w1, j);
 		return output;
 	}
 
