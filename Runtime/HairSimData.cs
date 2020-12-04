@@ -1,5 +1,4 @@
-﻿using System.Runtime.InteropServices;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Collections;
 
@@ -36,6 +35,8 @@ namespace Unity.DemoTeam.Hair
 			public RenderTexture accuVelocityY;
 			public RenderTexture accuVelocityZ;
 
+			public float allGroupsMaxParticleInterval;
+
 			public RenderTexture volumeDensity;
 			public RenderTexture volumeVelocity;
 			public RenderTexture volumeDivergence;
@@ -70,11 +71,8 @@ namespace Unity.DemoTeam.Hair
 
 			public uint _StrandCount;
 			public uint _StrandParticleCount;
-			public float _StrandParticleInterval;
-			public float _StrandParticleVolume;
-			public float _StrandParticleScale;
-
-			public float _StrandParticleContrib;//TODO remove
+			public float _StrandMaxParticleInterval;
+			public float _StrandMaxParticleContrib;
 
 			public float _DT;
 			public uint _Iterations;
@@ -118,6 +116,9 @@ namespace Unity.DemoTeam.Hair
 				_VolumeWorldMin = P
 				_VolumeWorldMax = Q
 			*/
+
+			public float _ResolveUnitVolume;
+			public float _ResolveUnitContrib;
 
 			public float _TargetDensityFactor;
 

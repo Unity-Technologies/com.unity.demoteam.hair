@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Mathematics;
 using Unity.DemoTeam.Attributes;
 
 #if UNITY_DEMOTEAM_DIGITALHUMAN
@@ -69,7 +68,8 @@ namespace Unity.DemoTeam.Hair
 			public enum Scale
 			{
 				Fixed,
-				UniformFromHierarchy,//TODO
+				UniformLowerBound,
+				UniformUpperBound,
 			}
 
 			public Scale strandScale;
@@ -96,7 +96,7 @@ namespace Unity.DemoTeam.Hair
 				strandScale = Scale.Fixed,
 				strandRenderer = Renderer.PrimitiveLines,
 				strandShadows = ShadowCastingMode.On,
-				strandLayer = 0x0101,//TODO decide based on active pipeline asset
+				strandLayer = 0x0101,//TODO decide based on active pipeline asset (current default is HDRP default)
 			};
 		}
 
@@ -255,10 +255,23 @@ namespace Unity.DemoTeam.Hair
 			{
 				default:
 				case SettingsStrands.Scale.Fixed:
-					return 1.0f;
+					{
+						return 1.0f;
+					}
 
-				case SettingsStrands.Scale.UniformFromHierarchy:
-					return math.cmin(this.transform.lossyScale);
+				case SettingsStrands.Scale.UniformLowerBound:
+					{
+						var lossyScale = this.transform.lossyScale;
+						var lossyScaleAbs = new Vector3(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y), Mathf.Abs(lossyScale.z));
+						return Mathf.Min(lossyScaleAbs.x, lossyScaleAbs.y, lossyScaleAbs.z);
+					}
+
+				case SettingsStrands.Scale.UniformUpperBound:
+					{
+						var lossyScale = this.transform.lossyScale;
+						var lossyScaleAbs = new Vector3(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y), Mathf.Abs(lossyScale.z));
+						return Mathf.Max(lossyScaleAbs.x, lossyScaleAbs.y, lossyScaleAbs.z);
+					}
 			}
 		}
 
@@ -292,8 +305,8 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			// get bounds
-			var simulationBounds = GetSimulationBoundsSquare();
-			var simulationScale = GetSimulationStrandScale();
+			var strandBounds = GetSimulationBoundsSquare();
+			var strandScale = GetSimulationStrandScale();
 
 			// update solver roots
 			for (int i = 0; i != solverData.Length; i++)
@@ -305,21 +318,18 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// update volume boundaries
-			HairSim.UpdateVolumeBoundaries(ref volumeData, volumeSettings, simulationBounds);
+			HairSim.UpdateVolumeBoundaries(ref volumeData, volumeSettings, strandBounds);
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
 			{
-				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds);
+				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, strandBounds, solverSettings.strandDiameter, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
 
 			// step solver data
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				var rootFilter = componentGroups[i].rootFilter;
-
-				var strandScale = GetSimulationStrandScale();
 				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, dt);
@@ -327,7 +337,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// step volume data
-			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds);
+			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, strandBounds, solverSettings.strandDiameter, strandScale);
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 			// update renderers
@@ -476,21 +486,23 @@ namespace Unity.DemoTeam.Hair
 
 			solverData = new HairSim.SolverData[strandGroups.Length];
 
+			var allGroupsMaxParticleInterval = 0.0f;
+
+			for (int i = 0; i != strandGroups.Length; i++)
+			{
+				allGroupsMaxParticleInterval = Mathf.Max(allGroupsMaxParticleInterval, strandGroups[i].maxParticleInterval);
+			}
+	
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
 				ref var strandGroup = ref strandGroups[i];
-
-				var rootFilter = componentGroups[i].rootFilter;
-				var rootTransform = rootFilter.transform.localToWorldMatrix;
-
-				var strandScale = GetSimulationStrandScale();
-				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 
 				solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 				solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
-				solverData[i].cbuffer._StrandParticleInterval = strandGroup.maxStrandLength / (strandGroup.strandParticleCount - 1);
+				solverData[i].cbuffer._StrandMaxParticleInterval = strandGroup.maxParticleInterval;
+				solverData[i].cbuffer._StrandMaxParticleContrib = strandGroup.maxParticleInterval / allGroupsMaxParticleInterval;
 
 				int particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 
@@ -516,7 +528,7 @@ namespace Unity.DemoTeam.Hair
 
 					solverData[i].particlePosition.SetData(tmpParticlePosition);
 
-					// note: the rest are initialized by HairSim.InitSolverParticles
+					// NOTE: rest of the buffers are initialized by KInitParticles
 					//solverData[i].particlePositionPrev.SetData(tmpParticlePosition);
 					//solverData[i].particlePositionPose.SetData(tmpZero);
 					//solverData[i].particlePositionCorr.SetData(tmpZero);
@@ -525,6 +537,12 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				solverData[i].memoryLayout = strandGroup.particleMemoryLayout;
+
+				var rootFilter = componentGroups[i].rootFilter;
+				var rootTransform = rootFilter.transform.localToWorldMatrix;
+
+				var strandScale = GetSimulationStrandScale();
+				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, 0.0f);
 				HairSim.UpdateSolverRoots(cmd, componentGroups[i].rootFilter.sharedMesh, rootTransform, solverData[i]);
@@ -540,6 +558,8 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false);
+
+			volumeData.allGroupsMaxParticleInterval = allGroupsMaxParticleInterval;
 
 			return true;
 		}

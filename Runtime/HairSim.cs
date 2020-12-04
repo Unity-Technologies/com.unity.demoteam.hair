@@ -176,8 +176,6 @@ namespace Unity.DemoTeam.Hair
 
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
 			public float strandDiameter;
-			[Range(0.0f, 9.0f)]
-			public float strandParticleContrib;//TODO move elsewhere
 
 			[LineHeader("Solver")]
 
@@ -234,7 +232,6 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
 				strandDiameter = 1.0f,
-				strandParticleContrib = 1.0f,
 
 				method = Method.GaussSeidel,
 				iterations = 5,
@@ -287,6 +284,10 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public SplatMethod volumeSplatMethod;
+			[ToggleGroup]
+			public bool volumeSplatDebug;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 9.0f)]
+			public float volumeSplatDebugContrib;
 			[Range(8, 160)]
 			public int volumeGridResolution;
 			[HideInInspector, Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
@@ -551,12 +552,6 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._LocalToWorld = rootTransform;
 			cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
 
-			float strandCrossSectionArea = 0.25f * Mathf.PI * solverSettings.strandDiameter * solverSettings.strandDiameter;
-			float strandParticleVolume = (1000.0f * cbuffer._StrandParticleInterval) * strandCrossSectionArea;
-
-			cbuffer._StrandParticleVolume = strandParticleVolume;
-			cbuffer._StrandParticleContrib = solverSettings.strandParticleContrib;
-
 			// update solver parameters
 			cbuffer._DT = dt;
 			cbuffer._Iterations = (uint)solverSettings.iterations;
@@ -570,7 +565,7 @@ namespace Unity.DemoTeam.Hair
 
 			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
-			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f * cbuffer._StrandParticleInterval;
+			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f * cbuffer._StrandMaxParticleInterval;//TODO account for scaling
 			cbuffer._ShapeStiffness = solverSettings.shapeStiffness;
 
 			switch (solverSettings.shapeFalloff)
@@ -763,7 +758,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
+		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds, float strandDiameter, float strandScale)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
 			ref var keywords = ref volumeData.keywords;
@@ -772,6 +767,13 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._VolumeCells = volumeSettings.volumeGridResolution * Vector3.one;
 			cbuffer._VolumeWorldMin = volumeBounds.min;
 			cbuffer._VolumeWorldMax = volumeBounds.max;
+
+			// update resolve parameters
+			float resolveUnitCrossSection = 0.25f * Mathf.PI * strandDiameter * strandDiameter;
+			float resolveUnitVolume = (1000.0f * volumeData.allGroupsMaxParticleInterval) * resolveUnitCrossSection;
+
+			cbuffer._ResolveUnitVolume = resolveUnitVolume * (strandScale * strandScale * strandScale);
+			cbuffer._ResolveUnitContrib = volumeSettings.volumeSplatDebugContrib;
 
 			// update pressure parameters
 			cbuffer._TargetDensityFactor = volumeSettings.targetDensityTerm;

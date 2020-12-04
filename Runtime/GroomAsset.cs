@@ -88,6 +88,7 @@ namespace Unity.DemoTeam.Hair
 			public int strandParticleCount;
 
 			public float maxStrandLength;
+			public float maxParticleInterval;
 
 			[HideInInspector] public float[] rootScale;
 			[HideInInspector] public Vector3[] rootPosition;

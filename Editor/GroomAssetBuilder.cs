@@ -215,7 +215,7 @@ namespace Unity.DemoTeam.Hair
 
 			strandGroup.particleMemoryLayout = memoryLayout;
 
-			// finalize (calc derivative fields, create mesh assets)
+			// calc derivative fields, create mesh assets
 			FinalizeStrandGroup(ref strandGroup);
 		}
 
@@ -259,7 +259,7 @@ namespace Unity.DemoTeam.Hair
 			// apply memory layout
 			strandGroup.particleMemoryLayout = memoryLayout;
 
-			// calc derivative fields, create mesh assets)
+			// calc derivative fields, create mesh assets
 			FinalizeStrandGroup(ref strandGroup);
 		}
 
@@ -269,17 +269,17 @@ namespace Unity.DemoTeam.Hair
 			var curveCount = strandGroup.strandCount;
 			var curvePointCount = strandGroup.strandParticleCount;
 
-			// find strand lengths
+			// examine strands
 			using (var strandLength = new NativeArray<float>(curveCount, Allocator.Temp))
 			{
 				unsafe
 				{
-					// calc piece-wise length
+					// calc piece-wise lengths
 					var strandLengthPtr = (float*)strandLength.GetUnsafePtr();
 
 					for (int i = 0; i != curveCount; i++)
 					{
-						float accumulatedLength = 0.0f;
+						var accuLength = 0.0f;
 
 						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
@@ -288,25 +288,28 @@ namespace Unity.DemoTeam.Hair
 							ref var p0 = ref strandGroup.particlePosition[j - strandParticleStride];
 							ref var p1 = ref strandGroup.particlePosition[j];
 
-							accumulatedLength += Vector3.Distance(p0, p1);
+							accuLength += Vector3.Distance(p0, p1);
 						}
 
-						strandLengthPtr[i] = accumulatedLength;
+						strandLengthPtr[i] = accuLength;
 					}
 
-					// find maximum length in group
+					// find maximum strand length
 					strandGroup.maxStrandLength = 0.0f;
 
 					for (int i = 0; i != curveCount; i++)
 					{
-						strandGroup.maxStrandLength = Mathf.Max(strandLengthPtr[i], strandGroup.maxStrandLength);
+						strandGroup.maxStrandLength = Mathf.Max(strandGroup.maxStrandLength, strandLengthPtr[i]);
 					}
 
-					// find relative length to group maximum
+					// calc scale factors within group
 					for (int i = 0; i != curveCount; i++)
 					{
 						strandGroup.rootScale[i] = strandLengthPtr[i] / strandGroup.maxStrandLength;
 					}
+
+					// find maximum particle interval
+					strandGroup.maxParticleInterval = strandGroup.maxStrandLength / (strandGroup.strandParticleCount - 1);
 				}
 			}
 
