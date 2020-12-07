@@ -287,11 +287,13 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroup]
 			public bool volumeSplatDebug;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 9.0f)]
-			public float volumeSplatDebugContrib;
+			public float volumeSplatDebugWidth;
 			[Range(8, 160)]
 			public int volumeGridResolution;
 			[HideInInspector, Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
 			public bool volumeGridStaggered;
+			[HideInInspector]
+			public bool volumeGridSquare;
 
 			[LineHeader("Pressure")]
 
@@ -318,8 +320,12 @@ namespace Unity.DemoTeam.Hair
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
 				volumeSplatMethod = SplatMethod.Compute,
+				volumeSplatDebug = false,
+				volumeSplatDebugWidth = 1.0f,
+
 				volumeGridResolution = 32,
 				volumeGridStaggered = false,
+				volumeGridSquare = true,
 
 				pressureIterations = 3,
 				pressureSolution = PressureSolution.DensityEquals,
@@ -543,7 +549,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.ClearRandomWriteTargets();
 		}
 
-		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, float dt)
+		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, float rootScale, float dt)
 		{
 			ref var cbuffer = ref solverData.cbuffer;
 			ref var keywords = ref solverData.keywords;
@@ -551,6 +557,8 @@ namespace Unity.DemoTeam.Hair
 			// update strand parameters
 			cbuffer._LocalToWorld = rootTransform;
 			cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
+
+			cbuffer._StrandScale = rootScale;
 
 			// update solver parameters
 			cbuffer._DT = dt;
@@ -565,7 +573,7 @@ namespace Unity.DemoTeam.Hair
 
 			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
-			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f * cbuffer._StrandMaxParticleInterval;//TODO account for scaling
+			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f;
 			cbuffer._ShapeStiffness = solverSettings.shapeStiffness;
 
 			switch (solverSettings.shapeFalloff)
@@ -769,11 +777,11 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._VolumeWorldMax = volumeBounds.max;
 
 			// update resolve parameters
-			float resolveUnitCrossSection = 0.25f * Mathf.PI * strandDiameter * strandDiameter;
-			float resolveUnitVolume = (1000.0f * volumeData.allGroupsMaxParticleInterval) * resolveUnitCrossSection;
+			float resolveCrossSection = 0.25f * Mathf.PI * strandDiameter * strandDiameter;
+			float resolveUnitVolume = (1000.0f * volumeData.allGroupsMaxParticleInterval) * resolveCrossSection;
 
 			cbuffer._ResolveUnitVolume = resolveUnitVolume * (strandScale * strandScale * strandScale);
-			cbuffer._ResolveUnitContrib = volumeSettings.volumeSplatDebugContrib;
+			cbuffer._ResolveUnitDebugWidth = volumeSettings.volumeSplatDebugWidth;
 
 			// update pressure parameters
 			cbuffer._TargetDensityFactor = volumeSettings.targetDensityTerm;

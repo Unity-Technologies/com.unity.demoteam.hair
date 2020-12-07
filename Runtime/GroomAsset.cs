@@ -1,6 +1,7 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.Formats.Alembic.Importer;
+using Unity.DemoTeam.Attributes;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -62,6 +63,7 @@ namespace Unity.DemoTeam.Hair
 				Brush,
 				Cap,
 				StratifiedCurtain,
+				VariableLengthCurtain,
 			}
 
 			public Style style;
@@ -71,6 +73,10 @@ namespace Unity.DemoTeam.Hair
 			public int strandParticleCount;
 			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
 			public float strandLength;
+			[ToggleGroup]
+			public bool strandLengthRandom;
+			[ToggleGroupItem, Range(0.0f, 1.0f)]
+			public float strandLengthRandomAmount;
 
 			public static readonly SettingsProcedural defaults = new SettingsProcedural()
 			{
@@ -78,6 +84,8 @@ namespace Unity.DemoTeam.Hair
 				strandCount = 64,
 				strandParticleCount = 32,
 				strandLength = 0.25f,
+				strandLengthRandom = false,
+				strandLengthRandomAmount = 0.2f,
 			};
 		}
 

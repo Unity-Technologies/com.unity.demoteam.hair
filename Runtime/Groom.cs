@@ -225,14 +225,14 @@ namespace Unity.DemoTeam.Hair
 			Debug.Assert(groomAsset != null);
 			Debug.Assert(groomAsset.strandGroups != null);
 
-			var scaleFactor = GetSimulationStrandScale();
+			var strandScale = GetSimulationStrandScale();
 			var worldBounds = GetRootBounds(componentGroups[0]);
-			var worldMargin = groomAsset.strandGroups[0].maxStrandLength * scaleFactor;
+			var worldMargin = groomAsset.strandGroups[0].maxStrandLength * strandScale;
 
 			for (int i = 1; i != componentGroups.Length; i++)
 			{
 				worldBounds.Encapsulate(GetRootBounds(componentGroups[i]));
-				worldMargin = Mathf.Max(groomAsset.strandGroups[i].maxStrandLength * scaleFactor, worldMargin);
+				worldMargin = Mathf.Max(groomAsset.strandGroups[i].maxStrandLength * strandScale, worldMargin);
 			}
 
 			worldMargin *= 1.5f;
@@ -332,7 +332,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, dt);
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, dt);
 				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings, volumeData);
 			}
 
@@ -484,15 +484,17 @@ namespace Unity.DemoTeam.Hair
 			if (solverData != null && solverData.Length == strandGroups.Length)
 				return true;
 
-			solverData = new HairSim.SolverData[strandGroups.Length];
+			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false);
 
-			var allGroupsMaxParticleInterval = 0.0f;
+			volumeData.allGroupsMaxParticleInterval = 0.0f;
 
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
-				allGroupsMaxParticleInterval = Mathf.Max(allGroupsMaxParticleInterval, strandGroups[i].maxParticleInterval);
+				volumeData.allGroupsMaxParticleInterval = Mathf.Max(volumeData.allGroupsMaxParticleInterval, strandGroups[i].maxParticleInterval);
 			}
-	
+
+			solverData = new HairSim.SolverData[strandGroups.Length];
+
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
 				ref var strandGroup = ref strandGroups[i];
@@ -502,7 +504,7 @@ namespace Unity.DemoTeam.Hair
 				solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 				solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
 				solverData[i].cbuffer._StrandMaxParticleInterval = strandGroup.maxParticleInterval;
-				solverData[i].cbuffer._StrandMaxParticleContrib = strandGroup.maxParticleInterval / allGroupsMaxParticleInterval;
+				solverData[i].cbuffer._StrandMaxParticleWeight = strandGroup.maxParticleInterval / volumeData.allGroupsMaxParticleInterval;
 
 				int particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 
@@ -544,7 +546,7 @@ namespace Unity.DemoTeam.Hair
 				var strandScale = GetSimulationStrandScale();
 				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, 0.0f);
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, 0.0f);
 				HairSim.UpdateSolverRoots(cmd, componentGroups[i].rootFilter.sharedMesh, rootTransform, solverData[i]);
 				{
 					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);
@@ -556,10 +558,6 @@ namespace Unity.DemoTeam.Hair
 
 				UpdateRenderer(cmd, componentGroups[i], solverData[i]);
 			}
-
-			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false);
-
-			volumeData.allGroupsMaxParticleInterval = allGroupsMaxParticleInterval;
 
 			return true;
 		}

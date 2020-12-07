@@ -72,7 +72,8 @@ namespace Unity.DemoTeam.Hair
 			public uint _StrandCount;
 			public uint _StrandParticleCount;
 			public float _StrandMaxParticleInterval;
-			public float _StrandMaxParticleContrib;
+			public float _StrandMaxParticleWeight;
+			public float _StrandScale;
 
 			public float _DT;
 			public uint _Iterations;
@@ -118,7 +119,7 @@ namespace Unity.DemoTeam.Hair
 			*/
 
 			public float _ResolveUnitVolume;
-			public float _ResolveUnitContrib;
+			public float _ResolveUnitDebugWidth;
 
 			public float _TargetDensityFactor;
 

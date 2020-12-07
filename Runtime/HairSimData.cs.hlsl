@@ -12,7 +12,8 @@ CBUFFER_START(SolverCBuffer)
     uint _StrandCount;
     uint _StrandParticleCount;
     float _StrandMaxParticleInterval;
-    float _StrandMaxParticleContrib;
+    float _StrandMaxParticleWeight;
+    float _StrandScale;
     float _DT;
     uint _Iterations;
     float _Stiffness;
@@ -37,9 +38,9 @@ CBUFFER_START(VolumeCBuffer)
     uint __pad2;
     float3 _VolumeWorldMax;
     uint __pad3;
-	float _ResolveUnitVolume;
-	float _ResolveUnitContrib;
-	float _TargetDensityFactor;
+    float _ResolveUnitVolume;
+    float _ResolveUnitDebugWidth;
+    float _TargetDensityFactor;
     int _BoundaryCapsuleCount;
     int _BoundarySphereCount;
     int _BoundaryTorusCount;

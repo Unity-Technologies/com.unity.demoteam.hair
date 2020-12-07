@@ -556,10 +556,15 @@ namespace Unity.DemoTeam.Hair
 				var rootPos = (Vector3*)tmpRoots.rootPosition.GetUnsafePtr();
 				var rootDir = (Vector3*)tmpRoots.rootDirection.GetUnsafePtr();
 
-				float strandParticleInterval = settings.strandLength / (settings.strandParticleCount - 1);
+				var strandParticleInterval = settings.strandLength / (settings.strandParticleCount - 1);
+				var strandParticleIntervalRandom = settings.strandLengthRandom ? settings.strandLengthRandomAmount : 0.0f;
+
+				var xorshift = new Unity.Mathematics.Random(257);
 
 				for (int i = 0; i != settings.strandCount; i++)
 				{
+					var step = strandParticleInterval * Mathf.Lerp(1.0f, xorshift.NextFloat(), strandParticleIntervalRandom);
+
 					var curPos = rootPos[i];
 					var curDir = rootDir[i];
 
@@ -568,7 +573,7 @@ namespace Unity.DemoTeam.Hair
 					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
 					{
 						pos[j] = curPos;
-						curPos += strandParticleInterval * curDir;
+						curPos += step * curDir;
 					}
 				}
 			}
