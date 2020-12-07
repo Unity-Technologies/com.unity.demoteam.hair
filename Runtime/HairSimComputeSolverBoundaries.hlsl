@@ -8,6 +8,8 @@
 
 float SdCapsule(const float3 p, const float3 centerA, const float3 centerB, const float radius)
 {
+	// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+
 	const float3 pa = p - centerA;
 	const float3 ba = centerB - centerA;
 
@@ -19,15 +21,29 @@ float SdCapsule(const float3 p, const float3 centerA, const float3 centerB, cons
 
 float SdSphere(const float3 p, const float3 center, const float radius)
 {
+	// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+
 	const float3 a = center;
 	const float r = radius;
 
 	return (length(a - p) - r);
 }
 
-float SdTorus(const float3 p, const float3 center, const float3 axis, const float radiusA, const float radiusB)
+float SdTorus(float3 p, const float3 center, const float3 axis, const float radiusA, const float radiusB)
 {
-	return 1e+7;//TODO
+	const float3 basisX = (axis.y > 1.0 - 1e-4) ? float3(1.0, 0.0, 0.0) : normalize(cross(axis, float3(0.0, 1.0, 0.0)));
+	const float3 basisY = axis;
+	const float3 basisZ = cross(basisX, axis);
+	const float3x3 invM = float3x3(basisX, basisY, basisZ);
+
+	p = mul(invM, p - center);
+
+	// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+
+	const float2 t = float2(radiusA, radiusB);
+	const float2 q = float2(length(p.xz) - t.x, p.y);
+
+	return length(q) - t.y;
 }
 
 float SdCapsule(const float3 p, const BoundaryPack capsule)
@@ -76,6 +92,7 @@ float BoundaryDistance(const float3 p)
 		for (uint i = 0; i != _BoundaryTorusCount; i++)
 		{
 			BoundaryTorus torus = _BoundaryTorus[i];
+
 			d = min(d, SdTorus(p, torus.center, torus.axis, torus.radiusA, torus.radiusB));
 		}
 	}

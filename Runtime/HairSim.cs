@@ -307,7 +307,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroup]
 			public bool boundarySDF;
 			[ToggleGroupItem(withLabel = true)]
-			public Texture3D boundarySDFTexture;
+			public Texture3DWithBounds boundarySDFTexture;
 			[ToggleGroup]
 			public bool boundaryShapes;
 			[ToggleGroupItem(withLabel = true)]
@@ -1171,13 +1171,13 @@ namespace Unity.DemoTeam.Hair
 				// cell density
 				if (debugSettings.drawCellDensity)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 2, MeshTopology.Points, GetCellCount(volumeData.cbuffer), 1, s_debugDrawMPB);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 2, MeshTopology.Points, GetCellCount(volumeData), 1, s_debugDrawMPB);
 				}
 
 				// cell gradient
 				if (debugSettings.drawCellGradient)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Lines, 2 * GetCellCount(volumeData.cbuffer), 1, s_debugDrawMPB);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Lines, 2 * GetCellCount(volumeData), 1, s_debugDrawMPB);
 				}
 
 				// volume slices
@@ -1222,34 +1222,37 @@ namespace Unity.DemoTeam.Hair
 		//TODO move elsewhere
 		//maybe 'HairSimDataUtility' ?
 
-		public static Vector3 GetCellSize(in VolumeCBuffer volumeParams)
+		public static Vector3 GetVolumeCellSize(in VolumeData volumeData)
 		{
-			var cellSize = new Vector3(
-				(volumeParams._VolumeWorldMax.x - volumeParams._VolumeWorldMin.x) / volumeParams._VolumeCells.x,
-				(volumeParams._VolumeWorldMax.y - volumeParams._VolumeWorldMin.y) / volumeParams._VolumeCells.y,
-				(volumeParams._VolumeWorldMax.z - volumeParams._VolumeWorldMin.z) / volumeParams._VolumeCells.z);
-			return cellSize;
+			return new Vector3(
+				(volumeData.cbuffer._VolumeWorldMax.x - volumeData.cbuffer._VolumeWorldMin.x) / volumeData.cbuffer._VolumeCells.x,
+				(volumeData.cbuffer._VolumeWorldMax.y - volumeData.cbuffer._VolumeWorldMin.y) / volumeData.cbuffer._VolumeCells.y,
+				(volumeData.cbuffer._VolumeWorldMax.z - volumeData.cbuffer._VolumeWorldMin.z) / volumeData.cbuffer._VolumeCells.z
+			);
 		}
 
-		public static float GetCellVolume(in VolumeCBuffer volumeParams)
+		public static float GetVolumeCellVolume(in VolumeData volumeData)
 		{
-			var cellSize = GetCellSize(volumeParams);
+			var cellSize = GetVolumeCellSize(volumeData);
 			return cellSize.x * cellSize.y * cellSize.z;
 		}
 
-		public static int GetCellCount(in VolumeCBuffer volumeParams)
+		public static int GetCellCount(in VolumeData volumeData)
 		{
-			return (int)volumeParams._VolumeCells.x * (int)volumeParams._VolumeCells.y * (int)volumeParams._VolumeCells.z;
+			var nx = (int)volumeData.cbuffer._VolumeCells.x;
+			var ny = (int)volumeData.cbuffer._VolumeCells.y;
+			var nz = (int)volumeData.cbuffer._VolumeCells.z;
+			return nx * ny * nz;
 		}
 
-		public static Vector3 GetVolumeCenter(in VolumeCBuffer volumeParams)
+		public static Vector3 GetVolumeCenter(in VolumeData volumeData)
 		{
-			return (volumeParams._VolumeWorldMax + volumeParams._VolumeWorldMin) * 0.5f;
+			return (volumeData.cbuffer._VolumeWorldMax + volumeData.cbuffer._VolumeWorldMin) * 0.5f;
 		}
 
-		public static Vector3 GetVolumeExtent(in VolumeCBuffer volumeParams)
+		public static Vector3 GetVolumeExtent(in VolumeData volumeData)
 		{
-			return (volumeParams._VolumeWorldMax - volumeParams._VolumeWorldMin) * 0.5f;
+			return (volumeData.cbuffer._VolumeWorldMax - volumeData.cbuffer._VolumeWorldMin) * 0.5f;
 		}
 	}
 }

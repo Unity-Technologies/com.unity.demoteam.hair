@@ -139,7 +139,7 @@ namespace Unity.DemoTeam.Hair
 		void OnDrawGizmos()
 		{
 			Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
-			Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData.cbuffer), 2.0f * HairSim.GetVolumeExtent(volumeData.cbuffer));
+			Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData), 2.0f * HairSim.GetVolumeExtent(volumeData));
 		}
 
 		void Update()

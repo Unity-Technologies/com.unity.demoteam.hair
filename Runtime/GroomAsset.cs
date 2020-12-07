@@ -4,7 +4,7 @@ using UnityEngine.Formats.Alembic.Importer;
 
 namespace Unity.DemoTeam.Hair
 {
-	[PreferBinarySerialization, CreateAssetMenu]
+	[CreateAssetMenu, PreferBinarySerialization]
 	public class GroomAsset : ScriptableObject
 	{
 		public enum Type
