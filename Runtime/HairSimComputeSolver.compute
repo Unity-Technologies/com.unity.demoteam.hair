@@ -1,4 +1,5 @@
 ﻿#pragma kernel KInitParticles							THREAD_GROUP_SIZE=64
+#pragma kernel KInitParticlesPostVolume					THREAD_GROUP_SIZE=64
 #pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64
 #pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64
 #pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
@@ -210,6 +211,51 @@ void KInitParticles(
 		_ParticlePositionPose[i].xyz = v;
 		_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _StrandMaxParticleWeight * _RootScale[strandIndex]);
 		_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _StrandMaxParticleWeight * _RootScale[strandIndex]);
+	}
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KInitParticlesPostVolume(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	DECLARE_STRAND(worldIdx.x);
+	
+	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
+	{
+		float3 uvw = VolumeWorldToUVW(_ParticlePosition[i].xyz);
+		float accu_w = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, uvw, 0).w;
+
+		//TODO comment
+		if (true)
+		{
+			TrilinearWeights tri = VolumeWorldToCellTrilinear(_ParticlePosition[i].xyz);
+
+			const float3 sqw0 = tri.w0 * tri.w0;
+			const float3 sqw1 = tri.w1 * tri.w1;
+
+			const float d = (
+				sqw0.x * sqw0.y * sqw0.z +
+				sqw1.x * sqw0.y * sqw0.z +
+				sqw0.x * sqw1.y * sqw0.z +
+				sqw1.x * sqw1.y * sqw0.z +
+				sqw0.x * sqw0.y * sqw1.z +
+				sqw1.x * sqw0.y * sqw1.z +
+				sqw0.x * sqw1.y * sqw1.z +
+				sqw1.x * sqw1.y * sqw1.z
+				);
+
+			accu_w = accu_w / d;
+		}
+
+		_ParticlePosition[i].w = accu_w;//TODO pack elsewhere?
+		_ParticlePositionPrev[i].w = accu_w;
 	}
 }
 

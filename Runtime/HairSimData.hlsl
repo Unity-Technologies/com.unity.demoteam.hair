@@ -34,12 +34,14 @@ HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;
 #define HAIRSIM_VOLUMEDATA Texture3D
 #endif
 
-HAIRSIM_VOLUMEDATA<int> _AccuDensity;
+HAIRSIM_VOLUMEDATA<int> _AccuWeight;
+HAIRSIM_VOLUMEDATA<int> _AccuWeight0;
 HAIRSIM_VOLUMEDATA<int> _AccuVelocityX;// this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 HAIRSIM_VOLUMEDATA<int> _AccuVelocityY;
 HAIRSIM_VOLUMEDATA<int> _AccuVelocityZ;
 
 HAIRSIM_VOLUMEDATA<float> _VolumeDensity;
+HAIRSIM_VOLUMEDATA<float> _VolumeDensity0;
 HAIRSIM_VOLUMEDATA<float4> _VolumeVelocity;
 HAIRSIM_VOLUMEDATA<float> _VolumeDivergence;
 

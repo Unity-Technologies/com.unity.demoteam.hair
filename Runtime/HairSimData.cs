@@ -30,7 +30,8 @@ namespace Unity.DemoTeam.Hair
 		{
 			public VolumeCBuffer cbuffer;
 
-			public RenderTexture accuDensity;
+			public RenderTexture accuWeight;
+			public RenderTexture accuWeight0;
 			public RenderTexture accuVelocityX;
 			public RenderTexture accuVelocityY;
 			public RenderTexture accuVelocityZ;
@@ -38,6 +39,7 @@ namespace Unity.DemoTeam.Hair
 			public float allGroupsMaxParticleInterval;
 
 			public RenderTexture volumeDensity;
+			public RenderTexture volumeDensity0;
 			public RenderTexture volumeVelocity;
 			public RenderTexture volumeDivergence;
 

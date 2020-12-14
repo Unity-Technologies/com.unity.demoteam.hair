@@ -78,12 +78,14 @@ namespace Unity.DemoTeam.Hair
 			// volume
 			public static int VolumeCBuffer;
 
-			public static int _AccuDensity;
+			public static int _AccuWeight;
+			public static int _AccuWeight0;
 			public static int _AccuVelocityX;
 			public static int _AccuVelocityY;
 			public static int _AccuVelocityZ;
 
 			public static int _VolumeDensity;
+			public static int _VolumeDensity0;
 			public static int _VolumeVelocity;
 			public static int _VolumeDivergence;
 
@@ -106,6 +108,7 @@ namespace Unity.DemoTeam.Hair
 		static class SolverKernels
 		{
 			public static int KInitParticles;
+			public static int KInitParticlesPostVolume;
 			public static int KSolveConstraints_GaussSeidelReference;
 			public static int KSolveConstraints_GaussSeidel;
 			public static int KSolveConstraints_Jacobi_16;
@@ -147,6 +150,8 @@ namespace Unity.DemoTeam.Hair
 		public struct VolumeKeywords<T>
 		{
 			public T VOLUME_SUPPORT_CONTRACTION;
+			public T VOLUME_TARGET_INITIAL_POSE;
+			public T VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
 		}
 
 		[Serializable]
@@ -279,8 +284,8 @@ namespace Unity.DemoTeam.Hair
 			public enum TargetDensity
 			{
 				Uniform,
-				//InitialPose,//TODO
-				//InitialPoseInParticles,//TODO
+				InitialPose,
+				InitialPoseInParticles,
 			}
 
 			public SplatMethod volumeSplatMethod;
@@ -361,7 +366,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Z")]
 			public float drawSliceZOffset;
 
-			[Range(0.0f, 4.0f), Tooltip("Scrubs between different layers")]
+			[Range(0.0f, 5.0f), Tooltip("Scrubs between different layers")]
 			public float drawSliceDivider;
 
 			public static readonly DebugSettings defaults = new DebugSettings()
@@ -428,6 +433,7 @@ namespace Unity.DemoTeam.Hair
 				InitializeStaticFields(typeof(MarkersGPU), (string s) => new ProfilingSampler("HairSim." + s.Replace('_', '.')));
 				InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
 
+				//TODO fix case where s_solverCS is null during static init
 				InitializeStaticFields(typeof(SolverKernels), (string s) => s_solverCS.FindKernel(s));
 				InitializeStaticFields(typeof(VolumeKernels), (string s) => s_volumeCS.FindKernel(s));
 
@@ -465,7 +471,8 @@ namespace Unity.DemoTeam.Hair
 			{
 				bool changed = false;
 
-				changed |= CreateVolume(ref volumeData.accuDensity, "AccuDensity", volumeCellCount, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt
+				changed |= CreateVolume(ref volumeData.accuWeight, "AccuWeight", volumeCellCount, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt
+				changed |= CreateVolume(ref volumeData.accuWeight0, "AccuWeight0", volumeCellCount, GraphicsFormat.R32_SInt);
 				changed |= CreateVolume(ref volumeData.accuVelocityX, "AccuVelocityX", volumeCellCount, GraphicsFormat.R32_SInt);
 				changed |= CreateVolume(ref volumeData.accuVelocityY, "AccuVelocityY", volumeCellCount, GraphicsFormat.R32_SInt);
 				changed |= CreateVolume(ref volumeData.accuVelocityZ, "AccuVelocityZ", volumeCellCount, GraphicsFormat.R32_SInt);
@@ -474,6 +481,7 @@ namespace Unity.DemoTeam.Hair
 				var fmtFloatRGBA = halfPrecision ? RenderTextureFormat.ARGBHalf : RenderTextureFormat.ARGBFloat;
 				{
 					changed |= CreateVolume(ref volumeData.volumeDensity, "VolumeDensity", volumeCellCount, fmtFloatR);
+					changed |= CreateVolume(ref volumeData.volumeDensity0, "VolumeDensity0", volumeCellCount, fmtFloatR);
 					changed |= CreateVolume(ref volumeData.volumeVelocity, "VolumeVelocity", volumeCellCount, fmtFloatRGBA);
 					changed |= CreateVolume(ref volumeData.volumeDivergence, "VolumeDivergence", volumeCellCount, fmtFloatR);
 
@@ -509,12 +517,14 @@ namespace Unity.DemoTeam.Hair
 
 		public static void ReleaseVolumeData(ref VolumeData volumeData)
 		{
-			ReleaseVolume(ref volumeData.accuDensity);
+			ReleaseVolume(ref volumeData.accuWeight);
+			ReleaseVolume(ref volumeData.accuWeight0);
 			ReleaseVolume(ref volumeData.accuVelocityX);
 			ReleaseVolume(ref volumeData.accuVelocityY);
 			ReleaseVolume(ref volumeData.accuVelocityZ);
 
 			ReleaseVolume(ref volumeData.volumeDensity);
+			ReleaseVolume(ref volumeData.volumeDensity0);
 			ReleaseVolume(ref volumeData.volumeVelocity);
 
 			ReleaseVolume(ref volumeData.volumeDivergence);
@@ -788,6 +798,8 @@ namespace Unity.DemoTeam.Hair
 
 			// update keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
+			keywords.VOLUME_TARGET_INITIAL_POSE = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPose);
+			keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPoseInParticles);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData)
@@ -853,12 +865,14 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
 
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuDensity, volumeData.accuDensity);
+			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuWeight, volumeData.accuWeight);
+			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuWeight0, volumeData.accuWeight0);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
 
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensity, volumeData.volumeDensity);
+			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensity0, volumeData.volumeDensity0);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
 
@@ -867,6 +881,8 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
 
 			CoreUtils.SetKeyword(cs, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
+			CoreUtils.SetKeyword(cs, "VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
+			CoreUtils.SetKeyword(cs, "VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 		}
 
 		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData)
@@ -878,12 +894,14 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetBuffer(UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
 			mpb.SetBuffer(UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
 
-			mpb.SetTexture(UniformIDs._AccuDensity, volumeData.accuDensity);
+			mpb.SetTexture(UniformIDs._AccuWeight, volumeData.accuWeight);
+			mpb.SetTexture(UniformIDs._AccuWeight0, volumeData.accuWeight0);
 			mpb.SetTexture(UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
 			mpb.SetTexture(UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
 			mpb.SetTexture(UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
 
 			mpb.SetTexture(UniformIDs._VolumeDensity, volumeData.volumeDensity);
+			mpb.SetTexture(UniformIDs._VolumeDensity0, volumeData.volumeDensity0);
 			mpb.SetTexture(UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
 			mpb.SetTexture(UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
 			
@@ -892,6 +910,8 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetTexture(UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
 
 			CoreUtils.SetKeyword(mat, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
+			CoreUtils.SetKeyword(mat, "VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
+			CoreUtils.SetKeyword(mat, "VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 		}
 
 		public static void InitSolverParticles(CommandBuffer cmd, in SolverData solverData, Matrix4x4 rootTransform)
@@ -908,6 +928,17 @@ namespace Unity.DemoTeam.Hair
 
 			PushSolverData(cmd, s_solverCS, SolverKernels.KInitParticles, solverDataCopy);
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KInitParticles, numX, numY, numZ);
+		}
+
+		public static void InitSolverParticlesPostVolume(CommandBuffer cmd, in SolverData solverData, in VolumeData volumeData)
+		{
+			int numX = (int)solverData.cbuffer._StrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % PARTICLE_GROUP_SIZE);
+			int numY = 1;
+			int numZ = 1;
+
+			PushVolumeData(cmd, s_solverCS, SolverKernels.KInitParticlesPostVolume, volumeData);
+			PushSolverData(cmd, s_solverCS, SolverKernels.KInitParticlesPostVolume, solverData);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KInitParticlesPostVolume, numX, numY, numZ);
 		}
 
 		public static void StepSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in VolumeData volumeData)

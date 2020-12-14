@@ -134,7 +134,7 @@
 		float3 uvw = input.color.xyz;
 
 		float3 localPos = VolumeUVWToLocal(uvw);
-		float3 localPosFloor = round(0.5 + localPos);
+		float3 localPosFloor = round(localPos + 0.5);
 
 		float3 gridAxis = float3(_DebugSliceAxis != 0, _DebugSliceAxis != 1, _DebugSliceAxis != 2);
 		float3 gridDist = gridAxis * abs(localPos - localPosFloor);
@@ -147,6 +147,7 @@
 		}
 
 		float volumeDensity = VolumeSampleScalar(_VolumeDensity, uvw);
+		float volumeDensity0 = VolumeSampleScalar(_VolumeDensity0, uvw);
 		float3 volumeVelocity = VolumeSampleVector(_VolumeVelocity, uvw);
 		float volumeDivergence = VolumeSampleScalar(_VolumeDivergence, uvw);
 		float volumePressure = VolumeSampleScalar(_VolumePressure, uvw);
@@ -200,10 +201,12 @@
 		if (x < 1.0)
 			return float4(ColorDensity(volumeDensity), _DebugSliceOpacity);
 		else if (x < 2.0)
-			return float4(ColorVelocity(volumeVelocity), _DebugSliceOpacity);
+			return float4(ColorDensity(volumeDensity0), _DebugSliceOpacity);
 		else if (x < 3.0)
-			return float4(ColorDivergence(volumeDivergence), _DebugSliceOpacity);
+			return float4(ColorVelocity(volumeVelocity), _DebugSliceOpacity);
 		else if (x < 4.0)
+			return float4(ColorDivergence(volumeDivergence), _DebugSliceOpacity);
+		else if (x < 5.0)
 			return float4(ColorPressure(volumePressure), _DebugSliceOpacity);
 		else
 			return float4(ColorGradient(volumePressureGrad), _DebugSliceOpacity);

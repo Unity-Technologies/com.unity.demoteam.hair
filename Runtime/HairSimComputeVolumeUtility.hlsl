@@ -18,6 +18,14 @@
 
 	_VolumeWorldMin = P
 	_VolumeWorldMax = Q
+
+	https://asawicki.info/news_1516_half-pixel_offset_in_directx_11.html
+
+	worldToUVW(P) = (0, 0, 0)
+	worldToUVW(Q) = (1, 1, 1)
+
+	worldToLocal(P) = (0, 0, 0)
+	worldToLocal(Q) = (3, 3, 3)
 */
 
 float3 VolumeWorldSize()
@@ -156,6 +164,28 @@ float3 VolumeSampleVector(Texture3D<float3> volume, float3 uvw)
 float3 VolumeSampleVector(Texture3D<float4> volume, float3 uvw)
 {
 	return VolumeSampleVector(volume, uvw, _Volume_trilinear_clamp);
+}
+
+struct TrilinearWeights
+{
+	uint3 idx0;
+	float3 w0;
+	float3 w1;
+};
+
+TrilinearWeights VolumeWorldToCellTrilinear(float3 worldPos, float3 offset = 0.5)
+{
+	float3 localPos = VolumeWorldToLocal(worldPos) - offset;// subtract offset to cell center
+	float3 localPosFloor = floor(localPos);
+
+	uint3 cellIdx0 = localPosFloor;
+	float3 cellPos = localPos - localPosFloor;
+
+	TrilinearWeights tri;
+	tri.idx0 = cellIdx0;
+	tri.w0 = 1.0 - cellPos;
+	tri.w1 = cellPos;
+	return tri;
 }
 
 #endif//__HAIRSIMCOMPUTEVOLUMEUTILITY_HLSL__

@@ -266,10 +266,11 @@ namespace Unity.DemoTeam.Hair
 						switch (index)
 						{
 							case 0: return "density";
-							case 1: return "velocity";
-							case 2: return "divergence";
-							case 3: return "pressure";
-							case 4: return "grad(pressure)";
+							case 1: return "rest-density";
+							case 2: return "velocity";
+							case 3: return "divergence";
+							case 4: return "pressure";
+							case 5: return "grad(pressure)";
 						}
 						return "unknown";
 					}
