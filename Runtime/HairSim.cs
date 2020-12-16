@@ -49,6 +49,7 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Volume_1_SplatVelocityXYZ;
 			public static ProfilingSampler Volume_1_SplatByRasterization;
 			public static ProfilingSampler Volume_1_SplatByRasterizationNoGS;
+			public static ProfilingSampler Volume_1_SplatInitialPose;
 			public static ProfilingSampler Volume_2_Resolve;
 			public static ProfilingSampler Volume_2_ResolveFromRasterization;
 			public static ProfilingSampler Volume_3_Divergence;
@@ -125,6 +126,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KVolumeSplatVelocityX;
 			public static int KVolumeSplatVelocityY;
 			public static int KVolumeSplatVelocityZ;
+			public static int KVolumeSplatInitialPose;
 			public static int KVolumeResolve;
 			public static int KVolumeResolveFromRasterization;
 			public static int KVolumeDivergence;
@@ -619,7 +621,7 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_SHAPE_GLOBAL = (solverSettings.shape && solverSettings.shapeStiffness > 0.0f);
 		}
 
-		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds overlapBounds)
+		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
 
@@ -638,7 +640,7 @@ namespace Unity.DemoTeam.Hair
 				if (volumeSettings.boundaryShapes)
 				{
 					var result = s_boundariesOverlapResult;
-					var resultCount = Physics.OverlapBoxNonAlloc(overlapBounds.center, overlapBounds.extents, result, Quaternion.identity);
+					var resultCount = Physics.OverlapBoxNonAlloc(volumeBounds.center, volumeBounds.extents, result, Quaternion.identity);
 
 					for (int i = 0; i != resultCount; i++)
 					{
@@ -1095,6 +1097,21 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 					break;
+			}
+
+			// accumulate initial pose
+			if (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPose)
+			{
+				int __numX = (int)solverData.cbuffer._StrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % PARTICLE_GROUP_SIZE);
+				int __numY = 1;
+				int __numZ = 1;
+
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatInitialPose))
+				{
+					PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatInitialPose, volumeData);
+					PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatInitialPose, solverData);
+					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatInitialPose, __numX, __numY, __numZ);
+				}
 			}
 		}
 

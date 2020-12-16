@@ -92,7 +92,6 @@ float BoundaryDistance(const float3 p)
 		for (uint i = 0; i != _BoundaryTorusCount; i++)
 		{
 			BoundaryTorus torus = _BoundaryTorus[i];
-
 			d = min(d, SdTorus(p, torus.center, torus.axis, torus.radiusA, torus.radiusB));
 		}
 	}

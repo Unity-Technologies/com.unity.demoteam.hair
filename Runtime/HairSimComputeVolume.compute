@@ -4,6 +4,7 @@
 #pragma kernel KVolumeSplatVelocityX
 #pragma kernel KVolumeSplatVelocityY
 #pragma kernel KVolumeSplatVelocityZ
+#pragma kernel KVolumeSplatInitialPose
 #pragma kernel KVolumeResolve
 #pragma kernel KVolumeResolveFromRasterization
 #pragma kernel KVolumeDivergence
@@ -13,6 +14,10 @@
 
 //----------
 // features
+
+#pragma multi_compile_local __ LAYOUT_INTERLEAVED
+// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
+// 1 == particles grouped by index, i.e. root, root, root+1, root+1
 
 #pragma multi_compile_local __ VOLUME_SUPPORT_CONTRACTION
 // 0 == pressure is always positive
@@ -52,6 +57,10 @@
 #define VOLUME_NUM_Y 8
 #define VOLUME_NUM_Z 1
 
+#define STRAND_NUM_X 64
+#define STRAND_NUM_Y 1
+#define STRAND_NUM_Z 1
+
 #if VOLUME_SUPPORT_CONTRACTION
 	#define VOLUME_REST_AT_ZERO					0
 	#define VOLUME_AIR_CELL_ZERO_PRESSURE		0
@@ -83,6 +92,22 @@
 
 #define CHECK_PARTICLE_INDEX(x)	\
 	if (x >= _StrandCount * _StrandParticleCount) return;
+
+#if LAYOUT_INTERLEAVED
+  #define DECLARE_STRAND(x)							\
+	if (x >= _StrandCount) return;					\
+	const uint strandIndex = x;						\
+	const uint strandParticleBegin = strandIndex;	\
+	const uint strandParticleStride = _StrandCount;	\
+	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
+#else
+  #define DECLARE_STRAND(x)													\
+	if (x >= _StrandCount) return;											\
+	const uint strandIndex = x;												\
+	const uint strandParticleBegin = strandIndex * _StrandParticleCount;	\
+	const uint strandParticleStride = 1;									\
+	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
+#endif
 
 //---------
 // utility
@@ -130,33 +155,33 @@ void InterlockedMaxTrilinear(RWTexture3D<int> volume, float value, uint3 idx0, f
 	InterlockedMax(volume[idx0 + h.xxx], (int)round(value * w1.x * w1.y * w1.z));
 }
 
-void InterlockedAddParticleContribution(uint i, float value, RWTexture3D<int> volume, float3 offset = 0.5)
+void InterlockedAddParticleContribution(float3 worldPos, float value, RWTexture3D<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
-	TrilinearWeights tri = VolumeWorldToCellTrilinear(_ParticlePosition[i].xyz, offset);
+	TrilinearWeights tri = VolumeWorldToCellTrilinear(worldPos, offset);
 	InterlockedAddTrilinear(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedAdd(volume[VolumeWorldToIndex(_ParticlePosition[i].xyz)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedAdd(volume[VolumeWorldToIndex(worldPos)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
 
-void InterlockedAddParticleContributionPackW(uint i, float value, RWTexture3D<int> volume, float3 offset = 0.5)
+void InterlockedAddParticleContributionPackW(float3 worldPos, float value, RWTexture3D<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
-	TrilinearWeights tri = VolumeWorldToCellTrilinear(_ParticlePosition[i].xyz, offset);
+	TrilinearWeights tri = VolumeWorldToCellTrilinear(worldPos, offset);
 	InterlockedAddTrilinearPackW(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedAdd(volume[VolumeWorldToIndex(_ParticlePosition[i].xyz)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedAdd(volume[VolumeWorldToIndex(worldPos)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
 
-void InterlockedMaxParticleContribution(uint i, float value, RWTexture3D<int> volume, float3 offset = 0.5)
+void InterlockedMaxParticleContribution(float3 worldPos, float value, RWTexture3D<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
-	TrilinearWeights tri = VolumeWorldToCellTrilinear(_ParticlePosition[i].xyz, offset);
+	TrilinearWeights tri = VolumeWorldToCellTrilinear(worldPos, offset);
 	InterlockedMaxTrilinear(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedMax(volume[VolumeWorldToIndex(_ParticlePosition[i].xyz)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedMax(volume[VolumeWorldToIndex(worldPos)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
 
@@ -175,9 +200,11 @@ void KVolumeClear(
 	// SV_GroupIndex        thread offset within execution group
 {
 	_AccuWeight[worldIdx] = 0;
-#if VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
+
+#if VOLUME_TARGET_INITIAL_POSE || VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
 	_AccuWeight0[worldIdx] = 0;
 #endif
+
 	_AccuVelocityX[worldIdx] = 0;
 	_AccuVelocityY[worldIdx] = 0;
 	_AccuVelocityZ[worldIdx] = 0;
@@ -203,21 +230,22 @@ void KVolumeSplat(
 	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
 	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
 
+	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];
 
-	InterlockedAddParticleContribution(worldIdx.x, (v.w), _AccuWeight);
+	InterlockedAddParticleContribution(p, (v.w), _AccuWeight);
 #if VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
-	InterlockedMaxParticleContribution(worldIdx.x, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
+	InterlockedMaxParticleContribution(p, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
 #endif
 
 #if VOLUME_STAGGERED_GRID
-	InterlockedAddParticleContributionPackW(worldIdx.x, (v.w * v.x), _AccuVelocityX, float3(0.0, 0.5, 0.5));
-	InterlockedAddParticleContributionPackW(worldIdx.x, (v.w * v.y), _AccuVelocityY, float3(0.5, 0.0, 0.5));
-	InterlockedAddParticleContributionPackW(worldIdx.x, (v.w * v.z), _AccuVelocityZ, float3(0.5, 0.5, 0.0));
+	InterlockedAddParticleContributionPackW(p, (v.w * v.x), _AccuVelocityX, float3(0.0, 0.5, 0.5));
+	InterlockedAddParticleContributionPackW(p, (v.w * v.y), _AccuVelocityY, float3(0.5, 0.0, 0.5));
+	InterlockedAddParticleContributionPackW(p, (v.w * v.z), _AccuVelocityZ, float3(0.5, 0.5, 0.0));
 #else
-	InterlockedAddParticleContribution(worldIdx.x, (v.w * v.x), _AccuVelocityX);
-	InterlockedAddParticleContribution(worldIdx.x, (v.w * v.y), _AccuVelocityY);
-	InterlockedAddParticleContribution(worldIdx.x, (v.w * v.z), _AccuVelocityZ);
+	InterlockedAddParticleContribution(p, (v.w * v.x), _AccuVelocityX);
+	InterlockedAddParticleContribution(p, (v.w * v.y), _AccuVelocityY);
+	InterlockedAddParticleContribution(p, (v.w * v.z), _AccuVelocityZ);
 #endif
 }
 
@@ -234,11 +262,12 @@ void KVolumeSplatDensity(
 {
 	CHECK_PARTICLE_INDEX(worldIdx.x);
 
+	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];
 
-	InterlockedAddParticleContribution(worldIdx.x, (v.w), _AccuWeight);
+	InterlockedAddParticleContribution(p, (v.w), _AccuWeight);
 #if VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
-	InterlockedMaxParticleContribution(worldIdx.x, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
+	InterlockedMaxParticleContribution(p, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
 #endif
 }
 
@@ -255,12 +284,13 @@ void KVolumeSplatVelocityX(
 {
 	CHECK_PARTICLE_INDEX(worldIdx.x);
 	
+	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];
 
 #if VOLUME_STAGGERED_GRID
-	InterlockedAddParticleContributionPackW(worldIdx.x, (v.w * v.x), _AccuVelocityX, float3(0.0, 0.5, 0.5));
+	InterlockedAddParticleContributionPackW(p, (v.w * v.x), _AccuVelocityX, float3(0.0, 0.5, 0.5));
 #else
-	InterlockedAddParticleContribution(worldIdx.x, (v.w * v.x), _AccuVelocityX);
+	InterlockedAddParticleContribution(p, (v.w * v.x), _AccuVelocityX);
 #endif
 }
 
@@ -277,12 +307,13 @@ void KVolumeSplatVelocityY(
 {
 	CHECK_PARTICLE_INDEX(worldIdx.x);
 
+	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];
 
 #if VOLUME_STAGGERED_GRID
-	InterlockedAddParticleContributionPackW(worldIdx.x, (v.w * v.y), _AccuVelocityY, float3(0.5, 0.0, 0.5));
+	InterlockedAddParticleContributionPackW(p, (v.w * v.y), _AccuVelocityY, float3(0.5, 0.0, 0.5));
 #else
-	InterlockedAddParticleContribution(worldIdx.x, (v.w * v.y), _AccuVelocityY);
+	InterlockedAddParticleContribution(p, (v.w * v.y), _AccuVelocityY);
 #endif
 }
 
@@ -299,13 +330,40 @@ void KVolumeSplatVelocityZ(
 {
 	CHECK_PARTICLE_INDEX(worldIdx.x);
 
+	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];
 
 #if VOLUME_STAGGERED_GRID
-	InterlockedAddParticleContributionPackW(worldIdx.x, (v.w * v.z), _AccuVelocityZ, float3(0.5, 0.5, 0.0));
+	InterlockedAddParticleContributionPackW(p, (v.w * v.z), _AccuVelocityZ, float3(0.5, 0.5, 0.0));
 #else
-	InterlockedAddParticleContribution(worldIdx.x, (v.w * v.z), _AccuVelocityZ);
+	InterlockedAddParticleContribution(p, (v.w * v.z), _AccuVelocityZ);
 #endif
+}
+
+[numthreads(STRAND_NUM_X, STRAND_NUM_Y, STRAND_NUM_Z)]
+void KVolumeSplatInitialPose(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	DECLARE_STRAND(worldIdx.x);
+
+	float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
+
+	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
+	{
+		float3 r = mul(_LocalToWorld, float4(_ParticlePositionPose[i].xyz, 0.0)).xyz;
+		float3 p = p0 + r;
+
+#if VOLUME_TARGET_INITIAL_POSE
+		InterlockedAddParticleContribution(p, _ParticleVelocity[i].w, _AccuWeight0);
+#endif
+	}
 }
 
 //-----------------
@@ -334,7 +392,7 @@ void KVolumeResolve(
 	_VolumeDensity[worldIdx] = rho_particle * accu_w;
 
 #if VOLUME_TARGET_INITIAL_POSE
-	_VolumeDensity0[worldIdx] = 0.0;//TODO
+	_VolumeDensity0[worldIdx] = rho_particle * (_AccuWeight0[worldIdx] / (float)(1 << SPLAT_FRACTIONAL_BITS));
 #elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
 	_VolumeDensity0[worldIdx] = rho_particle * (_AccuWeight0[worldIdx] / (float)(1 << SPLAT_FRACTIONAL_BITS));
 #endif
@@ -372,15 +430,13 @@ void KVolumeResolveFromRasterization(
 {
 	const float4 splat = _VolumeVelocity[worldIdx];
 	{
-		const float rho_particle = _ResolveUnitVolume / (1e+9 * VolumeWorldCellVolume());
-		const float rho_unscaled = splat.w;
 #if DEBUG_STRAND_31_32
-		const float rho = pow(_ResolveUnitDebugWidth, 3.0) * rho_unscaled;
+		const float rho_particle = pow(_ResolveUnitDebugWidth, 3.0);
 #else
-		const float rho = rho_particle * rho_unscaled;
+		const float rho_particle = _ResolveUnitVolume / (1e+9 * VolumeWorldCellVolume());
 #endif
 
-		_VolumeDensity[worldIdx] = rho;
+		_VolumeDensity[worldIdx] = rho_particle * splat.w;
 
 		if (splat.w > 0.0)
 			_VolumeVelocity[worldIdx] = float4(splat.xyz / splat.w, splat.w);

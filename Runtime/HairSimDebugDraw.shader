@@ -8,6 +8,10 @@
 	// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
 	// 1 == particles grouped by index, i.e. root, root, root+1, root+1
 	
+	#pragma multi_compile_local __ VOLUME_TARGET_INITIAL_POSE VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
+	// 0 == uniform target density
+	// 1 == non uniform target density
+
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 	#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
 
@@ -147,7 +151,11 @@
 		}
 
 		float volumeDensity = VolumeSampleScalar(_VolumeDensity, uvw);
+#if VOLUME_TARGET_INITIAL_POSE || VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
 		float volumeDensity0 = VolumeSampleScalar(_VolumeDensity0, uvw);
+#else
+		float volumeDensity0 = 1.0;
+#endif
 		float3 volumeVelocity = VolumeSampleVector(_VolumeVelocity, uvw);
 		float volumeDivergence = VolumeSampleScalar(_VolumeDivergence, uvw);
 		float volumePressure = VolumeSampleScalar(_VolumePressure, uvw);
@@ -201,7 +209,7 @@
 		if (x < 1.0)
 			return float4(ColorDensity(volumeDensity), _DebugSliceOpacity);
 		else if (x < 2.0)
-			return float4(ColorDensity(volumeDensity0), _DebugSliceOpacity);
+			return float4(float3(1.0, 1.0, 0.0) * ColorDensity(volumeDensity0), _DebugSliceOpacity);
 		else if (x < 3.0)
 			return float4(ColorVelocity(volumeVelocity), _DebugSliceOpacity);
 		else if (x < 4.0)

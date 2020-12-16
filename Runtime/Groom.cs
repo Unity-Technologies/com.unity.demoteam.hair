@@ -320,6 +320,12 @@ namespace Unity.DemoTeam.Hair
 			// update volume boundaries
 			HairSim.UpdateVolumeBoundaries(ref volumeData, volumeSettings, strandBounds);
 
+			// update solver data
+			for (int i = 0; i != solverData.Length; i++)
+			{
+				//TODO
+			}
+
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
 			{
@@ -487,6 +493,7 @@ namespace Unity.DemoTeam.Hair
 			if (solverData != null && solverData.Length == strandGroups.Length)
 				return true;
 
+			// prep volume data
 			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false);
 
 			volumeData.allGroupsMaxParticleInterval = 0.0f;
@@ -550,7 +557,7 @@ namespace Unity.DemoTeam.Hair
 				var strandScale = GetSimulationStrandScale();
 				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, 0.0f);
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, 1.0f);
 				HairSim.UpdateSolverRoots(cmd, rootMesh, rootTransform, solverData[i]);
 				{
 					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);
@@ -577,6 +584,7 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			// ready
 			return true;
 		}
 
