@@ -197,18 +197,19 @@ void KInitParticles(
 {
 	DECLARE_STRAND(worldIdx.x);
 	
-	float3 rootPos = _RootPosition[strandIndex].xyz;
-	float3 rootPosPrev = _ParticlePosition[strandParticleBegin].xyz;
+	float3 rootPosInit = _ParticlePosition[strandParticleBegin].xyz;
+	float3 rootPosCurr = _RootPosition[strandIndex].xyz;
 	
 	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 	{
-		float3 v = _ParticlePosition[i].xyz - rootPosPrev;
-		float3 p = rootPos + mul(_LocalToWorld, float4(v, 0.0)).xyz;
+		float3 r = _ParticlePosition[i].xyz - rootPosInit;
+		float3 p = rootPosCurr + mul(_LocalToWorld, float4(r, 0.0)).xyz;
 		
+		_InitialParticleOffset[i].xyz = r;
+
 		_ParticlePosition[i].xyz = p;
 		_ParticlePositionPrev[i].xyz = p;
 		_ParticlePositionCorr[i].xyz = 0.0;
-		_ParticlePositionPose[i].xyz = v;
 		_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _StrandMaxParticleWeight * _RootScale[strandIndex]);
 		_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _StrandMaxParticleWeight * _RootScale[strandIndex]);
 	}
@@ -297,10 +298,10 @@ void KSolveConstraints_GaussSeidelReference(
 
 		for (uint i = strandParticleBegin + strandParticleStride, k = 1; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
-			float3 v = _ParticlePosition[i].xyz - p0;
-			float3 w = mul(_LocalToWorld, float4(_ParticlePositionPose[i].xyz, 0.0)).xyz;
+			float3 r0 = _ParticlePosition[i].xyz - p0;
+			float3 r1 = mul(_LocalToWorld, float4(_InitialParticleOffset[i].xyz, 0.0)).xyz;
 
-			_ParticlePosition[i].xyz = p0 + lerp(v, w, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, k)));
+			_ParticlePosition[i].xyz = p0 + lerp(r0, r1, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, k)));
 		}
 	}
 
@@ -502,10 +503,10 @@ void KSolveConstraints_GaussSeidel(
 
 		for (uint i = strandParticleBegin + strandParticleStride, k = 1; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
-			float3 v = _ParticlePosition[i].xyz - p0;
-			float3 w = mul(_LocalToWorld, float4(_ParticlePositionPose[i].xyz, 0.0)).xyz;
+			float3 r0 = _ParticlePosition[i].xyz - p0;
+			float3 r1 = mul(_LocalToWorld, float4(_InitialParticleOffset[i].xyz, 0.0)).xyz;
 
-			_ParticlePosition[i].xyz = p0 + lerp(v, w, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, k)));
+			_ParticlePosition[i].xyz = p0 + lerp(r0, r1, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, k)));
 		}
 	}
 
@@ -687,10 +688,10 @@ void KSolveConstraints_Jacobi(
 
 		if (threadIdx > 0)
 		{
-			float3 v = gs_x[j].xyz - gs_x[1].xyz;
-			float3 w = mul(_LocalToWorld, float4(_ParticlePositionPose[i].xyz, 0.0)).xyz;
+			float3 r0 = gs_x[j].xyz - gs_x[1].xyz;
+			float3 r1 = mul(_LocalToWorld, float4(_InitialParticleOffset[i].xyz, 0.0)).xyz;
 
-			gs_x[j].xyz = gs_x[1].xyz + lerp(v, w, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, threadIdx)));
+			gs_x[j].xyz = gs_x[1].xyz + lerp(r0, r1, 1.0 - GetDecay(1.0 - GetShapeStiffness(strandIndex, threadIdx)));
 		}
 	}
 

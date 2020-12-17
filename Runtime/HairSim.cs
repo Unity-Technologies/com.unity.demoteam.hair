@@ -45,11 +45,10 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Volume;
 			public static ProfilingSampler Volume_0_Clear;
 			public static ProfilingSampler Volume_1_Splat;
-			public static ProfilingSampler Volume_1_SplatDensity;
-			public static ProfilingSampler Volume_1_SplatVelocityXYZ;
-			public static ProfilingSampler Volume_1_SplatByRasterization;
-			public static ProfilingSampler Volume_1_SplatByRasterizationNoGS;
-			public static ProfilingSampler Volume_1_SplatInitialPose;
+			public static ProfilingSampler Volume_1_Splat_Density;
+			public static ProfilingSampler Volume_1_Splat_VelocityXYZ;
+			public static ProfilingSampler Volume_1_Splat_Rasterization;
+			public static ProfilingSampler Volume_1_Splat_RasterizationNoGS;
 			public static ProfilingSampler Volume_2_Resolve;
 			public static ProfilingSampler Volume_2_ResolveFromRasterization;
 			public static ProfilingSampler Volume_3_Divergence;
@@ -69,10 +68,11 @@ namespace Unity.DemoTeam.Hair
 			public static int _RootPosition;
 			public static int _RootDirection;
 
+			public static int _InitialParticleOffset;
+
 			public static int _ParticlePosition;
 			public static int _ParticlePositionPrev;
 			public static int _ParticlePositionCorr;
-			public static int _ParticlePositionPose;
 			public static int _ParticleVelocity;
 			public static int _ParticleVelocityPrev;
 
@@ -126,7 +126,6 @@ namespace Unity.DemoTeam.Hair
 			public static int KVolumeSplatVelocityX;
 			public static int KVolumeSplatVelocityY;
 			public static int KVolumeSplatVelocityZ;
-			public static int KVolumeSplatInitialPose;
 			public static int KVolumeResolve;
 			public static int KVolumeResolveFromRasterization;
 			public static int KVolumeDivergence;
@@ -456,9 +455,10 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStride);
 				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStride);
 
+				changed |= CreateBuffer(ref solverData.initialParticleOffset, "InitialParticleOffset", particleCount, particleStride);
+
 				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, particleStride);
-				changed |= CreateBuffer(ref solverData.particlePositionPose, "ParticlePositionPose", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStride);
@@ -507,9 +507,10 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverData.rootPosition);
 			ReleaseBuffer(ref solverData.rootDirection);
 
+			ReleaseBuffer(ref solverData.initialParticleOffset);
+
 			ReleaseBuffer(ref solverData.particlePosition);
 			ReleaseBuffer(ref solverData.particlePositionPrev);
-			ReleaseBuffer(ref solverData.particlePositionPose);
 			ReleaseBuffer(ref solverData.particlePositionCorr);
 			ReleaseBuffer(ref solverData.particleVelocity);
 			ReleaseBuffer(ref solverData.particleVelocityPrev);
@@ -561,16 +562,16 @@ namespace Unity.DemoTeam.Hair
 			cmd.ClearRandomWriteTargets();
 		}
 
-		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, float rootScale, float dt)
+		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 strandTransform, float strandScale, float dt)
 		{
 			ref var cbuffer = ref solverData.cbuffer;
 			ref var keywords = ref solverData.keywords;
 
 			// update strand parameters
-			cbuffer._LocalToWorld = rootTransform;
-			cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
+			cbuffer._LocalToWorld = strandTransform;
+			cbuffer._LocalToWorldInvT = strandTransform.inverse.transpose;
 
-			cbuffer._StrandScale = rootScale;
+			cbuffer._StrandScale = strandScale;
 
 			// update solver parameters
 			cbuffer._DT = dt;
@@ -812,9 +813,10 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, solverData.rootPosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootDirection, solverData.rootDirection);
 
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
+
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePosition, solverData.particlePosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionPose, solverData.particlePositionPose);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
@@ -841,7 +843,7 @@ namespace Unity.DemoTeam.Hair
 
 			mpb.SetBuffer(UniformIDs._ParticlePosition, solverData.particlePosition);
 			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
-			mpb.SetBuffer(UniformIDs._ParticlePositionPose, solverData.particlePositionPose);
+			mpb.SetBuffer(UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
 			mpb.SetBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			mpb.SetBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
@@ -1035,82 +1037,67 @@ namespace Unity.DemoTeam.Hair
 			int numZ = 1;
 
 			// accumulate
-			switch (volumeSettings.volumeSplatMethod)
+			using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat))
 			{
-				case VolumeSettings.SplatMethod.Compute:
-					{
-						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat))
+				switch (volumeSettings.volumeSplatMethod)
+				{
+					case VolumeSettings.SplatMethod.Compute:
 						{
 							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplat, volumeData);
 							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplat, solverData);
 							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplat, numX, numY, numZ);
 						}
-					}
-					break;
+						break;
 
-				case VolumeSettings.SplatMethod.ComputeSplit:
-					{
-						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatDensity))
+					case VolumeSettings.SplatMethod.ComputeSplit:
 						{
-							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatDensity, volumeData);
-							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatDensity, solverData);
-							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatDensity, numX, numY, numZ);
-						}
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_Density))
+							{
+								PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatDensity, volumeData);
+								PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatDensity, solverData);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatDensity, numX, numY, numZ);
+							}
 
-						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatVelocityXYZ))
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_VelocityXYZ))
+							{
+								PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, volumeData);
+								PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, solverData);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, numX, numY, numZ);
+
+								PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, volumeData);
+								PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, solverData);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, numX, numY, numZ);
+
+								PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, volumeData);
+								PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, solverData);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, numX, numY, numZ);
+							}
+						}
+						break;
+
+					case VolumeSettings.SplatMethod.Rasterization:
 						{
-							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, volumeData);
-							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, solverData);
-							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, numX, numY, numZ);
-
-							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, volumeData);
-							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, solverData);
-							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, numX, numY, numZ);
-
-							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, volumeData);
-							PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, solverData);
-							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, numX, numY, numZ);
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_Rasterization))
+							{
+								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
+								PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
+								PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
+								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, particleCount, 1, s_volumeRasterMPB);
+							}
 						}
-					}
-					break;
+						break;
 
-				case VolumeSettings.SplatMethod.Rasterization:
-					{
-						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterization))
+					case VolumeSettings.SplatMethod.RasterizationNoGS:
 						{
-							CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
-							PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
-							PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
-							cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, particleCount, 1, s_volumeRasterMPB);
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_RasterizationNoGS))
+							{
+								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
+								PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
+								PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
+								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, particleCount * 8, 1, s_volumeRasterMPB);
+							}
 						}
-					}
-					break;
-
-				case VolumeSettings.SplatMethod.RasterizationNoGS:
-					{
-						using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatByRasterizationNoGS))
-						{
-							CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
-							PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
-							PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
-							cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, particleCount * 8, 1, s_volumeRasterMPB);
-						}
-					}
-					break;
-			}
-
-			// accumulate initial pose
-			if (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPose)
-			{
-				int __numX = (int)solverData.cbuffer._StrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % PARTICLE_GROUP_SIZE);
-				int __numY = 1;
-				int __numZ = 1;
-
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_1_SplatInitialPose))
-				{
-					PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatInitialPose, volumeData);
-					PushSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatInitialPose, solverData);
-					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatInitialPose, __numX, __numY, __numZ);
+						break;
 				}
 			}
 		}

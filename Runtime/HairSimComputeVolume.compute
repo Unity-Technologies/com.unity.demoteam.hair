@@ -4,7 +4,6 @@
 #pragma kernel KVolumeSplatVelocityX
 #pragma kernel KVolumeSplatVelocityY
 #pragma kernel KVolumeSplatVelocityZ
-#pragma kernel KVolumeSplatInitialPose
 #pragma kernel KVolumeResolve
 #pragma kernel KVolumeResolveFromRasterization
 #pragma kernel KVolumeDivergence
@@ -57,10 +56,6 @@
 #define VOLUME_NUM_Y 8
 #define VOLUME_NUM_Z 1
 
-#define STRAND_NUM_X 64
-#define STRAND_NUM_Y 1
-#define STRAND_NUM_Z 1
-
 #if VOLUME_SUPPORT_CONTRACTION
 	#define VOLUME_REST_AT_ZERO					0
 	#define VOLUME_AIR_CELL_ZERO_PRESSURE		0
@@ -93,24 +88,17 @@
 #define CHECK_PARTICLE_INDEX(x)	\
 	if (x >= _StrandCount * _StrandParticleCount) return;
 
-#if LAYOUT_INTERLEAVED
-  #define DECLARE_STRAND(x)							\
-	if (x >= _StrandCount) return;					\
-	const uint strandIndex = x;						\
-	const uint strandParticleBegin = strandIndex;	\
-	const uint strandParticleStride = _StrandCount;	\
-	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
-#else
-  #define DECLARE_STRAND(x)													\
-	if (x >= _StrandCount) return;											\
-	const uint strandIndex = x;												\
-	const uint strandParticleBegin = strandIndex * _StrandParticleCount;	\
-	const uint strandParticleStride = 1;									\
-	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
-#endif
-
 //---------
 // utility
+
+uint GetStrandIndex(uint particleIndex)
+{
+#if LAYOUT_INTERLEAVED
+	return particleIndex % _StrandCount;
+#else
+	return particleIndex / _StrandParticleCount;
+#endif
+}
 
 #define WEIGHT_BITS 16
 #define WEIGHT_MASK 0xFFFF
@@ -234,7 +222,12 @@ void KVolumeSplat(
 	const float4 v = _ParticleVelocity[worldIdx.x];
 
 	InterlockedAddParticleContribution(p, (v.w), _AccuWeight);
-#if VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
+	
+#if VOLUME_TARGET_INITIAL_POSE
+	const float3 q = _RootPosition[GetStrandIndex(worldIdx.x)].xyz;
+	const float3 r = mul(_LocalToWorld, float4(_InitialParticleOffset[worldIdx.x].xyz, 0.0)).xyz;
+	InterlockedAddParticleContribution(q + r, (v.w), _AccuWeight0);
+#elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
 	InterlockedMaxParticleContribution(p, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
 #endif
 
@@ -338,32 +331,6 @@ void KVolumeSplatVelocityZ(
 #else
 	InterlockedAddParticleContribution(p, (v.w * v.z), _AccuVelocityZ);
 #endif
-}
-
-[numthreads(STRAND_NUM_X, STRAND_NUM_Y, STRAND_NUM_Z)]
-void KVolumeSplatInitialPose(
-	uint3 groupIdx : SV_GroupID,
-	uint3 localIdx : SV_GroupThreadID,
-	uint3 worldIdx : SV_DispatchThreadID,
-	uint threadIdx : SV_GroupIndex)
-	// SV_GroupID           execution group coords
-	// SV_GroupThreadID     thread coords within execution group
-	// SV_DispatchThreadID  thread coords (global)
-	// SV_GroupIndex        thread offset within execution group
-{
-	DECLARE_STRAND(worldIdx.x);
-
-	float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
-
-	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
-	{
-		float3 r = mul(_LocalToWorld, float4(_ParticlePositionPose[i].xyz, 0.0)).xyz;
-		float3 p = p0 + r;
-
-#if VOLUME_TARGET_INITIAL_POSE
-		InterlockedAddParticleContribution(p, _ParticleVelocity[i].w, _AccuWeight0);
-#endif
-	}
 }
 
 //-----------------

@@ -304,27 +304,24 @@ namespace Unity.DemoTeam.Hair
 			if (!InitializeRuntimeData(cmd))
 				return;
 
-			// get bounds
+			// get bounds and scale
 			var strandBounds = GetSimulationBoundsSquare();
 			var strandScale = GetSimulationStrandScale();
 
 			// update solver roots
 			for (int i = 0; i != solverData.Length; i++)
 			{
+				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
+
 				var rootMesh = componentGroups[i].rootFilter.sharedMesh;
 				var rootTransform = componentGroups[i].rootFilter.transform.localToWorldMatrix;
 
+				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, dt);
 				HairSim.UpdateSolverRoots(cmd, rootMesh, rootTransform, solverData[i]);
 			}
 
 			// update volume boundaries
 			HairSim.UpdateVolumeBoundaries(ref volumeData, volumeSettings, strandBounds);
-
-			// update solver data
-			for (int i = 0; i != solverData.Length; i++)
-			{
-				//TODO
-			}
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
@@ -336,12 +333,6 @@ namespace Unity.DemoTeam.Hair
 			// step solver data
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				//TODO remove (leaving here for debugging)
-				//HairSim.InitSolverParticlesPostVolume(cmd, solverData[i], volumeData);
-
-				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
-
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, dt);
 				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings, volumeData);
 			}
 
@@ -545,7 +536,6 @@ namespace Unity.DemoTeam.Hair
 
 					// NOTE: the rest of the particle buffers are initialized by KInitParticles
 					//solverData[i].particlePositionPrev.SetData(tmpParticlePosition);
-					//solverData[i].particlePositionPose.SetData(tmpZero);
 					//solverData[i].particlePositionCorr.SetData(tmpZero);
 					//solverData[i].particleVelocity.SetData(tmpZero);
 					//solverData[i].particleVelocityPrev.SetData(tmpZero);
@@ -563,7 +553,7 @@ namespace Unity.DemoTeam.Hair
 					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);
 				}
 
-				// initialize renderer
+				// init renderer
 				if (componentGroups[i].lineRendererMPB == null)
 					componentGroups[i].lineRendererMPB = new MaterialPropertyBlock();
 

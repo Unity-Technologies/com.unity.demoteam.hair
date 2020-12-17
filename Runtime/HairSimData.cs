@@ -10,14 +10,15 @@ namespace Unity.DemoTeam.Hair
 		{
 			public SolverCBuffer cbuffer;
 
-			public ComputeBuffer rootScale;
-			public ComputeBuffer rootPosition;
-			public ComputeBuffer rootDirection;
+			public ComputeBuffer rootScale;     // strand length (relative to group maximum)
+			public ComputeBuffer rootPosition;  // strand root position
+			public ComputeBuffer rootDirection; // strand root direction
+
+			public ComputeBuffer initialParticleOffset;
 
 			public ComputeBuffer particlePosition;
 			public ComputeBuffer particlePositionPrev;
 			public ComputeBuffer particlePositionCorr;
-			public ComputeBuffer particlePositionPose;
 			public ComputeBuffer particleVelocity;
 			public ComputeBuffer particleVelocityPrev;
 
@@ -36,8 +37,6 @@ namespace Unity.DemoTeam.Hair
 			public RenderTexture accuVelocityY;
 			public RenderTexture accuVelocityZ;
 
-			public float allGroupsMaxParticleInterval;
-
 			public RenderTexture volumeDensity;
 			public RenderTexture volumeDensity0;
 			public RenderTexture volumeVelocity;
@@ -46,6 +45,8 @@ namespace Unity.DemoTeam.Hair
 			public RenderTexture volumePressure;
 			public RenderTexture volumePressureNext;
 			public RenderTexture volumePressureGrad;
+
+			public float allGroupsMaxParticleInterval;
 
 			public ComputeBuffer boundaryPack;
 			public ComputeBuffer boundaryMatrix;
@@ -71,11 +72,12 @@ namespace Unity.DemoTeam.Hair
 			public Matrix4x4 _LocalToWorld;
 			public Matrix4x4 _LocalToWorldInvT;
 
-			public uint _StrandCount;
-			public uint _StrandParticleCount;
-			public float _StrandMaxParticleInterval;
-			public float _StrandMaxParticleWeight;
-			public float _StrandScale;
+			public uint _StrandCount;                // group strand count
+			public uint _StrandParticleCount;        // group strand particle count
+			public float _StrandMaxParticleInterval; // group max particle interval
+			public float _StrandMaxParticleWeight;   // group max particle weight (relative to all groups within volume)
+
+			public float _StrandScale;               // global scale factor
 
 			public float _DT;
 			public uint _Iterations;
