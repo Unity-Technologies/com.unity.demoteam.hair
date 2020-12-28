@@ -43,14 +43,14 @@ namespace Unity.DemoTeam.Hair
 			[Tooltip("Alembic asset containing at least one set of curves")]
 			public AlembicStreamPlayer sourceAsset;
 			[Tooltip("Resample curves to ensure a specific number of particles along each strand")]
-			public bool resampleCurves;//TODO
+			public bool resampleCurves;
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
-			public int resampleParticleCount;//TODO
+			public int resampleParticleCount;
 
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
 			{
 				resampleCurves = true,
-				resampleParticleCount = 32,
+				resampleParticleCount = 16,
 			};
 		}
 

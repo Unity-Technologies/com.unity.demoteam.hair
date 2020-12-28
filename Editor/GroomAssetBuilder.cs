@@ -149,14 +149,14 @@ namespace Unity.DemoTeam.Hair
 
 			// get buffers
 			var bufferPos = curveSet.Positions;
-			var bufferPointCount = curveSet.CurvePointCount;
+			var bufferPosCount = curveSet.CurvePointCount;
 
 			//Debug.Log("curveSet: " + curveSet.name);
 			//Debug.Log("bufferPos.Length = " + bufferPos.Length);
 			//Debug.Log("bufferPointCount.Length = " + bufferPointCount.Length);
 
 			// get curve counts
-			int curveCount = bufferPointCount.Length;
+			int curveCount = bufferPosCount.Length;
 			int curvePointCount = (curveCount == 0) ? 0 : (bufferPos.Length / curveCount);
 			int curvePointRemainder = (curveCount == 0) ? 0 : (bufferPos.Length % curveCount);
 
@@ -168,6 +168,35 @@ namespace Unity.DemoTeam.Hair
 			{
 				curveCount = 0;
 				curvePointCount = 0;
+				curvePointRemainder = 0;
+			}
+
+			// resample curves
+			if (settings.resampleCurves)
+			{
+				var bufferPosResample = new Vector3[curveCount * settings.resampleParticleCount];
+
+				unsafe
+				{
+					fixed (Vector3* srcBase = bufferPos)
+					fixed (Vector3* dstBase = bufferPosResample)
+					{
+						var srcOffset = 0;
+						var dstOffset = 0;
+
+						for (int i = 0; i != curveCount; i++)
+						{
+							Resample(srcBase + srcOffset, bufferPosCount[i], dstBase + dstOffset, settings.resampleParticleCount);
+
+							srcOffset += bufferPosCount[i];
+							dstOffset += settings.resampleParticleCount;
+						}
+					}
+				}
+
+				bufferPos = bufferPosResample;
+
+				curvePointCount = settings.resampleParticleCount;
 				curvePointRemainder = 0;
 			}
 
@@ -614,6 +643,60 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			strandParticleEnd = strandParticleBegin + strandParticleStride * strandParticleCount;
+		}
+
+		public static unsafe void Resample(Vector3* srcPos, int srcCount, Vector3* dstPos, int dstCount)
+		{
+			var length = 0.0f;
+
+			for (int i = 1; i != srcCount; i++)
+			{
+				length += Vector3.Distance(srcPos[i], srcPos[i - 1]);
+			}
+
+			dstPos[0] = srcPos[0];
+
+			var dstPosPrev = dstPos[0];
+			var dstSpacing = length / (dstCount - 1);
+			var dstSpacingSq = dstSpacing * dstSpacing;
+
+			var srcIndex = 1;
+			var dstIndex = 1;
+
+			while (srcIndex < srcCount && dstIndex < dstCount)
+			{
+				var r = srcPos[srcIndex] - dstPosPrev;
+				var rNormSq = Vector3.SqrMagnitude(r);
+				if (rNormSq >= dstSpacingSq)
+				{
+					// find point on line between [srcIndex] and [srcIndex-1]
+					var n = Vector3.Normalize(srcPos[srcIndex] - srcPos[srcIndex - 1]);
+					var p = srcPos[srcIndex] - n * Vector3.Dot(n, r);
+
+					// b = sqrt(cc - aa) 
+					var aa = Vector3.SqrMagnitude(dstPosPrev - p);
+					var bb = dstSpacingSq - aa;
+
+					dstPos[dstIndex] = p + n * Mathf.Sqrt(bb);
+					dstPosPrev = dstPos[dstIndex++];
+				}
+				else
+				{
+					srcIndex++;
+				}
+			}
+
+			// just extrapolate the tail, if there is a tail
+			if (dstIndex < dstCount)
+			{
+				var n = Vector3.Normalize(srcPos[srcCount - 1] - dstPosPrev);
+
+				while (dstIndex < dstCount)
+				{
+					dstPos[dstIndex] = dstPosPrev + n * dstSpacing;
+					dstPosPrev = dstPos[dstIndex++];
+				}
+			}
 		}
 	}
 }
