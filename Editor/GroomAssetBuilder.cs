@@ -102,13 +102,18 @@ namespace Unity.DemoTeam.Hair
 			if (alembic == null)
 				return;
 
+			// instantiate to load the data
+			var alembicInstantiated = EditorUtility.IsPersistent(settings.sourceAsset);
+			if (alembicInstantiated)
+			{
+				alembic = GameObject.Instantiate(alembic);
+				alembic.gameObject.hideFlags |= HideFlags.DontSave;
+			}
+
 			// fetch all curve sets 
 			var curveSets = alembic.gameObject.GetComponentsInChildren<AlembicCurves>(true);
 			if (curveSets.Length == 0)
 				return;
-
-			// force-load the data
-			alembic.LoadFromFile(alembic.PathToAbc);
 
 			// prep strand groups in groom asset
 			groom.strandGroups = new GroomAsset.StrandGroup[curveSets.Length];
@@ -117,6 +122,12 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0; i != groom.strandGroups.Length; i++)
 			{
 				BuildGroomAssetStrandGroup(ref groom.strandGroups[i], settings, curveSets[i], memoryLayout);
+			}
+
+			// destroy container
+			if (alembicInstantiated)
+			{
+				GameObject.DestroyImmediate(alembic.gameObject);
 			}
 		}
 
@@ -134,18 +145,20 @@ namespace Unity.DemoTeam.Hair
 
 		public static void BuildGroomAssetStrandGroup(ref GroomAsset.StrandGroup strandGroup, in GroomAsset.SettingsAlembic settings, AlembicCurves curveSet, GroomAsset.MemoryLayout memoryLayout)
 		{
+			//TODO require resampling if not all curves have same number of points
+
 			// get buffers
 			var bufferPos = curveSet.Positions;
-			var bufferPosOffset = curveSet.PositionsOffsetBuffer;
+			var bufferPointCount = curveSet.CurvePointCount;
 
 			//Debug.Log("curveSet: " + curveSet.name);
-			//Debug.Log("bufferPos.Count = " + bufferPos.Count);
-			//Debug.Log("bufferPosOffset.Count = " + bufferPosOffset.Count);
+			//Debug.Log("bufferPos.Length = " + bufferPos.Length);
+			//Debug.Log("bufferPointCount.Length = " + bufferPointCount.Length);
 
 			// get curve counts
-			int curveCount = bufferPosOffset.Count;
-			int curvePointCount = (curveCount == 0) ? 0 : (bufferPos.Count / curveCount);
-			int curvePointRemainder = (curveCount == 0) ? 0 : (bufferPos.Count % curveCount);
+			int curveCount = bufferPointCount.Length;
+			int curvePointCount = (curveCount == 0) ? 0 : (bufferPos.Length / curveCount);
+			int curvePointRemainder = (curveCount == 0) ? 0 : (bufferPos.Length % curveCount);
 
 			Debug.Assert(curveCount > 0);
 			Debug.Assert(curvePointCount >= 2);
@@ -169,7 +182,7 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.particlePosition = new Vector3[curveCount * curvePointCount];
 
 			// build curve buffers
-			bufferPos.CopyTo(strandGroup.particlePosition);
+			bufferPos.CopyTo(strandGroup.particlePosition, 0);
 
 			for (int i = 0; i != curveCount; i++)
 			{

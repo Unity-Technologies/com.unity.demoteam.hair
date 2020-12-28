@@ -29,7 +29,7 @@
         },
         {
             "name": "com.unity.formats.alembic",
-            "expression": "2.0.1-preview.1",
+            "expression": "2.2.0-exp.1",
             "define": "UNITY_FORMATS_ALEMBIC"
         }
     ],

@@ -16,6 +16,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.formats.alembic",
+            "expression": "2.2.0-exp.1",
+            "define": "UNITY_FORMATS_ALEMBIC"
+        }
+    ],
     "noEngineReferences": false
 }
