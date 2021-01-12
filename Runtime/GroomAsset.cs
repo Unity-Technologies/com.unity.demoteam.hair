@@ -63,7 +63,6 @@ namespace Unity.DemoTeam.Hair
 				Brush,
 				Cap,
 				StratifiedCurtain,
-				VariableLengthCurtain,
 			}
 
 			public Style style;
@@ -73,10 +72,24 @@ namespace Unity.DemoTeam.Hair
 			public int strandParticleCount;
 			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
 			public float strandLength;
-			[ToggleGroup]
-			public bool strandLengthRandom;
-			[ToggleGroupItem, Range(0.0f, 1.0f)]
-			public float strandLengthRandomAmount;
+			[ToggleGroup, Tooltip("Enable this to vary strand lengths")]
+			public bool strandLengthVariation;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Fraction of strand length")]
+			public float strandLengthVariationAmount;
+			[ToggleGroup, Tooltip("Enable this to curl the strands")]
+			public bool strandCurl;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 10.0f), Tooltip("Curl radius in centimeters")]
+			public float strandCurlRadius;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Curl slope")]
+			public float strandCurlSlope;
+			[ToggleGroupItem, Tooltip("Relax slope for small radii, to maintain strand length")]
+			public bool strandCurlSlopeRelaxed;
+			[ToggleGroup, Tooltip("Enable this to vary curls")]
+			public bool strandCurlVariation;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Fraction of curl radius")]
+			public float strandCurlVariationRadius;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Fraction of curl slope")]
+			public float strandCurlVariationSlope;
 
 			public static readonly SettingsProcedural defaults = new SettingsProcedural()
 			{
@@ -84,8 +97,12 @@ namespace Unity.DemoTeam.Hair
 				strandCount = 64,
 				strandParticleCount = 32,
 				strandLength = 0.25f,
-				strandLengthRandom = false,
-				strandLengthRandomAmount = 0.2f,
+				strandLengthVariation = false,
+				strandLengthVariationAmount = 0.2f,
+				strandCurl = false,
+				strandCurlRadius = 1.0f,
+				strandCurlSlope = 0.3f,
+				strandCurlSlopeRelaxed = false,
 			};
 		}
 

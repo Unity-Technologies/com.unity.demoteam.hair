@@ -594,28 +594,73 @@ namespace Unity.DemoTeam.Hair
 
 			unsafe
 			{
-				var pos = (Vector3*)tmpStrands.particlePosition.GetUnsafePtr();
 				var rootPos = (Vector3*)tmpRoots.rootPosition.GetUnsafePtr();
 				var rootDir = (Vector3*)tmpRoots.rootDirection.GetUnsafePtr();
+				var pos = (Vector3*)tmpStrands.particlePosition.GetUnsafePtr();
 
-				var strandParticleInterval = settings.strandLength / (settings.strandParticleCount - 1);
-				var strandParticleIntervalRandom = settings.strandLengthRandom ? settings.strandLengthRandomAmount : 0.0f;
+				var particleInterval = settings.strandLength / (settings.strandParticleCount - 1);
+				var particleIntervalVariation = settings.strandLengthVariation ? settings.strandLengthVariationAmount : 0.0f;
 
-				var xorshift = new Unity.Mathematics.Random(257);
+				var curlRadiusVariation = settings.strandCurlVariation ? settings.strandCurlVariationRadius : 0.0f;
+				var curlSlopeVariation = settings.strandCurlVariation ? settings.strandCurlVariationSlope : 0.0f;
+
+				var randParticleInterval = new Unity.Mathematics.Random(257);
+				var randCurlRadius = new Unity.Mathematics.Random(709);
+				var randCurlSlope = new Unity.Mathematics.Random(1171);
 
 				for (int i = 0; i != settings.strandCount; i++)
 				{
-					var step = strandParticleInterval * Mathf.Lerp(1.0f, xorshift.NextFloat(), strandParticleIntervalRandom);
+					var step = particleInterval * Mathf.Lerp(1.0f, randParticleInterval.NextFloat(), particleIntervalVariation);
 
 					var curPos = rootPos[i];
 					var curDir = rootDir[i];
 
 					DeclareStrandIterator(memoryLayout, i, settings.strandCount, settings.strandParticleCount, out var strandParticleBegin, out var strandParticleStride, out var strandParticleEnd);
 
-					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+					if (settings.strandCurl)
 					{
-						pos[j] = curPos;
-						curPos += step * curDir;
+						var curPlaneU = Vector3.ProjectOnPlane(new Vector3(curDir.y, curDir.z, curDir.x), curDir);
+						var curPlaneV = Vector3.Cross(curPlaneU, curDir);
+
+						var targetRadius = settings.strandCurlRadius * 0.01f * Mathf.Lerp(1.0f, randCurlRadius.NextFloat(), curlRadiusVariation);
+						var targetSlope = settings.strandCurlSlope * Mathf.Lerp(1.0f, randCurlSlope.NextFloat(), curlSlopeVariation);
+
+						var stepPlane = step * Mathf.Cos(0.5f * Mathf.PI * targetSlope);
+						if (stepPlane > 1.0f * targetRadius)
+							stepPlane = 1.0f * targetRadius;
+
+						var stepSlope = step * Mathf.Sin(0.5f * Mathf.PI * targetSlope);
+						if (settings.strandCurlSlopeRelaxed)
+						{
+							stepSlope = Mathf.Sqrt(step * step - stepPlane * stepPlane);
+						}
+
+						var a = (stepPlane > 0.0f) ? 2.0f * Mathf.Asin(stepPlane / (2.0f * targetRadius)) : 0.0f;
+						var t = 0;
+
+						curPos -= curPlaneU * targetRadius;
+
+						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+						{
+							var du = targetRadius * Mathf.Cos(t * a);
+							var dv = targetRadius * Mathf.Sin(t * a);
+							var dn = stepSlope * t;
+
+							pos[j] = curPos +
+								du * curPlaneU +
+								dv * curPlaneV +
+								dn * curDir;
+
+							t++;
+						}
+					}
+					else
+					{
+						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+						{
+							pos[j] = curPos;
+							curPos += step * curDir;
+						}
 					}
 				}
 			}
