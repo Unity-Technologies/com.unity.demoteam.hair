@@ -9,6 +9,7 @@
 CBUFFER_START(SolverCBuffer)
     float4x4 _LocalToWorld;
     float4x4 _LocalToWorldInvT;
+    float4 _WorldRotation;
     uint _StrandCount;
     uint _StrandParticleCount;
     float _StrandMaxParticleInterval;
@@ -25,8 +26,9 @@ CBUFFER_START(SolverCBuffer)
     float _DampingFTL;
     float _BoundaryFriction;
     float _BendingCurvature;
-    float _ShapeStiffness;
-    float _ShapeFalloff;
+    float _GlobalShape;
+    float _GlobalShapeFalloff;
+    float _LocalShape;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

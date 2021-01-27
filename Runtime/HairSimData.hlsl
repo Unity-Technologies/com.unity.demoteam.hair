@@ -14,17 +14,20 @@
 #define HAIRSIM_SOLVERDATA StructuredBuffer
 #endif
 
-StructuredBuffer<float> _RootScale;
-StructuredBuffer<float4> _RootPosition;
-StructuredBuffer<float4> _RootDirection;
+StructuredBuffer<float> _RootScale;					// x: relative strand length [0..1] (to group maximum)
+StructuredBuffer<float4> _RootPosition;				// xyz: strand root position, w: -
+StructuredBuffer<float4> _RootDirection;			// xyz: strand root direction, w: -
+StructuredBuffer<float4> _RootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
 
-HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;
+HAIRSIM_SOLVERDATA<float4> _InitialRootFrame;			// quat(xyz,w): initial strand root material frame
+HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
+HAIRSIM_SOLVERDATA<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 
-HAIRSIM_SOLVERDATA<float4> _ParticlePosition;
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionCorr;
-HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;
-HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;
+HAIRSIM_SOLVERDATA<float4> _ParticlePosition;		// xyz: position, w: initial pose local accumulated weight (gather)
+HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;	// xyz: position, w: initial pose local accumulated weight (gather)
+HAIRSIM_SOLVERDATA<float4> _ParticlePositionCorr;	// xyz: ftl correction, w: -
+HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;		// xyz: velocity, w: weight
+HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;	// xyz: velocity, w: weight
 
 //-------------
 // volume data
@@ -35,15 +38,16 @@ HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;
 #define HAIRSIM_VOLUMEDATA Texture3D
 #endif
 
-HAIRSIM_VOLUMEDATA<int> _AccuWeight;
-HAIRSIM_VOLUMEDATA<int> _AccuWeight0;
-HAIRSIM_VOLUMEDATA<int> _AccuVelocityX;// this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
-HAIRSIM_VOLUMEDATA<int> _AccuVelocityY;
-HAIRSIM_VOLUMEDATA<int> _AccuVelocityZ;
+HAIRSIM_VOLUMEDATA<int> _AccuWeight;				// x: fp accumulated weight
+HAIRSIM_VOLUMEDATA<int> _AccuWeight0;				// x: fp accumulated target weight
+HAIRSIM_VOLUMEDATA<int> _AccuVelocityX;				// x: fp accumulated x-velocity
+HAIRSIM_VOLUMEDATA<int> _AccuVelocityY;				// x: ... ... ... .. y-velocity
+HAIRSIM_VOLUMEDATA<int> _AccuVelocityZ;				// x: .. ... ... ... z-velocity
+//TODO this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 
-HAIRSIM_VOLUMEDATA<float> _VolumeDensity;
-HAIRSIM_VOLUMEDATA<float> _VolumeDensity0;
-HAIRSIM_VOLUMEDATA<float4> _VolumeVelocity;
+HAIRSIM_VOLUMEDATA<float> _VolumeDensity;			// x: density
+HAIRSIM_VOLUMEDATA<float> _VolumeDensity0;			// x: density target
+HAIRSIM_VOLUMEDATA<float4> _VolumeVelocity;			// xyz: velocity, w: accumulated weight
 HAIRSIM_VOLUMEDATA<float> _VolumeDivergence;
 
 HAIRSIM_VOLUMEDATA<float> _VolumePressure;
@@ -58,12 +62,12 @@ struct BoundarySphere { float3 center; float radius; };
 struct BoundaryTorus { float3 center; float radiusA; float3 axis; float radiusB; };
 struct BoundaryPack
 {
-	//	shape	|	capsule		sphere		torus
-	//	----------------------------------------------
-	//	float3	|	centerA		center		center
-	//	float	|	radius		radius		radiusA
-	//	float3	|	centerB		__pad__		axis
-	//	float	|	__pad__		__pad__		radiusB
+	//  shape   |   capsule     sphere      torus
+	//  ----------------------------------------------
+	//  float3  |   centerA     center      center
+	//  float   |   radius      radius      radiusA
+	//  float3  |   centerB     __pad__     axis
+	//  float   |   __pad__     __pad__     radiusB
 
 	float3 pA;
 	float tA;

@@ -604,13 +604,14 @@ namespace Unity.DemoTeam.Hair
 				var curlRadiusVariation = settings.strandCurlVariation ? settings.strandCurlVariationRadius : 0.0f;
 				var curlSlopeVariation = settings.strandCurlVariation ? settings.strandCurlVariationSlope : 0.0f;
 
-				var randParticleInterval = new Unity.Mathematics.Random(257);
-				var randCurlRadius = new Unity.Mathematics.Random(709);
-				var randCurlSlope = new Unity.Mathematics.Random(1171);
+				var randSeqParticleInterval = new Unity.Mathematics.Random(257);
+				var randSeqCurlPlaneUV = new Unity.Mathematics.Random(457);
+				var randSeqCurlRadius = new Unity.Mathematics.Random(709);
+				var randSeqCurlSlope = new Unity.Mathematics.Random(1171);
 
 				for (int i = 0; i != settings.strandCount; i++)
 				{
-					var step = particleInterval * Mathf.Lerp(1.0f, randParticleInterval.NextFloat(), particleIntervalVariation);
+					var step = particleInterval * Mathf.Lerp(1.0f, randSeqParticleInterval.NextFloat(), particleIntervalVariation);
 
 					var curPos = rootPos[i];
 					var curDir = rootDir[i];
@@ -619,11 +620,21 @@ namespace Unity.DemoTeam.Hair
 
 					if (settings.strandCurl)
 					{
-						var curPlaneU = Vector3.ProjectOnPlane(new Vector3(curDir.y, curDir.z, curDir.x), curDir);
+						Vector3 NextVectorInPlane(ref Mathematics.Random randSeq, in Vector3 n)
+						{
+							Vector3 r;
+							{
+								do r = Vector3.ProjectOnPlane(randSeq.NextFloat3Direction(), n);
+								while (Vector3.SqrMagnitude(r) < 1e-5f);
+							}
+							return r;
+						};
+
+						var curPlaneU = Vector3.Normalize(NextVectorInPlane(ref randSeqCurlPlaneUV, curDir));
 						var curPlaneV = Vector3.Cross(curPlaneU, curDir);
 
-						var targetRadius = settings.strandCurlRadius * 0.01f * Mathf.Lerp(1.0f, randCurlRadius.NextFloat(), curlRadiusVariation);
-						var targetSlope = settings.strandCurlSlope * Mathf.Lerp(1.0f, randCurlSlope.NextFloat(), curlSlopeVariation);
+						var targetRadius = settings.strandCurlRadius * 0.01f * Mathf.Lerp(1.0f, randSeqCurlRadius.NextFloat(), curlRadiusVariation);
+						var targetSlope = settings.strandCurlSlope * Mathf.Lerp(1.0f, randSeqCurlSlope.NextFloat(), curlSlopeVariation);
 
 						var stepPlane = step * Mathf.Cos(0.5f * Mathf.PI * targetSlope);
 						if (stepPlane > 1.0f * targetRadius)

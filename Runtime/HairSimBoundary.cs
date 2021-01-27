@@ -23,12 +23,12 @@ namespace Unity.DemoTeam.Hair
 		public struct BoundaryTorus { public Vector3 center; public float radiusA; public Vector3 axis; public float radiusB; }
 		public struct BoundaryPack
 		{
-			//	shape	|	capsule		sphere		torus
-			//	----------------------------------------------
-			//	float3	|	centerA		center		center
-			//	float	|	radius		radius		radiusA
-			//	float3	|	centerB		__pad__		axis
-			//	float	|	__pad__		__pad__		radiusB
+			//  shape   |   capsule     sphere      torus
+			//  ----------------------------------------------
+			//  float3  |   centerA     center      center
+			//  float   |   radius      radius      radiusA
+			//  float3  |   centerB     __pad__     axis
+			//  float   |   __pad__     __pad__     radiusB
 
 			public Vector3 pA;
 			public float tA;

@@ -66,16 +66,19 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public Style style;
+
 			[Range(64, HairSim.MAX_STRAND_COUNT), Tooltip("Number of strands")]
 			public int strandCount;
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
 			public int strandParticleCount;
+
 			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
 			public float strandLength;
 			[ToggleGroup, Tooltip("Enable this to vary strand lengths")]
 			public bool strandLengthVariation;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Fraction of strand length")]
 			public float strandLengthVariationAmount;
+
 			[ToggleGroup, Tooltip("Enable this to curl the strands")]
 			public bool strandCurl;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 10.0f), Tooltip("Curl radius in centimeters")]
@@ -94,15 +97,21 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SettingsProcedural defaults = new SettingsProcedural()
 			{
 				style = Style.Curtain,
+
 				strandCount = 64,
 				strandParticleCount = 32,
+
 				strandLength = 0.25f,
 				strandLengthVariation = false,
 				strandLengthVariationAmount = 0.2f,
+
 				strandCurl = false,
 				strandCurlRadius = 1.0f,
 				strandCurlSlope = 0.3f,
 				strandCurlSlopeRelaxed = false,
+				strandCurlVariation = false,
+				strandCurlVariationRadius = 0.1f,
+				strandCurlVariationSlope = 0.3f,
 			};
 		}
 

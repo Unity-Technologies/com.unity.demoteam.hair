@@ -1,8 +1,6 @@
 #ifndef __HAIRSIMCOMPUTECONSTRAINTS_HLSL__
 #define __HAIRSIMCOMPUTECONSTRAINTS_HLSL__
 
-#include "HairSimComputeSolverBoundaries.hlsl"
-
 // Constraints between particles with infinite mass may exhibit division by zero.
 // Ideally, the application should not evaluate such constraints, as checking for
 // division by zero incurs an additional cost. For generic applications where the
@@ -19,8 +17,11 @@
 #define GUARD(x)
 #endif
 
-//--------------------
-// constraint solvers
+#include "HairSimComputeSolverBoundaries.hlsl"
+#include "HairSimComputeSolverQuaternion.hlsl"
+
+//----------------------
+// constraint functions
 
 void SolveCollisionConstraint(
 	const float w,
@@ -28,6 +29,7 @@ void SolveCollisionConstraint(
 	inout float3 d)
 {
 	//  - - -- -- ----+
+	//                |
 	//                |
 	//             d  |
 	//           .---.|
@@ -65,7 +67,7 @@ void SolveCollisionFrictionConstraint(
 	const float3 p,
 	inout float3 d)
 {
-	// Unified Particle Physics for Real-Time Applications
+	// see: "Unified Particle Physics for Real-Time Applications"
 	// https://mmacklin.com/uppfrta_preprint.pdf
 	//
 	//                          x0
@@ -143,16 +145,13 @@ void SolveDistanceMinConstraint(
 	const float3 p0, const float3 p1,
 	inout float3 d0, inout float3 d1)
 {
+	// variation of SolveDistanceConstraint,
+	// ensures distance p0-p1 >= distanceMin
+
 	float3 r = p1 - p0;
 	float rd_inv = rsqrt(dot(r, r));
 
-	// if (rd < distanceMin)
-	// { ... 1.0 - distanceMin / rd }
-	//
-	// =>
-	// { ... 1.0 - max(1.0, distanceMin / rd) }
-
-	float delta = 1.0 - max(1.0, distanceMin * rd_inv);
+	float delta = 1.0 - max(1.0, distanceMin * rd_inv);// === if (rd < distanceMin) { delta = 1.0 - distanceMin / rd; }
 	float W_inv = (delta * stiffness) / (w0 + w1);
 
 	GUARD(W_inv > 0.0)
@@ -168,16 +167,13 @@ void SolveDistanceMaxConstraint(
 	const float3 p0, const float3 p1,
 	inout float3 d0, inout float3 d1)
 {
+	// variation of SolveDistanceConstraint,
+	// ensures distance p0-p1 <= distanceMax
+
 	float3 r = p1 - p0;
 	float rd_inv = rsqrt(dot(r, r));
 
-	// if (rd > distanceMax)
-	// { ... 1.0 - distanceMax / rd }
-	//
-	// =>
-	// { ... 1.0 - min(1.0, distanceMax / rd) }
-
-	float delta = 1.0 - min(1.0, distanceMax * rd_inv);
+	float delta = 1.0 - min(1.0, distanceMax * rd_inv);// === if (rd > distanceMax) { delta = 1.0 - distanceMax / rd; }
 	float W_inv = (delta * stiffness) / (w0 + w1);
 
 	GUARD(W_inv > 0.0)
@@ -187,7 +183,10 @@ void SolveDistanceMaxConstraint(
 	}
 }
 
-void SolveDistanceLRAConstraint(const float distanceMax, const float3 p0, const float3 p1, inout float3 d1)
+void SolveDistanceLRAConstraint(
+	const float distanceMax,
+	const float3 p0, const float3 p1,
+	inout float3 d1)
 {
 	//                        d1
 	//                      .----.
@@ -203,9 +202,12 @@ void SolveDistanceLRAConstraint(const float distanceMax, const float3 p0, const 
 	d1 -= r;
 }
 
-void SolveDistanceFTLConstraint(const float distance, const float3 p0, const float3 p1, inout float3 d1)
+void SolveDistanceFTLConstraint(
+	const float distance,
+	const float3 p0, const float3 p1,
+	inout float3 d1)
 {
-	// Fast Simulation of Inextensible Hair and Fur
+	// see: "Fast Simulation of Inextensible Hair and Fur"
 	// https://matthias-research.github.io/pages/publications/FTLHairFur.pdf
 	//
 	//                       d1
@@ -228,14 +230,18 @@ void SolveTriangleBendingConstraint(
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
-	// A Triangle Bending Constraint Model for Position-Based Dynamics
+	// see: "A Triangle Bending Constraint Model for Position-Based Dynamics"
 	// http://image.diku.dk/kenny/download/kelager.niebe.ea10.pdf
 	//
-	//                     p1
-	//                 . ´ : ` .
-	//            . ´      :      ` .
-	// :     . ´           c           ` .    :
-	// p0 ´ - - - - - - - - - - - - - - - - ` p2
+	//                 p1
+	//                  o
+	//                ,´|`.
+	//              ,´  |  `.
+	//            ,´    | r  `.
+	//    .     ,´      |      `.     .
+	//    |   ,´        o C      `.   | r/2
+	//    | ,´                     `. |
+	// p0 o´-------------------------`o p2
 
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
@@ -258,17 +264,14 @@ void SolveTriangleBendingMinConstraint(
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
+	// variation of SolveTriangleBendingConstraint,
+	// ensures triangle bending radius >= radiusMin
+
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
 	float rd_inv = rsqrt(dot(r, r));
 
-	// if (rd > radiusMin)
-	// { ... 1.0 - radiusMin / rd }
-	//
-	// =>
-	// { ... 1.0 - max(1.0, radiusMin / rd) }
-
-	float delta = 1.0 - max(1.0, radiusMin * rd_inv);
+	float delta = 1.0 - max(1.0, radiusMin * rd_inv);// === if (rd < radiusMin) { delta = 1.0 - radiusMin / rd; }
 	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2);
 
 	GUARD(W_inv > 0.0)
@@ -285,17 +288,14 @@ void SolveTriangleBendingMaxConstraint(
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
+	// variation of SolveTriangleBendingConstraint,
+	// ensures triangle bending radius <= radiusMax
+
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
 	float rd_inv = rsqrt(dot(r, r));
 
-	// if (rd > radiusMax)
-	// { ... 1.0 - radiusMax / rd }
-	//
-	// =>
-	// { ... 1.0 - min(1.0, radiusMax / rd) }
-
-	float delta = 1.0 - min(1.0, radiusMax * rd_inv);
+	float delta = 1.0 - min(1.0, radiusMax * rd_inv);// === if (rd > radiusMax) { delta = 1.0 - radiusMax / rd; }
 	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2);
 
 	GUARD(W_inv > 0.0)
@@ -303,6 +303,57 @@ void SolveTriangleBendingMaxConstraint(
 		d0 += (w0 * W_inv) * r;
 		d1 -= (w1 * W_inv * 2.0) * r;
 		d2 += (w2 * W_inv) * r;
+	}
+}
+
+void SolveMaterialFrameBendTwistConstraint(
+	const float4 darboux0, const float stiffness,
+	const float w0, const float w1,
+	const float4 q0, const float4 q1,
+	inout float4 d0, inout float4 d1)
+{
+	// see: "Position and Orientation Based Cosserat Rods" by T. Kugelstadt and E. Schömer
+	// https://www.cg.informatik.uni-mainz.de/files/2016/06/Position-and-Orientation-Based-Cosserat-Rods.pdf
+	
+	// calc relative rotation from q0 to q1
+	float4 darboux = QMul(QInverse(q0), q1);
+	
+	// apply eq. 32 + 33 to pick closest delta
+	float4 delta_add = darboux + darboux0;
+	float4 delta_sub = darboux - darboux0;
+	float sqnorm_add = dot(delta_add, delta_add);
+	float sqnorm_sub = dot(delta_sub, delta_sub);
+	float4 delta = (sqnorm_add < sqnorm_sub) ? delta_add : delta_sub;
+
+	// apply eq. 40 to compute the corrections
+	float W_inv = stiffness / (w0 + w1);
+	GUARD(W_inv > 0.0)
+	{
+		delta.w = 0.0;// scalar part
+		d0 += (w0 * W_inv) * QMul(q1, delta);
+		d1 -= (w1 * W_inv) * QMul(q0, delta);
+	}
+}
+
+void SolveMaterialFrameTangentConstraint(
+	const float4 frame, const float3 tangent, const float stiffness,
+	const float w0, const float w1,
+	const float3 p0, const float3 p1,
+	inout float3 d0, inout float3 d1)
+{
+#if 0
+	float3 delta = p1 - (p0 + QMul(frame, tangent));
+#else
+	float3 mid = 0.5 * (p1 + p0);
+	float3 mid_plus = mid + 0.5 * QMul(frame, tangent);
+	float3 delta = p1 - mid_plus;
+#endif
+
+	float W_inv = stiffness / (w0 + w1);
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (w0 * W_inv) * delta;
+		d1 -= (w1 * W_inv) * delta;
 	}
 }
 
@@ -472,6 +523,40 @@ void ApplyTriangleBendingMaxConstraint(
 	p0 += d0;
 	p1 += d1;
 	p2 += d2;
+}
+
+void ApplyMaterialFrameBendTwistConstraint(
+	const float4 darboux0, const float stiffness,
+	const float w0, const float w1,
+	inout float4 q0, inout float4 q1)
+{
+	float4 d0 = 0.0;
+	float4 d1 = 0.0;
+	SolveMaterialFrameBendTwistConstraint(darboux0, stiffness, w0, w1, q0, q1, d0, d1);
+	q0 += d0;
+	q1 += d1;
+}
+
+void ApplyMaterialFrameBendTwistConstraintSafe(
+	const float4 darboux0, const float stiffness,
+	const float w0, const float w1,
+	inout float4 q0, inout float4 q1)
+{
+	ApplyMaterialFrameBendTwistConstraint(darboux0, stiffness, w0, w1, q0, q1);
+	q0 = normalize(q0);
+	q1 = normalize(q1);
+}
+
+void ApplyMaterialFrameTangentConstraint(
+	const float4 frame, const float3 tangent, const float stiffness,
+	const float w0, const float w1,
+	inout float3 p0, inout float3 p1)
+{
+	float3 d0 = 0.0;
+	float3 d1 = 0.0;
+	SolveMaterialFrameTangentConstraint(frame, tangent, stiffness, w0, w1, p0, p1, d0, d1);
+	p0 += d0;
+	p1 += d1;
 }
 
 #endif//__HAIRSIMCOMPUTECONSTRAINTS_HLSL__

@@ -67,8 +67,11 @@ namespace Unity.DemoTeam.Hair
 			public static int _RootScale;
 			public static int _RootPosition;
 			public static int _RootDirection;
+			//public static int _RootFrame;
 
+			public static int _InitialRootFrame;
 			public static int _InitialParticleOffset;
+			public static int _InitialParticleFrameDelta;
 
 			public static int _ParticlePosition;
 			public static int _ParticlePositionPrev;
@@ -145,7 +148,10 @@ namespace Unity.DemoTeam.Hair
 			public T ENABLE_CURVATURE_EQ;
 			public T ENABLE_CURVATURE_GEQ;
 			public T ENABLE_CURVATURE_LEQ;
-			public T ENABLE_SHAPE_GLOBAL;
+			public T ENABLE_POSE_GLOBAL_POSITION;
+			public T ENABLE_POSE_GLOBAL_ROTATION;
+			public T ENABLE_POSE_LOCAL_ROTATION;
+			public T ENABLE_POSE_LOCAL_BEND_TWIST;
 		}
 
 		public struct VolumeKeywords<T>
@@ -165,19 +171,23 @@ namespace Unity.DemoTeam.Hair
 				Jacobi = 2,
 			}
 
-			public enum Compare
+			public enum BendCompare
 			{
 				Equals,
 				LessThan,
 				GreaterThan,
 			}
 
-			public enum Falloff
+			public enum GlobalShapeMode
 			{
-				Constant,
-				FadeSlow,
-				FadeLinear,
-				FadeSquared,
+				GlobalPosition,
+				GlobalRotation,
+			}
+
+			public enum LocalShapeMode
+			{
+				LocalRotation,
+				LocalBendTwist,
 			}
 
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
@@ -198,9 +208,9 @@ namespace Unity.DemoTeam.Hair
 
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
 			public float cellPressure;
-			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (0 == FLIP, 1 == PIC)")]
+			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (where 0 == FLIP, 1 == PIC)")]
 			public float cellVelocity;
-			[Range(0.0f, 1.0f), Tooltip("Velocity damping factor")]
+			[Range(0.0f, 1.0f), Tooltip("Linear damping factor (applied to particle velocity)")]
 			public float damping;
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
@@ -209,9 +219,9 @@ namespace Unity.DemoTeam.Hair
 
 			[Tooltip("Enable particle-particle distance constraint")]
 			public bool distance;
-			[Tooltip("Enable max root-particle distance constraint")]
+			[Tooltip("Enable max. root-particle distance constraint")]
 			public bool distanceLRA;
-			[ToggleGroup, Tooltip("Enable 'Follow the leader' constraint (hard particle-particle distance, non-physical)")]
+			[ToggleGroup, Tooltip("Enable 'follow the leader' distance constraint (hard particle-particle distance, non-physical)")]
 			public bool distanceFTL;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("FTL correction / damping factor")]
 			public float distanceFTLDamping;
@@ -220,20 +230,32 @@ namespace Unity.DemoTeam.Hair
 			public bool boundaryCollision;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Boundary shape friction")]
 			public float boundaryCollisionFriction;
-
-			[ToggleGroup, Tooltip("Enable curvature constraint")]
+			[ToggleGroup, Tooltip("Enable isotropic curvature constraint")]
 			public bool curvature;
 			[ToggleGroupItem, Tooltip("Curvature constraint mode (=, <, >)")]
-			public Compare curvatureCompare;
+			public BendCompare curvatureCompare;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Scales to [0 .. 90] degrees")]
 			public float curvatureCompareValue;
 
-			[ToggleGroup, Tooltip("Global shape preservation constraint")]
-			public bool shape;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 5.0f), Tooltip("Global shape preservation stiffness")]
-			public float shapeStiffness;
-			[ToggleGroupItem]
-			public Falloff shapeFalloff;
+			[LineHeader("Shape Preservation")]
+
+			[ToggleGroup, Tooltip("Enable local shape preservation")]
+			public bool localShape;
+			[ToggleGroupItem, Tooltip("Type of local shape constraint")]
+			public LocalShapeMode localShapeMode;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape influence")]
+			public float localShapeStiffness;
+
+			[ToggleGroup, Tooltip("Enable global shape preservation")]
+			public bool globalShape;
+			[ToggleGroupItem, Tooltip("Type of global shape constraint")]
+			public GlobalShapeMode globalShapeMode;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Global shape influence")]
+			public float globalShapeStiffness;
+			[ToggleGroup, Tooltip("Fade global shape towards tip of strand")]
+			public bool globalShapeFalloff;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 4.0f), Tooltip("Exponent to falloff curve (where 0 == None, 1 == Linear, 2 == Cubed)")]
+			public float globalShapeFalloffExponent;
 
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
@@ -256,11 +278,18 @@ namespace Unity.DemoTeam.Hair
 				boundaryCollision = true,
 				boundaryCollisionFriction = 0.5f,
 				curvature = false,
-				curvatureCompare = Compare.LessThan,
+				curvatureCompare = BendCompare.LessThan,
 				curvatureCompareValue = 0.1f,
-				shape = false,
-				shapeStiffness = 0.5f,
-				shapeFalloff = Falloff.Constant,
+
+				localShape = false,
+				localShapeMode = LocalShapeMode.LocalBendTwist,
+				localShapeStiffness = 0.5f,
+
+				globalShape = false,
+				globalShapeMode = GlobalShapeMode.GlobalPosition,
+				globalShapeStiffness = 0.5f,
+				globalShapeFalloff = true,
+				globalShapeFalloffExponent = 2.0f,
 			};
 		}
 
@@ -279,7 +308,7 @@ namespace Unity.DemoTeam.Hair
 			public enum PressureSolution
 			{
 				DensityEquals,
-				DensityGreaterThan,
+				DensityLessThan,
 			}
 
 			public enum TargetDensity
@@ -303,12 +332,14 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Pressure")]
 
-			[Range(0, 100), Tooltip("0 = EOS, [1 .. *] = Jacobi iteration")]
+			[Range(0, 100), Tooltip("Number of pressure iterations (where 0 = Initialization by EOS, [1 .. n] = Jacobi iteration)")]
 			public int pressureIterations;
+			[Tooltip("Pressure solution can either target an exact density (causing both compression and decompression), or a maximum density (causing just decompression)")]
 			public PressureSolution pressureSolution;
+			[Tooltip("Target density can be uniform (based on physical strand diameter), based on the initial pose, or based on initial pose carried in particles (a runtime average)")]
 			public TargetDensity targetDensity;
-			[Range(0.0f, 1.0f)]
-			public float targetDensityTerm;
+			[Range(0.0f, 1.0f), Tooltip("Influence of target density vs. an always-present incompressibility term")]
+			public float targetDensityInfluence;
 
 			[LineHeader("Boundaries")]
 
@@ -336,7 +367,7 @@ namespace Unity.DemoTeam.Hair
 				pressureIterations = 3,
 				pressureSolution = PressureSolution.DensityEquals,
 				targetDensity = TargetDensity.Uniform,
-				targetDensityTerm = 1.0f,
+				targetDensityInfluence = 1.0f,
 
 				boundaryShapes = true,
 				boundaryShapesLayerMask = Physics.AllLayers,
@@ -353,6 +384,8 @@ namespace Unity.DemoTeam.Hair
 			public bool drawStrandParticles;
 			public bool drawCellDensity;
 			public bool drawCellGradient;
+
+			[LineHeader("Volume Visualization")]
 
 			[ToggleGroup]
 			public bool drawSliceX;
@@ -435,6 +468,7 @@ namespace Unity.DemoTeam.Hair
 				InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
 
 				//TODO fix case where s_solverCS is null during static init
+
 				InitializeStaticFields(typeof(SolverKernels), (string s) => s_solverCS.FindKernel(s));
 				InitializeStaticFields(typeof(VolumeKernels), (string s) => s_volumeCS.FindKernel(s));
 
@@ -454,8 +488,11 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverData.rootScale, "RootScale", strandCount, sizeof(float));
 				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStride);
 				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStride);
+				changed |= CreateBuffer(ref solverData.rootFrame, "RootFrame", strandCount, particleStride);
 
+				changed |= CreateBuffer(ref solverData.initialRootFrame, "InitialRootFrame", strandCount, particleStride);
 				changed |= CreateBuffer(ref solverData.initialParticleOffset, "InitialParticleOffset", particleCount, particleStride);
+				changed |= CreateBuffer(ref solverData.initialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStride);
 
 				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, particleStride);
 				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, particleStride);
@@ -507,7 +544,9 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverData.rootPosition);
 			ReleaseBuffer(ref solverData.rootDirection);
 
+			ReleaseBuffer(ref solverData.initialRootFrame);
 			ReleaseBuffer(ref solverData.initialParticleOffset);
+			ReleaseBuffer(ref solverData.initialParticleFrameDelta);
 
 			ReleaseBuffer(ref solverData.particlePosition);
 			ReleaseBuffer(ref solverData.particlePositionPrev);
@@ -558,6 +597,7 @@ namespace Unity.DemoTeam.Hair
 
 			cmd.SetRandomWriteTarget(1, solverData.rootPosition);
 			cmd.SetRandomWriteTarget(2, solverData.rootDirection);
+			cmd.SetRandomWriteTarget(3, solverData.rootFrame);
 			cmd.DrawMesh(rootMesh, Matrix4x4.identity, s_solverRootsMat, 0, 0, s_solverRootsMPB);
 			cmd.ClearRandomWriteTargets();
 		}
@@ -570,6 +610,7 @@ namespace Unity.DemoTeam.Hair
 			// update strand parameters
 			cbuffer._LocalToWorld = strandTransform;
 			cbuffer._LocalToWorldInvT = strandTransform.inverse.transpose;
+			cbuffer._WorldRotation = new Vector4(strandTransform.rotation.x, strandTransform.rotation.y, strandTransform.rotation.z, strandTransform.rotation.w);
 
 			cbuffer._StrandScale = strandScale;
 
@@ -587,27 +628,10 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
 			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f;
-			cbuffer._ShapeStiffness = solverSettings.shapeStiffness;
 
-			switch (solverSettings.shapeFalloff)
-			{
-				default:
-				case SolverSettings.Falloff.Constant:
-					cbuffer._ShapeFalloff = 0.0f;
-					break;
-
-				case SolverSettings.Falloff.FadeSlow:
-					cbuffer._ShapeFalloff = 0.1f;
-					break;
-
-				case SolverSettings.Falloff.FadeLinear:
-					cbuffer._ShapeFalloff = 1.0f;
-					break;
-
-				case SolverSettings.Falloff.FadeSquared:
-					cbuffer._ShapeFalloff = 2.0f;
-					break;
-			}
+			cbuffer._GlobalShape = solverSettings.globalShapeStiffness;
+			cbuffer._GlobalShapeFalloff = (solverSettings.globalShapeFalloff ? solverSettings.globalShapeFalloffExponent : 0.0f);
+			cbuffer._LocalShape = solverSettings.localShapeStiffness;
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
@@ -616,10 +640,13 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_DISTANCE_FTL = solverSettings.distanceFTL;
 			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
 			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f);
-			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.Equals);
-			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.GreaterThan);
-			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.Compare.LessThan);
-			keywords.ENABLE_SHAPE_GLOBAL = (solverSettings.shape && solverSettings.shapeStiffness > 0.0f);
+			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.Equals);
+			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.GreaterThan);
+			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.LessThan);
+			keywords.ENABLE_POSE_GLOBAL_POSITION = (solverSettings.globalShape && solverSettings.globalShapeMode == SolverSettings.GlobalShapeMode.GlobalPosition && solverSettings.globalShapeStiffness > 0.0f);
+			keywords.ENABLE_POSE_GLOBAL_ROTATION = (solverSettings.globalShape && solverSettings.globalShapeMode == SolverSettings.GlobalShapeMode.GlobalRotation);
+			keywords.ENABLE_POSE_LOCAL_ROTATION = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalRotation);
+			keywords.ENABLE_POSE_LOCAL_BEND_TWIST = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalBendTwist);
 		}
 
 		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
@@ -797,7 +824,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._ResolveUnitDebugWidth = volumeSettings.volumeSplatDebugWidth;
 
 			// update pressure parameters
-			cbuffer._TargetDensityFactor = volumeSettings.targetDensityTerm;
+			cbuffer._TargetDensityFactor = volumeSettings.targetDensityInfluence;
 
 			// update keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
@@ -813,7 +840,9 @@ namespace Unity.DemoTeam.Hair
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, solverData.rootPosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootDirection, solverData.rootDirection);
 
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._InitialRootFrame, solverData.initialRootFrame);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
+			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._InitialParticleFrameDelta, solverData.initialParticleFrameDelta);
 
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePosition, solverData.particlePosition);
 			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
@@ -830,7 +859,10 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
 			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			CoreUtils.SetKeyword(cs, "ENABLE_SHAPE_GLOBAL", solverData.keywords.ENABLE_SHAPE_GLOBAL);
+			CoreUtils.SetKeyword(cs, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
+			CoreUtils.SetKeyword(cs, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
+			CoreUtils.SetKeyword(cs, "ENABLE_POSE_LOCAL_ROTATION", solverData.keywords.ENABLE_POSE_LOCAL_ROTATION);
+			CoreUtils.SetKeyword(cs, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData)
@@ -841,9 +873,12 @@ namespace Unity.DemoTeam.Hair
 			mpb.SetBuffer(UniformIDs._RootPosition, solverData.rootPosition);
 			mpb.SetBuffer(UniformIDs._RootDirection, solverData.rootDirection);
 
+			mpb.SetBuffer(UniformIDs._InitialRootFrame, solverData.initialRootFrame);
+			mpb.SetBuffer(UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
+			mpb.SetBuffer(UniformIDs._InitialParticleFrameDelta, solverData.initialParticleFrameDelta);
+
 			mpb.SetBuffer(UniformIDs._ParticlePosition, solverData.particlePosition);
 			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
-			mpb.SetBuffer(UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
 			mpb.SetBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			mpb.SetBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
@@ -857,7 +892,10 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
 			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			CoreUtils.SetKeyword(mat, "ENABLE_SHAPE_GLOBAL", solverData.keywords.ENABLE_SHAPE_GLOBAL);
+			CoreUtils.SetKeyword(mat, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
+			CoreUtils.SetKeyword(mat, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
+			CoreUtils.SetKeyword(mat, "ENABLE_POSE_LOCAL_ROTATION", solverData.keywords.ENABLE_POSE_LOCAL_ROTATION);
+			CoreUtils.SetKeyword(mat, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
 		}
 
 		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData)

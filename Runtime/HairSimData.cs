@@ -13,8 +13,11 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer rootScale;     // strand length (relative to group maximum)
 			public ComputeBuffer rootPosition;  // strand root position
 			public ComputeBuffer rootDirection; // strand root direction
+			public ComputeBuffer rootFrame;     // strand root material frame
 
+			public ComputeBuffer initialRootFrame;
 			public ComputeBuffer initialParticleOffset;
+			public ComputeBuffer initialParticleFrameDelta;
 
 			public ComputeBuffer particlePosition;
 			public ComputeBuffer particlePositionPrev;
@@ -71,6 +74,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public Matrix4x4 _LocalToWorld;
 			public Matrix4x4 _LocalToWorldInvT;
+			public Vector4 _WorldRotation;
 
 			public uint _StrandCount;                // group strand count
 			public uint _StrandParticleCount;        // group strand particle count
@@ -92,8 +96,10 @@ namespace Unity.DemoTeam.Hair
 			public float _DampingFTL;
 			public float _BoundaryFriction;
 			public float _BendingCurvature;
-			public float _ShapeStiffness;
-			public float _ShapeFalloff;
+
+			public float _GlobalShape;
+			public float _GlobalShapeFalloff;
+			public float _LocalShape;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]

@@ -311,10 +311,10 @@ namespace Unity.DemoTeam.Hair
 			// update solver roots
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
-
 				var rootMesh = componentGroups[i].rootFilter.sharedMesh;
 				var rootTransform = componentGroups[i].rootFilter.transform.localToWorldMatrix;
+
+				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, dt);
 				HairSim.UpdateSolverRoots(cmd, rootMesh, rootTransform, solverData[i]);
