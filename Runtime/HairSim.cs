@@ -219,7 +219,7 @@ namespace Unity.DemoTeam.Hair
 
 			[Tooltip("Enable particle-particle distance constraint")]
 			public bool distance;
-			[Tooltip("Enable max. root-particle distance constraint")]
+			[Tooltip("Enable 'long range attachment' distance constraint (root-particle maximum distance)")]
 			public bool distanceLRA;
 			[ToggleGroup, Tooltip("Enable 'follow the leader' distance constraint (hard particle-particle distance, non-physical)")]
 			public bool distanceFTL;
@@ -230,6 +230,7 @@ namespace Unity.DemoTeam.Hair
 			public bool boundaryCollision;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Boundary shape friction")]
 			public float boundaryCollisionFriction;
+
 			[ToggleGroup, Tooltip("Enable isotropic curvature constraint")]
 			public bool curvature;
 			[ToggleGroupItem, Tooltip("Curvature constraint mode (=, <, >)")]
@@ -252,7 +253,7 @@ namespace Unity.DemoTeam.Hair
 			public GlobalShapeMode globalShapeMode;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Global shape influence")]
 			public float globalShapeStiffness;
-			[ToggleGroup, Tooltip("Fade global shape towards tip of strand")]
+			[ToggleGroup, Tooltip("Fade global shape influence towards tip of strand")]
 			public bool globalShapeFalloff;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 4.0f), Tooltip("Exponent to falloff curve (where 0 == None, 1 == Linear, 2 == Cubed)")]
 			public float globalShapeFalloffExponent;
@@ -618,7 +619,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._DT = dt;
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
-			cbuffer._SOR = solverSettings.kSOR;
+			cbuffer._SOR = (solverSettings.iterations > 1) ? solverSettings.kSOR : 1.0f;
 
 			cbuffer._CellPressure = solverSettings.cellPressure;
 			cbuffer._CellVelocity = solverSettings.cellVelocity;

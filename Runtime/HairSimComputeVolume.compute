@@ -224,9 +224,9 @@ void KVolumeSplat(
 	InterlockedAddParticleContribution(p, (v.w), _AccuWeight);
 	
 #if VOLUME_TARGET_INITIAL_POSE
-	const float3 q = _RootPosition[GetStrandIndex(worldIdx.x)].xyz;
-	const float3 r = mul(_LocalToWorld, float4(_InitialParticleOffset[worldIdx.x].xyz, 0.0)).xyz;
-	InterlockedAddParticleContribution(q + r, (v.w), _AccuWeight0);
+	const float3 p0 = _RootPosition[GetStrandIndex(worldIdx.x)].xyz;
+	const float3 r0 = mul(_LocalToWorld, float4(_InitialParticleOffset[worldIdx.x].xyz, 0.0)).xyz;
+	InterlockedAddParticleContribution(p0 + r0, (v.w), _AccuWeight0);
 #elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
 	InterlockedMaxParticleContribution(p, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
 #endif
