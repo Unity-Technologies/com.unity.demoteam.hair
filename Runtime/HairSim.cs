@@ -544,6 +544,7 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverData.rootScale);
 			ReleaseBuffer(ref solverData.rootPosition);
 			ReleaseBuffer(ref solverData.rootDirection);
+			ReleaseBuffer(ref solverData.rootFrame);
 
 			ReleaseBuffer(ref solverData.initialRootFrame);
 			ReleaseBuffer(ref solverData.initialParticleOffset);

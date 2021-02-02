@@ -145,7 +145,7 @@ void SolveDistanceMinConstraint(
 	const float3 p0, const float3 p1,
 	inout float3 d0, inout float3 d1)
 {
-	// variation of SolveDistanceConstraint,
+	// variation of SolveDistanceConstraint(...),
 	// ensures distance p0-p1 >= distanceMin
 
 	float3 r = p1 - p0;
@@ -167,7 +167,7 @@ void SolveDistanceMaxConstraint(
 	const float3 p0, const float3 p1,
 	inout float3 d0, inout float3 d1)
 {
-	// variation of SolveDistanceConstraint,
+	// variation of SolveDistanceConstraint(...),
 	// ensures distance p0-p1 <= distanceMax
 
 	float3 r = p1 - p0;
@@ -188,6 +188,9 @@ void SolveDistanceLRAConstraint(
 	const float3 p0, const float3 p1,
 	inout float3 d1)
 {
+	// see: "Long Range Attachments - A Method to Simulate Inextensible Clothing in Computer Games"
+	// https://matthias-research.github.io/pages/publications/sca2012cloth.pdf
+	//
 	//                        d1
 	//                      .----.
 	// p0 #----------------<------ p1
@@ -264,7 +267,7 @@ void SolveTriangleBendingMinConstraint(
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
-	// variation of SolveTriangleBendingConstraint,
+	// variation of SolveTriangleBendingConstraint(...),
 	// ensures triangle bending radius >= radiusMin
 
 	float3 c = (p0 + p1 + p2) / 3.0;
@@ -288,7 +291,7 @@ void SolveTriangleBendingMaxConstraint(
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
-	// variation of SolveTriangleBendingConstraint,
+	// variation of SolveTriangleBendingConstraint(...),
 	// ensures triangle bending radius <= radiusMax
 
 	float3 c = (p0 + p1 + p2) / 3.0;
@@ -533,18 +536,8 @@ void ApplyMaterialFrameBendTwistConstraint(
 	float4 d0 = 0.0;
 	float4 d1 = 0.0;
 	SolveMaterialFrameBendTwistConstraint(darboux0, stiffness, w0, w1, q0, q1, d0, d1);
-	q0 += d0;
-	q1 += d1;
-}
-
-void ApplyMaterialFrameBendTwistConstraintSafe(
-	const float4 darboux0, const float stiffness,
-	const float w0, const float w1,
-	inout float4 q0, inout float4 q1)
-{
-	ApplyMaterialFrameBendTwistConstraint(darboux0, stiffness, w0, w1, q0, q1);
-	q0 = normalize(q0);
-	q1 = normalize(q1);
+	q0 = normalize(q0 + d0);
+	q1 = normalize(q1 + d1);
 }
 
 void ApplyMaterialFrameTangentConstraint(
