@@ -72,7 +72,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
 			public int strandParticleCount;
 
-			[Range(0.001f, 5.0f), Tooltip("Strand length in meters")]
+			[Range(0.001f, 5.0f), Tooltip("Strand length (in meters)")]
 			public float strandLength;
 			[ToggleGroup, Tooltip("Enable this to vary strand lengths")]
 			public bool strandLengthVariation;
@@ -81,7 +81,7 @@ namespace Unity.DemoTeam.Hair
 
 			[ToggleGroup, Tooltip("Enable this to curl the strands")]
 			public bool strandCurl;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 10.0f), Tooltip("Curl radius in centimeters")]
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 10.0f), Tooltip("Curl radius (in centimeters)")]
 			public float strandCurlRadius;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Curl slope")]
 			public float strandCurlSlope;

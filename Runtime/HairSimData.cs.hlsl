@@ -22,13 +22,17 @@ CBUFFER_START(SolverCBuffer)
     float _CellPressure;
     float _CellVelocity;
     float _Damping;
+	float _DampingPeriod;
     float _Gravity;
-    float _DampingFTL;
+    float _FTLDamping;
     float _BoundaryFriction;
     float _BendingCurvature;
-    float _GlobalShape;
-    float _GlobalShapeFalloff;
-    float _LocalShape;
+	float _GlobalPosition;
+	float _GlobalPositionPeriod;
+	float _GlobalRotation;
+	float _GlobalFadeOffset;
+	float _GlobalFadeExtent;
+	float _LocalShape;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

@@ -12,9 +12,11 @@ namespace Unity.DemoTeam.Attributes
 	{
 		public bool withLabel;
 		public bool allowSceneObjects;
-		public ToggleGroupItemAttribute(bool withLabel = false, bool allowSceneObjects = true)
+		public string withSuffix;
+		public ToggleGroupItemAttribute(bool withLabel = false, string withSuffix = null, bool allowSceneObjects = true)
 		{
 			this.withLabel = withLabel;
+			this.withSuffix = withSuffix;
 			this.allowSceneObjects = allowSceneObjects;
 		}
 	}
@@ -146,6 +148,16 @@ namespace Unity.DemoTeam.Attributes
 						{
 							GUI.Label(GUILayoutUtility.GetLastRect(), new GUIContent(string.Empty, fieldTooltip));
 						}
+					}
+
+					if (groupItem.withSuffix != null)
+					{
+						var fieldSuffix = new GUIContent(groupItem.withSuffix);
+						var fieldSuffixPad = 18.0f;// ...
+						var fieldSuffixWidth = EditorStyles.label.CalcSize(fieldSuffix).x + fieldSuffixPad;
+
+						GUILayout.Space(-10.0f);
+						EditorGUILayout.LabelField(fieldSuffix, EditorStyles.label, GUILayout.MaxWidth(fieldSuffixWidth));
 					}
 				}
 			}

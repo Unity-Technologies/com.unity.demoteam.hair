@@ -14,12 +14,11 @@ namespace Unity.DemoTeam.Hair
 {
 	using static HairSimUtility;
 
-	[AddComponentMenu("")]
-	public partial class HairSim : MonoBehaviour
+	public partial class HairSim
 	{
 		static bool s_initialized = false;
 
-		static Collider[] s_boundariesOverlapResult = new Collider[64];
+		static Collider[] s_boundariesOverlapBuffer = new Collider[64];
 		static List<HairSimBoundary> s_boundariesTmp = new List<HairSimBoundary>();
 
 		static ComputeShader s_solverCS;
@@ -171,17 +170,19 @@ namespace Unity.DemoTeam.Hair
 				Jacobi = 2,
 			}
 
+			public enum Frequency
+			{
+				PerSecond,
+				Per30HzFrame,
+				Per60HzFrame,
+				PerMillisecond,
+			}
+
 			public enum BendCompare
 			{
 				Equals,
 				LessThan,
 				GreaterThan,
-			}
-
-			public enum GlobalShapeMode
-			{
-				GlobalPosition,
-				GlobalRotation,
 			}
 
 			public enum LocalShapeMode
@@ -190,7 +191,7 @@ namespace Unity.DemoTeam.Hair
 				LocalBendTwist,
 			}
 
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter in millimeters")]
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
 			public float strandDiameter;
 
 			[LineHeader("Solver")]
@@ -210,8 +211,10 @@ namespace Unity.DemoTeam.Hair
 			public float cellPressure;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (where 0 == FLIP, 1 == PIC)")]
 			public float cellVelocity;
-			[Range(0.0f, 1.0f), Tooltip("Linear damping factor (applied to particle velocity)")]
+			[Range(0.0f, 1.0f), Tooltip("Linear damping factor (fraction of linear velocity to subtract per unit of time)")]
 			public float damping;
+			[HideInInspector, Tooltip("Unit of time")]
+			public Frequency dampingRate;
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
 
@@ -231,7 +234,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Boundary shape friction")]
 			public float boundaryCollisionFriction;
 
-			[ToggleGroup, Tooltip("Enable isotropic curvature constraint")]
+			[ToggleGroup, Tooltip("Enable bending curvature constraint")]
 			public bool curvature;
 			[ToggleGroupItem, Tooltip("Curvature constraint mode (=, <, >)")]
 			public BendCompare curvatureCompare;
@@ -240,23 +243,29 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Shape Preservation")]
 
-			[ToggleGroup, Tooltip("Enable local shape preservation")]
+			[ToggleGroup, Tooltip("Enable local shape constraint")]
 			public bool localShape;
 			[ToggleGroupItem, Tooltip("Type of local shape constraint")]
 			public LocalShapeMode localShapeMode;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape influence")]
-			public float localShapeStiffness;
+			public float localShapeInfluence;
 
-			[ToggleGroup, Tooltip("Enable global shape preservation")]
-			public bool globalShape;
-			[ToggleGroupItem, Tooltip("Type of global shape constraint")]
-			public GlobalShapeMode globalShapeMode;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Global shape influence")]
-			public float globalShapeStiffness;
-			[ToggleGroup, Tooltip("Fade global shape influence towards tip of strand")]
-			public bool globalShapeFalloff;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 4.0f), Tooltip("Exponent to falloff curve (where 0 == None, 1 == Linear, 2 == Cubed)")]
-			public float globalShapeFalloffExponent;
+			[ToggleGroup, Tooltip("Enable global position constraint")]
+			public bool globalPosition;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Fraction of global position to apply per unit of time")]
+			public float globalPositionInfluence;
+			[ToggleGroupItem, Tooltip("Unit of time")]
+			public Frequency globalPositionRate;
+			[ToggleGroup, Tooltip("Enable global rotation constraint")]
+			public bool globalRotation;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Global rotation influence")]
+			public float globalRotationInfluence;
+			[ToggleGroup, Tooltip("Fade influence of global constraints towards tip of strand")]
+			public bool globalFade;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Fade offset from root of strand")]
+			public float globalFadeOffset;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Fade extent from fade offset")]
+			public float globalFadeExtent;
 
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
@@ -270,6 +279,7 @@ namespace Unity.DemoTeam.Hair
 				cellPressure = 1.0f,
 				cellVelocity = 0.05f,
 				damping = 0.0f,
+				dampingRate = Frequency.PerSecond,
 				gravity = 1.0f,
 
 				distance = true,
@@ -284,13 +294,16 @@ namespace Unity.DemoTeam.Hair
 
 				localShape = false,
 				localShapeMode = LocalShapeMode.LocalBendTwist,
-				localShapeStiffness = 0.5f,
+				localShapeInfluence = 1.0f,
 
-				globalShape = false,
-				globalShapeMode = GlobalShapeMode.GlobalPosition,
-				globalShapeStiffness = 0.5f,
-				globalShapeFalloff = true,
-				globalShapeFalloffExponent = 2.0f,
+				globalPosition = false,
+				globalPositionInfluence = 1.0f,
+				globalPositionRate = Frequency.PerSecond,
+				globalRotation = false,
+				globalRotationInfluence = 1.0f,
+				globalFade = false,
+				globalFadeOffset = 0.1f,
+				globalFadeExtent = 0.1f,
 			};
 		}
 
@@ -420,58 +433,49 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
-		[HideInInspector] public ComputeShader solverCS;
-		[HideInInspector] public ComputeShader volumeCS;
-
-		[HideInInspector] public Material solverRootsMat;
-		[HideInInspector] public Material volumeRasterMat;
-		[HideInInspector] public Material debugDrawMat;
-
 		public const int PARTICLE_GROUP_SIZE = 64;
 
 		public const int MAX_BOUNDARIES = 8;
 		public const int MAX_STRAND_COUNT = 64000;
 		public const int MAX_STRAND_PARTICLE_COUNT = 128;
 
-#if UNITY_EDITOR
-		[UnityEditor.InitializeOnLoadMethod]
-#else
-		[RuntimeInitializeOnLoadMethod]
-#endif
-		static void StaticInitialize()
+		static HairSim()
 		{
 			if (s_initialized == false)
 			{
-				var instance = ComponentSingleton<HairSim>.instance;
+				var resources = HairSimResources.Load();
 				{
-					s_solverCS = instance.solverCS;
-					s_volumeCS = instance.volumeCS;
+					s_solverCS = resources.computeSolver;
+					s_volumeCS = resources.computeVolume;
 
-					s_solverRootsMat = new Material(instance.solverRootsMat);
+					s_solverRootsMat = new Material(resources.computeRoots);
 					s_solverRootsMat.hideFlags = HideFlags.HideAndDontSave;
 					s_solverRootsMPB = new MaterialPropertyBlock();
 
-					s_volumeRasterMat = new Material(instance.volumeRasterMat);
+					s_volumeRasterMat = new Material(resources.computeVolumeRaster);
 					s_volumeRasterMat.hideFlags = HideFlags.HideAndDontSave;
 					s_volumeRasterMPB = new MaterialPropertyBlock();
 
-					s_debugDrawMat = new Material(instance.debugDrawMat);
+					s_debugDrawMat = new Material(resources.debugDraw);
 					s_debugDrawMat.hideFlags = HideFlags.HideAndDontSave;
 					s_debugDrawMPB = new MaterialPropertyBlock();
 				}
-
-#if UNITY_EDITOR
-				UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ComponentSingleton<HairSim>.Release;
-#endif
 
 				InitializeStaticFields(typeof(MarkersCPU), (string s) => new ProfilerMarker("HairSim." + s.Replace('_', '.')));
 				InitializeStaticFields(typeof(MarkersGPU), (string s) => new ProfilingSampler("HairSim." + s.Replace('_', '.')));
 				InitializeStaticFields(typeof(UniformIDs), (string s) => Shader.PropertyToID(s));
 
-				//TODO fix case where s_solverCS is null during static init
-
 				InitializeStaticFields(typeof(SolverKernels), (string s) => s_solverCS.FindKernel(s));
 				InitializeStaticFields(typeof(VolumeKernels), (string s) => s_volumeCS.FindKernel(s));
+
+#if UNITY_EDITOR
+				UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += () =>
+				{
+					Material.DestroyImmediate(HairSim.s_solverRootsMat);
+					Material.DestroyImmediate(HairSim.s_volumeRasterMat);
+					Material.DestroyImmediate(HairSim.s_debugDrawMat);
+				};
+#endif
 
 				s_initialized = true;
 			}
@@ -511,7 +515,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				bool changed = false;
 
-				changed |= CreateVolume(ref volumeData.accuWeight, "AccuWeight", volumeCellCount, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt
+				changed |= CreateVolume(ref volumeData.accuWeight, "AccuWeight", volumeCellCount, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt ?
 				changed |= CreateVolume(ref volumeData.accuWeight0, "AccuWeight0", volumeCellCount, GraphicsFormat.R32_SInt);
 				changed |= CreateVolume(ref volumeData.accuVelocityX, "AccuVelocityX", volumeCellCount, GraphicsFormat.R32_SInt);
 				changed |= CreateVolume(ref volumeData.accuVelocityY, "AccuVelocityY", volumeCellCount, GraphicsFormat.R32_SInt);
@@ -617,6 +621,18 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._StrandScale = strandScale;
 
 			// update solver parameters
+			float GetPeriod(SolverSettings.Frequency freq)
+			{
+				switch (freq)
+				{
+					default:
+					case SolverSettings.Frequency.PerSecond: return 1.0f;
+					case SolverSettings.Frequency.Per30HzFrame: return 1.0f / 30.0f;
+					case SolverSettings.Frequency.Per60HzFrame: return 1.0f / 60.0f;
+					case SolverSettings.Frequency.PerMillisecond: return 1.0f / 1000.0f;
+				}
+			}
+
 			cbuffer._DT = dt;
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
@@ -625,15 +641,19 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._CellPressure = solverSettings.cellPressure;
 			cbuffer._CellVelocity = solverSettings.cellVelocity;
 			cbuffer._Damping = solverSettings.damping;
+			cbuffer._DampingPeriod = GetPeriod(solverSettings.dampingRate);
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
 
-			cbuffer._DampingFTL = solverSettings.distanceFTLDamping;
+			cbuffer._FTLDamping = solverSettings.distanceFTLDamping;
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
 			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f;
 
-			cbuffer._GlobalShape = solverSettings.globalShapeStiffness;
-			cbuffer._GlobalShapeFalloff = (solverSettings.globalShapeFalloff ? solverSettings.globalShapeFalloffExponent : 0.0f);
-			cbuffer._LocalShape = solverSettings.localShapeStiffness;
+			cbuffer._GlobalPosition = solverSettings.globalPositionInfluence;
+			cbuffer._GlobalPositionPeriod = GetPeriod(solverSettings.globalPositionRate);
+			cbuffer._GlobalRotation = solverSettings.globalRotationInfluence;
+			cbuffer._GlobalFadeOffset = solverSettings.globalFade ? solverSettings.globalFadeOffset : 1e9f;
+			cbuffer._GlobalFadeExtent = solverSettings.globalFade ? solverSettings.globalFadeExtent : 1e9f;
+			cbuffer._LocalShape = solverSettings.localShapeInfluence;
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
@@ -645,10 +665,10 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.Equals);
 			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.GreaterThan);
 			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.LessThan);
-			keywords.ENABLE_POSE_GLOBAL_POSITION = (solverSettings.globalShape && solverSettings.globalShapeMode == SolverSettings.GlobalShapeMode.GlobalPosition && solverSettings.globalShapeStiffness > 0.0f);
-			keywords.ENABLE_POSE_GLOBAL_ROTATION = (solverSettings.globalShape && solverSettings.globalShapeMode == SolverSettings.GlobalShapeMode.GlobalRotation);
-			keywords.ENABLE_POSE_LOCAL_ROTATION = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalRotation);
-			keywords.ENABLE_POSE_LOCAL_BEND_TWIST = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalBendTwist);
+			keywords.ENABLE_POSE_GLOBAL_POSITION = (solverSettings.globalPosition && solverSettings.globalPositionInfluence > 0.0f);
+			keywords.ENABLE_POSE_GLOBAL_ROTATION = (solverSettings.globalRotation && solverSettings.globalRotationInfluence > 0.0f);
+			keywords.ENABLE_POSE_LOCAL_ROTATION = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalRotation && solverSettings.localShapeInfluence > 0.0f);
+			keywords.ENABLE_POSE_LOCAL_BEND_TWIST = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalBendTwist && solverSettings.localShapeInfluence > 0.0f);
 		}
 
 		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
@@ -669,7 +689,7 @@ namespace Unity.DemoTeam.Hair
 
 				if (volumeSettings.boundaryShapes)
 				{
-					var result = s_boundariesOverlapResult;
+					var result = s_boundariesOverlapBuffer;
 					var resultCount = Physics.OverlapBoxNonAlloc(volumeBounds.center, volumeBounds.extents, result, Quaternion.identity);
 
 					for (int i = 0; i != resultCount; i++)

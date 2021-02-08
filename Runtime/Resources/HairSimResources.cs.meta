@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 90a0f1ea2cd8f2d43ac3752210225e3b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - computeRoots: {instanceID: 0}
+  - computeSolver: {instanceID: 0}
+  - computeVolume: {instanceID: 0}
+  - computeVolumeRaster: {instanceID: 0}
+  - debugDraw: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

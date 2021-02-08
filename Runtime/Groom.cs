@@ -147,11 +147,11 @@ namespace Unity.DemoTeam.Hair
 			InitializeComponents();
 
 #if UNITY_DEMOTEAM_DIGITALHUMAN
-  #if UNITY_EDITOR
+	#if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
 				return;
-  #endif
+	#endif
 
 			if (componentGroups != null)
 			{
@@ -183,9 +183,9 @@ namespace Unity.DemoTeam.Hair
 				{
 					settingsRoots.rootsAttachTarget.CommitSubjectsIfRequired();
 					settingsRoots.rootsAttachTargetBone = new PrimarySkinningBone(settingsRoots.rootsAttachTarget.transform);
-  #if UNITY_EDITOR
+	#if UNITY_EDITOR
 					UnityEditor.EditorUtility.SetDirty(settingsRoots.rootsAttachTarget);
-  #endif
+	#endif
 				}
 			}
 #endif

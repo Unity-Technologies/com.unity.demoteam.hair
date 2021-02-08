@@ -309,6 +309,22 @@ void SolveTriangleBendingMaxConstraint(
 	}
 }
 
+void SolveEdgeVectorConstraint(
+	const float3 v0, const float stiffness,
+	const float w0, const float w1,
+	const float3 p0, const float3 p1,
+	inout float3 d0, inout float3 d1)
+{
+	float3 r = (p1 - p0) - v0;
+
+	float W_inv = stiffness / (w0 + w1);
+	GUARD(W_inv > 0.0)
+	{
+		d0 += (w0 * W_inv) * r;
+		d1 -= (w1 * W_inv) * r;
+	}
+}
+
 void SolveMaterialFrameBendTwistConstraint(
 	const float4 darboux0, const float stiffness,
 	const float w0, const float w1,
@@ -344,20 +360,7 @@ void SolveMaterialFrameTangentConstraint(
 	const float3 p0, const float3 p1,
 	inout float3 d0, inout float3 d1)
 {
-#if 0
-	float3 delta = p1 - (p0 + QMul(frame, tangent));
-#else
-	float3 mid = 0.5 * (p1 + p0);
-	float3 mid_plus = mid + 0.5 * QMul(frame, tangent);
-	float3 delta = p1 - mid_plus;
-#endif
-
-	float W_inv = stiffness / (w0 + w1);
-	GUARD(W_inv > 0.0)
-	{
-		d0 += (w0 * W_inv) * delta;
-		d1 -= (w1 * W_inv) * delta;
-	}
+	SolveEdgeVectorConstraint(QMul(frame, tangent), stiffness, w0, w1, p0, p1, d0, d1);
 }
 
 //--------------------------------------------------
@@ -425,6 +428,22 @@ void SolveTriangleBendingMaxConstraint(
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
 	SolveTriangleBendingMaxConstraint(radiusMax, stiffness, p0.w, p1.w, p2.w, p0.xyz, p1.xyz, p2.xyz, d0, d1, d2);
+}
+
+void SolveEdgeVectorConstraint(
+	const float3 v0, const float stiffness,
+	const float4 p0, const float4 p1,
+	inout float3 d0, inout float3 d1)
+{
+	SolveEdgeVectorConstraint(v0, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
+}
+
+void SolveMaterialFrameTangentConstraint(
+	const float4 frame, const float3 tangent, const float stiffness,
+	const float4 p0, const float4 p1,
+	inout float3 d0, inout float3 d1)
+{
+	SolveMaterialFrameTangentConstraint(frame, tangent, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
 }
 
 //------------------------------------------------------------
@@ -526,6 +545,18 @@ void ApplyTriangleBendingMaxConstraint(
 	p0 += d0;
 	p1 += d1;
 	p2 += d2;
+}
+
+void ApplyEdgeVectorConstraint(
+	const float3 v0, const float stiffness,
+	const float w0, const float w1,
+	inout float3 p0, inout float3 p1)
+{
+	float3 d0 = 0.0;
+	float3 d1 = 0.0;
+	SolveEdgeVectorConstraint(v0, stiffness, w0, w1, p0, p1, d0, d1);
+	p0 += d0;
+	p1 += d1;
 }
 
 void ApplyMaterialFrameBendTwistConstraint(

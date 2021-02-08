@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90a0f1ea2cd8f2d43ac3752210225e3b, type: 3}
+  m_Name: HairSimResources
+  m_EditorClassIdentifier: 
+  computeRoots: {fileID: 4800000, guid: 6e058d123672f674799fd1072e73d6d1, type: 3}
+  computeSolver: {fileID: 7200000, guid: b6088415b07a2b44ab1624cac72a2252, type: 3}
+  computeVolume: {fileID: 7200000, guid: 6936d281b1638924b97a8733f5ce8974, type: 3}
+  computeVolumeRaster: {fileID: 4800000, guid: 7e9119a1fe374fd45b70c831f4cc3131, type: 3}
+  debugDraw: {fileID: 4800000, guid: f84628556e79514499da79fa2a82f427, type: 3}

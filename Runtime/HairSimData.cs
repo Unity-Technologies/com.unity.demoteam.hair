@@ -91,14 +91,19 @@ namespace Unity.DemoTeam.Hair
 			public float _CellPressure;
 			public float _CellVelocity;
 			public float _Damping;
+			public float _DampingPeriod;
 			public float _Gravity;
 
-			public float _DampingFTL;
+			public float _FTLDamping;
 			public float _BoundaryFriction;
 			public float _BendingCurvature;
 
-			public float _GlobalShape;
-			public float _GlobalShapeFalloff;
+			public float _GlobalPosition;
+			public float _GlobalPositionPeriod;
+			public float _GlobalRotation;
+			public float _GlobalFadeOffset;
+			public float _GlobalFadeExtent;
+
 			public float _LocalShape;
 		}
 
