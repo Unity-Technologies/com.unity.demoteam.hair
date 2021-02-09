@@ -6,7 +6,7 @@ using Unity.DemoTeam.Attributes;
 namespace Unity.DemoTeam.Hair
 {
 	[CreateAssetMenu, PreferBinarySerialization]
-	public class GroomAsset : ScriptableObject
+	public class HairAsset : ScriptableObject
 	{
 		public enum Type
 		{

@@ -51,7 +51,7 @@ namespace Unity.DemoTeam.Hair
 						dt = Mathf.Clamp(dt, dtMin, dtMax);
 						dt = 1.0f / 60.0f;
 
-						foreach (var hair in Groom.s_instances)
+						foreach (var hair in HairInstance.s_instances)
 						{
 							if (hair != null && hair.isActiveAndEnabled)
 								hair.DispatchStep(context.cmd, dt);
@@ -68,7 +68,7 @@ namespace Unity.DemoTeam.Hair
 
 			if (dispatch.HasFlag(Dispatch.Draw))
 			{
-				foreach (var hair in Groom.s_instances)
+				foreach (var hair in HairInstance.s_instances)
 				{
 					if (hair != null && hair.isActiveAndEnabled)
 						hair.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);

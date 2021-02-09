@@ -5,8 +5,8 @@ namespace Unity.DemoTeam.Hair
 {
 	using static HairGUILayout;
 
-	[CustomEditor(typeof(GroomAsset))]
-	public class GroomAssetEditor : Editor
+	[CustomEditor(typeof(HairAsset))]
+	public class HairAssetEditor : Editor
 	{
 		static Material s_previewMat;
 
@@ -64,8 +64,8 @@ namespace Unity.DemoTeam.Hair
 
 		public override void OnInspectorGUI()
 		{
-			var groom = target as GroomAsset;
-			if (groom == null)
+			var hairAsset = target as HairAsset;
+			if (hairAsset == null)
 				return;
 
 			EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
@@ -84,13 +84,13 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
-			EditorGUILayout.LabelField(groom.checksum, EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.LabelField(hairAsset.checksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
 		public void DrawImporterGUI()
 		{
-			var groom = target as GroomAsset;
-			if (groom == null)
+			var hairAsset = target as HairAsset;
+			if (hairAsset == null)
 				return;
 
 			EditorGUI.BeginChangeCheck();
@@ -98,16 +98,16 @@ namespace Unity.DemoTeam.Hair
 				StructPropertyFieldsWithHeader(_settingsBasic);
 
 				if (_settingsBasic_material.objectReferenceValue == null)
-					_settingsBasic_material.objectReferenceValue = groom.defaultMaterial;
+					_settingsBasic_material.objectReferenceValue = hairAsset.defaultMaterial;
 
 				EditorGUILayout.Space();
 
-				switch ((GroomAsset.Type)_settingsBasic_type.enumValueIndex)
+				switch ((HairAsset.Type)_settingsBasic_type.enumValueIndex)
 				{
-					case GroomAsset.Type.Alembic:
+					case HairAsset.Type.Alembic:
 						StructPropertyFieldsWithHeader(_settingsAlembic);
 						break;
-					case GroomAsset.Type.Procedural:
+					case HairAsset.Type.Procedural:
 						StructPropertyFieldsWithHeader(_settingsProcedural);
 						break;
 				}
@@ -120,9 +120,9 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (GUILayout.Button("Build strand groups") || (settingsChanged && _strandGroupsAutoBuild.boolValue))
 				{
-					GroomAssetBuilder.ClearGroomAsset(groom);
+					HairAssetBuilder.ClearHairAsset(hairAsset);
 					serializedObject.ApplyModifiedPropertiesWithoutUndo();
-					GroomAssetBuilder.BuildGroomAsset(groom);
+					HairAssetBuilder.BuildHairAsset(hairAsset);
 					serializedObject.Update();
 				}
 
@@ -133,11 +133,11 @@ namespace Unity.DemoTeam.Hair
 
 		public void DrawStrandGroupsGUI()
 		{
-			var groom = target as GroomAsset;
-			if (groom == null)
+			var hairAsset = target as HairAsset;
+			if (hairAsset == null)
 				return;
 
-			if (groom.strandGroups == null || groom.strandGroups.Length == 0)
+			if (hairAsset.strandGroups == null || hairAsset.strandGroups.Length == 0)
 			{
 				EditorGUILayout.LabelField("None");
 			}
@@ -146,21 +146,21 @@ namespace Unity.DemoTeam.Hair
 				int numStrands = 0;
 				int numParticles = 0;
 
-				for (int i = 0; i != groom.strandGroups.Length; i++)
+				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 				{
-					numStrands += groom.strandGroups[i].strandCount;
-					numParticles += groom.strandGroups[i].strandCount * groom.strandGroups[i].strandParticleCount;
+					numStrands += hairAsset.strandGroups[i].strandCount;
+					numParticles += hairAsset.strandGroups[i].strandCount * hairAsset.strandGroups[i].strandParticleCount;
 				}
 
 				EditorGUILayout.LabelField("Summary", EditorStyles.miniBoldLabel);
 				using (new EditorGUI.IndentLevelScope())
 				{
-					EditorGUILayout.IntField("Total groups", groom.strandGroups.Length, EditorStyles.label);
+					EditorGUILayout.IntField("Total groups", hairAsset.strandGroups.Length, EditorStyles.label);
 					EditorGUILayout.IntField("Total strands", numStrands, EditorStyles.label);
 					EditorGUILayout.IntField("Total particles", numParticles, EditorStyles.label);
 				}
 
-				for (int i = 0; i != groom.strandGroups.Length; i++)
+				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 				{
 					EditorGUILayout.Space();
 					EditorGUILayout.LabelField("Group:" + i, EditorStyles.miniBoldLabel);
@@ -168,8 +168,8 @@ namespace Unity.DemoTeam.Hair
 					{
 						EditorGUILayout.BeginVertical();
 						{
-							var meshRoots = groom.strandGroups[i].meshAssetRoots;
-							var meshLines = groom.strandGroups[i].meshAssetLines;
+							var meshRoots = hairAsset.strandGroups[i].meshAssetRoots;
+							var meshLines = hairAsset.strandGroups[i].meshAssetLines;
 							var meshCenter = meshLines.bounds.center;
 							var meshRadius = meshLines.bounds.extents.magnitude;
 							var meshOffset = Mathf.Sqrt(2.0f * meshRadius * meshRadius);
@@ -193,7 +193,7 @@ namespace Unity.DemoTeam.Hair
 								//	{
 								//		previewRotation = Quaternion.Euler(0.0f, 360.0f * fracX, 0.0f);
 								//	}
-								//	EditorUtility.SetDirty(groom);
+								//	EditorUtility.SetDirty(hairAsset);
 								//}
 
 								//var editor = Editor.CreateEditor(meshLines);
@@ -204,9 +204,9 @@ namespace Unity.DemoTeam.Hair
 
 								var material = _settingsBasic_material.objectReferenceValue as Material;
 								if (material == null)
-									material = groom.defaultMaterial;
+									material = hairAsset.defaultMaterial;
 
-								previewUtilMPB.SetInt("_StrandCount", groom.strandGroups[i].strandCount);
+								previewUtilMPB.SetInt("_StrandCount", hairAsset.strandGroups[i].strandCount);
 
 								previewUtil.BeginPreview(rect, GUIStyle.none);
 								previewUtil.DrawMesh(meshLines, matrix, material, 0, previewUtilMPB);

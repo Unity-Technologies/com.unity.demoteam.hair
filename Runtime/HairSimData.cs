@@ -25,7 +25,7 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particleVelocity;		// xyz: velocity, w: weight
 			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: weight
 
-			public GroomAsset.MemoryLayout memoryLayout;
+			public HairAsset.MemoryLayout memoryLayout;
 
 			public SolverKeywords keywords;
 		}

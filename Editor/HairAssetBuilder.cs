@@ -10,16 +10,16 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Unity.DemoTeam.Hair
 {
-	public static class GroomAssetBuilder
+	public static class HairAssetBuilder
 	{
-		public static void ClearGroomAsset(GroomAsset groom)
+		public static void ClearHairAsset(HairAsset hairAsset)
 		{
 			// do nothing if already clean
-			if (groom.strandGroups == null)
+			if (hairAsset.strandGroups == null)
 				return;
 
 			// unlink and destroy any sub-assets
-			foreach (var strandGroup in groom.strandGroups)
+			foreach (var strandGroup in hairAsset.strandGroups)
 			{
 				if (strandGroup.meshAssetLines != null)
 				{
@@ -35,67 +35,67 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// clear
-			groom.strandGroups = null;
+			hairAsset.strandGroups = null;
 		}
 
-		public static void BuildGroomAsset(GroomAsset groom)
+		public static void BuildHairAsset(HairAsset hairAsset)
 		{
 			// clean up
-			ClearGroomAsset(groom);
+			ClearHairAsset(hairAsset);
 
 			// build the data
-			switch (groom.settingsBasic.type)
+			switch (hairAsset.settingsBasic.type)
 			{
-				case GroomAsset.Type.Alembic:
-					BuildGroomAsset(groom, groom.settingsAlembic, groom.settingsBasic.memoryLayout);
+				case HairAsset.Type.Alembic:
+					BuildHairAsset(hairAsset, hairAsset.settingsAlembic, hairAsset.settingsBasic.memoryLayout);
 					break;
 
-				case GroomAsset.Type.Procedural:
-					BuildGroomAsset(groom, groom.settingsProcedural, groom.settingsBasic.memoryLayout);
+				case HairAsset.Type.Procedural:
+					BuildHairAsset(hairAsset, hairAsset.settingsProcedural, hairAsset.settingsBasic.memoryLayout);
 					break;
 			}
 
 			// hash the data
-			if (groom.strandGroups != null)
+			if (hairAsset.strandGroups != null)
 			{
 				var hash = new Hash128();
-				for (int i = 0; i != groom.strandGroups.Length; i++)
+				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 				{
-					hash.Append(groom.strandGroups[i].meshAssetLines.GetInstanceID());
-					hash.Append(groom.strandGroups[i].particlePosition);
+					hash.Append(hairAsset.strandGroups[i].meshAssetLines.GetInstanceID());
+					hash.Append(hairAsset.strandGroups[i].particlePosition);
 				}
 
-				groom.checksum = hash.ToString();
+				hairAsset.checksum = hash.ToString();
 			}
 			else
 			{
-				groom.checksum = string.Empty;
+				hairAsset.checksum = string.Empty;
 			}
 
 			// link sub-assets
-			if (groom.strandGroups != null)
+			if (hairAsset.strandGroups != null)
 			{
-				for (int i = 0; i != groom.strandGroups.Length; i++)
+				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 				{
-					AssetDatabase.AddObjectToAsset(groom.strandGroups[i].meshAssetLines, groom);
-					AssetDatabase.AddObjectToAsset(groom.strandGroups[i].meshAssetRoots, groom);
+					AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetLines, hairAsset);
+					AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetRoots, hairAsset);
 
-					groom.strandGroups[i].meshAssetLines.name = "Lines:" + i;
-					groom.strandGroups[i].meshAssetRoots.name = "Roots:" + i;
+					hairAsset.strandGroups[i].meshAssetLines.name = "Lines:" + i;
+					hairAsset.strandGroups[i].meshAssetRoots.name = "Roots:" + i;
 				}
 			}
 
 			// dirty the asset
-			EditorUtility.SetDirty(groom);
+			EditorUtility.SetDirty(hairAsset);
 
 #if ENABLE_VISIBLE_SUBASSETS
 			// save and re-import to force hierearchy update
 			AssetDatabase.SaveAssets();
-			AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(groom), ImportAssetOptions.ForceUpdate);
+			AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(hairAsset), ImportAssetOptions.ForceUpdate);
 #endif
 		}
 
-		public static void BuildGroomAsset(GroomAsset groom, in GroomAsset.SettingsAlembic settings, GroomAsset.MemoryLayout memoryLayout)
+		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsAlembic settings, HairAsset.MemoryLayout memoryLayout)
 		{
 			// check stream present
 			var alembic = settings.sourceAsset;
@@ -115,13 +115,13 @@ namespace Unity.DemoTeam.Hair
 			if (curveSets.Length == 0)
 				return;
 
-			// prep strand groups in groom asset
-			groom.strandGroups = new GroomAsset.StrandGroup[curveSets.Length];
+			// prep strand groups in hair asset
+			hairAsset.strandGroups = new HairAsset.StrandGroup[curveSets.Length];
 
-			// build strand groups in groom asset
-			for (int i = 0; i != groom.strandGroups.Length; i++)
+			// build strand groups in hair asset
+			for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 			{
-				BuildGroomAssetStrandGroup(ref groom.strandGroups[i], settings, curveSets[i], memoryLayout);
+				BuildHairAssetStrandGroup(ref hairAsset.strandGroups[i], settings, curveSets[i], memoryLayout);
 			}
 
 			// destroy container
@@ -131,19 +131,19 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void BuildGroomAsset(GroomAsset groom, in GroomAsset.SettingsProcedural settings, GroomAsset.MemoryLayout memoryLayout)
+		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
 		{
-			// prep strand groups in groom asset
-			groom.strandGroups = new GroomAsset.StrandGroup[1];
+			// prep strand groups in hair asset
+			hairAsset.strandGroups = new HairAsset.StrandGroup[1];
 
-			// build strand groups in groom asset
-			for (int i = 0; i != groom.strandGroups.Length; i++)
+			// build strand groups in hair asset
+			for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 			{
-				BuildGroomAssetStrandGroup(ref groom.strandGroups[i], settings, memoryLayout);
+				BuildHairAssetStrandGroup(ref hairAsset.strandGroups[i], settings, memoryLayout);
 			}
 		}
 
-		public static void BuildGroomAssetStrandGroup(ref GroomAsset.StrandGroup strandGroup, in GroomAsset.SettingsAlembic settings, AlembicCurves curveSet, GroomAsset.MemoryLayout memoryLayout)
+		public static void BuildHairAssetStrandGroup(ref HairAsset.StrandGroup strandGroup, in HairAsset.SettingsAlembic settings, AlembicCurves curveSet, HairAsset.MemoryLayout memoryLayout)
 		{
 			//TODO require resampling if not all curves have same number of points
 
@@ -225,13 +225,13 @@ namespace Unity.DemoTeam.Hair
 			// apply memory layout
 			switch (memoryLayout)
 			{
-				case GroomAsset.MemoryLayout.Sequential:
+				case HairAsset.MemoryLayout.Sequential:
 					{
 						// do nothing
 					}
 					break;
 
-				case GroomAsset.MemoryLayout.Interleaved:
+				case HairAsset.MemoryLayout.Interleaved:
 					unsafe
 					{
 						using (var src = new NativeArray<Vector3>(strandGroup.particlePosition, Allocator.Temp))
@@ -261,7 +261,7 @@ namespace Unity.DemoTeam.Hair
 			FinalizeStrandGroup(ref strandGroup);
 		}
 
-		public static void BuildGroomAssetStrandGroup(ref GroomAsset.StrandGroup strandGroup, in GroomAsset.SettingsProcedural settings, GroomAsset.MemoryLayout memoryLayout)
+		public static void BuildHairAssetStrandGroup(ref HairAsset.StrandGroup strandGroup, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
 		{
 			// calc curve counts
 			int curveCount = settings.strandCount;
@@ -305,7 +305,7 @@ namespace Unity.DemoTeam.Hair
 			FinalizeStrandGroup(ref strandGroup);
 		}
 
-		static void FinalizeStrandGroup(ref GroomAsset.StrandGroup strandGroup)
+		static void FinalizeStrandGroup(ref HairAsset.StrandGroup strandGroup)
 		{
 			// get curve counts
 			var curveCount = strandGroup.strandCount;
@@ -380,7 +380,7 @@ namespace Unity.DemoTeam.Hair
 					switch (strandGroup.particleMemoryLayout)
 					{
 						//TODO profile this again, first look indicated slower
-						//case GroomAsset.MemoryLayout.Interleaved:
+						//case HairAsset.MemoryLayout.Interleaved:
 						//	for (int j = 0; j != wireStrandLineCount; j++)
 						//	{
 						//		for (int i = 0; i != curveCount; i++)
@@ -502,7 +502,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static IntermediateRoots GenerateRoots(in GroomAsset.SettingsProcedural settings)
+		public static IntermediateRoots GenerateRoots(in HairAsset.SettingsProcedural settings)
 		{
 			var tmpRoots = new IntermediateRoots(settings.strandCount);
 
@@ -513,7 +513,7 @@ namespace Unity.DemoTeam.Hair
 
 				switch (settings.style)
 				{
-					case GroomAsset.SettingsProcedural.Style.Curtain:
+					case HairAsset.SettingsProcedural.Style.Curtain:
 						{
 							var strandSpan = 1.0f;
 							var strandInterval = strandSpan / (settings.strandCount - 1);
@@ -529,7 +529,7 @@ namespace Unity.DemoTeam.Hair
 						}
 						break;
 
-					case GroomAsset.SettingsProcedural.Style.StratifiedCurtain:
+					case HairAsset.SettingsProcedural.Style.StratifiedCurtain:
 						{
 							var strandSpan = 1.0f;
 							var strandInterval = strandSpan / settings.strandCount;
@@ -548,7 +548,7 @@ namespace Unity.DemoTeam.Hair
 						}
 						break;
 
-					case GroomAsset.SettingsProcedural.Style.Brush:
+					case HairAsset.SettingsProcedural.Style.Brush:
 						{
 							var localExt = 0.5f * Vector3.one;
 							var localMin = new Vector2(-localExt.x, -localExt.z);
@@ -566,7 +566,7 @@ namespace Unity.DemoTeam.Hair
 						}
 						break;
 
-					case GroomAsset.SettingsProcedural.Style.Cap:
+					case HairAsset.SettingsProcedural.Style.Cap:
 						{
 							var localExt = 0.5f;
 							var xorshift = new Unity.Mathematics.Random(257);
@@ -588,7 +588,7 @@ namespace Unity.DemoTeam.Hair
 			return tmpRoots;
 		}
 
-		public static IntermediateStrands GenerateStrands(in GroomAsset.SettingsProcedural settings, in IntermediateRoots tmpRoots, GroomAsset.MemoryLayout memoryLayout)
+		public static IntermediateStrands GenerateStrands(in HairAsset.SettingsProcedural settings, in IntermediateRoots tmpRoots, HairAsset.MemoryLayout memoryLayout)
 		{
 			var tmpStrands = new IntermediateStrands(settings.strandCount, settings.strandParticleCount);
 
@@ -679,7 +679,7 @@ namespace Unity.DemoTeam.Hair
 			return tmpStrands;
 		}
 
-		public static void DeclareStrandIterator(GroomAsset.MemoryLayout memoryLayout, int strandIndex, int strandCount, int strandParticleCount,
+		public static void DeclareStrandIterator(HairAsset.MemoryLayout memoryLayout, int strandIndex, int strandCount, int strandParticleCount,
 			out int strandParticleBegin,
 			out int strandParticleStride,
 			out int strandParticleEnd)
@@ -687,12 +687,12 @@ namespace Unity.DemoTeam.Hair
 			switch (memoryLayout)
 			{
 				default:
-				case GroomAsset.MemoryLayout.Sequential:
+				case HairAsset.MemoryLayout.Sequential:
 					strandParticleBegin = strandIndex * strandParticleCount;
 					strandParticleStride = 1;
 					break;
 
-				case GroomAsset.MemoryLayout.Interleaved:
+				case HairAsset.MemoryLayout.Interleaved:
 					strandParticleBegin = strandIndex;
 					strandParticleStride = strandCount;
 					break;

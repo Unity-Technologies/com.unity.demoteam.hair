@@ -5,13 +5,13 @@ namespace Unity.DemoTeam.Hair
 {
 	using static HairGUILayout;
 
-	[CustomEditor(typeof(Groom)), CanEditMultipleObjects]
-	public class GroomEditor : Editor
+	[CustomEditor(typeof(HairInstance)), CanEditMultipleObjects]
+	public class HairInstanceEditor : Editor
 	{
-		Editor groomAssetEditor;
+		Editor hairAssetEditor;
 
-		SerializedProperty _groomAsset;
-		SerializedProperty _groomAssetQuickEdit;
+		SerializedProperty _hairAsset;
+		SerializedProperty _hairAssetQuickEdit;
 
 		SerializedProperty _settingsRoots;
 		SerializedProperty _settingsRoots_rootsAttach;
@@ -23,8 +23,8 @@ namespace Unity.DemoTeam.Hair
 
 		void OnEnable()
 		{
-			_groomAsset = serializedObject.FindProperty("groomAsset");
-			_groomAssetQuickEdit = serializedObject.FindProperty("groomAssetQuickEdit");
+			_hairAsset = serializedObject.FindProperty("hairAsset");
+			_hairAssetQuickEdit = serializedObject.FindProperty("hairAssetQuickEdit");
 
 			_settingsRoots = serializedObject.FindProperty("settingsRoots");
 			_settingsRoots_rootsAttach = _settingsRoots.FindPropertyRelative("rootsAttach");
@@ -37,16 +37,16 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDisable()
 		{
-			if (groomAssetEditor != null)
+			if (hairAssetEditor != null)
 			{
-				DestroyImmediate(groomAssetEditor);
+				DestroyImmediate(hairAssetEditor);
 			}
 		}
 
 		public override void OnInspectorGUI()
 		{
-			var groom = target as Groom;
-			if (groom == null)
+			var hairInstance = target as HairInstance;
+			if (hairInstance == null)
 				return;
 
 			EditorGUILayout.LabelField("Instance", EditorStyles.centeredGreyMiniLabel);
@@ -73,21 +73,21 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndVertical();
 
 			EditorGUILayout.Space();
-			EditorGUILayout.LabelField(groom.componentGroupsChecksum, EditorStyles.centeredGreyMiniLabel);
+			EditorGUILayout.LabelField(hairInstance.componentGroupsChecksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
 		public void DrawInstanceGUI()
 		{
-			var groom = target as Groom;
-			if (groom == null)
+			var hairInstance = target as HairInstance;
+			if (hairInstance == null)
 				return;
 
-			using (new GovernedByPrefabScope(groom))
+			using (new GovernedByPrefabScope(hairInstance))
 			{
 				EditorGUI.BeginChangeCheck();
 				{
-					EditorGUILayout.PropertyField(_groomAsset);
-					_groomAssetQuickEdit.boolValue = GUILayout.Toggle(_groomAssetQuickEdit.boolValue, "Quick Edit", EditorStyles.miniButton);
+					EditorGUILayout.PropertyField(_hairAsset);
+					_hairAssetQuickEdit.boolValue = GUILayout.Toggle(_hairAssetQuickEdit.boolValue, "Quick Edit", EditorStyles.miniButton);
 				}
 
 				if (EditorGUI.EndChangeCheck())
@@ -95,13 +95,13 @@ namespace Unity.DemoTeam.Hair
 					serializedObject.ApplyModifiedProperties();
 				}
 
-				var groomAsset = groom.groomAsset;
-				if (groomAsset != null && _groomAssetQuickEdit.boolValue)
+				var hairAsset = hairInstance.hairAsset;
+				if (hairAsset != null && _hairAssetQuickEdit.boolValue)
 				{
-					Editor.CreateCachedEditor(groomAsset, null, ref groomAssetEditor);
+					Editor.CreateCachedEditor(hairAsset, null, ref hairAssetEditor);
 					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 					{
-						(groomAssetEditor as GroomAssetEditor).DrawImporterGUI();
+						(hairAssetEditor as HairAssetEditor).DrawImporterGUI();
 					}
 					EditorGUILayout.EndVertical();
 				}
@@ -110,15 +110,15 @@ namespace Unity.DemoTeam.Hair
 				{
 					if (GUILayout.Button("Reload"))
 					{
-						groom.componentGroupsChecksum = string.Empty;
+						hairInstance.componentGroupsChecksum = string.Empty;
 					}
 
 					if (GUILayout.Button("Unlock", GUILayout.Width(60.0f)))
 					{
-						var componentGroups = groom.componentGroups;
+						var componentGroups = hairInstance.componentGroups;
 						if (componentGroups != null)
 						{
-							foreach (var componentGroup in groom.componentGroups)
+							foreach (var componentGroup in hairInstance.componentGroups)
 							{
 								componentGroup.container.hideFlags &= ~HideFlags.NotEditable;
 								componentGroup.lineFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
@@ -133,11 +133,11 @@ namespace Unity.DemoTeam.Hair
 
 		public void DrawStrandSettingsGUI()
 		{
-			var groom = target as Groom;
-			if (groom == null)
+			var hairInstance = target as HairInstance;
+			if (hairInstance == null)
 				return;
 
-			var material = groom.GetStrandMaterial();
+			var material = hairInstance.GetStrandMaterial();
 			if (material != null && !material.HasProperty("HAIRMATERIALTAG"))
 			{
 				EditorGUILayout.HelpBox("Configuration warning: Active material does not define property 'HAIRMATERIALTAG'.", MessageType.Warning, wide: true);
@@ -145,7 +145,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 			{
-				using (new GovernedByPrefabScope(groom))
+				using (new GovernedByPrefabScope(hairInstance))
 				{
 					StructPropertyFieldsWithHeader(_settingsRoots);
 				}
@@ -169,15 +169,15 @@ namespace Unity.DemoTeam.Hair
 
 		public void DrawSimulationSettingsGUI()
 		{
-			var groom = target as Groom;
-			if (groom == null)
+			var hairInstance = target as HairInstance;
+			if (hairInstance == null)
 				return;
 
-			if (groom.solverData != null && groom.solverData.Length > 0)
+			if (hairInstance.solverData != null && hairInstance.solverData.Length > 0)
 			{
-				var strandSolver = groom.solverSettings.method;
-				var strandMemoryLayout = groom.solverData[0].memoryLayout;
-				var strandParticleCount = groom.solverData[0].cbuffer._StrandParticleCount;
+				var strandSolver = hairInstance.solverSettings.method;
+				var strandMemoryLayout = hairInstance.solverData[0].memoryLayout;
+				var strandParticleCount = hairInstance.solverData[0].cbuffer._StrandParticleCount;
 
 				switch (strandSolver)
 				{
@@ -186,7 +186,7 @@ namespace Unity.DemoTeam.Hair
 						break;
 
 					case HairSim.SolverSettings.Method.GaussSeidel:
-						if (strandMemoryLayout != GroomAsset.MemoryLayout.Interleaved)
+						if (strandMemoryLayout != HairAsset.MemoryLayout.Interleaved)
 						{
 							EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'. This is fixable by changing memory layout in the asset.", MessageType.Warning, wide: true);
 						}
@@ -200,7 +200,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64, 128. Using slow reference solver as fallback. This is fixable by resampling curves in the asset.", MessageType.Error, wide: true);
 						}
-						else if (strandMemoryLayout != GroomAsset.MemoryLayout.Sequential)
+						else if (strandMemoryLayout != HairAsset.MemoryLayout.Sequential)
 						{
 							EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'.  This is fixable by changing memory layout in the asset.", MessageType.Warning, wide: true);
 						}
@@ -216,9 +216,9 @@ namespace Unity.DemoTeam.Hair
 				StructPropertyFieldsWithHeader(_settingsVolume, "Settings Volume");
 				using (new EditorGUI.IndentLevelScope())
 				{
-					var countCapsule = groom.volumeData.cbuffer._BoundaryCapsuleCount;
-					var countSphere = groom.volumeData.cbuffer._BoundarySphereCount;
-					var countTorus = groom.volumeData.cbuffer._BoundaryTorusCount;
+					var countCapsule = hairInstance.volumeData.cbuffer._BoundaryCapsuleCount;
+					var countSphere = hairInstance.volumeData.cbuffer._BoundarySphereCount;
+					var countTorus = hairInstance.volumeData.cbuffer._BoundaryTorusCount;
 					var countPack = countCapsule + countSphere + countTorus;
 					var countTxt = countPack + " active shapes (" + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus)";
 
@@ -230,7 +230,7 @@ namespace Unity.DemoTeam.Hair
 						GUI.Box(EditorGUI.IndentedRect(rect), countTxt, HairGUIStyles.statusBox);
 					}
 
-					var discarded = groom.volumeData.boundaryPrevCountDiscarded;
+					var discarded = hairInstance.volumeData.boundaryPrevCountDiscarded;
 					if (discarded > 0)
 					{
 						rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));

@@ -17,9 +17,9 @@ using UnityEngine.VFX;
 namespace Unity.DemoTeam.Hair
 {
 	[ExecuteAlways, SelectionBase]
-	public class Groom : MonoBehaviour
+	public class HairInstance : MonoBehaviour
 	{
-		public static HashSet<Groom> s_instances = new HashSet<Groom>();
+		public static HashSet<HairInstance> s_instances = new HashSet<HairInstance>();
 
 		[Serializable]
 		public struct ComponentGroup
@@ -100,8 +100,8 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
-		public GroomAsset groomAsset;
-		public bool groomAssetQuickEdit;
+		public HairAsset hairAsset;
+		public bool hairAssetQuickEdit;
 
 		public ComponentGroup[] componentGroups;
 		public string componentGroupsChecksum;
@@ -222,17 +222,17 @@ namespace Unity.DemoTeam.Hair
 
 		public Bounds GetSimulationBounds()
 		{
-			Debug.Assert(groomAsset != null);
-			Debug.Assert(groomAsset.strandGroups != null);
+			Debug.Assert(hairAsset != null);
+			Debug.Assert(hairAsset.strandGroups != null);
 
 			var strandScale = GetSimulationStrandScale();
 			var worldBounds = GetRootBounds(componentGroups[0]);
-			var worldMargin = groomAsset.strandGroups[0].maxStrandLength * strandScale;
+			var worldMargin = hairAsset.strandGroups[0].maxStrandLength * strandScale;
 
 			for (int i = 1; i != componentGroups.Length; i++)
 			{
 				worldBounds.Encapsulate(GetRootBounds(componentGroups[i]));
-				worldMargin = Mathf.Max(groomAsset.strandGroups[i].maxStrandLength * strandScale, worldMargin);
+				worldMargin = Mathf.Max(hairAsset.strandGroups[i].maxStrandLength * strandScale, worldMargin);
 			}
 
 			worldMargin *= 1.5f;
@@ -281,9 +281,9 @@ namespace Unity.DemoTeam.Hair
 			{
 				return settingsStrands.materialValue;
 			}
-			else if (groomAsset != null)
+			else if (hairAsset != null)
 			{
-				return groomAsset.settingsBasic.material;
+				return hairAsset.settingsBasic.material;
 			}
 			else
 			{
@@ -296,7 +296,7 @@ namespace Unity.DemoTeam.Hair
 		//	if (settingsStrands.strandDiameter)
 		//		return settingsStrands.strandDiameterValue;
 		//	else
-		//		return groomAsset.settingsBasic.strandDiameter;
+		//		return hairAsset.settingsBasic.strandDiameter;
 		//}
 
 		public void DispatchStep(CommandBuffer cmd, float dt)
@@ -410,10 +410,10 @@ namespace Unity.DemoTeam.Hair
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
 			{
-				if (groomAsset != null)
+				if (hairAsset != null)
 				{
 					// did the underlying asset change since prefab was built?
-					if (componentGroupsChecksum != groomAsset.checksum)
+					if (componentGroupsChecksum != hairAsset.checksum)
 					{
 						var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
 						var prefabContents = UnityEditor.PrefabUtility.LoadPrefabContents(prefabPath);
@@ -428,12 +428,12 @@ namespace Unity.DemoTeam.Hair
 			}
 #endif
 
-			if (groomAsset != null)
+			if (hairAsset != null)
 			{
-				if (componentGroupsChecksum != groomAsset.checksum)
+				if (componentGroupsChecksum != hairAsset.checksum)
 				{
-					GroomBuilder.BuildGroomInstance(this, groomAsset);
-					componentGroupsChecksum = groomAsset.checksum;
+					HairInstanceBuilder.BuildHairInstance(this, hairAsset);
+					componentGroupsChecksum = hairAsset.checksum;
 
 					ReleaseRuntimeData();
 
@@ -447,7 +447,7 @@ namespace Unity.DemoTeam.Hair
 			}
 			else
 			{
-				GroomBuilder.ClearGroomInstance(this);
+				HairInstanceBuilder.ClearHairInstance(this);
 				componentGroupsChecksum = string.Empty;
 
 				ReleaseRuntimeData();
@@ -471,13 +471,13 @@ namespace Unity.DemoTeam.Hair
 
 		bool InitializeRuntimeData(CommandBuffer cmd)
 		{
-			if (groomAsset == null)
+			if (hairAsset == null)
 				return false;
 
-			if (groomAsset.checksum != componentGroupsChecksum)
+			if (hairAsset.checksum != componentGroupsChecksum)
 				return false;
 
-			var strandGroups = groomAsset.strandGroups;
+			var strandGroups = hairAsset.strandGroups;
 			if (strandGroups == null || strandGroups.Length == 0)
 				return false;
 
@@ -594,15 +594,15 @@ namespace Unity.DemoTeam.Hair
 		}
 	}
 
-	//move to GroomEditorUtility ?
-	public static class GroomBuilder
+	//move to HairInstanceEditorUtility ?
+	public static class HairInstanceBuilder
 	{
-		public static void ClearGroomInstance(Groom groom)
+		public static void ClearHairInstance(HairInstance hairInstance)
 		{
-			if (groom.componentGroups == null)
+			if (hairInstance.componentGroups == null)
 				return;
 
-			foreach (var componentGroup in groom.componentGroups)
+			foreach (var componentGroup in hairInstance.componentGroups)
 			{
 				var material = componentGroup.lineRenderer.sharedMaterial;
 				if (material != null)
@@ -625,33 +625,33 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			groom.componentGroups = null;
+			hairInstance.componentGroups = null;
 
 #if UNITY_EDITOR
-			UnityEditor.EditorUtility.SetDirty(groom);
+			UnityEditor.EditorUtility.SetDirty(hairInstance);
 #endif
 		}
 
-		public static void BuildGroomInstance(Groom groom, GroomAsset groomAsset)
+		public static void BuildHairInstance(HairInstance hairInstance, HairAsset hairAsset)
 		{
-			ClearGroomInstance(groom);
+			ClearHairInstance(hairInstance);
 
-			var strandGroups = groomAsset.strandGroups;
+			var strandGroups = hairAsset.strandGroups;
 			if (strandGroups == null || strandGroups.Length == 0)
 				return;
 
 			// prep component groups
-			groom.componentGroups = new Groom.ComponentGroup[strandGroups.Length];
+			hairInstance.componentGroups = new HairInstance.ComponentGroup[strandGroups.Length];
 
 			// build component groups
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
-				ref var componentGroup = ref groom.componentGroups[i];
+				ref var componentGroup = ref hairInstance.componentGroups[i];
 
 				var container = new GameObject();
 				{
 					container.name = "Group:" + i;
-					container.transform.SetParent(groom.transform, worldPositionStays: false);
+					container.transform.SetParent(hairInstance.transform, worldPositionStays: false);
 					container.hideFlags = HideFlags.NotEditable;
 
 					var linesContainer = new GameObject();
@@ -665,7 +665,7 @@ namespace Unity.DemoTeam.Hair
 
 						componentGroup.lineRenderer = linesContainer.AddComponent<MeshRenderer>();
 
-						var material = groom.GetStrandMaterial();
+						var material = hairInstance.GetStrandMaterial();
 						if (material != null)
 						{
 							componentGroup.lineRenderer.sharedMaterial = new Material(material);
@@ -691,11 +691,11 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				groom.componentGroups[i].container = container;
+				hairInstance.componentGroups[i].container = container;
 			}
 
 #if UNITY_EDITOR
-			UnityEditor.EditorUtility.SetDirty(groom);
+			UnityEditor.EditorUtility.SetDirty(hairInstance);
 #endif
 		}
 	}

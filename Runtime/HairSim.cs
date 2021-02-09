@@ -632,7 +632,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._LocalShape = solverSettings.localShapeInfluence;
 
 			// update keywords
-			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == GroomAsset.MemoryLayout.Interleaved);
+			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == HairAsset.MemoryLayout.Interleaved);
 			keywords.ENABLE_DISTANCE = solverSettings.distance;
 			keywords.ENABLE_DISTANCE_LRA = solverSettings.distanceLRA;
 			keywords.ENABLE_DISTANCE_FTL = solverSettings.distanceFTL;
