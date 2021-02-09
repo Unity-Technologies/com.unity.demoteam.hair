@@ -23,8 +23,8 @@ HAIRSIM_SOLVERDATA<float4> _InitialRootFrame;			// quat(xyz,w): initial strand r
 HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
 HAIRSIM_SOLVERDATA<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 
-HAIRSIM_SOLVERDATA<float4> _ParticlePosition;		// xyz: position, w: initial pose local accumulated weight (gather)
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;	// xyz: position, w: initial pose local accumulated weight (gather)
+HAIRSIM_SOLVERDATA<float4> _ParticlePosition;		// xyz: position, w: initial local accumulated weight (gather)
+HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;	// xyz: position, w: initial local accumulated weight (gather)
 HAIRSIM_SOLVERDATA<float4> _ParticlePositionCorr;	// xyz: ftl correction, w: -
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;		// xyz: velocity, w: weight
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;	// xyz: velocity, w: weight
@@ -45,17 +45,20 @@ HAIRSIM_VOLUMEDATA<int> _AccuVelocityY;				// x: ... ... ... .. y-velocity
 HAIRSIM_VOLUMEDATA<int> _AccuVelocityZ;				// x: .. ... ... ... z-velocity
 //TODO this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 
-HAIRSIM_VOLUMEDATA<float> _VolumeDensity;			// x: density
+HAIRSIM_VOLUMEDATA<float> _VolumeDensity;			// x: density (as fraction occupied)
 HAIRSIM_VOLUMEDATA<float> _VolumeDensity0;			// x: density target
 HAIRSIM_VOLUMEDATA<float4> _VolumeVelocity;			// xyz: velocity, w: accumulated weight
-HAIRSIM_VOLUMEDATA<float> _VolumeDivergence;
+HAIRSIM_VOLUMEDATA<float> _VolumeDivergence;		// x: velocity divergence + source term
 
-HAIRSIM_VOLUMEDATA<float> _VolumePressure;
-HAIRSIM_VOLUMEDATA<float> _VolumePressureNext;
-HAIRSIM_VOLUMEDATA<float3> _VolumePressureGrad;
+HAIRSIM_VOLUMEDATA<float> _VolumePressure;			// x: pressure
+HAIRSIM_VOLUMEDATA<float> _VolumePressureNext;		// x: pressure (output of iteration)
+HAIRSIM_VOLUMEDATA<float3> _VolumePressureGrad;		// xyz: pressure gradient, w: -
 
 SamplerState _Volume_point_clamp;
 SamplerState _Volume_trilinear_clamp;
+
+//-------------------
+// volume boundaries
 
 struct BoundaryCapsule { float3 centerA; float radius; float3 centerB; float __pad__; };
 struct BoundarySphere { float3 center; float radius; };

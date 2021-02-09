@@ -136,30 +136,6 @@ namespace Unity.DemoTeam.Hair
 			public static int KVolumePressureGradient;
 		}
 
-		public struct SolverKeywords<T>
-		{
-			public T LAYOUT_INTERLEAVED;
-			public T ENABLE_DISTANCE;
-			public T ENABLE_DISTANCE_LRA;
-			public T ENABLE_DISTANCE_FTL;
-			public T ENABLE_BOUNDARY;
-			public T ENABLE_BOUNDARY_FRICTION;
-			public T ENABLE_CURVATURE_EQ;
-			public T ENABLE_CURVATURE_GEQ;
-			public T ENABLE_CURVATURE_LEQ;
-			public T ENABLE_POSE_GLOBAL_POSITION;
-			public T ENABLE_POSE_GLOBAL_ROTATION;
-			public T ENABLE_POSE_LOCAL_ROTATION;
-			public T ENABLE_POSE_LOCAL_BEND_TWIST;
-		}
-
-		public struct VolumeKeywords<T>
-		{
-			public T VOLUME_SUPPORT_CONTRACTION;
-			public T VOLUME_TARGET_INITIAL_POSE;
-			public T VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
-		}
-
 		[Serializable]
 		public struct SolverSettings
 		{
@@ -854,129 +830,73 @@ namespace Unity.DemoTeam.Hair
 			keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPoseInParticles);
 		}
 
-		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData)
+		public static void PushSolverData<T>(CommandBuffer cmd, T target, in SolverData solverData) where T : IPushTarget
 		{
-			ConstantBuffer.Push(cmd, solverData.cbuffer, cs, UniformIDs.SolverCBuffer);
+			target.PushConstantBuffer(cmd, UniformIDs.SolverCBuffer, solverData.cbuffer);
 
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootScale, solverData.rootScale);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootPosition, solverData.rootPosition);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._RootDirection, solverData.rootDirection);
+			target.PushComputeBuffer(cmd, UniformIDs._RootScale, solverData.rootScale);
+			target.PushComputeBuffer(cmd, UniformIDs._RootPosition, solverData.rootPosition);
+			target.PushComputeBuffer(cmd, UniformIDs._RootDirection, solverData.rootDirection);
 
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._InitialRootFrame, solverData.initialRootFrame);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._InitialParticleFrameDelta, solverData.initialParticleFrameDelta);
+			target.PushComputeBuffer(cmd, UniformIDs._InitialRootFrame, solverData.initialRootFrame);
+			target.PushComputeBuffer(cmd, UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
+			target.PushComputeBuffer(cmd, UniformIDs._InitialParticleFrameDelta, solverData.initialParticleFrameDelta);
 
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePosition, solverData.particlePosition);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocity, solverData.particleVelocity);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
-
-			CoreUtils.SetKeyword(cs, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
-			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
-			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
-			CoreUtils.SetKeyword(cs, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
-			CoreUtils.SetKeyword(cs, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
-			CoreUtils.SetKeyword(cs, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
-			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
-			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
-			CoreUtils.SetKeyword(cs, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			CoreUtils.SetKeyword(cs, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
-			CoreUtils.SetKeyword(cs, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
-			CoreUtils.SetKeyword(cs, "ENABLE_POSE_LOCAL_ROTATION", solverData.keywords.ENABLE_POSE_LOCAL_ROTATION);
-			CoreUtils.SetKeyword(cs, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
+			target.PushComputeBuffer(cmd, UniformIDs._ParticlePosition, solverData.particlePosition);
+			target.PushComputeBuffer(cmd, UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
+			target.PushComputeBuffer(cmd, UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
+			target.PushComputeBuffer(cmd, UniformIDs._ParticleVelocity, solverData.particleVelocity);
+			target.PushComputeBuffer(cmd, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+	
+			target.PushKeyword(cmd, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
+			target.PushKeyword(cmd, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
+			target.PushKeyword(cmd, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
+			target.PushKeyword(cmd, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
+			target.PushKeyword(cmd, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
+			target.PushKeyword(cmd, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
+			target.PushKeyword(cmd, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
+			target.PushKeyword(cmd, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
+			target.PushKeyword(cmd, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
+			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
+			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
+			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_ROTATION", solverData.keywords.ENABLE_POSE_LOCAL_ROTATION);
+			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
 		}
 
-		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData)
+		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData) => PushSolverData(cmd, new PushTargetCompute(cs, kernel), solverData);
+		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData) => PushSolverData(cmd, new PushTargetMaterial(mat, mpb), solverData);
+
+		public static void PushVolumeData<T>(CommandBuffer cmd, T target, in VolumeData volumeData) where T : IPushTarget
 		{
-			ConstantBuffer.Push(cmd, solverData.cbuffer, mat, UniformIDs.SolverCBuffer);
+			target.PushConstantBuffer(cmd, UniformIDs.VolumeCBuffer, volumeData.cbuffer);
 
-			mpb.SetBuffer(UniformIDs._RootScale, solverData.rootScale);
-			mpb.SetBuffer(UniformIDs._RootPosition, solverData.rootPosition);
-			mpb.SetBuffer(UniformIDs._RootDirection, solverData.rootDirection);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryPack, volumeData.boundaryPack);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
 
-			mpb.SetBuffer(UniformIDs._InitialRootFrame, solverData.initialRootFrame);
-			mpb.SetBuffer(UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
-			mpb.SetBuffer(UniformIDs._InitialParticleFrameDelta, solverData.initialParticleFrameDelta);
+			target.PushComputeTexture(cmd, UniformIDs._AccuWeight, volumeData.accuWeight);
+			target.PushComputeTexture(cmd, UniformIDs._AccuWeight0, volumeData.accuWeight0);
+			target.PushComputeTexture(cmd, UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
+			target.PushComputeTexture(cmd, UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
+			target.PushComputeTexture(cmd, UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
 
-			mpb.SetBuffer(UniformIDs._ParticlePosition, solverData.particlePosition);
-			mpb.SetBuffer(UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
-			mpb.SetBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
-			mpb.SetBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
-			mpb.SetBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+			target.PushComputeTexture(cmd, UniformIDs._VolumeDensity, volumeData.volumeDensity);
+			target.PushComputeTexture(cmd, UniformIDs._VolumeDensity0, volumeData.volumeDensity0);
+			target.PushComputeTexture(cmd, UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
+			target.PushComputeTexture(cmd, UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
 
-			CoreUtils.SetKeyword(mat, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
-			CoreUtils.SetKeyword(mat, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
-			CoreUtils.SetKeyword(mat, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
-			CoreUtils.SetKeyword(mat, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
-			CoreUtils.SetKeyword(mat, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
-			CoreUtils.SetKeyword(mat, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
-			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
-			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
-			CoreUtils.SetKeyword(mat, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			CoreUtils.SetKeyword(mat, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
-			CoreUtils.SetKeyword(mat, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
-			CoreUtils.SetKeyword(mat, "ENABLE_POSE_LOCAL_ROTATION", solverData.keywords.ENABLE_POSE_LOCAL_ROTATION);
-			CoreUtils.SetKeyword(mat, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
+			target.PushComputeTexture(cmd, UniformIDs._VolumePressure, volumeData.volumePressure);
+			target.PushComputeTexture(cmd, UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
+			target.PushComputeTexture(cmd, UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
+
+			target.PushKeyword(cmd, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
+			target.PushKeyword(cmd, "VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
+			target.PushKeyword(cmd, "VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 		}
 
-		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData)
-		{
-			ConstantBuffer.Push(cmd, volumeData.cbuffer, cs, UniformIDs.VolumeCBuffer);
-
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryPack, volumeData.boundaryPack);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
-			cmd.SetComputeBufferParam(cs, kernel, UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
-
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuWeight, volumeData.accuWeight);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuWeight0, volumeData.accuWeight0);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
-
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensity, volumeData.volumeDensity);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDensity0, volumeData.volumeDensity0);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
-
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressure, volumeData.volumePressure);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
-			cmd.SetComputeTextureParam(cs, kernel, UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
-
-			CoreUtils.SetKeyword(cs, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
-			CoreUtils.SetKeyword(cs, "VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
-			CoreUtils.SetKeyword(cs, "VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
-		}
-
-		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData)
-		{
-			ConstantBuffer.Push(cmd, volumeData.cbuffer, mat, UniformIDs.VolumeCBuffer);
-
-			mpb.SetBuffer(UniformIDs._BoundaryPack, volumeData.boundaryPack);
-			mpb.SetBuffer(UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
-			mpb.SetBuffer(UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
-			mpb.SetBuffer(UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
-
-			mpb.SetTexture(UniformIDs._AccuWeight, volumeData.accuWeight);
-			mpb.SetTexture(UniformIDs._AccuWeight0, volumeData.accuWeight0);
-			mpb.SetTexture(UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
-			mpb.SetTexture(UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
-			mpb.SetTexture(UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
-
-			mpb.SetTexture(UniformIDs._VolumeDensity, volumeData.volumeDensity);
-			mpb.SetTexture(UniformIDs._VolumeDensity0, volumeData.volumeDensity0);
-			mpb.SetTexture(UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
-			mpb.SetTexture(UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
-			
-			mpb.SetTexture(UniformIDs._VolumePressure, volumeData.volumePressure);
-			mpb.SetTexture(UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
-			mpb.SetTexture(UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
-
-			CoreUtils.SetKeyword(mat, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
-			CoreUtils.SetKeyword(mat, "VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
-			CoreUtils.SetKeyword(mat, "VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
-		}
+		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData) => PushVolumeData(cmd, new PushTargetCompute(cs, kernel), volumeData);
+		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData) => PushVolumeData(cmd, new PushTargetMaterial(mat, mpb), volumeData);
 
 		public static void InitSolverParticles(CommandBuffer cmd, in SolverData solverData, Matrix4x4 rootTransform)
 		{
@@ -1050,8 +970,8 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 
-				SwapBuffers(ref solverData.particlePosition, ref solverData.particlePositionPrev);
-				SwapBuffers(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
+				CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);
+				CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
 
 				PushVolumeData(cmd, s_solverCS, kernel, volumeData);
 				PushSolverData(cmd, s_solverCS, kernel, solverData);
@@ -1216,7 +1136,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureSolve, numX, numY, numZ);
 
-					SwapVolumes(ref volumeData.volumePressure, ref volumeData.volumePressureNext);
+					CoreUtils.Swap(ref volumeData.volumePressure, ref volumeData.volumePressureNext);
 					cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumePressureSolve, UniformIDs._VolumePressure, volumeData.volumePressure);
 					cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumePressureSolve, UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
 				}

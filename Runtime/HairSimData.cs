@@ -10,44 +10,44 @@ namespace Unity.DemoTeam.Hair
 		{
 			public SolverCBuffer cbuffer;
 
-			public ComputeBuffer rootScale;     // strand length (relative to group maximum)
-			public ComputeBuffer rootPosition;  // strand root position
-			public ComputeBuffer rootDirection; // strand root direction
-			public ComputeBuffer rootFrame;     // strand root material frame
+			public ComputeBuffer rootScale;				// x: relative strand length [0..1] (to group maximum)
+			public ComputeBuffer rootPosition;			// xyz: strand root position, w: -
+			public ComputeBuffer rootDirection;			// xyz: strand root direction, w: -
+			public ComputeBuffer rootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
 
-			public ComputeBuffer initialRootFrame;
-			public ComputeBuffer initialParticleOffset;
-			public ComputeBuffer initialParticleFrameDelta;
+			public ComputeBuffer initialRootFrame;			// quat(xyz,w): initial strand root material frame
+			public ComputeBuffer initialParticleOffset;		// xyz: initial particle offset from strand root, w: -
+			public ComputeBuffer initialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 
-			public ComputeBuffer particlePosition;
-			public ComputeBuffer particlePositionPrev;
-			public ComputeBuffer particlePositionCorr;
-			public ComputeBuffer particleVelocity;
-			public ComputeBuffer particleVelocityPrev;
+			public ComputeBuffer particlePosition;		// xyz: position, w: initial local accumulated weight (gather)
+			public ComputeBuffer particlePositionPrev;	// xyz: position, w: initial local accumulated weight (gather)
+			public ComputeBuffer particlePositionCorr;	// xyz: ftl correction, w: -
+			public ComputeBuffer particleVelocity;		// xyz: velocity, w: weight
+			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: weight
 
 			public GroomAsset.MemoryLayout memoryLayout;
 
-			public SolverKeywords<bool> keywords;
+			public SolverKeywords keywords;
 		}
 
 		public struct VolumeData
 		{
 			public VolumeCBuffer cbuffer;
 
-			public RenderTexture accuWeight;
-			public RenderTexture accuWeight0;
-			public RenderTexture accuVelocityX;
-			public RenderTexture accuVelocityY;
-			public RenderTexture accuVelocityZ;
+			public RenderTexture accuWeight;			// x: fp accumulated weight
+			public RenderTexture accuWeight0;			// x: fp accumulated target weight
+			public RenderTexture accuVelocityX;			// x: fp accumulated x-velocity
+			public RenderTexture accuVelocityY;			// x: ... ... ... .. y-velocity
+			public RenderTexture accuVelocityZ;			// x: .. ... ... ... z-velocity
 
-			public RenderTexture volumeDensity;
-			public RenderTexture volumeDensity0;
-			public RenderTexture volumeVelocity;
-			public RenderTexture volumeDivergence;
+			public RenderTexture volumeDensity;         // x: density (as fraction occupied)
+			public RenderTexture volumeDensity0;		// x: density target
+			public RenderTexture volumeVelocity;		// xyz: velocity, w: accumulated weight
+			public RenderTexture volumeDivergence;		// x: velocity divergence + source term
 
-			public RenderTexture volumePressure;
-			public RenderTexture volumePressureNext;
-			public RenderTexture volumePressureGrad;
+			public RenderTexture volumePressure;		// x: pressure
+			public RenderTexture volumePressureNext;    // x: pressure (output of iteration)
+			public RenderTexture volumePressureGrad;    // xyz: pressure gradient, w: -
 
 			public float allGroupsMaxParticleInterval;
 
@@ -66,7 +66,7 @@ namespace Unity.DemoTeam.Hair
 			public int boundaryPrevCount;
 			public int boundaryPrevCountDiscarded;
 
-			public VolumeKeywords<bool> keywords;
+			public VolumeKeywords keywords;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
@@ -76,12 +76,12 @@ namespace Unity.DemoTeam.Hair
 			public Matrix4x4 _LocalToWorldInvT;
 			public Vector4 _WorldRotation;
 
-			public uint _StrandCount;                // group strand count
-			public uint _StrandParticleCount;        // group strand particle count
-			public float _StrandMaxParticleInterval; // group max particle interval
-			public float _StrandMaxParticleWeight;   // group max particle weight (relative to all groups within volume)
+			public uint _StrandCount;					// group strand count
+			public uint _StrandParticleCount;			// group strand particle count
+			public float _StrandMaxParticleInterval;	// group max particle interval
+			public float _StrandMaxParticleWeight;		// group max particle weight (relative to all groups within volume)
 
-			public float _StrandScale;               // global scale factor
+			public float _StrandScale;					// global scale factor
 
 			public float _DT;
 			public uint _Iterations;
@@ -141,6 +141,30 @@ namespace Unity.DemoTeam.Hair
 			public int _BoundaryCapsuleCount;
 			public int _BoundarySphereCount;
 			public int _BoundaryTorusCount;
+		}
+
+		public struct SolverKeywords
+		{
+			public bool LAYOUT_INTERLEAVED;
+			public bool ENABLE_DISTANCE;
+			public bool ENABLE_DISTANCE_LRA;
+			public bool ENABLE_DISTANCE_FTL;
+			public bool ENABLE_BOUNDARY;
+			public bool ENABLE_BOUNDARY_FRICTION;
+			public bool ENABLE_CURVATURE_EQ;
+			public bool ENABLE_CURVATURE_GEQ;
+			public bool ENABLE_CURVATURE_LEQ;
+			public bool ENABLE_POSE_GLOBAL_POSITION;
+			public bool ENABLE_POSE_GLOBAL_ROTATION;
+			public bool ENABLE_POSE_LOCAL_ROTATION;
+			public bool ENABLE_POSE_LOCAL_BEND_TWIST;
+		}
+
+		public struct VolumeKeywords
+		{
+			public bool VOLUME_SUPPORT_CONTRACTION;
+			public bool VOLUME_TARGET_INITIAL_POSE;
+			public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
 		}
 	}
 }

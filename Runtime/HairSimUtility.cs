@@ -7,6 +7,9 @@ namespace Unity.DemoTeam.Hair
 {
 	public static class HairSimUtility
 	{
+		//---------------
+		// gpu resources
+
 		public static bool CreateBuffer(ref ComputeBuffer buffer, string name, int count, int stride, ComputeBufferType type = ComputeBufferType.Default)
 		{
 			if (buffer != null && buffer.count == count && buffer.stride == stride && buffer.IsValid())
@@ -94,19 +97,53 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void SwapBuffers(ref ComputeBuffer bufferA, ref ComputeBuffer bufferB)
+		//------------------
+		// gpu push targets
+
+		public interface IPushTarget
 		{
-			ComputeBuffer tmp = bufferA;
-			bufferA = bufferB;
-			bufferB = tmp;
+			void PushConstantBuffer<CBType>(CommandBuffer cmd, int nameID, in CBType data) where CBType : struct;
+			void PushComputeBuffer(CommandBuffer cmd, int nameID, ComputeBuffer buffer);
+			void PushComputeTexture(CommandBuffer cmd, int nameID, RenderTexture texture);
+			void PushKeyword(CommandBuffer cmd, string name, bool value);
 		}
 
-		public static void SwapVolumes(ref RenderTexture volumeA, ref RenderTexture volumeB)
+		public struct PushTargetCompute : IPushTarget
 		{
-			RenderTexture tmp = volumeA;
-			volumeA = volumeB;
-			volumeB = tmp;
+			public ComputeShader cs;
+			public int kernel;
+
+			public PushTargetCompute(ComputeShader cs, int kernel)
+			{
+				this.cs = cs;
+				this.kernel = kernel;
+			}
+
+			public void PushConstantBuffer<CBType>(CommandBuffer cmd, int nameID, in CBType data) where CBType : struct => ConstantBuffer.Push(cmd, data, cs, nameID);
+			public void PushComputeBuffer(CommandBuffer cmd, int nameID, ComputeBuffer buffer) => cmd.SetComputeBufferParam(cs, kernel, nameID, buffer);
+			public void PushComputeTexture(CommandBuffer cmd, int nameID, RenderTexture texture) => cmd.SetComputeTextureParam(cs, kernel, nameID, texture);
+			public void PushKeyword(CommandBuffer cmd, string name, bool value) => CoreUtils.SetKeyword(cs, name, value);
 		}
+
+		public struct PushTargetMaterial : IPushTarget
+		{
+			public Material mat;
+			public MaterialPropertyBlock mpb;
+
+			public PushTargetMaterial(Material mat, MaterialPropertyBlock mpb)
+			{
+				this.mat = mat;
+				this.mpb = mpb;
+			}
+
+			public void PushConstantBuffer<CBType>(CommandBuffer cmd, int nameID, in CBType data) where CBType : struct => ConstantBuffer.Push(cmd, data, mat, nameID);
+			public void PushComputeBuffer(CommandBuffer cmd, int nameID, ComputeBuffer buffer) => mpb.SetBuffer(nameID, buffer);
+			public void PushComputeTexture(CommandBuffer cmd, int nameID, RenderTexture texture) => mpb.SetTexture(nameID, texture);
+			public void PushKeyword(CommandBuffer cmd, string name, bool value) => CoreUtils.SetKeyword(mat, name, value);
+		}
+
+		//------------
+		// reflection
 
 		public static void InitializeStaticFields<T>(Type type, Func<string, T> construct)
 		{
@@ -125,6 +162,15 @@ namespace Unity.DemoTeam.Hair
 				field.SetValue(boxed, construct(field.Name));
 			}
 			data = (TStruct)boxed;
+		}
+
+		public static void EnumerateFields(Type type, Action<int, System.Reflection.FieldInfo> visit)
+		{
+			var fields = type.GetFields();
+			for (int i = 0; i != fields.Length; i++)
+			{
+				visit(i, fields[i]);
+			}
 		}
 	}
 }
