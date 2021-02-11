@@ -45,20 +45,14 @@ namespace Unity.DemoTeam.Hair
 					var dt = Time.deltaTime;
 					if (dt != 0.0f)
 					{
-						const float dtMin = 1.0f / 120.0f;
-						const float dtMax = 1.0f / 30.0f;
-
-						dt = Mathf.Clamp(dt, dtMin, dtMax);
-						dt = 1.0f / 60.0f;
-
-						foreach (var hair in HairInstance.s_instances)
+						foreach (var hairInstance in HairInstance.s_instances)
 						{
-							if (hair != null && hair.isActiveAndEnabled)
-								hair.DispatchStep(context.cmd, dt);
+							if (hairInstance != null && hairInstance.isActiveAndEnabled)
+								hairInstance.DispatchTime(context.cmd, dt);
 						}
-					}
 
-					lastSimulationFrame = frame;
+						lastSimulationFrame = frame;
+					}
 				}
 			}
 			else
@@ -68,10 +62,10 @@ namespace Unity.DemoTeam.Hair
 
 			if (dispatch.HasFlag(Dispatch.Draw))
 			{
-				foreach (var hair in HairInstance.s_instances)
+				foreach (var hairInstance in HairInstance.s_instances)
 				{
-					if (hair != null && hair.isActiveAndEnabled)
-						hair.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);
+					if (hairInstance != null && hairInstance.isActiveAndEnabled)
+						hairInstance.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);
 				}
 			}
 		}

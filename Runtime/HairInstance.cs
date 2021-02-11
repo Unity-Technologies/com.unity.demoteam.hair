@@ -56,7 +56,14 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsStrands
 		{
-			public enum Renderer
+			public enum StrandScale
+			{
+				Fixed,
+				UniformLowerBound,
+				UniformUpperBound,
+			}
+
+			public enum StrandRenderer
 			{
 				PrimitiveLines,
 				InstancedMesh,//TODO
@@ -65,38 +72,80 @@ namespace Unity.DemoTeam.Hair
 #endif
 			}
 
-			public enum Scale
+			public enum Simulation
 			{
-				Fixed,
-				UniformLowerBound,
-				UniformUpperBound,
+				Disabled,
+				Enabled,
+				EnabledInPlaymode,
 			}
 
-			public Scale strandScale;
-			public Renderer strandRenderer;
-			[VisibleIf(nameof(strandRenderer), Renderer.InstancedMesh)]
+			public enum SimulationRate
+			{
+				Fixed30Hz,
+				Fixed60Hz,
+				Fixed120Hz,
+				CustomTimeStep,
+			}
+
+			[LineHeader("Sizing")]
+
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
+			public float strandDiameter;
+			[Tooltip("Strand scale")]
+			public StrandScale strandScale;
+
+			[LineHeader("Rendering")]
+
+			[ToggleGroup]
+			public bool strandMaterial;
+			[ToggleGroupItem]
+			public Material strandMaterialValue;
+			public StrandRenderer strandRenderer;
+			[VisibleIf(nameof(strandRenderer), StrandRenderer.InstancedMesh)]
 			public Mesh strandMesh;
 #if UNITY_VISUALEFFECTGRAPH
-			[VisibleIf(nameof(strandRenderer), Renderer.VFXGraph)]
+			[VisibleIf(nameof(strandRenderer), StrandRenderer.VFXGraph)]
 			public VisualEffect strandOutputGraph;
 #endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
 			public int strandLayer;
 
-			[LineHeader("Overrides")]
+			[LineHeader("Dynamics")]
 
-			[ToggleGroup]
-			public bool material;
-			[ToggleGroupItem]
-			public Material materialValue;
+			[Tooltip("Simulation state")]
+			public Simulation simulation;
+			[Tooltip("Simulation update rate")]
+			public SimulationRate simulationRate;
+			[VisibleIf(nameof(simulationRate), SimulationRate.CustomTimeStep), Tooltip("Simulation time step (in seconds)")]
+			public float simulationTimeStep;
+			[ToggleGroup, Tooltip("Enable minimum number of simulation steps per rendered frame")]
+			public bool stepsMin;
+			[ToggleGroupItem, Tooltip("Minimum number of simulation steps per rendered frame")]
+			public int stepsMinValue;
+			[ToggleGroup, Tooltip("Enable maximum number of simulation steps per rendered frame")]
+			public bool stepsMax;
+			[ToggleGroupItem, Tooltip("Maximum number of simulation steps per rendered frame")]
+			public int stepsMaxValue;
 
 			public static readonly SettingsStrands defaults = new SettingsStrands()
 			{
-				strandScale = Scale.Fixed,
-				strandRenderer = Renderer.PrimitiveLines,
+				strandDiameter = 1.0f,
+				strandScale = StrandScale.Fixed,
+
+				strandMaterial = false,
+				strandMaterialValue = null,
+				strandRenderer = StrandRenderer.PrimitiveLines,
 				strandShadows = ShadowCastingMode.On,
-				strandLayer = 0x0101,//TODO decide based on active pipeline asset (current default is HDRP default)
+				strandLayer = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
+
+				simulation = Simulation.Enabled,
+				simulationRate = SimulationRate.Fixed60Hz,
+				simulationTimeStep = 1.0f / 100.0f,
+				stepsMin = false,
+				stepsMinValue = 1,
+				stepsMax = true,
+				stepsMaxValue = 10,
 			};
 		}
 
@@ -115,6 +164,8 @@ namespace Unity.DemoTeam.Hair
 
 		public HairSim.SolverData[] solverData;
 		public HairSim.VolumeData volumeData;
+
+		private float accumulatedTime;
 
 		void OnEnable()
 		{
@@ -220,12 +271,12 @@ namespace Unity.DemoTeam.Hair
 			return new Bounds(worldCenter, 2.0f * worldExtent);
 		}
 
-		public Bounds GetSimulationBounds()
+		public Bounds GetSimulationBounds(bool square = true)
 		{
 			Debug.Assert(hairAsset != null);
 			Debug.Assert(hairAsset.strandGroups != null);
 
-			var strandScale = GetSimulationStrandScale();
+			var strandScale = GetStrandScale();
 			var worldBounds = GetRootBounds(componentGroups[0]);
 			var worldMargin = hairAsset.strandGroups[0].maxStrandLength * strandScale;
 
@@ -238,35 +289,40 @@ namespace Unity.DemoTeam.Hair
 			worldMargin *= 1.5f;
 			worldBounds.Expand(2.0f * worldMargin);
 
-			return new Bounds(worldBounds.center, worldBounds.size);
+			if (square)
+			{
+				var size = worldBounds.size;
+				return new Bounds(worldBounds.center, Vector3.one * Mathf.Max(size.x, size.y, size.z));
+			}
+			else
+			{
+				return new Bounds(worldBounds.center, worldBounds.size);
+			}
 		}
 
-		public Bounds GetSimulationBoundsSquare()
+		public float GetStrandDiameter()
 		{
-			var worldBounds = GetSimulationBounds();
-			var worldExtent = worldBounds.extents;
-
-			return new Bounds(worldBounds.center, Vector3.one * (2.0f * Mathf.Max(worldExtent.x, worldExtent.y, worldExtent.z)));
+			return settingsStrands.strandDiameter;
 		}
 
-		public float GetSimulationStrandScale()
+		public float GetStrandScale()
 		{
 			switch (settingsStrands.strandScale)
 			{
 				default:
-				case SettingsStrands.Scale.Fixed:
+				case SettingsStrands.StrandScale.Fixed:
 					{
 						return 1.0f;
 					}
 
-				case SettingsStrands.Scale.UniformLowerBound:
+				case SettingsStrands.StrandScale.UniformLowerBound:
 					{
 						var lossyScale = this.transform.lossyScale;
 						var lossyScaleAbs = new Vector3(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y), Mathf.Abs(lossyScale.z));
 						return Mathf.Min(lossyScaleAbs.x, lossyScaleAbs.y, lossyScaleAbs.z);
 					}
 
-				case SettingsStrands.Scale.UniformUpperBound:
+				case SettingsStrands.StrandScale.UniformUpperBound:
 					{
 						var lossyScale = this.transform.lossyScale;
 						var lossyScaleAbs = new Vector3(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y), Mathf.Abs(lossyScale.z));
@@ -277,27 +333,72 @@ namespace Unity.DemoTeam.Hair
 
 		public Material GetStrandMaterial()
 		{
-			if (settingsStrands.material)
-			{
-				return settingsStrands.materialValue;
-			}
-			else if (hairAsset != null)
-			{
-				return hairAsset.settingsBasic.material;
-			}
-			else
-			{
-				return null;
-			}
+			var mat = null as Material;
+
+			if (mat == null && settingsStrands.strandMaterial)
+				mat = settingsStrands.strandMaterialValue;
+
+			if (mat == null && hairAsset != null)
+				mat = hairAsset.settingsBasic.material;
+
+			return mat;
 		}
 
-		//public float GetStrandDiameter()
-		//{
-		//	if (settingsStrands.strandDiameter)
-		//		return settingsStrands.strandDiameterValue;
-		//	else
-		//		return hairAsset.settingsBasic.strandDiameter;
-		//}
+		public void DispatchTime(CommandBuffer cmd, float dt)
+		{
+			// skip if not simulating
+			switch (settingsStrands.simulation)
+			{
+				case SettingsStrands.Simulation.Disabled: return;
+				case SettingsStrands.Simulation.Enabled: break;
+				case SettingsStrands.Simulation.EnabledInPlaymode: if (Application.isPlaying) break; return;
+			}
+
+			// calc step length
+			var stepDT = 0.0f;
+			{
+				switch (settingsStrands.simulationRate)
+				{
+					case SettingsStrands.SimulationRate.Fixed30Hz: stepDT = 1.0f / 30.0f; break;
+					case SettingsStrands.SimulationRate.Fixed60Hz: stepDT = 1.0f / 60.0f; break;
+					case SettingsStrands.SimulationRate.Fixed120Hz: stepDT = 1.0f / 120.0f; break;
+					case SettingsStrands.SimulationRate.CustomTimeStep: stepDT = settingsStrands.simulationTimeStep; break;
+				}
+			}
+
+			// skip if not simulating due to zero time step
+			if (stepDT == 0.0f)
+			{
+				return;
+			}
+
+			// calc step count
+			accumulatedTime += dt;
+
+			var stepCountRT = (int)Mathf.Floor(accumulatedTime / stepDT);
+			var stepCount = stepCountRT;
+			{
+				stepCount = Mathf.Max(stepCount, settingsStrands.stepsMin ? settingsStrands.stepsMinValue : stepCount);
+				stepCount = Mathf.Min(stepCount, settingsStrands.stepsMax ? settingsStrands.stepsMaxValue : stepCount);
+			}
+
+			accumulatedTime -= Mathf.Max(stepCountRT, stepCount) * stepDT;
+
+			if (accumulatedTime < 0.0f)
+				accumulatedTime = 0.0f;
+
+			// warn if truncating
+			if (stepCount < stepCountRT)
+			{
+				Debug.LogWarning("Number of simulation steps clamped to " + stepCount + " from " + stepCountRT, this);
+			}
+
+			// perform the steps
+			for (int i = 0; i != stepCount; i++)
+			{
+				DispatchStep(cmd, stepDT);
+			}
+		}
 
 		public void DispatchStep(CommandBuffer cmd, float dt)
 		{
@@ -305,8 +406,9 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			// get bounds and scale
-			var strandBounds = GetSimulationBoundsSquare();
-			var strandScale = GetSimulationStrandScale();
+			var simulationBounds = GetSimulationBounds();
+			var strandDiameter = GetStrandDiameter();
+			var strandScale = GetStrandScale();
 
 			// update solver roots
 			for (int i = 0; i != solverData.Length; i++)
@@ -321,12 +423,12 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// update volume boundaries
-			HairSim.UpdateVolumeBoundaries(ref volumeData, volumeSettings, strandBounds);
+			HairSim.UpdateVolumeBoundaries(ref volumeData, volumeSettings, simulationBounds);
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
 			{
-				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, strandBounds, solverSettings.strandDiameter, strandScale);
+				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
 
@@ -337,7 +439,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// step volume data
-			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, strandBounds, solverSettings.strandDiameter, strandScale);
+			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 			// update renderers
@@ -544,7 +646,7 @@ namespace Unity.DemoTeam.Hair
 				var rootMesh = componentGroups[i].rootFilter.sharedMesh;
 				var rootTransform = componentGroups[i].rootFilter.transform.localToWorldMatrix;
 
-				var strandScale = GetSimulationStrandScale();
+				var strandScale = GetStrandScale();
 				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
 				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, 1.0f);
@@ -562,10 +664,11 @@ namespace Unity.DemoTeam.Hair
 
 			// init volume data
 			{
-				var strandScale = GetSimulationStrandScale();
-				var strandBounds = GetSimulationBoundsSquare();
+				var simulationBounds = GetSimulationBounds();
+				var strandDiameter = GetStrandDiameter();
+				var strandScale = GetStrandScale();
 
-				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, strandBounds, solverSettings.strandDiameter, strandScale);
+				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 				for (int i = 0; i != solverData.Length; i++)

@@ -167,12 +167,10 @@ namespace Unity.DemoTeam.Hair
 				LocalBendTwist,
 			}
 
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
-			public float strandDiameter;
-
 			[LineHeader("Solver")]
 
 			[Tooltip("Constraint solver")]
+
 			public Method method;
 			[Range(1, 100), Tooltip("Constraint iterations")]
 			public int iterations;
@@ -245,8 +243,6 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
-				strandDiameter = 1.0f,
-
 				method = Method.GaussSeidel,
 				iterations = 5,
 				stiffness = 1.0f,

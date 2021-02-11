@@ -48,7 +48,7 @@ namespace Unity.DemoTeam.Attributes
 				label.tooltip = labelTooltip;
 			}
 
-			property.boolValue = EditorGUILayout.Toggle(label, property.boolValue);
+			property.boolValue = EditorGUILayout.Toggle(label, property.boolValue, GUILayout.ExpandWidth(false));
 
 			using (new EditorGUI.DisabledScope(!property.boolValue))
 			{
@@ -74,15 +74,11 @@ namespace Unity.DemoTeam.Attributes
 
 						TryGetTooltipAttribute(field, out var fieldLabelTooltip);
 
-						var fieldLabel = new GUIContent(fieldLabelText, fieldLabelTooltip);
-						var fieldLabelPad = 18.0f;// ...
-						var fieldLabelWidth = EditorStyles.label.CalcSize(fieldLabel).x + fieldLabelPad;
-
-						GUILayout.Space(-10.0f);
-						EditorGUILayout.LabelField(fieldLabel, EditorStyles.label, GUILayout.MaxWidth(fieldLabelWidth));
+						GUILayout.Space(2.0f);
+						GUILayout.Label(new GUIContent(fieldLabelText, fieldLabelTooltip));
 					}
 
-					GUILayout.Space(-10.0f);
+					GUILayout.Space(-12.0f);
 					switch (property.propertyType)
 					{
 						case SerializedPropertyType.Enum:
@@ -152,12 +148,8 @@ namespace Unity.DemoTeam.Attributes
 
 					if (groupItem.withSuffix != null)
 					{
-						var fieldSuffix = new GUIContent(groupItem.withSuffix);
-						var fieldSuffixPad = 18.0f;// ...
-						var fieldSuffixWidth = EditorStyles.label.CalcSize(fieldSuffix).x + fieldSuffixPad;
-
-						GUILayout.Space(-10.0f);
-						EditorGUILayout.LabelField(fieldSuffix, EditorStyles.label, GUILayout.MaxWidth(fieldSuffixWidth));
+						GUILayout.Space(2.0f);
+						GUILayout.Label(new GUIContent(groupItem.withSuffix));
 					}
 				}
 			}

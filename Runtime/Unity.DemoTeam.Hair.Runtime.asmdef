@@ -18,6 +18,11 @@
     "defineConstraints": [],
     "versionDefines": [
         {
+            "name": "com.unity.formats.alembic",
+            "expression": "2.2.0-exp.1",
+            "define": "UNITY_FORMATS_ALEMBIC"
+        },
+        {
             "name": "com.unity.demoteam.digital-human",
             "expression": "0.1.1-preview",
             "define": "UNITY_DEMOTEAM_DIGITALHUMAN"
@@ -26,11 +31,6 @@
             "name": "com.unity.visualeffectgraph",
             "expression": "10.1.0",
             "define": "UNITY_VISUALEFFECTGRAPH"
-        },
-        {
-            "name": "com.unity.formats.alembic",
-            "expression": "2.2.0-exp.1",
-            "define": "UNITY_FORMATS_ALEMBIC"
         }
     ],
     "noEngineReferences": false

@@ -149,13 +149,12 @@ namespace Unity.DemoTeam.Hair
 				{
 					StructPropertyFieldsWithHeader(_settingsRoots);
 				}
-				if (_settingsRoots_rootsAttach == null)
+#if !UNITY_DEMOTEAM_DIGITALHUMAN
+				using (new EditorGUI.IndentLevelScope())
 				{
-					using (new EditorGUI.IndentLevelScope())
-					{
-						EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human'.", MessageType.None, wide: true);
-					}
+					EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human'.", MessageType.None, wide: true);
 				}
+#endif
 
 				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsStrands);
