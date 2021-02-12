@@ -145,7 +145,7 @@ namespace Unity.DemoTeam.Hair
 				stepsMin = false,
 				stepsMinValue = 1,
 				stepsMax = true,
-				stepsMaxValue = 10,
+				stepsMaxValue = 5,
 			};
 		}
 
@@ -165,7 +165,12 @@ namespace Unity.DemoTeam.Hair
 		public HairSim.SolverData[] solverData;
 		public HairSim.VolumeData volumeData;
 
-		private float accumulatedTime;
+		[NonSerialized]
+		public float accumulatedTime;
+		[NonSerialized]
+		public int stepsLastFrame;
+		[NonSerialized]
+		public float stepsLastFrameSmooth;
 
 		void OnEnable()
 		{
@@ -191,6 +196,26 @@ namespace Unity.DemoTeam.Hair
 		{
 			Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
 			Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData), 2.0f * HairSim.GetVolumeExtent(volumeData));
+
+			if (componentGroups != null)
+			{
+				foreach (var componentGroup in componentGroups)
+				{
+					var rootFilter = componentGroup.rootFilter;
+					if (rootFilter != null)
+					{
+						var rootMesh = rootFilter.sharedMesh;
+						if (rootMesh != null)
+						{
+							var rootBounds = rootMesh.bounds;
+
+							Gizmos.color = Color.Lerp(Color.blue, Color.clear, 0.5f);
+							Gizmos.matrix = rootFilter.transform.localToWorldMatrix;
+							Gizmos.DrawWireCube(rootBounds.center, rootBounds.size);
+						}
+					}
+				}
+			}
 		}
 
 		void Update()
@@ -300,6 +325,30 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public bool GetSimulationActive()
+		{
+			switch (settingsStrands.simulation)
+			{
+				case SettingsStrands.Simulation.Enabled: return true;
+				case SettingsStrands.Simulation.EnabledInPlaymode: return Application.isPlaying;
+			}
+
+			return false;
+		}
+
+		public float GetSimulationTimeStep()
+		{
+			switch (settingsStrands.simulationRate)
+			{
+				case SettingsStrands.SimulationRate.Fixed30Hz: return 1.0f / 30.0f;
+				case SettingsStrands.SimulationRate.Fixed60Hz: return 1.0f / 60.0f;
+				case SettingsStrands.SimulationRate.Fixed120Hz: return 1.0f / 120.0f;
+				case SettingsStrands.SimulationRate.CustomTimeStep: return settingsStrands.simulationTimeStep;
+			}
+
+			return 0.0f;
+		}
+
 		public float GetStrandDiameter()
 		{
 			return settingsStrands.strandDiameter;
@@ -346,33 +395,18 @@ namespace Unity.DemoTeam.Hair
 
 		public void DispatchTime(CommandBuffer cmd, float dt)
 		{
-			// skip if not simulating
-			switch (settingsStrands.simulation)
-			{
-				case SettingsStrands.Simulation.Disabled: return;
-				case SettingsStrands.Simulation.Enabled: break;
-				case SettingsStrands.Simulation.EnabledInPlaymode: if (Application.isPlaying) break; return;
-			}
+			var active = GetSimulationActive();
+			var stepDT = GetSimulationTimeStep();
 
-			// calc step length
-			var stepDT = 0.0f;
+			// skip if inactive or time step zero
+			if (stepDT == 0.0f || active == false)
 			{
-				switch (settingsStrands.simulationRate)
-				{
-					case SettingsStrands.SimulationRate.Fixed30Hz: stepDT = 1.0f / 30.0f; break;
-					case SettingsStrands.SimulationRate.Fixed60Hz: stepDT = 1.0f / 60.0f; break;
-					case SettingsStrands.SimulationRate.Fixed120Hz: stepDT = 1.0f / 120.0f; break;
-					case SettingsStrands.SimulationRate.CustomTimeStep: stepDT = settingsStrands.simulationTimeStep; break;
-				}
-			}
-
-			// skip if not simulating due to zero time step
-			if (stepDT == 0.0f)
-			{
+				stepsLastFrame = 0;
+				stepsLastFrameSmooth = 0.0f;
 				return;
 			}
 
-			// calc step count
+			// calc number of steps
 			accumulatedTime += dt;
 
 			var stepCountRT = (int)Mathf.Floor(accumulatedTime / stepDT);
@@ -387,17 +421,22 @@ namespace Unity.DemoTeam.Hair
 			if (accumulatedTime < 0.0f)
 				accumulatedTime = 0.0f;
 
-			// warn if truncating
-			if (stepCount < stepCountRT)
-			{
-				Debug.LogWarning("Number of simulation steps clamped to " + stepCount + " from " + stepCountRT, this);
-			}
+			////TODO some kind of toggle/loglevel
+			//// warn if truncating
+			//if (stepCount < stepCountRT)
+			//{
+			//	Debug.LogWarning("Number of simulation steps clamped to " + stepCount + " from " + stepCountRT, this);
+			//}
 
 			// perform the steps
 			for (int i = 0; i != stepCount; i++)
 			{
 				DispatchStep(cmd, stepDT);
 			}
+
+			// update counters
+			stepsLastFrame = stepCount;
+			stepsLastFrameSmooth = Mathf.Lerp(stepsLastFrameSmooth, stepsLastFrame, 1.0f - Mathf.Pow(0.01f, dt / 0.2f));
 		}
 
 		public void DispatchStep(CommandBuffer cmd, float dt)

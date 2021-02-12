@@ -119,15 +119,19 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.Space();
 			EditorGUILayout.BeginHorizontal();
 			{
-				if (GUILayout.Button("Build strand groups") || (settingsChanged && _strandGroupsAutoBuild.boolValue))
+				var buildNow = GUILayout.Button("Build strand groups");
+				var buildAuto = EditorGUILayout.ToggleLeft("Auto", _strandGroupsAutoBuild.boolValue, GUILayout.Width(50.0f));
+				var buildAutoDown = buildAuto && (_strandGroupsAutoBuild.boolValue == false);
+
+				_strandGroupsAutoBuild.boolValue = buildAuto;
+
+				if (buildNow || (buildAuto && settingsChanged) || buildAutoDown)
 				{
 					HairAssetBuilder.ClearHairAsset(hairAsset);
 					serializedObject.ApplyModifiedPropertiesWithoutUndo();
 					HairAssetBuilder.BuildHairAsset(hairAsset);
 					serializedObject.Update();
 				}
-
-				_strandGroupsAutoBuild.boolValue = EditorGUILayout.ToggleLeft("Auto", _strandGroupsAutoBuild.boolValue, GUILayout.Width(50.0f));
 			}
 			EditorGUILayout.EndHorizontal();
 		}
@@ -189,12 +193,12 @@ namespace Unity.DemoTeam.Hair
 									previewZoom = Mathf.Clamp01(previewZoom);
 									e.Use();
 
-									GUI.changed = true;
+									//EditorUtility.SetDirty(hairAsset);
 								}
 
 								if (Drag2D(ref previewDrag, rect))
 								{
-									GUI.changed = true;
+									//EditorUtility.SetDirty(hairAsset);
 								}
 
 								var meshRoots = hairAsset.strandGroups[i].meshAssetRoots;

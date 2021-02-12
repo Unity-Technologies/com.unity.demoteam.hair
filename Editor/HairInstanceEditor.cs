@@ -8,13 +8,14 @@ namespace Unity.DemoTeam.Hair
 	[CustomEditor(typeof(HairInstance)), CanEditMultipleObjects]
 	public class HairInstanceEditor : Editor
 	{
+		static bool s_indicator;
+
 		Editor hairAssetEditor;
 
 		SerializedProperty _hairAsset;
 		SerializedProperty _hairAssetQuickEdit;
 
 		SerializedProperty _settingsRoots;
-		SerializedProperty _settingsRoots_rootsAttach;
 		SerializedProperty _settingsStrands;
 
 		SerializedProperty _settingsSolver;
@@ -27,7 +28,6 @@ namespace Unity.DemoTeam.Hair
 			_hairAssetQuickEdit = serializedObject.FindProperty("hairAssetQuickEdit");
 
 			_settingsRoots = serializedObject.FindProperty("settingsRoots");
-			_settingsRoots_rootsAttach = _settingsRoots.FindPropertyRelative("rootsAttach");
 			_settingsStrands = serializedObject.FindProperty("settingsStrands");
 
 			_settingsSolver = serializedObject.FindProperty("solverSettings");
@@ -158,6 +158,63 @@ namespace Unity.DemoTeam.Hair
 
 				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsStrands);
+
+				using (new EditorGUI.IndentLevelScope())
+				{
+					EditorGUILayout.Space(-EditorGUIUtility.standardVerticalSpacing);
+					EditorGUILayout.BeginHorizontal();
+					EditorGUILayout.PrefixLabel("Steps Status");
+					EditorGUILayout.BeginVertical();
+					EditorGUILayout.Space(EditorGUIUtility.standardVerticalSpacing);
+
+					var rect = GUILayoutUtility.GetRect(0.0f, EditorGUIUtility.singleLineHeight, GUILayout.ExpandWidth(true));
+					if (rect.Contains(Event.current.mousePosition) && Event.current.type == EventType.MouseDown)
+					{
+						s_indicator = !s_indicator;
+					}
+
+					if (s_indicator)
+					{
+						var stepsMin = hairInstance.settingsStrands.stepsMin ? hairInstance.settingsStrands.stepsMinValue : 0;
+						var stepsMax = hairInstance.settingsStrands.stepsMax ? hairInstance.settingsStrands.stepsMaxValue : (int)Mathf.Ceil(hairInstance.stepsLastFrameSmooth);
+						if (stepsMax == 0)
+							stepsMax = 1;
+
+						var stepDT = hairInstance.GetSimulationTimeStep();
+						var stepCount = hairInstance.stepsLastFrameSmooth;
+
+						var rectWidth = rect.width;
+						var rectWidthStep = rectWidth / stepsMax;
+						var rectWidthCount = Mathf.Min(rectWidth, rectWidthStep * stepCount);
+
+						rect.width = rectWidthCount;
+						{
+							using (new ColorScope(Color.green, ColorScope.Type.Color))
+							{
+								EditorGUI.HelpBox(rect, string.Empty, MessageType.None);
+							}
+						}
+
+						rect.width = rectWidthStep;
+						{
+							var text = stepDT.ToString();
+							for (int i = 0; i != stepsMax; i++)
+							{
+								EditorGUI.HelpBox(rect, text, MessageType.None);
+								rect.x += rectWidthStep;
+							}
+						}
+
+						EditorUtility.SetDirty(hairInstance);
+					}
+					else
+					{
+						EditorGUI.HelpBox(rect, "Click to toggle indicator.", MessageType.None);
+					}
+
+					EditorGUILayout.EndVertical();
+					EditorGUILayout.EndHorizontal();
+				}
 			}
 
 			if (EditorGUI.EndChangeCheck())
@@ -221,7 +278,7 @@ namespace Unity.DemoTeam.Hair
 					var countPack = countCapsule + countSphere + countTorus;
 					var countTxt = countPack + " active shapes (" + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus)";
 
-					var rectHeight = GUI.skin.box.CalcHeight(new GUIContent(string.Empty), 0.0f);
+					var rectHeight = HairGUIStyles.statusBox.CalcHeight(new GUIContent(string.Empty), 0.0f);
 					var rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
 
 					using (new ColorScope(Color.white))
@@ -245,7 +302,7 @@ namespace Unity.DemoTeam.Hair
 				StructPropertyFieldsWithHeader(_settingsDebug, "Settings Debug");
 				using (new EditorGUI.IndentLevelScope())
 				{
-					var divider = _settingsDebug.FindPropertyRelative("drawSliceDivider").floatValue;
+					var divider = hairInstance.debugSettings.drawSliceDivider;
 					var dividerBase = Mathf.Floor(divider);
 					var dividerFrac = divider - Mathf.Floor(divider);
 
