@@ -111,7 +111,7 @@ namespace Unity.DemoTeam.Hair
 			[RenderingLayerMask]
 			public int strandLayer;
 
-			[LineHeader("Dynamics")]
+			[LineHeader("Physics")]
 
 			[Tooltip("Simulation state")]
 			public Simulation simulation;
@@ -145,7 +145,7 @@ namespace Unity.DemoTeam.Hair
 				stepsMin = false,
 				stepsMinValue = 1,
 				stepsMax = true,
-				stepsMaxValue = 5,
+				stepsMaxValue = 2,
 			};
 		}
 
@@ -171,6 +171,8 @@ namespace Unity.DemoTeam.Hair
 		public int stepsLastFrame;
 		[NonSerialized]
 		public float stepsLastFrameSmooth;
+		[NonSerialized]
+		public int stepsLastFrameSkipped;
 
 		void OnEnable()
 		{
@@ -403,6 +405,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				stepsLastFrame = 0;
 				stepsLastFrameSmooth = 0.0f;
+				stepsLastFrameSkipped = 0;
 				return;
 			}
 
@@ -416,17 +419,11 @@ namespace Unity.DemoTeam.Hair
 				stepCount = Mathf.Min(stepCount, settingsStrands.stepsMax ? settingsStrands.stepsMaxValue : stepCount);
 			}
 
+			// always subtract the maximum (effectively clear accumulated if skipping frames)
 			accumulatedTime -= Mathf.Max(stepCountRT, stepCount) * stepDT;
 
 			if (accumulatedTime < 0.0f)
 				accumulatedTime = 0.0f;
-
-			////TODO some kind of toggle/loglevel
-			//// warn if truncating
-			//if (stepCount < stepCountRT)
-			//{
-			//	Debug.LogWarning("Number of simulation steps clamped to " + stepCount + " from " + stepCountRT, this);
-			//}
 
 			// perform the steps
 			for (int i = 0; i != stepCount; i++)
@@ -437,6 +434,7 @@ namespace Unity.DemoTeam.Hair
 			// update counters
 			stepsLastFrame = stepCount;
 			stepsLastFrameSmooth = Mathf.Lerp(stepsLastFrameSmooth, stepsLastFrame, 1.0f - Mathf.Pow(0.01f, dt / 0.2f));
+			stepsLastFrameSkipped = Mathf.Max(0, stepCountRT - stepCount);
 		}
 
 		public void DispatchStep(CommandBuffer cmd, float dt)

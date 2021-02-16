@@ -98,12 +98,12 @@ namespace Unity.DemoTeam.Hair
 		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsAlembic settings, HairAsset.MemoryLayout memoryLayout)
 		{
 			// check stream present
-			var alembic = settings.sourceAsset;
+			var alembic = settings.alembicAsset;
 			if (alembic == null)
 				return;
 
 			// instantiate to load the data
-			var alembicInstantiated = EditorUtility.IsPersistent(settings.sourceAsset);
+			var alembicInstantiated = EditorUtility.IsPersistent(settings.alembicAsset);
 			if (alembicInstantiated)
 			{
 				alembic = GameObject.Instantiate(alembic);
@@ -133,6 +133,11 @@ namespace Unity.DemoTeam.Hair
 
 		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
 		{
+			// check placement target present
+			var placementMesh = settings.placementMesh;
+			if (placementMesh == null && settings.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
+				return;
+
 			// prep strand groups in hair asset
 			hairAsset.strandGroups = new HairAsset.StrandGroup[1];
 
@@ -290,12 +295,12 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.particlePosition = new Vector3[curveCount * curvePointCount];
 
 			// build curve buffers
-			using (var tmpRoots = GenerateRoots(settings))
-			using (var tmpStrands = GenerateStrands(settings, tmpRoots, memoryLayout))
+			using (var procRoots = GenerateRoots(settings))
+			using (var procStrands = GenerateStrands(settings, procRoots, memoryLayout))
 			{
-				tmpRoots.rootPosition.CopyTo(strandGroup.rootPosition);
-				tmpRoots.rootDirection.CopyTo(strandGroup.rootDirection);
-				tmpStrands.particlePosition.CopyTo(strandGroup.particlePosition);
+				procRoots.rootPosition.CopyTo(strandGroup.rootPosition);
+				procRoots.rootDirection.CopyTo(strandGroup.rootDirection);
+				procStrands.particlePosition.CopyTo(strandGroup.particlePosition);
 			}
 
 			// apply memory layout
@@ -465,12 +470,12 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public struct IntermediateRoots : IDisposable
+		public struct GeneratedRoots : IDisposable
 		{
 			public NativeArray<Vector3> rootPosition;
 			public NativeArray<Vector3> rootDirection;
 
-			public IntermediateRoots(int strandCount)
+			public GeneratedRoots(int strandCount)
 			{
 				rootPosition = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 				rootDirection = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
@@ -483,13 +488,13 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public struct IntermediateStrands : IDisposable
+		public struct GeneratedStrands : IDisposable
 		{
 			public int strandCount;
 			public int strandParticleCount;
 			public NativeArray<Vector3> particlePosition;
 
-			public IntermediateStrands(int strandCount, int strandParticleCount)
+			public GeneratedStrands(int strandCount, int strandParticleCount)
 			{
 				this.strandCount = strandCount;
 				this.strandParticleCount = strandParticleCount;
@@ -502,107 +507,373 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static IntermediateRoots GenerateRoots(in HairAsset.SettingsProcedural settings)
+		public static GeneratedRoots GenerateRoots(in HairAsset.SettingsProcedural settings)
 		{
-			var tmpRoots = new IntermediateRoots(settings.strandCount);
+			var procRoots = new GeneratedRoots(settings.strandCount);
 
 			unsafe
 			{
-				var rootPos = (Vector3*)tmpRoots.rootPosition.GetUnsafePtr();
-				var rootDir = (Vector3*)tmpRoots.rootDirection.GetUnsafePtr();
+				var rootPos = (Vector3*)procRoots.rootPosition.GetUnsafePtr();
+				var rootDir = (Vector3*)procRoots.rootDirection.GetUnsafePtr();
 
-				switch (settings.style)
+				if (settings.placement == HairAsset.SettingsProcedural.PlacementType.Primitive)
 				{
-					case HairAsset.SettingsProcedural.Style.Curtain:
-						{
-							var strandSpan = 1.0f;
-							var strandInterval = strandSpan / (settings.strandCount - 1);
+					switch (settings.placementPrimitive)
+					{
+						case HairAsset.SettingsProcedural.PrimitiveType.Curtain:
+							{
+								var strandSpan = 1.0f;
+								var strandInterval = strandSpan / (settings.strandCount - 1);
 
-							var startPos = (-0.5f * strandSpan) * Vector3.right;
-							var startDir = Vector3.down;
+								var startPos = (-0.5f * strandSpan) * Vector3.right;
+								var startDir = Vector3.down;
+
+								for (int i = 0; i != settings.strandCount; i++)
+								{
+									rootPos[i] = startPos + i * strandInterval * Vector3.right;
+									rootDir[i] = startDir;
+								}
+							}
+							break;
+
+						case HairAsset.SettingsProcedural.PrimitiveType.StratifiedCurtain:
+							{
+								var strandSpan = 1.0f;
+								var strandInterval = strandSpan / settings.strandCount;
+								var strandIntervalNoise = 0.5f;
+
+								var xorshift = new Unity.Mathematics.Random(257);
+
+								for (int i = 0; i != settings.strandCount; i++)
+								{
+									var localRnd = strandIntervalNoise * xorshift.NextFloat2(-1.0f, 1.0f);
+									var localPos = -0.5f * strandSpan + (i + 0.5f + 0.5f * localRnd.x) * strandInterval;
+
+									rootPos[i] = new Vector3(localPos, 0.0f, 0.5f * localRnd.y * strandInterval);
+									rootDir[i] = Vector3.down;
+								}
+							}
+							break;
+
+						case HairAsset.SettingsProcedural.PrimitiveType.Brush:
+							{
+								var localExt = 0.5f * Vector3.one;
+								var localMin = new Vector2(-localExt.x, -localExt.z);
+								var localMax = new Vector2(localExt.x, localExt.z);
+
+								var xorshift = new Unity.Mathematics.Random(257);
+
+								for (int i = 0; i != settings.strandCount; i++)
+								{
+									var localPos = xorshift.NextFloat2(localMin, localMax);
+
+									rootPos[i] = new Vector3(localPos.x, 0.0f, localPos.y);
+									rootDir[i] = Vector3.down;
+								}
+							}
+							break;
+
+						case HairAsset.SettingsProcedural.PrimitiveType.Cap:
+							{
+								var localExt = 0.5f;
+								var xorshift = new Unity.Mathematics.Random(257);
+
+								for (int i = 0; i != settings.strandCount; i++)
+								{
+									var localDir = xorshift.NextFloat3Direction();
+									if (localDir.y < 0.0f)
+										localDir.y = -localDir.y;
+
+									rootPos[i] = (Vector3)localDir * localExt;
+									rootDir[i] = (Vector3)localDir;
+								}
+							}
+							break;
+					}
+				}
+				else if (settings.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
+				{
+					using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.placementMesh))
+					using (var meshSampler = new TriMeshSampler(meshData[0], 0, Allocator.Temp))
+					{
+						if (settings.placementDensity != null && settings.placementDensity.isReadable)
+						{
+							var density = settings.placementDensity;
+							var densityThreshold = new Unity.Mathematics.Random(257);
 
 							for (int i = 0; i != settings.strandCount; i++)
 							{
-								rootPos[i] = startPos + i * strandInterval * Vector3.right;
-								rootDir[i] = startDir;
+								var sample = meshSampler.Next();
+								var sampleDensity = density.GetPixelBilinear(sample.uv0.x, sample.uv0.y);
+								var sampleIteration = 0;// safety
+
+								while (sampleDensity.r < densityThreshold.NextFloat() && sampleIteration++ < 200)
+								{
+									sample = meshSampler.Next();
+									sampleDensity = density.GetPixelBilinear(sample.uv0.x, sample.uv0.y, 0);
+								}
+
+								rootPos[i] = sample.position;
+								rootDir[i] = sample.normal;
 							}
 						}
-						break;
-
-					case HairAsset.SettingsProcedural.Style.StratifiedCurtain:
+						else
 						{
-							var strandSpan = 1.0f;
-							var strandInterval = strandSpan / settings.strandCount;
-							var strandIntervalNoise = 0.5f;
-
-							var xorshift = new Unity.Mathematics.Random(257);
-
 							for (int i = 0; i != settings.strandCount; i++)
 							{
-								var localRnd = strandIntervalNoise * xorshift.NextFloat2(-1.0f, 1.0f);
-								var localPos = -0.5f * strandSpan + (i + 0.5f + 0.5f * localRnd.x) * strandInterval;
-
-								rootPos[i] = new Vector3(localPos, 0.0f, 0.5f * localRnd.y * strandInterval);
-								rootDir[i] = Vector3.down;
+								var sample = meshSampler.Next();
+								rootPos[i] = sample.position;
+								rootDir[i] = sample.normal;
 							}
 						}
-						break;
-
-					case HairAsset.SettingsProcedural.Style.Brush:
-						{
-							var localExt = 0.5f * Vector3.one;
-							var localMin = new Vector2(-localExt.x, -localExt.z);
-							var localMax = new Vector2(localExt.x, localExt.z);
-
-							var xorshift = new Unity.Mathematics.Random(257);
-
-							for (int i = 0; i != settings.strandCount; i++)
-							{
-								var localPos = xorshift.NextFloat2(localMin, localMax);
-
-								rootPos[i] = new Vector3(localPos.x, 0.0f, localPos.y);
-								rootDir[i] = Vector3.down;
-							}
-						}
-						break;
-
-					case HairAsset.SettingsProcedural.Style.Cap:
-						{
-							var localExt = 0.5f;
-							var xorshift = new Unity.Mathematics.Random(257);
-
-							for (int i = 0; i != settings.strandCount; i++)
-							{
-								var localDir = xorshift.NextFloat3Direction();
-								if (localDir.y < 0.0f)
-									localDir.y = -localDir.y;
-
-								rootPos[i] = (Vector3)localDir * localExt;
-								rootDir[i] = (Vector3)localDir;
-							}
-						}
-						break;
+					}
 				}
 			}
 
-			return tmpRoots;
+			return procRoots;
 		}
 
-		public static IntermediateStrands GenerateStrands(in HairAsset.SettingsProcedural settings, in IntermediateRoots tmpRoots, HairAsset.MemoryLayout memoryLayout)
+		public struct TriMeshBuffers : IDisposable
 		{
-			var tmpStrands = new IntermediateStrands(settings.strandCount, settings.strandParticleCount);
+			[Flags]
+			public enum Attribute
+			{
+				All = Position | Normal | UV0,
+				Position = 1 << 0,
+				Normal = 1 << 1,
+				UV0 = 1 << 2,
+			}
+
+			public int vertexCount;
+			public Attribute vertexAttributes;
+
+			public NativeArray<Vector3> vertexPosition;
+			public NativeArray<Vector3> vertexNormal;
+			public NativeArray<Vector2> vertexUV0;
+
+			public int triangleVertexCount;
+			public NativeArray<int> triangleVertexIndices;
+
+			public TriMeshBuffers(Mesh.MeshData meshData, Attribute meshAttributes = Attribute.All, Allocator allocator = Allocator.Temp)
+			{
+				vertexCount = meshData.vertexCount;
+				vertexAttributes = meshAttributes;
+
+				vertexPosition = new NativeArray<Vector3>(vertexCount, allocator, NativeArrayOptions.UninitializedMemory);
+				vertexNormal = new NativeArray<Vector3>(vertexCount, allocator, NativeArrayOptions.UninitializedMemory);
+				vertexUV0 = new NativeArray<Vector2>(vertexCount, allocator, NativeArrayOptions.UninitializedMemory);
+
+				if (vertexAttributes.HasFlag(Attribute.Position))
+					meshData.GetVertices(vertexPosition);
+
+				if (vertexAttributes.HasFlag(Attribute.Normal))
+					meshData.GetNormals(vertexNormal);
+
+				if (vertexAttributes.HasFlag(Attribute.UV0))
+					meshData.GetUVs(0, vertexUV0);
+
+				triangleVertexCount = 0;
+				{
+					for (int i = 0; i != meshData.subMeshCount; i++)
+					{
+						var submesh = meshData.GetSubMesh(i);
+						if (submesh.topology != MeshTopology.Triangles)
+							continue;
+
+						triangleVertexCount += submesh.indexCount;
+					}
+				}
+
+				triangleVertexIndices = new NativeArray<int>(triangleVertexCount, allocator, NativeArrayOptions.UninitializedMemory);
+				{
+					int writeOffset = 0;
+
+					for (int i = 0; i != meshData.subMeshCount; i++)
+					{
+						var submesh = meshData.GetSubMesh(i);
+						if (submesh.topology != MeshTopology.Triangles)
+							continue;
+
+						var indexCount = submesh.indexCount;
+						if (indexCount == 0)
+							continue;
+
+						using (var meshIndices = new NativeArray<int>(indexCount, allocator, NativeArrayOptions.UninitializedMemory))
+						{
+							meshData.GetIndices(meshIndices, i);
+							meshIndices.CopyTo(triangleVertexIndices.GetSubArray(writeOffset, submesh.indexCount));
+						}
+
+						writeOffset += indexCount;
+					}
+				}
+			}
+
+			public bool HasAttribute(Attribute attribute)
+			{
+				return vertexAttributes.HasFlag(attribute);
+			}
+
+			public void Dispose()
+			{
+				if (vertexPosition.IsCreated)
+					vertexPosition.Dispose();
+
+				if (vertexNormal.IsCreated)
+					vertexNormal.Dispose();
+
+				if (vertexUV0.IsCreated)
+					vertexUV0.Dispose();
+			}
+		}
+
+		public struct TriMeshSampler : IDisposable
+		{
+			public TriMeshBuffers triangleMesh;
+
+			public int triangleCount;
+			public float triangleAreaSum;
+			public NativeArray<float> triangleArea;
+			public NativeArray<float> triangleAreaAccu;
+
+			public Unity.Mathematics.Random randSeed;
+			public Unity.Mathematics.Random rand;
+
+			public TriMeshSampler(Mesh.MeshData meshData, uint seedIndex, Allocator allocator = Allocator.Temp)
+			{
+				triangleMesh = new TriMeshBuffers(meshData, TriMeshBuffers.Attribute.All, allocator);
+
+				triangleCount = triangleMesh.triangleVertexCount / 3;
+				triangleAreaSum = 0.0f;
+
+				triangleArea = new NativeArray<float>(triangleCount, allocator);
+				triangleAreaAccu = new NativeArray<float>(triangleCount, allocator);
+
+				// calc triangle area + total
+				for (int i = 0; i != triangleCount; i++)
+				{
+					var j0 = triangleMesh.triangleVertexIndices[i * 3 + 0];
+					var j1 = triangleMesh.triangleVertexIndices[i * 3 + 1];
+					var j2 = triangleMesh.triangleVertexIndices[i * 3 + 2];
+
+					var p0 = triangleMesh.vertexPosition[j0];
+					var p1 = triangleMesh.vertexPosition[j1];
+					var p2 = triangleMesh.vertexPosition[j2];
+
+					var area = 0.5f * Mathf.Abs(Vector3.Magnitude(Vector3.Cross(p2 - p0, p1 - p0)));
+
+					triangleAreaSum += area;
+					triangleArea[i] = area;
+				}
+
+				// calc triangle area accumulated until current index
+				if (triangleCount > 0)
+				{
+					triangleAreaAccu[0] = triangleArea[0];
+					for (int i = 1; i != triangleCount; i++)
+					{
+						triangleAreaAccu[i] = triangleAreaAccu[i - 1] + triangleArea[i];
+					}
+				}
+
+				// initial sequence
+				rand = randSeed = Unity.Mathematics.Random.CreateFromIndex(seedIndex);
+			}
+
+			public void Dispose()
+			{
+				triangleMesh.Dispose();
+
+				triangleArea.Dispose();
+				triangleAreaAccu.Dispose();
+			}
+
+			private void ResetSequence()
+			{
+				rand = randSeed;
+			}
+
+			private int NextTriangleIndex()
+			{
+				if (triangleCount == 0)
+				{
+					return -1;
+				}
+				else
+				{
+					var searchValue = triangleAreaSum * rand.NextFloat();
+					var searchIndex = triangleAreaAccu.BinarySearch(searchValue);
+
+					if (searchIndex > 0)
+						return searchIndex;
+					else
+						return ~searchIndex;
+				}
+			}
+
+			public Sample Next()
+			{
+				var i = NextTriangleIndex();
+				if (i == -1)
+				{
+					return new Sample();
+				}
+
+				var s = rand.NextFloat();
+				var t = rand.NextFloat();
+				if (s + t > 1.0f)
+				{
+					s = 1.0f - s;
+					t = 1.0f - t;
+				}
+
+				var j0 = triangleMesh.triangleVertexIndices[i * 3 + 0];
+				var j1 = triangleMesh.triangleVertexIndices[i * 3 + 1];
+				var j2 = triangleMesh.triangleVertexIndices[i * 3 + 2];
+
+				var	p0 = triangleMesh.vertexPosition[j0];
+				var p1 = triangleMesh.vertexPosition[j1] - p0;
+				var p2 = triangleMesh.vertexPosition[j2] - p0;
+
+				var n0 = triangleMesh.vertexNormal[j0];
+				var n1 = triangleMesh.vertexNormal[j1] - n0;
+				var n2 = triangleMesh.vertexNormal[j2] - n0;
+
+				var u0 = triangleMesh.vertexUV0[j0];
+				var u1 = triangleMesh.vertexUV0[j1] - u0;
+				var u2 = triangleMesh.vertexUV0[j2] - u0;
+
+				return new Sample()
+				{
+					position = p0 + s * p1 + t * p2,
+					normal = n0 + s * n1 + t * n2,
+					uv0 = u0 + s * u1 + t * u2,
+				};
+			}
+
+			public struct Sample
+			{
+				public Vector3 position;
+				public Vector3 normal;
+				public Vector2 uv0;
+			}
+		}
+
+		public static GeneratedStrands GenerateStrands(in HairAsset.SettingsProcedural settings, in GeneratedRoots procRoots, HairAsset.MemoryLayout memoryLayout)
+		{
+			var procStrands = new GeneratedStrands(settings.strandCount, settings.strandParticleCount);
 
 			unsafe
 			{
-				var rootPos = (Vector3*)tmpRoots.rootPosition.GetUnsafePtr();
-				var rootDir = (Vector3*)tmpRoots.rootDirection.GetUnsafePtr();
-				var pos = (Vector3*)tmpStrands.particlePosition.GetUnsafePtr();
+				var rootPos = (Vector3*)procRoots.rootPosition.GetUnsafePtr();
+				var rootDir = (Vector3*)procRoots.rootDirection.GetUnsafePtr();
+				var pos = (Vector3*)procStrands.particlePosition.GetUnsafePtr();
 
 				var particleInterval = settings.strandLength / (settings.strandParticleCount - 1);
 				var particleIntervalVariation = settings.strandLengthVariation ? settings.strandLengthVariationAmount : 0.0f;
 
-				var curlRadiusVariation = settings.strandCurlVariation ? settings.strandCurlVariationRadius : 0.0f;
-				var curlSlopeVariation = settings.strandCurlVariation ? settings.strandCurlVariationSlope : 0.0f;
+				var curlRadiusVariation = settings.curlVariation ? settings.curlVariationRadius : 0.0f;
+				var curlSlopeVariation = settings.curlVariation ? settings.curlVariationSlope : 0.0f;
 
 				var randSeqParticleInterval = new Unity.Mathematics.Random(257);
 				var randSeqCurlPlaneUV = new Unity.Mathematics.Random(457);
@@ -618,7 +889,7 @@ namespace Unity.DemoTeam.Hair
 
 					DeclareStrandIterator(memoryLayout, i, settings.strandCount, settings.strandParticleCount, out var strandParticleBegin, out var strandParticleStride, out var strandParticleEnd);
 
-					if (settings.strandCurl)
+					if (settings.curl)
 					{
 						Vector3 NextVectorInPlane(ref Mathematics.Random randSeq, in Vector3 n)
 						{
@@ -633,17 +904,27 @@ namespace Unity.DemoTeam.Hair
 						var curPlaneU = Vector3.Normalize(NextVectorInPlane(ref randSeqCurlPlaneUV, curDir));
 						var curPlaneV = Vector3.Cross(curPlaneU, curDir);
 
-						var targetRadius = settings.strandCurlRadius * 0.01f * Mathf.Lerp(1.0f, randSeqCurlRadius.NextFloat(), curlRadiusVariation);
-						var targetSlope = settings.strandCurlSlope * Mathf.Lerp(1.0f, randSeqCurlSlope.NextFloat(), curlSlopeVariation);
+						var targetRadius = settings.curlRadius * 0.01f * Mathf.Lerp(1.0f, randSeqCurlRadius.NextFloat(), curlRadiusVariation);
+						var targetSlope = settings.curlSlope * Mathf.Lerp(1.0f, randSeqCurlSlope.NextFloat(), curlSlopeVariation);
 
 						var stepPlane = step * Mathf.Cos(0.5f * Mathf.PI * targetSlope);
 						if (stepPlane > 1.0f * targetRadius)
 							stepPlane = 1.0f * targetRadius;
 
-						var stepSlope = step * Mathf.Sin(0.5f * Mathf.PI * targetSlope);
-						if (settings.strandCurlSlopeRelaxed)
+						var stepSlope = 0.0f;
 						{
-							stepSlope = Mathf.Sqrt(step * step - stepPlane * stepPlane);
+							switch (settings.curlSamplingStrategy)
+							{
+								// maintain slope
+								case HairAsset.SettingsProcedural.CurlSamplingStrategy.RelaxStrandLength:
+									stepSlope = step * Mathf.Sin(0.5f * Mathf.PI * targetSlope);
+									break;
+
+								// maintain strand length
+								case HairAsset.SettingsProcedural.CurlSamplingStrategy.RelaxCurlSlope:
+									stepSlope = Mathf.Sqrt(step * step - stepPlane * stepPlane);
+									break;
+							}
 						}
 
 						var a = (stepPlane > 0.0f) ? 2.0f * Mathf.Asin(stepPlane / (2.0f * targetRadius)) : 0.0f;
@@ -676,7 +957,7 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			return tmpStrands;
+			return procStrands;
 		}
 
 		public static void DeclareStrandIterator(HairAsset.MemoryLayout memoryLayout, int strandIndex, int strandCount, int strandParticleCount,

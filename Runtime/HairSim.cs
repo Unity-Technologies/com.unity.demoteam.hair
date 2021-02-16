@@ -146,12 +146,12 @@ namespace Unity.DemoTeam.Hair
 				Jacobi = 2,
 			}
 
-			public enum Frequency
+			public enum TimeSpan
 			{
 				PerSecond,
-				Per30HzFrame,
-				Per60HzFrame,
-				PerMillisecond,
+				Per100ms,
+				Per10ms,
+				Per1ms,
 			}
 
 			public enum BendCompare
@@ -187,8 +187,8 @@ namespace Unity.DemoTeam.Hair
 			public float cellVelocity;
 			[Range(0.0f, 1.0f), Tooltip("Linear damping factor (fraction of linear velocity to subtract per unit of time)")]
 			public float damping;
-			[HideInInspector, Tooltip("Unit of time")]
-			public Frequency dampingRate;
+			[HideInInspector, Tooltip("Unit of time")]//TODO expose in ui?
+			public TimeSpan dampingPeriod;
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
 
@@ -228,8 +228,8 @@ namespace Unity.DemoTeam.Hair
 			public bool globalPosition;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Fraction of global position to apply per unit of time")]
 			public float globalPositionInfluence;
-			[ToggleGroupItem, Tooltip("Unit of time")]
-			public Frequency globalPositionRate;
+			[ToggleGroupItem, Tooltip("Unit of time during which to apply fraction of global position")]
+			public TimeSpan globalPositionPeriod;
 			[ToggleGroup, Tooltip("Enable global rotation constraint")]
 			public bool globalRotation;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Global rotation influence")]
@@ -251,7 +251,7 @@ namespace Unity.DemoTeam.Hair
 				cellPressure = 1.0f,
 				cellVelocity = 0.05f,
 				damping = 0.0f,
-				dampingRate = Frequency.PerSecond,
+				dampingPeriod = TimeSpan.PerSecond,
 				gravity = 1.0f,
 
 				distance = true,
@@ -270,12 +270,12 @@ namespace Unity.DemoTeam.Hair
 
 				globalPosition = false,
 				globalPositionInfluence = 1.0f,
-				globalPositionRate = Frequency.PerSecond,
+				globalPositionPeriod = TimeSpan.PerSecond,
 				globalRotation = false,
 				globalRotationInfluence = 1.0f,
 				globalFade = false,
 				globalFadeOffset = 0.1f,
-				globalFadeExtent = 0.1f,
+				globalFadeExtent = 0.2f,
 			};
 		}
 
@@ -593,15 +593,15 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._StrandScale = strandScale;
 
 			// update solver parameters
-			float GetPeriod(SolverSettings.Frequency freq)
+			float GetSeconds(SolverSettings.TimeSpan period)
 			{
-				switch (freq)
+				switch (period)
 				{
 					default:
-					case SolverSettings.Frequency.PerSecond: return 1.0f;
-					case SolverSettings.Frequency.Per30HzFrame: return 1.0f / 30.0f;
-					case SolverSettings.Frequency.Per60HzFrame: return 1.0f / 60.0f;
-					case SolverSettings.Frequency.PerMillisecond: return 1.0f / 1000.0f;
+					case SolverSettings.TimeSpan.PerSecond: return 1.0f;
+					case SolverSettings.TimeSpan.Per100ms: return 0.1f;
+					case SolverSettings.TimeSpan.Per10ms: return 0.01f;
+					case SolverSettings.TimeSpan.Per1ms: return 0.001f;
 				}
 			}
 
@@ -613,7 +613,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._CellPressure = solverSettings.cellPressure;
 			cbuffer._CellVelocity = solverSettings.cellVelocity;
 			cbuffer._Damping = solverSettings.damping;
-			cbuffer._DampingPeriod = GetPeriod(solverSettings.dampingRate);
+			cbuffer._DampingPeriod = GetSeconds(solverSettings.dampingPeriod);
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
 
 			cbuffer._FTLDamping = solverSettings.distanceFTLDamping;
@@ -621,7 +621,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f;
 
 			cbuffer._GlobalPosition = solverSettings.globalPositionInfluence;
-			cbuffer._GlobalPositionPeriod = GetPeriod(solverSettings.globalPositionRate);
+			cbuffer._GlobalPositionPeriod = GetSeconds(solverSettings.globalPositionPeriod);
 			cbuffer._GlobalRotation = solverSettings.globalRotationInfluence;
 			cbuffer._GlobalFadeOffset = solverSettings.globalFade ? solverSettings.globalFadeOffset : 1e9f;
 			cbuffer._GlobalFadeExtent = solverSettings.globalFade ? solverSettings.globalFadeExtent : 1e9f;

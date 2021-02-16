@@ -4,6 +4,7 @@ using UnityEditor;
 namespace Unity.DemoTeam.Hair
 {
 	using static HairGUILayout;
+	using static HairGUIUtility;
 
 	[CustomEditor(typeof(HairInstance)), CanEditMultipleObjects]
 	public class HairInstanceEditor : Editor
@@ -189,7 +190,7 @@ namespace Unity.DemoTeam.Hair
 
 						rect.width = rectWidthCount;
 						{
-							using (new ColorScope(Color.green, ColorScope.Type.Color))
+							using (new ColorScope(hairInstance.stepsLastFrameSkipped > 0 ? Color.red : Color.green, ColorScope.Type.Color))
 							{
 								EditorGUI.HelpBox(rect, string.Empty, MessageType.None);
 							}

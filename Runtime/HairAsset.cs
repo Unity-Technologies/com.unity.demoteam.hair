@@ -41,7 +41,10 @@ namespace Unity.DemoTeam.Hair
 		public struct SettingsAlembic
 		{
 			[Tooltip("Alembic asset containing at least one set of curves")]
-			public AlembicStreamPlayer sourceAsset;
+			public AlembicStreamPlayer alembicAsset;
+
+			[LineHeader("Processing")]
+
 			[Tooltip("Resample curves to ensure a specific number of particles along each strand")]
 			public bool resampleCurves;
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
@@ -57,7 +60,14 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsProcedural
 		{
-			public enum Style
+			public enum PlacementType
+			{
+				Primitive,
+				//Custom,//TODO
+				Mesh,
+			}
+
+			public enum PrimitiveType
 			{
 				Curtain,
 				Brush,
@@ -65,38 +75,60 @@ namespace Unity.DemoTeam.Hair
 				StratifiedCurtain,
 			}
 
-			public Style style;
+			public enum CurlSamplingStrategy
+			{
+				RelaxStrandLength,
+				RelaxCurlSlope,
+			}
+
+			[LineHeader("Roots")]
+
+			public PlacementType placement;
+			[VisibleIf(nameof(placement), PlacementType.Primitive)]
+			public PrimitiveType placementPrimitive;
+			//[VisibleIf(nameof(placement), PlacementType.Custom)]
+			//public ScriptableObject placementCustom;
+			[VisibleIf(nameof(placement), PlacementType.Mesh)]
+			public Mesh placementMesh;
+			[VisibleIf(nameof(placement), PlacementType.Mesh)]
+			public Texture2D placementDensity;
+
+			[LineHeader("Strands")]
 
 			[Range(64, HairSim.MAX_STRAND_COUNT), Tooltip("Number of strands")]
 			public int strandCount;
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
 			public int strandParticleCount;
-
 			[Range(0.001f, 5.0f), Tooltip("Strand length (in meters)")]
 			public float strandLength;
-			[ToggleGroup, Tooltip("Enable this to vary strand lengths")]
+			[ToggleGroup, Tooltip("Enable this to vary the strand lengths")]
 			public bool strandLengthVariation;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Fraction of strand length")]
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Amount of variation as fraction of strand length")]
 			public float strandLengthVariationAmount;
 
+			[LineHeader("Curls")]
+
 			[ToggleGroup, Tooltip("Enable this to curl the strands")]
-			public bool strandCurl;
+			public bool curl;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 10.0f), Tooltip("Curl radius (in centimeters)")]
-			public float strandCurlRadius;
+			public float curlRadius;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Curl slope")]
-			public float strandCurlSlope;
-			[ToggleGroupItem, Tooltip("Relax slope for small radii, to maintain strand length")]
-			public bool strandCurlSlopeRelaxed;
-			[ToggleGroup, Tooltip("Enable this to vary curls")]
-			public bool strandCurlVariation;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Fraction of curl radius")]
-			public float strandCurlVariationRadius;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Fraction of curl slope")]
-			public float strandCurlVariationSlope;
+			public float curlSlope;
+			[ToggleGroup, Tooltip("Enable this to vary the curls")]
+			public bool curlVariation;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Amount of variation as fraction of curl radius")]
+			public float curlVariationRadius;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Amount of variation as fraction of curl slope")]
+			public float curlVariationSlope;
+			[Tooltip("Choose which parameter to relax if the curls become undersampled (due to a combination of particle count, strand length, curl radius and slope)")]
+			public CurlSamplingStrategy curlSamplingStrategy;
 
 			public static readonly SettingsProcedural defaults = new SettingsProcedural()
 			{
-				style = Style.Curtain,
+				placement = PlacementType.Primitive,
+				placementPrimitive = PrimitiveType.Curtain,
+				placementMesh = null,
+				placementDensity = null,
 
 				strandCount = 64,
 				strandParticleCount = 32,
@@ -105,13 +137,13 @@ namespace Unity.DemoTeam.Hair
 				strandLengthVariation = false,
 				strandLengthVariationAmount = 0.2f,
 
-				strandCurl = false,
-				strandCurlRadius = 1.0f,
-				strandCurlSlope = 0.3f,
-				strandCurlSlopeRelaxed = false,
-				strandCurlVariation = false,
-				strandCurlVariationRadius = 0.1f,
-				strandCurlVariationSlope = 0.3f,
+				curl = false,
+				curlRadius = 1.0f,
+				curlSlope = 0.3f,
+				curlVariation = false,
+				curlVariationRadius = 0.1f,
+				curlVariationSlope = 0.3f,
+				curlSamplingStrategy = CurlSamplingStrategy.RelaxStrandLength,
 			};
 		}
 

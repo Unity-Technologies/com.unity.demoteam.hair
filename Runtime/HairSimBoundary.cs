@@ -15,7 +15,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		public Type type = Type.Sphere;
-		[VisibleIf("type", Type.Torus)]
+		[VisibleIf(nameof(type), Type.Torus)]
 		public float outerRadius;
 
 		public struct BoundaryCapsule { public Vector3 centerA; public float radius; public Vector3 centerB; public float __pad__; };

@@ -94,6 +94,18 @@ namespace Unity.DemoTeam.Hair
 			if (hairAsset == null)
 				return;
 
+			switch (hairAsset.settingsBasic.type)
+			{
+				case HairAsset.Type.Procedural:
+					if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh &&
+						hairAsset.settingsProcedural.placementDensity != null &&
+						hairAsset.settingsProcedural.placementDensity.isReadable == false)
+					{
+						EditorGUILayout.HelpBox("Configuration warning: Placement density map will be ignored as is not marked 'Read/Write'.", MessageType.Warning, wide: true);
+					}
+					break;
+			}
+
 			EditorGUI.BeginChangeCheck();
 			{
 				StructPropertyFieldsWithHeader(_settingsBasic);
