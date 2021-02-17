@@ -9,7 +9,6 @@ using Unity.DemoTeam.Attributes;
 #if UNITY_DEMOTEAM_DIGITALHUMAN
 using Unity.DemoTeam.DigitalHuman;
 #endif
-
 #if UNITY_VISUALEFFECTGRAPH
 using UnityEngine.VFX;
 #endif
@@ -48,8 +47,10 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SettingsRoots defaults = new SettingsRoots()
 			{
+#if UNITY_DEMOTEAM_DIGITALHUMAN
 				rootsAttach = false,
 				rootsAttachTarget = null,
+#endif
 			};
 		}
 

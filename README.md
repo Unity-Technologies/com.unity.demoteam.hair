@@ -5,13 +5,13 @@ Strand based hair simulation and rendering.
 
 ## Requirements
 
-- Unity 2020.2.0b11 +
-- HDRP 10.1.0 +
+- Unity 2020.2.0f1 +
+- HDRP 10.2.2 +
 
 
 ## Features
 
-[nice bullets]
+[list of features]
 
 
 ## Usage
@@ -22,7 +22,6 @@ Declare the package and its dependencies as git dependencies in `Packages/manife
 "dependencies": {
     "com.unity.demoteam.hair": "https://github.com/Unity-Technologies/com.unity.demoteam.hair.git",
     "com.unity.demoteam.attributes": "https://github.com/Unity-Technologies/com.unity.demoteam.attributes.git",
-    "com.unity.demoteam.digital-human": "https://github.com/Unity-Technologies/com.unity.demoteam.digital-human.git",
     ...
 }
 ```
@@ -35,7 +34,7 @@ https://github.com/Unity-Technologies/com.unity.demoteam.digital-human
 
 ## Related links
 
-[tbd]
+[list of pages/videos]
 
 
 ## References
