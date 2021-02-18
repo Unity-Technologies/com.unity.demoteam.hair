@@ -19,5 +19,6 @@ namespace Unity.DemoTeam.Hair
 		public ComputeShader computeVolume;
 		public Shader computeVolumeRaster;
 		public Shader debugDraw;
+		public Mesh debugDrawCube;
 	}
 }

@@ -4,10 +4,11 @@
     "references": [
         "GUID:f430d943acec4664388d12e0bbff46de",
         "GUID:d8b63aba1907145bea998dd612889d6b",
+        "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:df380645f10b7bc4b97d4f5eb6303d95",
-        "GUID:457756d89b35d2941b3e7b37b4ece6f1",
+        "GUID:22f31b74491fb45d5b598e0b935deb31",
         "GUID:7e9d95a3be8cd654ba8a8d2bb2409223",
-        "GUID:22f31b74491fb45d5b598e0b935deb31"
+        "GUID:457756d89b35d2941b3e7b37b4ece6f1"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -28,8 +29,13 @@
             "define": "UNITY_DEMOTEAM_DIGITALHUMAN"
         },
         {
+            "name": "com.unity.render-pipelines.high-definition",
+            "expression": "10.2.2",
+            "define": "UNITY_HDRP"
+        },
+        {
             "name": "com.unity.visualeffectgraph",
-            "expression": "10.1.0",
+            "expression": "10.2.2",
             "define": "UNITY_VISUALEFFECTGRAPH"
         }
     ],

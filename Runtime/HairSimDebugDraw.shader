@@ -14,6 +14,7 @@
 
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 	#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
+	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
 	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
@@ -24,6 +25,8 @@
 	float _DebugSliceOffset;
 	float _DebugSliceDivider;
 	float _DebugSliceOpacity;
+	float _DebugIsosurfaceDensity;
+	uint _DebugIsosurfaceSubsteps;
 
 	struct DebugVaryings
 	{
@@ -220,6 +223,53 @@
 			return float4(ColorGradient(volumePressureGrad), _DebugSliceOpacity);
 	}
 
+	DebugVaryings DebugVert_VolumeIsosurface(float3 position : POSITION)
+	{
+		float3 positionRWS = TransformObjectToWorld(position);
+		float3 positionWS = GetAbsolutePositionWS(positionRWS);
+
+		DebugVaryings output;
+		output.positionCS = TransformWorldToHClip(positionRWS);
+		output.color = float4(positionWS, 1);
+		return output;
+	}
+
+	float4 DebugFrag_VolumeIsosurface(DebugVaryings input) : SV_Target
+	{
+		const float3 worldPos = input.color.xyz;
+		const float3 worldPosCamera = -GetCameraRelativePositionWS(float3(0, 0, 0));
+		const float3 worldDir = normalize(worldPos - worldPosCamera);
+
+		const int numStepsWithinCell = _DebugIsosurfaceSubsteps;
+		const int numSteps = _VolumeCells.x * numStepsWithinCell;
+
+		VolumeTraceState trace = VolumeTraceBegin(worldPos, worldDir, 0.5, numStepsWithinCell);
+
+		float3 accuDensity = 0;
+
+		for (int i = 0; i != numSteps; i++)
+		{
+			if (VolumeTraceStep(trace))
+			{
+				float rho = VolumeSampleScalar(_VolumeDensity, trace.uvw);
+				if (rho > _DebugIsosurfaceDensity)
+				{
+					float3 gradDensity = normalize(VolumeSampleScalarGradient(_VolumeDensity, trace.uvw));
+					return float4(0.5 * gradDensity + 0.5, 1.0);
+				}
+
+				accuDensity.r += rho;
+			}
+			else
+			{
+				accuDensity.g = 1.0 - (i + 1.0) / numSteps;
+				break;
+			}
+		}
+
+		return float4(saturate(accuDensity), 0.5);
+	}
+
 	ENDHLSL
 
 	SubShader
@@ -270,8 +320,8 @@
 
 		Pass// 4 == VOLUME SLICE
 		{
-			ZTest LEqual
 			Blend SrcAlpha OneMinusSrcAlpha
+			ZTest LEqual
 
 			HLSLPROGRAM
 
@@ -283,14 +333,29 @@
 
 		Pass// 5 == VOLUME SLICE (BELOW)
 		{
-			ZWrite Off
-			ZTest Greater
 			Blend SrcAlpha OneMinusSrcAlpha
+			ZTest Greater
+			ZWrite Off
 
 			HLSLPROGRAM
 
 			#pragma vertex DebugVert_VolumeSlice
 			#pragma fragment DebugFrag_VolumeSlice
+
+			ENDHLSL
+		}
+
+		Pass// 6 == VOLUME ISOSURFACE
+		{
+			Blend SrcAlpha OneMinusSrcAlpha
+			Cull Back
+			ZTest Always
+			ZWrite Off
+
+			HLSLPROGRAM
+
+			#pragma vertex DebugVert_VolumeIsosurface
+			#pragma fragment DebugFrag_VolumeIsosurface
 
 			ENDHLSL
 		}

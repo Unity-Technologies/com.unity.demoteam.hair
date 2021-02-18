@@ -9,6 +9,7 @@
     "com.unity.demoteam.attributes": "0.1.1-preview",
     "com.unity.mathematics": "1.2.1",
     "com.unity.collections": "0.15.0-preview.21",
+    "com.unity.render-pipelines.core": "10.2.2",
     "com.unity.render-pipelines.high-definition": "10.2.2",
     "com.unity.formats.alembic": "2.2.0-exp.1"
   }

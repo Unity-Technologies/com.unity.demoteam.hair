@@ -83,15 +83,22 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Roots")]
 
+			[Tooltip("Placement method")]
 			public PlacementType placement;
-			[VisibleIf(nameof(placement), PlacementType.Primitive)]
+			[VisibleIf(nameof(placement), PlacementType.Primitive), Tooltip("Place strands using builtin primitive generator")]
 			public PrimitiveType placementPrimitive;
 			//[VisibleIf(nameof(placement), PlacementType.Custom)]
 			//public ScriptableObject placementCustom;
-			[VisibleIf(nameof(placement), PlacementType.Mesh)]
+			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on specified triangle mesh")]
 			public Mesh placementMesh;
-			[VisibleIf(nameof(placement), PlacementType.Mesh)]
+			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on mesh according to specified density map (where 0 == Empty region, 1 == Fully populated region)")]
 			public Texture2D placementDensity;
+
+			//TODO implement
+			//[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Source strand direction from specified object space normal map")]
+			//public Texture2D paintedDirection;
+			//[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Source strand parameter variation from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)")]
+			//public Texture2D paintedVariation;
 
 			[LineHeader("Strands")]
 

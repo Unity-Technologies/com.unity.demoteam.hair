@@ -30,6 +30,7 @@ namespace Unity.DemoTeam.Hair
 		static Material s_volumeRasterMat;
 		static MaterialPropertyBlock s_volumeRasterMPB;
 
+		static Mesh s_debugDrawCube;
 		static Material s_debugDrawMat;
 		static MaterialPropertyBlock s_debugDrawMPB;
 
@@ -106,6 +107,8 @@ namespace Unity.DemoTeam.Hair
 			public static int _DebugSliceOffset;
 			public static int _DebugSliceDivider;
 			public static int _DebugSliceOpacity;
+			public static int _DebugIsosurfaceDensity;
+			public static int _DebugIsosurfaceSubsteps;
 		}
 
 		static class SolverKernels
@@ -318,7 +321,7 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Pressure")]
 
-			[Range(0, 100), Tooltip("Number of pressure iterations (where 0 = Initialization by EOS, [1 .. n] = Jacobi iteration)")]
+			[Range(0, 100), Tooltip("Number of pressure iterations (where 0 == Initialization by EOS, [1 .. n] == Jacobi iteration)")]
 			public int pressureIterations;
 			[Tooltip("Pressure solution can either target an exact density (causing both compression and decompression), or a maximum density (causing just decompression)")]
 			public PressureSolution pressureSolution;
@@ -374,6 +377,13 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Volume Visualization")]
 
 			[ToggleGroup]
+			public bool drawIsosurface;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Trace threshold")]
+			public float drawIsosurfaceDensity;
+			[ToggleGroupItem(withLabel = true), Range(1, 10), Tooltip("Substeps within each cell")]
+			public int drawIsosurfaceSubsteps;
+
+			[ToggleGroup]
 			public bool drawSliceX;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along X")]
 			public float drawSliceXOffset;
@@ -385,7 +395,6 @@ namespace Unity.DemoTeam.Hair
 			public bool drawSliceZ;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Z")]
 			public float drawSliceZOffset;
-
 			[Range(0.0f, 5.0f), Tooltip("Scrubs between different layers")]
 			public float drawSliceDivider;
 
@@ -395,6 +404,11 @@ namespace Unity.DemoTeam.Hair
 				drawStrandParticles = false,
 				drawCellDensity = false,
 				drawCellGradient = false,
+
+				drawIsosurface = false,
+				drawIsosurfaceDensity = 0.5f,
+				drawIsosurfaceSubsteps = 4,
+
 				drawSliceX = false,
 				drawSliceXOffset = 0.5f,
 				drawSliceY = false,
@@ -428,6 +442,7 @@ namespace Unity.DemoTeam.Hair
 					s_volumeRasterMat.hideFlags = HideFlags.HideAndDontSave;
 					s_volumeRasterMPB = new MaterialPropertyBlock();
 
+					s_debugDrawCube = resources.debugDrawCube;
 					s_debugDrawMat = new Material(resources.debugDraw);
 					s_debugDrawMat.hideFlags = HideFlags.HideAndDontSave;
 					s_debugDrawMPB = new MaterialPropertyBlock();
@@ -1180,7 +1195,8 @@ namespace Unity.DemoTeam.Hair
 					!debugSettings.drawCellGradient &&
 					!debugSettings.drawSliceX &&
 					!debugSettings.drawSliceY &&
-					!debugSettings.drawSliceZ)
+					!debugSettings.drawSliceZ &&
+					!debugSettings.drawIsosurface)
 					return;
 
 				CoreUtils.SetRenderTarget(cmd, color, depth);
@@ -1234,6 +1250,20 @@ namespace Unity.DemoTeam.Hair
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
 						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 					}
+				}
+
+				// volume isosurface
+				if (debugSettings.drawIsosurface)
+				{
+					var worldMin = volumeData.cbuffer._VolumeWorldMin;
+					var worldMax = volumeData.cbuffer._VolumeWorldMax;
+					var worldCenter = 0.5f * (worldMin + worldMax);
+					var worldExtent = 0.5f * (worldMax - worldMin);
+
+					s_debugDrawMPB.SetFloat(UniformIDs._DebugIsosurfaceDensity, debugSettings.drawIsosurfaceDensity);
+					s_debugDrawMPB.SetInt(UniformIDs._DebugIsosurfaceSubsteps, debugSettings.drawIsosurfaceSubsteps);
+
+					cmd.DrawMesh(s_debugDrawCube, Matrix4x4.TRS(worldCenter, Quaternion.identity, 2.0f * worldExtent), s_debugDrawMat, 0, 6, s_debugDrawMPB);
 				}
 			}
 		}

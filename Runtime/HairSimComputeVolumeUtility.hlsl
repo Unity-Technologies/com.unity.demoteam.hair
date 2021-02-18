@@ -133,6 +133,31 @@ float VolumeSampleScalar(Texture3D<float> volume, float3 uvw, SamplerState state
 	return volume.SampleLevel(state, uvw, 0);
 }
 
+float VolumeSampleScalar(Texture3D<float> volume, float3 uvw)
+{
+	return VolumeSampleScalar(volume, uvw, _Volume_trilinear_clamp);
+}
+
+float3 VolumeSampleScalarGradient(Texture3D<float> volume, float3 uvw)
+{
+	const float2 h0 = float2(1.0 / _VolumeCells.x, 0.0);
+	
+	float s_xm = VolumeSampleScalar(volume, uvw - h0.xyy, _Volume_trilinear_clamp);
+	float s_ym = VolumeSampleScalar(volume, uvw - h0.yxy, _Volume_trilinear_clamp);
+	float s_zm = VolumeSampleScalar(volume, uvw - h0.yyx, _Volume_trilinear_clamp);
+
+	float s_xp = VolumeSampleScalar(volume, uvw + h0.xyy, _Volume_trilinear_clamp);
+	float s_yp = VolumeSampleScalar(volume, uvw + h0.yxy, _Volume_trilinear_clamp);
+	float s_zp = VolumeSampleScalar(volume, uvw + h0.yyx, _Volume_trilinear_clamp);
+
+	const float3 diff = float3(
+		s_xp - s_xm,
+		s_yp - s_ym,
+		s_zp - s_zm);
+
+	return diff / (2.0 * h0.x);
+}
+
 float3 VolumeSampleVector(Texture3D<float3> volume, float3 uvw, SamplerState state)
 {
 #if VOLUME_STAGGERED_GRID
@@ -149,11 +174,6 @@ float3 VolumeSampleVector(Texture3D<float4> volume, float3 uvw, SamplerState sta
 #else
 	return volume.SampleLevel(state, uvw, 0).xyz;
 #endif
-}
-
-float VolumeSampleScalar(Texture3D<float> volume, float3 uvw)
-{
-	return VolumeSampleScalar(volume, uvw, _Volume_trilinear_clamp);
 }
 
 float3 VolumeSampleVector(Texture3D<float3> volume, float3 uvw)
@@ -186,6 +206,56 @@ TrilinearWeights VolumeWorldToCellTrilinear(float3 worldPos, float3 offset = 0.5
 	tri.w0 = 1.0 - cellPos;
 	tri.w1 = cellPos;
 	return tri;
+}
+
+float3 VolumeWorldCellStep(float3 worldDir)
+{
+#if VOLUME_SQUARE_CELLS
+	float3 dirAbs = abs(worldDir);
+	float3 dirMax = max(dirAbs.x, max(dirAbs.y, dirAbs.z));
+	float3 step = worldDir * (VolumeWorldCellSize().x / dirMax);
+	return step;
+#else
+	//TODO or otherwise always force VOLUME_SQUARE_CELLS ?
+#endif
+}
+
+struct VolumeTraceState
+{
+	float3 uvw;
+	float3 uvwStep;
+};
+
+VolumeTraceState VolumeTraceBegin(float3 worldPos, float3 worldDir, float cellOffset, int cellSubsteps)
+{
+	float3 uvwStep = VolumeWorldCellStep(worldDir) / (_VolumeWorldMax - _VolumeWorldMin);
+	float3 uvw = VolumeWorldToUVW(worldPos) + cellOffset * uvwStep;
+
+	uvwStep /= cellSubsteps;
+	uvw -= uvwStep;
+
+	VolumeTraceState trace;
+	{
+		trace.uvwStep = uvwStep;
+		trace.uvw = uvw;
+	}
+
+	return trace;
+}
+
+bool VolumeTraceStep(inout VolumeTraceState trace)
+{
+	trace.uvw += trace.uvwStep;
+
+	// terminate if for any axis the trace is outside the volume and not reentering
+	if (any((trace.uvw < 0 && trace.uvwStep <= 0) || (trace.uvw > 1 && trace.uvwStep >= 0)))
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
 }
 
 #endif//__HAIRSIMCOMPUTEVOLUMEUTILITY_HLSL__
