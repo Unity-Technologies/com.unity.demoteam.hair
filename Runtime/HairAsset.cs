@@ -1,7 +1,10 @@
 ﻿using System;
 using UnityEngine;
-using UnityEngine.Formats.Alembic.Importer;
 using Unity.DemoTeam.Attributes;
+
+#if UNITY_FORMATS_ALEMBIC && UNITY_EDITOR
+using UnityEngine.Formats.Alembic.Importer;
+#endif
 
 namespace Unity.DemoTeam.Hair
 {
@@ -40,8 +43,10 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsAlembic
 		{
+#if UNITY_FORMATS_ALEMBIC && UNITY_EDITOR
 			[Tooltip("Alembic asset containing at least one set of curves")]
 			public AlembicStreamPlayer alembicAsset;
+#endif
 
 			[LineHeader("Processing")]
 

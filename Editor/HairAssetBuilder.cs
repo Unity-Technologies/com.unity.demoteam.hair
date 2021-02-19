@@ -3,10 +3,13 @@
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Formats.Alembic.Importer;
 using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+
+#if UNITY_FORMATS_ALEMBIC
+using UnityEngine.Formats.Alembic.Importer;
+#endif
 
 namespace Unity.DemoTeam.Hair
 {
@@ -97,6 +100,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsAlembic settings, HairAsset.MemoryLayout memoryLayout)
 		{
+#if UNITY_FORMATS_ALEMBIC
 			// check stream present
 			var alembic = settings.alembicAsset;
 			if (alembic == null)
@@ -129,6 +133,9 @@ namespace Unity.DemoTeam.Hair
 			{
 				GameObject.DestroyImmediate(alembic.gameObject);
 			}
+#else
+			return;
+#endif
 		}
 
 		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
@@ -148,6 +155,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+#if UNITY_FORMATS_ALEMBIC
 		public static void BuildHairAssetStrandGroup(ref HairAsset.StrandGroup strandGroup, in HairAsset.SettingsAlembic settings, AlembicCurves curveSet, HairAsset.MemoryLayout memoryLayout)
 		{
 			//TODO require resampling if not all curves have same number of points
@@ -265,6 +273,7 @@ namespace Unity.DemoTeam.Hair
 			// calc derivative fields, create mesh assets
 			FinalizeStrandGroup(ref strandGroup);
 		}
+#endif
 
 		public static void BuildHairAssetStrandGroup(ref HairAsset.StrandGroup strandGroup, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
 		{

@@ -88,23 +88,35 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.LabelField(hairAsset.checksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
+		static StructValidation ValidationGUIAlembic(object userData)
+		{
+#if UNITY_FORMATS_ALEMBIC
+			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.0-exp.1", MessageType.Warning, wide: true);
+			return StructValidation.Inaccessible;
+#else
+			return StructValidation.Pass;
+#endif
+		}
+
+		static StructValidation ValidationGUIProcedural(object userData)
+		{
+			var hairAsset = userData as HairAsset;
+
+			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh &&
+				hairAsset.settingsProcedural.placementDensity != null &&
+				hairAsset.settingsProcedural.placementDensity.isReadable == false)
+			{
+				EditorGUILayout.HelpBox("Configuration warning: Placement density map will be ignored as the asset is not marked 'Read/Write'.", MessageType.Warning, wide: true);
+			}
+
+			return StructValidation.Pass;
+		}
+
 		public void DrawImporterGUI()
 		{
 			var hairAsset = target as HairAsset;
 			if (hairAsset == null)
 				return;
-
-			switch (hairAsset.settingsBasic.type)
-			{
-				case HairAsset.Type.Procedural:
-					if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh &&
-						hairAsset.settingsProcedural.placementDensity != null &&
-						hairAsset.settingsProcedural.placementDensity.isReadable == false)
-					{
-						EditorGUILayout.HelpBox("Configuration warning: Placement density map will be ignored as is not marked 'Read/Write'.", MessageType.Warning, wide: true);
-					}
-					break;
-			}
 
 			EditorGUI.BeginChangeCheck();
 			{
@@ -118,10 +130,10 @@ namespace Unity.DemoTeam.Hair
 				switch ((HairAsset.Type)_settingsBasic_type.enumValueIndex)
 				{
 					case HairAsset.Type.Alembic:
-						StructPropertyFieldsWithHeader(_settingsAlembic);
+						StructPropertyFieldsWithHeader(_settingsAlembic, ValidationGUIAlembic);
 						break;
 					case HairAsset.Type.Procedural:
-						StructPropertyFieldsWithHeader(_settingsProcedural);
+						StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
 						break;
 				}
 			}
@@ -256,7 +268,7 @@ namespace Unity.DemoTeam.Hair
 
 		static bool Drag2D(ref Vector2 delta, Rect rect)
 		{
-			int i = GUIUtility.GetControlID("HairAsset.Drag2D".GetHashCode(), FocusType.Passive);
+			int i = GUIUtility.GetControlID("HairAssetEditor.Drag2D".GetHashCode(), FocusType.Passive);
 			var e = Event.current;
 
 			switch (e.GetTypeForControl(i))
