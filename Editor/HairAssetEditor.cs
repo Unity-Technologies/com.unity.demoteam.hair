@@ -100,13 +100,20 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUIProcedural(object userData)
 		{
-			var hairAsset = userData as HairAsset;
-
-			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh &&
-				hairAsset.settingsProcedural.placementDensity != null &&
-				hairAsset.settingsProcedural.placementDensity.isReadable == false)
+			void WarnIfMissingReadable(Texture2D texture, string label)
 			{
-				EditorGUILayout.HelpBox("Configuration warning: Placement density map will be ignored as the asset is not marked 'Read/Write'.", MessageType.Warning, wide: true);
+				if (texture != null && texture.isReadable == false)
+				{
+					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' map will be ignored as the asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
+				}
+			}
+
+			var hairAsset = userData as HairAsset;
+			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
+			{
+				WarnIfMissingReadable(hairAsset.settingsProcedural.placementDensity, "Placement Density");
+				WarnIfMissingReadable(hairAsset.settingsProcedural.paintedDirection, "Painted Direction");
+				WarnIfMissingReadable(hairAsset.settingsProcedural.paintedParameters, "Painted Parameters");
 			}
 
 			return StructValidation.Pass;

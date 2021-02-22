@@ -481,19 +481,35 @@ namespace Unity.DemoTeam.Hair
 
 		public struct GeneratedRoots : IDisposable
 		{
+			public struct Params4
+			{
+				public float normalizedStrandLength;
+				public float normalizedStrandDiameter;
+				public float normalizedCurlRadius;
+				public float normalizedCurlSlope;
+			}
+
+			public int strandCount;
 			public NativeArray<Vector3> rootPosition;
 			public NativeArray<Vector3> rootDirection;
+			public NativeArray<Vector2> rootTexCoord;
+			public NativeArray<Params4> rootParameters;// R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope
 
 			public GeneratedRoots(int strandCount)
 			{
+				this.strandCount = strandCount;
 				rootPosition = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 				rootDirection = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+				rootTexCoord = new NativeArray<Vector2>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+				rootParameters = new NativeArray<Params4>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 			}
 
 			public void Dispose()
 			{
 				rootPosition.Dispose();
 				rootDirection.Dispose();
+				rootTexCoord.Dispose();
+				rootParameters.Dispose();
 			}
 		}
 
@@ -524,6 +540,8 @@ namespace Unity.DemoTeam.Hair
 			{
 				var rootPos = (Vector3*)procRoots.rootPosition.GetUnsafePtr();
 				var rootDir = (Vector3*)procRoots.rootDirection.GetUnsafePtr();
+				var rootUV0 = (Vector2*)procRoots.rootTexCoord.GetUnsafePtr();
+				var rootVar = (Vector4*)procRoots.rootParameters.GetUnsafePtr();
 
 				if (settings.placement == HairAsset.SettingsProcedural.PlacementType.Primitive)
 				{
@@ -541,6 +559,7 @@ namespace Unity.DemoTeam.Hair
 								{
 									rootPos[i] = startPos + i * strandInterval * Vector3.right;
 									rootDir[i] = startDir;
+									rootUV0[i] = Vector2.zero;
 								}
 							}
 							break;
@@ -560,6 +579,7 @@ namespace Unity.DemoTeam.Hair
 
 									rootPos[i] = new Vector3(localPos, 0.0f, 0.5f * localRnd.y * strandInterval);
 									rootDir[i] = Vector3.down;
+									rootUV0[i] = Vector2.zero;
 								}
 							}
 							break;
@@ -578,6 +598,7 @@ namespace Unity.DemoTeam.Hair
 
 									rootPos[i] = new Vector3(localPos.x, 0.0f, localPos.y);
 									rootDir[i] = Vector3.down;
+									rootUV0[i] = Vector2.zero;
 								}
 							}
 							break;
@@ -595,9 +616,15 @@ namespace Unity.DemoTeam.Hair
 
 									rootPos[i] = (Vector3)localDir * localExt;
 									rootDir[i] = (Vector3)localDir;
+									rootUV0[i] = Vector2.zero;
 								}
 							}
 							break;
+					}
+
+					for (int i = 0; i != settings.strandCount; i++)
+					{
+						rootVar[i] = Vector4.one;
 					}
 				}
 				else if (settings.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
@@ -605,7 +632,12 @@ namespace Unity.DemoTeam.Hair
 					using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.placementMesh))
 					using (var meshSampler = new TriMeshSampler(meshData[0], 0, Allocator.Temp))
 					{
-						if (settings.placementDensity != null && settings.placementDensity.isReadable)
+						bool IsTextureReadable(Texture2D texture)
+						{
+							return (texture != null && texture.isReadable);
+						}
+
+						if (IsTextureReadable(settings.placementDensity))
 						{
 							var density = settings.placementDensity;
 							var densityThreshold = new Unity.Mathematics.Random(257);
@@ -624,6 +656,7 @@ namespace Unity.DemoTeam.Hair
 
 								rootPos[i] = sample.position;
 								rootDir[i] = sample.normal;
+								rootUV0[i] = sample.uv0;
 							}
 						}
 						else
@@ -633,6 +666,39 @@ namespace Unity.DemoTeam.Hair
 								var sample = meshSampler.Next();
 								rootPos[i] = sample.position;
 								rootDir[i] = sample.normal;
+								rootUV0[i] = sample.uv0;
+							}
+						}
+
+						// apply painted direction
+						if (IsTextureReadable(settings.paintedDirection))
+						{
+							for (int i = 0; i != settings.strandCount; i++)
+							{
+								rootDir[i] = Vector3.Normalize((Vector4)settings.paintedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, 0));
+							}
+						}
+						else
+						{
+							for (int i = 0; i != settings.strandCount; i++)
+							{
+								rootDir[i] = Vector3.Normalize(rootDir[i]);
+							}
+						}
+
+						// apply painted parameters
+						if (IsTextureReadable(settings.paintedParameters))
+						{
+							for (int i = 0; i != settings.strandCount; i++)
+							{
+								rootVar[i] = (Vector4)settings.paintedParameters.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, 0);
+							}
+						}
+						else
+						{
+							for (int i = 0; i != settings.strandCount; i++)
+							{
+								rootVar[i] = Vector4.one;
 							}
 						}
 					}
@@ -854,9 +920,9 @@ namespace Unity.DemoTeam.Hair
 
 				return new Sample()
 				{
-					position = p0 + s * p1 + t * p2,
-					normal = n0 + s * n1 + t * n2,
-					uv0 = u0 + s * u1 + t * u2,
+					position = p0 + (s * p1) + (t * p2),
+					normal = n0 + (s * n1) + (t * n2),
+					uv0 = u0 + (s * u1) + (t * u2),
 				};
 			}
 
@@ -874,9 +940,11 @@ namespace Unity.DemoTeam.Hair
 
 			unsafe
 			{
+				var pos = (Vector3*)procStrands.particlePosition.GetUnsafePtr();
+
 				var rootPos = (Vector3*)procRoots.rootPosition.GetUnsafePtr();
 				var rootDir = (Vector3*)procRoots.rootDirection.GetUnsafePtr();
-				var pos = (Vector3*)procStrands.particlePosition.GetUnsafePtr();
+				var rootVar = (GeneratedRoots.Params4*)procRoots.rootParameters.GetUnsafePtr();
 
 				var particleInterval = settings.strandLength / (settings.strandParticleCount - 1);
 				var particleIntervalVariation = settings.strandLengthVariation ? settings.strandLengthVariationAmount : 0.0f;
@@ -891,7 +959,7 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != settings.strandCount; i++)
 				{
-					var step = particleInterval * Mathf.Lerp(1.0f, randSeqParticleInterval.NextFloat(), particleIntervalVariation);
+					var step = rootVar[i].normalizedStrandLength * particleInterval * Mathf.Lerp(1.0f, randSeqParticleInterval.NextFloat(), particleIntervalVariation);
 
 					var curPos = rootPos[i];
 					var curDir = rootDir[i];
@@ -913,8 +981,8 @@ namespace Unity.DemoTeam.Hair
 						var curPlaneU = Vector3.Normalize(NextVectorInPlane(ref randSeqCurlPlaneUV, curDir));
 						var curPlaneV = Vector3.Cross(curPlaneU, curDir);
 
-						var targetRadius = settings.curlRadius * 0.01f * Mathf.Lerp(1.0f, randSeqCurlRadius.NextFloat(), curlRadiusVariation);
-						var targetSlope = settings.curlSlope * Mathf.Lerp(1.0f, randSeqCurlSlope.NextFloat(), curlSlopeVariation);
+						var targetRadius = rootVar[i].normalizedCurlRadius * settings.curlRadius * 0.01f * Mathf.Lerp(1.0f, randSeqCurlRadius.NextFloat(), curlRadiusVariation);
+						var targetSlope = rootVar[i].normalizedCurlSlope * settings.curlSlope * Mathf.Lerp(1.0f, randSeqCurlSlope.NextFloat(), curlSlopeVariation);
 
 						var stepPlane = step * Mathf.Cos(0.5f * Mathf.PI * targetSlope);
 						if (stepPlane > 1.0f * targetRadius)
