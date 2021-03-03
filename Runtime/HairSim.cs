@@ -218,14 +218,14 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Scales to [0 .. 90] degrees")]
 			public float curvatureCompareValue;
 
-			[LineHeader("Shape Preservation")]
-
 			[ToggleGroup, Tooltip("Enable local shape constraint")]
 			public bool localShape;
 			[ToggleGroupItem, Tooltip("Type of local shape constraint")]
 			public LocalShapeMode localShapeMode;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape influence")]
 			public float localShapeInfluence;
+
+			[LineHeader("Global Shape")]
 
 			[ToggleGroup, Tooltip("Enable global position constraint")]
 			public bool globalPosition;
@@ -1161,7 +1161,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void DrawSolverData(CommandBuffer cmd, RTHandle color, RTHandle depth, in SolverData solverData, in DebugSettings debugSettings)
+		public static void DrawSolverData(CommandBuffer cmd, RenderTargetIdentifier color, RenderTargetIdentifier depth, in SolverData solverData, in DebugSettings debugSettings)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawSolverData))
 			{
@@ -1187,7 +1187,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void DrawVolumeData(CommandBuffer cmd, RTHandle color, RTHandle depth, in VolumeData volumeData, in DebugSettings debugSettings)
+		public static void DrawVolumeData(CommandBuffer cmd, RenderTargetIdentifier color, RenderTargetIdentifier depth, in VolumeData volumeData, in DebugSettings debugSettings)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawVolumeData))
 			{

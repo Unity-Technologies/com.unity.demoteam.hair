@@ -146,7 +146,7 @@ void SolveDistanceMinConstraint(
 	inout float3 d0, inout float3 d1)
 {
 	// variation of SolveDistanceConstraint(...),
-	// ensures distance p0-p1 >= distanceMin
+	// ensures distance p0 - p1 >= distanceMin
 
 	float3 r = p1 - p0;
 	float rd_inv = rsqrt(dot(r, r));
@@ -168,7 +168,7 @@ void SolveDistanceMaxConstraint(
 	inout float3 d0, inout float3 d1)
 {
 	// variation of SolveDistanceConstraint(...),
-	// ensures distance p0-p1 <= distanceMax
+	// ensures distance p0 - p1 <= distanceMax
 
 	float3 r = p1 - p0;
 	float rd_inv = rsqrt(dot(r, r));
@@ -315,13 +315,30 @@ void SolveEdgeVectorConstraint(
 	const float3 p0, const float3 p1,
 	inout float3 d0, inout float3 d1)
 {
-	float3 r = (p1 - p0) - v0;
+	float3 r = (p0 + v0) - p1;
 
 	float W_inv = stiffness / (w0 + w1);
 	GUARD(W_inv > 0.0)
 	{
-		d0 += (w0 * W_inv) * r;
-		d1 -= (w1 * W_inv) * r;
+		d0 -= (w0 * W_inv) * r;
+		d1 += (w1 * W_inv) * r;
+	}
+}
+
+void SolveDualEdgeVectorConstraint(
+	const float3 v0, const float3 v1, const float stiffness,
+	const float w0, const float w1, const float w2,
+	const float3 p0, const float3 p1, const float3 p2,
+	inout float3 d0, inout float3 d1, inout float3 d2)
+{
+	float3 r = (p0 - 2.0 * p1 + p2 + v0 - v1);
+
+	float W_inv = (1.0 * stiffness) / (w0 + 4.0 * w1 + w2);
+	GUARD(W_inv > 0.0)
+	{
+		d0 -= (w0 * W_inv) * r;
+		d1 += (w1 * W_inv * 2.0) * r;
+		d2 -= (w2 * W_inv) * r;
 	}
 }
 
@@ -333,34 +350,44 @@ void SolveMaterialFrameBendTwistConstraint(
 {
 	// see: "Position and Orientation Based Cosserat Rods" by T. Kugelstadt and E. Schömer
 	// https://www.cg.informatik.uni-mainz.de/files/2016/06/Position-and-Orientation-Based-Cosserat-Rods.pdf
-	
-	// calc relative rotation from q0 to q1
-	float4 darboux = QMul(QInverse(q0), q1);
-	
-	// apply eq. 32 + 33 to pick closest delta
-	float4 delta_add = darboux + darboux0;
-	float4 delta_sub = darboux - darboux0;
-	float sqnorm_add = dot(delta_add, delta_add);
-	float sqnorm_sub = dot(delta_sub, delta_sub);
-	float4 delta = (sqnorm_add < sqnorm_sub) ? delta_add : delta_sub;
 
-	// apply eq. 40 to compute the corrections
+	float4 darboux = QMul(QInverse(q0), q1);
+
+	// apply eq. 32 + 33 to pick closest delta
+	float4 delta_add = (darboux + darboux0);
+	float4 delta_sub = (darboux - darboux0);
+	float4 delta = (dot(delta_add, delta_add) < dot(delta_sub, delta_sub)) ? delta_add : delta_sub;
+
+	// apply eq. 40 to calc corrections
 	float W_inv = stiffness / (w0 + w1);
-	GUARD(W_inv > 0.0)
 	{
-		delta.w = 0.0;// scalar part
+		delta.w = 0.0;// zero scalar part
 		d0 += (w0 * W_inv) * QMul(q1, delta);
 		d1 -= (w1 * W_inv) * QMul(q0, delta);
 	}
 }
 
-void SolveMaterialFrameTangentConstraint(
-	const float4 frame, const float3 tangent, const float stiffness,
-	const float w0, const float w1,
-	const float3 p0, const float3 p1,
-	inout float3 d0, inout float3 d1)
+void SolveMaterialFrameStretchShearConstraint(
+	const float distance0, const float stiffness,
+	const float w0, const float w1, const float wq,
+	const float3 p0, const float3 p1, const float4 q,
+	inout float3 d0, inout float3 d1, inout float4 dq)
 {
-	SolveEdgeVectorConstraint(QMul(frame, tangent), stiffness, w0, w1, p0, p1, d0, d1);
+	// see: "Position and Orientation Based Cosserat Rods" by T. Kugelstadt and E. Schömer
+	// https://www.cg.informatik.uni-mainz.de/files/2016/06/Position-and-Orientation-Based-Cosserat-Rods.pdf
+
+	const float3 e3 = float3(0, 1, 0);
+
+	// apply eq. 31 to obtain change vector
+	float3 r = (p1 - p0) / distance0 - QMul(q, e3);
+
+	// apply eq. 37 to calc corrections
+	float W_inv = stiffness / (w0 + w1 + 4.0 * wq * distance0 * distance0);
+	{
+		d0 += (w0 * W_inv * distance0) * r;
+		d1 -= (w1 * W_inv * distance0) * r;
+		dq += (wq * W_inv * distance0 * distance0) * QMul(float4(r, 0), QMul(q, QConjugate(float4(0, 1, 0, 0))));
+	}
 }
 
 //--------------------------------------------------
@@ -438,12 +465,12 @@ void SolveEdgeVectorConstraint(
 	SolveEdgeVectorConstraint(v0, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
 }
 
-void SolveMaterialFrameTangentConstraint(
-	const float4 frame, const float3 tangent, const float stiffness,
-	const float4 p0, const float4 p1,
-	inout float3 d0, inout float3 d1)
+void SolveDualEdgeVectorConstraint(
+	const float3 v0, const float3 v1, const float stiffness,
+	const float4 p0, const float4 p1, const float4 p2,
+	inout float3 d0, inout float3 d1, inout float3 d2)
 {
-	SolveMaterialFrameTangentConstraint(frame, tangent, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
+	SolveDualEdgeVectorConstraint(v0, v1, stiffness, p0.w, p1.w, p2.w, p0.xyz, p1.xyz, p2.xyz, d0, d1, d2);
 }
 
 //------------------------------------------------------------
@@ -559,6 +586,20 @@ void ApplyEdgeVectorConstraint(
 	p1 += d1;
 }
 
+void ApplyDualEdgeVectorConstraint(
+	const float3 v0, const float3 v1, const float stiffness,
+	const float w0, const float w1, const float w2,
+	inout float3 p0, inout float3 p1, inout float3 p2)
+{
+	float3 d0 = 0.0;
+	float3 d1 = 0.0;
+	float3 d2 = 0.0;
+	SolveDualEdgeVectorConstraint(v0, v1, stiffness, w0, w1, w2, p0, p1, p2, d0, d1, d2);
+	p0 += d0;
+	p1 += d1;
+	p2 += d2;
+}
+
 void ApplyMaterialFrameBendTwistConstraint(
 	const float4 darboux0, const float stiffness,
 	const float w0, const float w1,
@@ -571,16 +612,18 @@ void ApplyMaterialFrameBendTwistConstraint(
 	q1 = normalize(q1 + d1);
 }
 
-void ApplyMaterialFrameTangentConstraint(
-	const float4 frame, const float3 tangent, const float stiffness,
-	const float w0, const float w1,
-	inout float3 p0, inout float3 p1)
+void ApplyMaterialFrameStretchShearConstraint(
+	const float distance0, const float stiffness,
+	const float w0, const float w1, const float wq,
+	inout float3 p0, inout float3 p1, inout float4 q)
 {
 	float3 d0 = 0.0;
 	float3 d1 = 0.0;
-	SolveMaterialFrameTangentConstraint(frame, tangent, stiffness, w0, w1, p0, p1, d0, d1);
+	float4 dq = 0.0;
+	SolveMaterialFrameStretchShearConstraint(distance0, stiffness, w0, w1, wq, p0, p1, q, d0, d1, dq);
 	p0 += d0;
 	p1 += d1;
+	q = normalize(q + dq);
 }
 
 #endif//__HAIRSIMCOMPUTECONSTRAINTS_HLSL__

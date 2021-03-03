@@ -91,10 +91,10 @@ namespace Unity.DemoTeam.Hair
 		static StructValidation ValidationGUIAlembic(object userData)
 		{
 #if UNITY_FORMATS_ALEMBIC
+			return StructValidation.Pass;
+#else
 			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.0-exp.1", MessageType.Warning, wide: true);
 			return StructValidation.Inaccessible;
-#else
-			return StructValidation.Pass;
 #endif
 		}
 
