@@ -149,7 +149,7 @@ namespace Unity.DemoTeam.Hair
 				Jacobi = 2,
 			}
 
-			public enum TimeSpan
+			public enum TimeInterval
 			{
 				PerSecond,
 				Per100ms,
@@ -157,7 +157,7 @@ namespace Unity.DemoTeam.Hair
 				Per1ms,
 			}
 
-			public enum BendCompare
+			public enum LocalCurvatureMode
 			{
 				Equals,
 				LessThan,
@@ -188,14 +188,19 @@ namespace Unity.DemoTeam.Hair
 			public float cellPressure;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (where 0 == FLIP, 1 == PIC)")]
 			public float cellVelocity;
-			[Range(0.0f, 1.0f), Tooltip("Linear damping factor (fraction of linear velocity to subtract per unit of time)")]
+			[Range(0.0f, 1.0f), Tooltip("Linear damping factor (fraction of linear velocity to subtract per interval of time)")]
 			public float damping;
-			[HideInInspector, Tooltip("Unit of time")]//TODO expose in ui?
-			public TimeSpan dampingPeriod;
+			[HideInInspector, Tooltip("Interval of time over which to subtract fraction of linear velocity")]
+			public TimeInterval dampingInterval;
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
 
 			[LineHeader("Constraints")]
+
+			[ToggleGroup, Tooltip("Enable boundary collision constraint")]
+			public bool boundaryCollision;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Boundary collision friction")]
+			public float boundaryCollisionFriction;
 
 			[Tooltip("Enable particle-particle distance constraint")]
 			public bool distance;
@@ -206,42 +211,37 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("FTL correction / damping factor")]
 			public float distanceFTLDamping;
 
-			[ToggleGroup, Tooltip("Enable boundary shape collision constraint")]
-			public bool boundaryCollision;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Boundary shape friction")]
-			public float boundaryCollisionFriction;
-
 			[ToggleGroup, Tooltip("Enable bending curvature constraint")]
-			public bool curvature;
-			[ToggleGroupItem, Tooltip("Curvature constraint mode (=, <, >)")]
-			public BendCompare curvatureCompare;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Scales to [0 .. 90] degrees")]
-			public float curvatureCompareValue;
+			public bool localCurvature;
+			[ToggleGroupItem, Tooltip("Bending curvature constraint mode (=, <, >)")]
+			public LocalCurvatureMode localCurvatureMode;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Scales to a bend of [0 .. 90] degrees")]
+			public float localCurvatureValue;
 
 			[ToggleGroup, Tooltip("Enable local shape constraint")]
 			public bool localShape;
-			[ToggleGroupItem, Tooltip("Type of local shape constraint")]
+			[ToggleGroupItem, Tooltip("Local shape constraint mode")]
 			public LocalShapeMode localShapeMode;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape influence")]
 			public float localShapeInfluence;
 
-			[LineHeader("Global Shape")]
+			[LineHeader("Global Pose")]
 
 			[ToggleGroup, Tooltip("Enable global position constraint")]
 			public bool globalPosition;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Fraction of global position to apply per unit of time")]
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Fraction of global position to apply per interval of time")]
 			public float globalPositionInfluence;
-			[ToggleGroupItem, Tooltip("Unit of time during which to apply fraction of global position")]
-			public TimeSpan globalPositionPeriod;
+			[ToggleGroupItem, Tooltip("Interval of time over which to apply fraction of global position")]
+			public TimeInterval globalPositionInterval;
 			[ToggleGroup, Tooltip("Enable global rotation constraint")]
 			public bool globalRotation;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Global rotation influence")]
 			public float globalRotationInfluence;
-			[ToggleGroup, Tooltip("Fade influence of global constraints towards tip of strand")]
+			[ToggleGroup, Tooltip("Fade influence of global constraints from root to tip")]
 			public bool globalFade;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Fade offset from root of strand")]
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Normalized fade offset (normalized distance from root)")]
 			public float globalFadeOffset;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Fade extent from fade offset")]
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Normalized fade extent (normalized distance from specified offset)")]
 			public float globalFadeExtent;
 
 			public static readonly SolverSettings defaults = new SolverSettings()
@@ -254,26 +254,25 @@ namespace Unity.DemoTeam.Hair
 				cellPressure = 1.0f,
 				cellVelocity = 0.05f,
 				damping = 0.0f,
-				dampingPeriod = TimeSpan.PerSecond,
+				dampingInterval = TimeInterval.PerSecond,
 				gravity = 1.0f,
 
+				boundaryCollision = true,
+				boundaryCollisionFriction = 0.5f,
 				distance = true,
 				distanceLRA = true,
 				distanceFTL = false,
 				distanceFTLDamping = 0.8f,
-				boundaryCollision = true,
-				boundaryCollisionFriction = 0.5f,
-				curvature = false,
-				curvatureCompare = BendCompare.LessThan,
-				curvatureCompareValue = 0.1f,
-
+				localCurvature = false,
+				localCurvatureMode = LocalCurvatureMode.LessThan,
+				localCurvatureValue = 0.1f,
 				localShape = false,
 				localShapeMode = LocalShapeMode.LocalBendTwist,
 				localShapeInfluence = 1.0f,
 
 				globalPosition = false,
 				globalPositionInfluence = 1.0f,
-				globalPositionPeriod = TimeSpan.PerSecond,
+				globalPositionInterval = TimeInterval.PerSecond,
 				globalRotation = false,
 				globalRotationInfluence = 1.0f,
 				globalFade = false,
@@ -334,7 +333,7 @@ namespace Unity.DemoTeam.Hair
 
 			[ToggleGroup]
 			public bool boundarySDF;
-			[ToggleGroupItem(withLabel = true)]
+			[ToggleGroupItem]
 			public Texture3DWithBounds boundarySDFTexture;
 			[ToggleGroup]
 			public bool boundaryShapes;
@@ -369,19 +368,24 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct DebugSettings
 		{
+			[LineHeader("Strands")]
+
 			public bool drawStrandRoots;
 			public bool drawStrandParticles;
+
+			[LineHeader("Volume")]
+
 			public bool drawCellDensity;
 			public bool drawCellGradient;
 
-			[LineHeader("Volume Visualization")]
-
 			[ToggleGroup]
 			public bool drawIsosurface;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Trace threshold")]
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Trace threshold")]
 			public float drawIsosurfaceDensity;
 			[ToggleGroupItem(withLabel = true), Range(1, 10), Tooltip("Substeps within each cell")]
 			public int drawIsosurfaceSubsteps;
+
+			[LineHeader("Volume Slices")]
 
 			[ToggleGroup]
 			public bool drawSliceX;
@@ -608,15 +612,15 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._StrandScale = strandScale;
 
 			// update solver parameters
-			float GetSeconds(SolverSettings.TimeSpan period)
+			float GetSeconds(SolverSettings.TimeInterval interval)
 			{
-				switch (period)
+				switch (interval)
 				{
 					default:
-					case SolverSettings.TimeSpan.PerSecond: return 1.0f;
-					case SolverSettings.TimeSpan.Per100ms: return 0.1f;
-					case SolverSettings.TimeSpan.Per10ms: return 0.01f;
-					case SolverSettings.TimeSpan.Per1ms: return 0.001f;
+					case SolverSettings.TimeInterval.PerSecond: return 1.0f;
+					case SolverSettings.TimeInterval.Per100ms: return 0.1f;
+					case SolverSettings.TimeInterval.Per10ms: return 0.01f;
+					case SolverSettings.TimeInterval.Per1ms: return 0.001f;
 				}
 			}
 
@@ -628,34 +632,34 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._CellPressure = solverSettings.cellPressure;
 			cbuffer._CellVelocity = solverSettings.cellVelocity;
 			cbuffer._Damping = solverSettings.damping;
-			cbuffer._DampingPeriod = GetSeconds(solverSettings.dampingPeriod);
+			cbuffer._DampingInterval = GetSeconds(solverSettings.dampingInterval);
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
 
-			cbuffer._FTLDamping = solverSettings.distanceFTLDamping;
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
-			cbuffer._BendingCurvature = solverSettings.curvatureCompareValue * 0.5f;
+			cbuffer._FTLDamping = solverSettings.distanceFTLDamping;
+			cbuffer._LocalCurvature = solverSettings.localCurvatureValue * 0.5f;
+			cbuffer._LocalShape = solverSettings.localShapeInfluence;
 
 			cbuffer._GlobalPosition = solverSettings.globalPositionInfluence;
-			cbuffer._GlobalPositionPeriod = GetSeconds(solverSettings.globalPositionPeriod);
+			cbuffer._GlobalPositionInterval = GetSeconds(solverSettings.globalPositionInterval);
 			cbuffer._GlobalRotation = solverSettings.globalRotationInfluence;
 			cbuffer._GlobalFadeOffset = solverSettings.globalFade ? solverSettings.globalFadeOffset : 1e9f;
 			cbuffer._GlobalFadeExtent = solverSettings.globalFade ? solverSettings.globalFadeExtent : 1e9f;
-			cbuffer._LocalShape = solverSettings.localShapeInfluence;
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == HairAsset.MemoryLayout.Interleaved);
+			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
+			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f);
 			keywords.ENABLE_DISTANCE = solverSettings.distance;
 			keywords.ENABLE_DISTANCE_LRA = solverSettings.distanceLRA;
 			keywords.ENABLE_DISTANCE_FTL = solverSettings.distanceFTL;
-			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
-			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f);
-			keywords.ENABLE_CURVATURE_EQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.Equals);
-			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.GreaterThan);
-			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.curvature && solverSettings.curvatureCompare == SolverSettings.BendCompare.LessThan);
-			keywords.ENABLE_POSE_GLOBAL_POSITION = (solverSettings.globalPosition && solverSettings.globalPositionInfluence > 0.0f);
-			keywords.ENABLE_POSE_GLOBAL_ROTATION = (solverSettings.globalRotation && solverSettings.globalRotationInfluence > 0.0f);
+			keywords.ENABLE_CURVATURE_EQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.Equals);
+			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.GreaterThan);
+			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.LessThan);
 			keywords.ENABLE_POSE_LOCAL_ROTATION = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalRotation && solverSettings.localShapeInfluence > 0.0f);
 			keywords.ENABLE_POSE_LOCAL_BEND_TWIST = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalBendTwist && solverSettings.localShapeInfluence > 0.0f);
+			keywords.ENABLE_POSE_GLOBAL_POSITION = (solverSettings.globalPosition && solverSettings.globalPositionInfluence > 0.0f);
+			keywords.ENABLE_POSE_GLOBAL_ROTATION = (solverSettings.globalRotation && solverSettings.globalRotationInfluence > 0.0f);
 		}
 
 		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
@@ -860,18 +864,18 @@ namespace Unity.DemoTeam.Hair
 			target.PushComputeBuffer(cmd, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
 	
 			target.PushKeyword(cmd, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
+			target.PushKeyword(cmd, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
+			target.PushKeyword(cmd, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
 			target.PushKeyword(cmd, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
 			target.PushKeyword(cmd, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
 			target.PushKeyword(cmd, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
-			target.PushKeyword(cmd, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
-			target.PushKeyword(cmd, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
 			target.PushKeyword(cmd, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
 			target.PushKeyword(cmd, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
 			target.PushKeyword(cmd, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
-			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
 			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_ROTATION", solverData.keywords.ENABLE_POSE_LOCAL_ROTATION);
 			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
+			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
+			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
 		}
 
 		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData) => PushSolverData(cmd, new PushTargetCompute(cs, kernel), solverData);
@@ -1161,7 +1165,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void DrawSolverData(CommandBuffer cmd, RenderTargetIdentifier color, RenderTargetIdentifier depth, in SolverData solverData, in DebugSettings debugSettings)
+		public static void DrawSolverData(CommandBuffer cmd, RTHandle color, RTHandle depth, in SolverData solverData, in DebugSettings debugSettings)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawSolverData))
 			{
@@ -1187,7 +1191,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void DrawVolumeData(CommandBuffer cmd, RenderTargetIdentifier color, RenderTargetIdentifier depth, in VolumeData volumeData, in DebugSettings debugSettings)
+		public static void DrawVolumeData(CommandBuffer cmd, RTHandle color, RTHandle depth, in VolumeData volumeData, in DebugSettings debugSettings)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawVolumeData))
 			{

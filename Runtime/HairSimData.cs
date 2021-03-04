@@ -91,20 +91,19 @@ namespace Unity.DemoTeam.Hair
 			public float _CellPressure;
 			public float _CellVelocity;
 			public float _Damping;
-			public float _DampingPeriod;
+			public float _DampingInterval;
 			public float _Gravity;
 
-			public float _FTLDamping;
 			public float _BoundaryFriction;
-			public float _BendingCurvature;
+			public float _FTLDamping;
+			public float _LocalCurvature;
+			public float _LocalShape;
 
 			public float _GlobalPosition;
-			public float _GlobalPositionPeriod;
+			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
-
-			public float _LocalShape;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
@@ -146,18 +145,18 @@ namespace Unity.DemoTeam.Hair
 		public struct SolverKeywords
 		{
 			public bool LAYOUT_INTERLEAVED;
+			public bool ENABLE_BOUNDARY;
+			public bool ENABLE_BOUNDARY_FRICTION;
 			public bool ENABLE_DISTANCE;
 			public bool ENABLE_DISTANCE_LRA;
 			public bool ENABLE_DISTANCE_FTL;
-			public bool ENABLE_BOUNDARY;
-			public bool ENABLE_BOUNDARY_FRICTION;
 			public bool ENABLE_CURVATURE_EQ;
 			public bool ENABLE_CURVATURE_GEQ;
 			public bool ENABLE_CURVATURE_LEQ;
-			public bool ENABLE_POSE_GLOBAL_POSITION;
-			public bool ENABLE_POSE_GLOBAL_ROTATION;
 			public bool ENABLE_POSE_LOCAL_ROTATION;
 			public bool ENABLE_POSE_LOCAL_BEND_TWIST;
+			public bool ENABLE_POSE_GLOBAL_POSITION;
+			public bool ENABLE_POSE_GLOBAL_ROTATION;
 		}
 
 		public struct VolumeKeywords

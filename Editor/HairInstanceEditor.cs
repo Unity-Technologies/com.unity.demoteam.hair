@@ -109,7 +109,7 @@ namespace Unity.DemoTeam.Hair
 					case HairSim.SolverSettings.Method.GaussSeidel:
 						if (strandMemoryLayout != HairAsset.MemoryLayout.Interleaved)
 						{
-							EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'. This is fixable by changing memory layout in the asset.", MessageType.Warning, wide: true);
+							EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'. This can be solved by changing memory layout in the asset.", MessageType.Warning, wide: true);
 						}
 						break;
 
@@ -119,11 +119,11 @@ namespace Unity.DemoTeam.Hair
 							strandParticleCount != 64 &&
 							strandParticleCount != 128)
 						{
-							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64, 128. Using slow reference solver as fallback. This is fixable by resampling curves in the asset.", MessageType.Error, wide: true);
+							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64, 128. Using slow reference solver as fallback. This can be solved by resampling curves in the asset.", MessageType.Error, wide: true);
 						}
 						else if (strandMemoryLayout != HairAsset.MemoryLayout.Sequential)
 						{
-							EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'.  This is fixable by changing memory layout in the asset.", MessageType.Warning, wide: true);
+							EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'. This can be solved by changing memory layout in the asset.", MessageType.Warning, wide: true);
 						}
 						break;
 				}
@@ -154,7 +154,7 @@ namespace Unity.DemoTeam.Hair
 				var hairAsset = hairInstance.hairAsset;
 				if (hairAsset != null && _hairAssetQuickEdit.boolValue)
 				{
-					Editor.CreateCachedEditor(hairAsset, null, ref hairAssetEditor);
+					Editor.CreateCachedEditor(hairAsset, typeof(HairAssetEditor), ref hairAssetEditor);
 					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 					{
 						(hairAssetEditor as HairAssetEditor).DrawImporterGUI();

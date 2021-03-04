@@ -14,18 +14,21 @@
 // 0 == particles grouped by strand, i.e. root, root+1, root, root+1
 // 1 == particles grouped by index, i.e. root, root, root+1, root+1
 
+#pragma multi_compile_local __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
 #pragma multi_compile_local __ ENABLE_DISTANCE
 #pragma multi_compile_local __ ENABLE_DISTANCE_LRA
 #pragma multi_compile_local __ ENABLE_DISTANCE_FTL
-#pragma multi_compile_local __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
 #pragma multi_compile_local __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
+#pragma multi_compile_local __ ENABLE_POSE_LOCAL_ROTATION ENABLE_POSE_LOCAL_BEND_TWIST
 #pragma multi_compile_local __ ENABLE_POSE_GLOBAL_POSITION
 #pragma multi_compile_local __ ENABLE_POSE_GLOBAL_ROTATION
-#pragma multi_compile_local __ ENABLE_POSE_LOCAL_ROTATION ENABLE_POSE_LOCAL_BEND_TWIST
 
-#define ENABLE_VOLUME_PRESSURE 1
-#define ENABLE_VOLUME_FRICTION 1
-
+#ifndef ENABLE_BOUNDARY
+#define ENABLE_BOUNDARY 0
+#endif
+#ifndef ENABLE_BOUNDARY_FRICTION
+#define ENABLE_BOUNDARY_FRICTION 0
+#endif
 #ifndef ENABLE_DISTANCE
 #define ENABLE_DISTANCE 0
 #endif
@@ -34,12 +37,6 @@
 #endif
 #ifndef ENABLE_DISTANCE_FTL
 #define ENABLE_DISTANCE_FTL 0
-#endif
-#ifndef ENABLE_BOUNDARY
-#define ENABLE_BOUNDARY 0
-#endif
-#ifndef ENABLE_BOUNDARY_FRICTION
-#define ENABLE_BOUNDARY_FRICTION 0
 #endif
 #ifndef ENABLE_CURVATURE_EQ
 #define ENABLE_CURVATURE_EQ 0
@@ -50,7 +47,6 @@
 #ifndef ENABLE_CURVATURE_LEQ
 #define ENABLE_CURVATURE_LEQ 0
 #endif
-
 #ifndef ENABLE_POSE_GLOBAL_POSITION
 #define ENABLE_POSE_GLOBAL_POSITION 0
 #endif
@@ -63,6 +59,9 @@
 #ifndef ENABLE_POSE_LOCAL_BEND_TWIST
 #define ENABLE_POSE_LOCAL_BEND_TWIST 0
 #endif
+
+#define ENABLE_VOLUME_PRESSURE 1
+#define ENABLE_VOLUME_FRICTION 1
 
 //----------
 // includes
@@ -144,14 +143,14 @@ float3 ParticleVolumeImpulse(uint i, float3 velocity)
 	);
 }
 
-float GetDecay(float smoothing, float period)
+float GetDecay(float smoothing, float interval)
 {
-	return pow(max(1e-5, smoothing), _DT / period);
+	return pow(max(1e-5, smoothing), _DT / interval);
 }
 
 float GetDampingDecay()
 {
-	return GetDecay(1.0 - _Damping, _DampingPeriod);
+	return GetDecay(1.0 - _Damping, _DampingInterval);
 }
 
 float3 IntegratePosition(float3 x0, float3 v0, float3 a0)
@@ -172,10 +171,10 @@ float GetParticleInterval(uint strandIndex)
 
 float GetBendingRadius(uint strandIndex)
 {
-	return _BendingCurvature * GetParticleInterval(strandIndex);
+	return _LocalCurvature * GetParticleInterval(strandIndex);
 }
 
-float GetGlobalShapeFade(uint strandIndex, uint linearParticleIndex)
+float GetGlobalAttenuation(uint strandIndex, uint linearParticleIndex)
 {
 	float t = _RootScale[strandIndex] * (linearParticleIndex / (float)(_StrandParticleCount - 1));
 	float k = saturate((t - _GlobalFadeOffset) / _GlobalFadeExtent);
@@ -184,13 +183,13 @@ float GetGlobalShapeFade(uint strandIndex, uint linearParticleIndex)
 
 float GetGlobalPositionInfluence(uint strandIndex, uint linearParticleIndex)
 {
-	float k = _GlobalPosition * GetGlobalShapeFade(strandIndex, linearParticleIndex);
-	return 1.0 - GetDecay(1.0 - k, _GlobalPositionPeriod);
+	float k = _GlobalPosition * GetGlobalAttenuation(strandIndex, linearParticleIndex);
+	return 1.0 - GetDecay(1.0 - k, _GlobalPositionInterval);
 }
 
 float GetGlobalRotationInfluence(uint strandIndex, uint linearParticleIndex)
 {
-	float k = _GlobalRotation * GetGlobalShapeFade(strandIndex, linearParticleIndex);
+	float k = _GlobalRotation * GetGlobalAttenuation(strandIndex, linearParticleIndex);
 	return k;
 }
 

@@ -487,7 +487,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public void DispatchDraw(CommandBuffer cmd, RenderTargetIdentifier color, RenderTargetIdentifier depth)
+		public void DispatchDraw(CommandBuffer cmd, RTHandle color, RTHandle depth)
 		{
 			if (!InitializeRuntimeData(cmd))
 				return;
