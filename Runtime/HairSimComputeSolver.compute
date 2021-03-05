@@ -19,7 +19,7 @@
 #pragma multi_compile_local __ ENABLE_DISTANCE_LRA
 #pragma multi_compile_local __ ENABLE_DISTANCE_FTL
 #pragma multi_compile_local __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
-#pragma multi_compile_local __ ENABLE_POSE_LOCAL_ROTATION ENABLE_POSE_LOCAL_BEND_TWIST
+#pragma multi_compile_local __ ENABLE_POSE_LOCAL_BEND_TWIST
 #pragma multi_compile_local __ ENABLE_POSE_GLOBAL_POSITION
 #pragma multi_compile_local __ ENABLE_POSE_GLOBAL_ROTATION
 
@@ -47,17 +47,14 @@
 #ifndef ENABLE_CURVATURE_LEQ
 #define ENABLE_CURVATURE_LEQ 0
 #endif
+#ifndef ENABLE_POSE_LOCAL_BEND_TWIST
+#define ENABLE_POSE_LOCAL_BEND_TWIST 0
+#endif
 #ifndef ENABLE_POSE_GLOBAL_POSITION
 #define ENABLE_POSE_GLOBAL_POSITION 0
 #endif
 #ifndef ENABLE_POSE_GLOBAL_ROTATION
 #define ENABLE_POSE_GLOBAL_ROTATION 0
-#endif
-#ifndef ENABLE_POSE_LOCAL_ROTATION
-#define ENABLE_POSE_LOCAL_ROTATION 0
-#endif
-#ifndef ENABLE_POSE_LOCAL_BEND_TWIST
-#define ENABLE_POSE_LOCAL_BEND_TWIST 0
 #endif
 
 #define ENABLE_VOLUME_PRESSURE 1
@@ -184,7 +181,7 @@ float GetGlobalAttenuation(uint strandIndex, uint linearParticleIndex)
 float GetGlobalPositionInfluence(uint strandIndex, uint linearParticleIndex)
 {
 	float k = _GlobalPosition * GetGlobalAttenuation(strandIndex, linearParticleIndex);
-	return 1.0 - GetDecay(1.0 - k, _GlobalPositionInterval);
+	return 1.0 - GetDecay(1.0 - k, _GlobalPositionInterval);// fits into lerp
 }
 
 float GetGlobalRotationInfluence(uint strandIndex, uint linearParticleIndex)
@@ -519,7 +516,7 @@ void KSolveConstraints_GaussSeidelReference(
 		}
 
 		// solve local shape constraints
-		if (ENABLE_POSE_LOCAL_ROTATION || ENABLE_POSE_LOCAL_BEND_TWIST)
+		if (ENABLE_POSE_LOCAL_BEND_TWIST)
 		{
 			float4 rootFrame = QMul(_WorldRotation, _InitialRootFrame[strandIndex]);
 			float3 rootPos = _RootPosition[strandIndex].xyz;
@@ -536,8 +533,6 @@ void KSolveConstraints_GaussSeidelReference(
 
 			float4 accuFrame = QMul(rootFrame, _InitialParticleFrameDelta[strandParticleBegin]);
 
-#define NEW_BEND_TWIST 1
-
 			// root+1
 			{
 				const uint i = strandParticleBegin + strandParticleStride;
@@ -550,14 +545,8 @@ void KSolveConstraints_GaussSeidelReference(
 				q2 = q3;// root frame
 				q3 = QMul(MakeQuaternionFromBend(p1, p2, p3), q2);
 
-#if NEW_BEND_TWIST
 				ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, 0.0f, 1.0f, q2, q3);
 				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 0.0f, 1.0f, 1.0f, p2, p3, q3);
-#else
-				float4 frame_p2p3 = QMul(accuFrame, _InitialParticleFrameDelta[i]);
-
-				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 0.0f, 1.0f, 0.0f, p2, p3, frame_p2p3);
-#endif
 			}
 
 			// root+2..
@@ -571,36 +560,8 @@ void KSolveConstraints_GaussSeidelReference(
 				q2 = q3;
 				q3 = QMul(MakeQuaternionFromBend(p1, p2, p3), q2);
 
-				if (ENABLE_POSE_LOCAL_ROTATION)
-				{
-					// calc current frame for segment [p1--p2] and target frame for [p2--p3]
-					float4 frame_p1p2 = QMul(MakeQuaternionFromBend(p0, p1, p2), accuFrame);
-					float4 frame_p2p3 = QMul(frame_p1p2, _InitialParticleFrameDelta[i]);
-
-					// apply material frame constraint
-					ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), 0.5 * stiffness * _LocalShape, 1.0f, 1.0f, 0.0f, p2, p3, frame_p2p3);
-
-					// update settled frame
-					accuFrame = QMul(MakeQuaternionFromBend(p0, p1, p2), accuFrame);
-				}
-				else if (ENABLE_POSE_LOCAL_BEND_TWIST)
-				{
-#if NEW_BEND_TWIST
-					ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, 1.0f, 1.0f, q2, q3);
-					ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 1.0f, 1.0f, 1.0f, p2, p3, q3);
-#else
-					// calc current frames for segments [p1--p2] and [p2--p3]
-					float4 frame_p1p2 = QMul(MakeQuaternionFromBend(p0, p1, p2), accuFrame);
-					float4 frame_p2p3 = QMul(MakeQuaternionFromBend(p1, p2, p3), frame_p1p2);
-
-					// apply material frame constraints
-					ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, 1.0, 1.0, frame_p1p2, frame_p2p3);
-					ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 1.0f, 1.0f, 0.0f, p2, p3, frame_p2p3);
-
-					// update settled frame
-					accuFrame = QMul(MakeQuaternionFromBend(p0, p1, p2), accuFrame);
-#endif
-				}
+				ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, 1.0f, 1.0f, q2, q3);
+				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 1.0f, 1.0f, 1.0f, p2, p3, q3);
 
 				_ParticlePosition[i - strandParticleStride].xyz = p2;
 			}
@@ -644,44 +605,65 @@ void KSolveConstraints_GaussSeidelReference(
 	}
 }
 
-#define EX_BEND_TWIST_BIDIRECTIONAL 1
-
-#if ENABLE_CURVATURE || (ENABLE_POSE_LOCAL_BEND_TWIST && EX_BEND_TWIST_BIDIRECTIONAL)
-  #define GS_LIVE_CONSTRAINTS 3
-#elif ENABLE_DISTANCE || ENABLE_POSE_GLOBAL_ROTATION || ENABLE_POSE_LOCAL_ROTATION || (ENABLE_POSE_LOCAL_BEND_TWIST && !EX_BEND_TWIST_BIDIRECTIONAL)
-  #define GS_LIVE_CONSTRAINTS 2
+#if ENABLE_CURVATURE
+#define GS_LIVE_CONSTRAINTS 3
+#elif ENABLE_DISTANCE || ENABLE_POSE_GLOBAL_ROTATION || ENABLE_POSE_LOCAL_BEND_TWIST
+#define GS_LIVE_CONSTRAINTS 2
 #else
-  #define GS_LIVE_CONSTRAINTS 1
+#define GS_LIVE_CONSTRAINTS 1
 #endif
 
-struct PartialStrand
+struct PartialStrandPos
 {
-	float3 minus0;// head
-	float3 minus1;// head-1
-	float3 minus2;// ..
 	float3 minus3;// ..
-	float3 minus4;// head-4
+	float3 minus2;// ..
+	float3 minus1;// head-1
+	float3 minus0;// head
+};
 
-	float4 q_minus0;// head
-	float4 q_minus1;// head-1
-
-	float4 frame;// depends on GS_LIVE_CONSTRAINTS
-	float4 frameGlobal;
+struct PartialStrandRot
+{
+	float4 minus1;// ..
+	float4 minus0;// head
+	float4 minus0_global;
 };
 
 void PartialStrand_SolveNext(
-	inout PartialStrand p,
+	inout PartialStrandPos p, inout PartialStrandRot q,
 	const uint strandIndex, const uint strandParticleStride,
 	const float3 rootPos,
 	const uint i, const uint k, const float stiffness,
 	const float w_minus2, const float w_minus1, const float w_minus0)
 {
-	p.minus4 = p.minus3;
 	p.minus3 = p.minus2;
 	p.minus2 = p.minus1;
 	p.minus1 = p.minus0;
 	p.minus0 = _ParticlePosition[i].xyz;
-	p.frameGlobal = QMul(p.frameGlobal, _InitialParticleFrameDelta[i]);
+
+	q.minus0_global = QMul(q.minus0_global, _InitialParticleFrameDelta[i]);
+
+	if (ENABLE_POSE_GLOBAL_ROTATION)
+	{
+		ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * GetGlobalRotationInfluence(strandIndex, k), w_minus1, w_minus0, 0.0, p.minus1, p.minus0, q.minus0_global);
+	}
+
+	// GS_LIVE_CONSTRAINTS == 3
+	//                                                 load
+	//                           (q1)          (q0)     |
+	// - --- p3 ---------- p2 ---------- p1 ---------- p0
+	//                       `--------- solve ---------´
+	//
+	// GS_LIVE_CONSTRAINTS == 2
+	//                                                 load
+	//                           (q1)          (q0)     |
+	// - --- p3 ---------- p2 ---------- p1 ---------- p0
+	//                                     `-- solve --´
+	//
+	// GS_LIVE_CONSTRAINTS == 1
+	//                                                 load
+	//                           (q1)          (q0)     |
+	// - --- p3 ---------- p2 ---------- p1 ---------- p0
+	//                                                   `-- solve
 
 	if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p.minus0);
 	if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[i].xyz, p.minus0);
@@ -689,82 +671,41 @@ void PartialStrand_SolveNext(
 	if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, rootPos, p.minus0);
 	if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, w_minus2, w_minus1, w_minus0, p.minus2, p.minus1, p.minus0);
 
-	if (ENABLE_POSE_GLOBAL_ROTATION)
+	q.minus1 = q.minus0;
+	q.minus0 = QMul(MakeQuaternionFromBend(p.minus2, p.minus1, p.minus0), q.minus1);
+
+	if (ENABLE_POSE_LOCAL_BEND_TWIST)
 	{
-		ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * GetGlobalRotationInfluence(strandIndex, k), w_minus1, w_minus0, 1.0, p.minus1, p.minus0, p.frameGlobal);
+		float wq_minus1 = 0.5 * (w_minus2 + w_minus1);
+		float wq_minus0 = 0.5 * (w_minus1 + w_minus0);
+
+		ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, wq_minus1, wq_minus0, q.minus1, q.minus0);
+		ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus1, w_minus0, wq_minus0, p.minus1, p.minus0, q.minus0);
 	}
 
-	p.q_minus1 = p.q_minus0;
-	p.q_minus0 = QMul(MakeQuaternionFromBend(p.minus2, p.minus1, p.minus0), p.q_minus1);
-
-	if (ENABLE_POSE_LOCAL_ROTATION || ENABLE_POSE_LOCAL_BEND_TWIST)
-	{
-		// GS_LIVE_CONSTRAINTS == 3
-		//
-		// - -- frame ---------.
-		// - --- m4 ---------- m3 ---------- m2 ---------- m1 ---------- m0
-		//                                     `--------- solve ---------´
-		//
-		// GS_LIVE_CONSTRAINTS == 2
-		//
-		//         ,--------- frame ---------.
-		// - --- m4 ---------- m3 ---------- m2 ---------- m1 ---------- m0
-		//                                                   `-- solve --´
-		//
-		// GS_LIVE_CONSTRAINTS == 1
-		//
-		//                       ,--------- frame ---------.
-		// - --- m4 ---------- m3 ---------- m2 ---------- m1 ---------- m0
-		//                                                                 `- solve
-
-		// calc frame for segment [m3 -- m2]
-		float4 frame_minus3minus2;
-		{
-			if (GS_LIVE_CONSTRAINTS == 3) frame_minus3minus2 = QMul(MakeQuaternionFromBend(p.minus4, p.minus3, p.minus2), p.frame);
-			if (GS_LIVE_CONSTRAINTS == 2) frame_minus3minus2 = p.frame;
-			if (GS_LIVE_CONSTRAINTS == 1) frame_minus3minus2 = 0;// dummy case to satisfy variants
-		}
-
-		if (ENABLE_POSE_LOCAL_ROTATION)
-		{
-			// calc frame for segment [m2 -- m1] and target frame for [m1 -- m0]
-			float4 frame_minus2minus1 = QMul(MakeQuaternionFromBend(p.minus3, p.minus2, p.minus1), frame_minus3minus2);
-			float4 frame_minus1minus0 = QMul(frame_minus2minus1, _InitialParticleFrameDelta[i]);
-
-			// apply material frame constraint
-			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), 0.5 * stiffness * _LocalShape, w_minus1, w_minus0, 0.0, p.minus1, p.minus0, frame_minus1minus0);
-		}
-		else if (ENABLE_POSE_LOCAL_BEND_TWIST)
-		{
-			float wq_minus1 = 0.5 * (w_minus2 + w_minus1);
-			float wq_minus0 = 0.5 * (w_minus1 + w_minus0);
-
-#if NEW_BEND_TWIST
-			ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, wq_minus1, wq_minus0, p.q_minus1, p.q_minus0);
-			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus1, w_minus0, wq_minus0, p.minus1, p.minus0, p.q_minus0);
-#else
-			// calc frames for segments [m2 -- m1] and [m1 -- m0]
-			float4 frame_minus2minus1 = QMul(MakeQuaternionFromBend(p.minus3, p.minus2, p.minus1), frame_minus3minus2);
-			float4 frame_minus1minus0 = QMul(MakeQuaternionFromBend(p.minus2, p.minus1, p.minus0), frame_minus2minus1);
-
-			// apply material frame constraints
-			ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, wq_minus1, wq_minus0, frame_minus2minus1, frame_minus1minus0);
-
-	#if EX_BEND_TWIST_BIDIRECTIONAL
-		#if 0
-			float3 v0 = GetParticleInterval(strandIndex) * QMul(frame_minus2minus1, float3(0, 1, 0));
-			float3 v1 = GetParticleInterval(strandIndex) * QMul(frame_minus1minus0, float3(0, 1, 0));
-			ApplyDualEdgeVectorConstraint(v0, v1, stiffness * _LocalShape, w_minus2, w_minus1, w_minus0, p.minus2, p.minus1, p.minus0);
-		#else
-			if (w_minus0 != 0.0) ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus1, w_minus0, 0.0, p.minus1, p.minus0, frame_minus1minus0);
-			if (w_minus1 != 0.0) ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus2, w_minus1, 0.0, p.minus2, p.minus1, frame_minus2minus1);
-		#endif
-	#else
-			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus1, w_minus0, 0.0, p.minus1, p.minus0, frame_minus1minus0);
-	#endif
-#endif
-		}
-	}
+	// GS_LIVE_CONSTRAINTS == 3
+	//
+	//                           (q1)          (q0)
+	// - --- p3 ---------- p2 ---------- p1 ---------- p0
+	//    (anchor)          |`-------- modify ---------´
+	//                      |
+	//                     write
+	//
+	// GS_LIVE_CONSTRAINTS == 2
+	//
+	//                           (q1)          (q0)
+	// - --- p3 ---------- p2 ---------- p1 ---------- p0
+	//                  (anchor)          |`- modify --´
+	//                                    |
+	//                                   write
+	//
+	// GS_LIVE_CONSTRAINTS == 1
+	//
+	//                           (q1)          (q0)
+	// - --- p3 ---------- p2 ---------- p1 ---------- p0
+	//                                (anchor)          |`-- modify
+	//                                                  |
+	//                                                 write
 
 	if (ENABLE_DISTANCE_FTL)
 	{
@@ -776,37 +717,9 @@ void PartialStrand_SolveNext(
 	if ((GS_LIVE_CONSTRAINTS == 3) && (w_minus2 != 0.0)) _ParticlePosition[i - strandParticleStride * 2].xyz = p.minus2;
 	if ((GS_LIVE_CONSTRAINTS == 2) && (w_minus1 != 0.0)) _ParticlePosition[i - strandParticleStride * 1].xyz = p.minus1;
 	if ((GS_LIVE_CONSTRAINTS == 1) && (w_minus0 != 0.0)) _ParticlePosition[i - strandParticleStride * 0].xyz = p.minus0;
-
-	// GS_LIVE_CONSTRAINTS == 3
-	//
-	//        ,---------- frame ---------.
-	// - --- p0 ---------- p1 ---------- p2 ---------- p3 ---------- p4
-	//                                    |`-------- modify ---------´
-	//                                    |
-	//                                   final
-	//
-	// GS_LIVE_CONSTRAINTS == 2
-	//
-	//                      ,---------- frame ---------.
-	// - --- p0 ---------- p1 ---------- p2 ---------- p3 ---------- p4
-	//                                                  |`- modify --´
-	//                                                  |
-	//                                                 final
-	//
-	// GS_LIVE_CONSTRAINTS == 1
-	//
-	//                                    ,---------- frame ---------.
-	// - --- p0 ---------- p1 ---------- p2 ---------- p3 ---------- p4
-	//                                                                |`- modify
-	//                                                                |
-	//                                                               final
-
-	if ((GS_LIVE_CONSTRAINTS == 3) && (w_minus2 != 0.0)) p.frame = QMul(MakeQuaternionFromBend(p.minus4, p.minus3, p.minus2), p.frame);
-	if ((GS_LIVE_CONSTRAINTS == 2) && (w_minus1 != 0.0)) p.frame = QMul(MakeQuaternionFromBend(p.minus3, p.minus2, p.minus1), p.frame);
-	if ((GS_LIVE_CONSTRAINTS == 1) && (w_minus0 != 0.0)) p.frame = QMul(MakeQuaternionFromBend(p.minus2, p.minus1, p.minus0), p.frame);
 }
 
-void PartialStrand_SolveTail(inout PartialStrand p, const uint strandIndex, const uint strandParticleStride, const uint strandParticleEnd)
+void PartialStrand_SolveTail(inout PartialStrandPos p, const uint strandIndex, const uint strandParticleStride, const uint strandParticleEnd)
 {
 	if (ENABLE_DISTANCE_FTL)
 	{
@@ -881,7 +794,6 @@ void KSolveConstraints_GaussSeidel(
 		}
 	}
 
-#if 1
 	// solve constraints by Gauss-Seidel iteration
 	{
 		float4 rootFrame = QMul(_WorldRotation, _InitialRootFrame[strandIndex]);
@@ -892,24 +804,23 @@ void KSolveConstraints_GaussSeidel(
 		{
 			const float stiffness = GetIterationStiffness(__iteration);
 
-			PartialStrand p;
-			p.minus4 = rootPos - rootVec * 4.0;
+			PartialStrandPos p;
 			p.minus3 = rootPos - rootVec * 3.0;
 			p.minus2 = rootPos - rootVec * 2.0;
 			p.minus1 = rootPos - rootVec * 1.0;
 			p.minus0 = rootPos;
 
-			p.q_minus1 = MakeQuaternionIdentity();
-			p.q_minus0 = rootFrame;
-
-			p.frame = p.frameGlobal = rootFrame;
+			PartialStrandRot q;
+			q.minus1 = MakeQuaternionIdentity();
+			q.minus0 = rootFrame;
+			q.minus0_global = rootFrame;
 
 			// root+1
 			{
 				const uint i = strandParticleBegin + strandParticleStride * 1;
 				const uint k = 1;
 
-				PartialStrand_SolveNext(p, strandIndex, strandParticleStride, rootPos, i, k, stiffness, 0.0, 0.0, 1.0);
+				PartialStrand_SolveNext(p, q, strandIndex, strandParticleStride, rootPos, i, k, stiffness, 0.0, 0.0, 1.0);
 			}
 
 			// root+2
@@ -917,115 +828,19 @@ void KSolveConstraints_GaussSeidel(
 				const uint i = strandParticleBegin + strandParticleStride * 2;
 				const uint k = 2;
 
-				PartialStrand_SolveNext(p, strandIndex, strandParticleStride, rootPos, i, k, stiffness, 0.0, 1.0, 1.0);
+				PartialStrand_SolveNext(p, q, strandIndex, strandParticleStride, rootPos, i, k, stiffness, 0.0, 1.0, 1.0);
 			}
 
 			// root+3..
 			for (uint i = strandParticleBegin + strandParticleStride * 3, k = 3; i != strandParticleEnd; i += strandParticleStride, k++)
 			{
-				PartialStrand_SolveNext(p, strandIndex, strandParticleStride, rootPos, i, k, stiffness, 1.0, 1.0, 1.0);
+				PartialStrand_SolveNext(p, q, strandIndex, strandParticleStride, rootPos, i, k, stiffness, 1.0, 1.0, 1.0);
 			}
 
 			// n-2, n-1
 			PartialStrand_SolveTail(p, strandIndex, strandParticleStride, strandParticleEnd);
 		}
 	}
-#else
-	// solve constraints by Gauss-Seidel iteration
-	for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
-	{
-		const float stiffness = GetIterationStiffness(__iteration);
-
-		float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
-		float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
-		float3 p2 = _ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz;
-		float3 r0 = p0 - _RootDirection[strandIndex].xyz * GetParticleInterval(strandIndex);
-
-		//      p1 <-- solve
-		//     /
-		//--- p0 <-- fixed (root)
-		//    |
-		//    r0 <-- fixed (root-1)
-		if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p1);
-		if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride].xyz, p1);
-		if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.0, 1.0, p0, p1);
-		if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex), p0, p1);
-		if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 0.0, 0.0, 1.0, r0, p0, p1);
-		if (ENABLE_DISTANCE_FTL)
-		{
-			if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleBegin].xyz);
-		}
-		
-	#if DEBUG_STRAND_31_32 == 2
-		{
-			_ParticlePosition[strandParticleBegin + strandParticleStride].xyz = p1;
-			_ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz = 1e+7;
-			continue;
-		}
-	#endif
-
-		//      p2 <-- solve
-		//      |
-		//      p1 <-- solve
-		//     /
-		//--- p0 <-- fixed (root)
-		//    |
-		//    r0
-		if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p2);
-		if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride * 2].xyz, p2);
-		if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
-		if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * 2, _ParticlePosition[strandParticleBegin].xyz, p2);
-		if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
-		if (ENABLE_DISTANCE_FTL)
-		{
-			if (GS_LIVE_CONSTRAINTS == 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleBegin].xyz);
-			if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[strandParticleBegin + strandParticleStride].xyz);
-		}
-		
-		for (uint i = strandParticleBegin + strandParticleStride * 3, k = 3; i != strandParticleEnd; i += strandParticleStride, k++)
-		{
-			r0 = p0;
-			p0 = p1;
-			p1 = p2;
-			p2 = _ParticlePosition[i].xyz;
-
-			//      p2 <-- solve
-			//      |
-			//      p1 <-- solve
-			//     /
-			//    p0 <-- solve
-			//    |
-			//--- r0
-			if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p2);
-			if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[i].xyz, p2);
-			if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
-			if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, _ParticlePosition[strandParticleBegin].xyz, p2);
-			if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 1.0, 1.0, 1.0, p0, p1, p2);
-			if (ENABLE_DISTANCE_FTL)
-			{
-				if (GS_LIVE_CONSTRAINTS == 3) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), r0, p0, _ParticlePositionCorr[i - strandParticleStride * 3].xyz);
-				if (GS_LIVE_CONSTRAINTS == 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[i - strandParticleStride * 2].xyz);
-				if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[i - strandParticleStride * 1].xyz);
-			}
-
-			_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
-		}
-
-		//      p2 <-- solve (ftl)
-		//     /
-		//    p1 <-- solve (ftl)
-		//    |
-		//    p0
-		if (ENABLE_DISTANCE_FTL)
-		{
-			if (GS_LIVE_CONSTRAINTS >= 3) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz);
-			if (GS_LIVE_CONSTRAINTS >= 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz);
-		}
-
-		_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
-		_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
-	}
-#endif
 
 	// derive velocity from effective change in position
 	{
@@ -1045,7 +860,7 @@ void KSolveConstraints_GaussSeidel(
 
 // pad head so that index 0 == root-1
 groupshared float4 gs_x[1 + THREAD_GROUP_SIZE];// xyz: position, w: weight
-groupshared float3 gs_d[1 + THREAD_GROUP_SIZE];// xyz: ftl correction, w: -
+groupshared float3 gs_d[1 + THREAD_GROUP_SIZE];// xyz: ftl correction
 groupshared float4 gs_q[1 + THREAD_GROUP_SIZE];// quat(xyz,w): material frame
 
 // one thread group per strand
@@ -1063,7 +878,7 @@ void KSolveConstraints_Jacobi(
 	DECLARE_STRAND(groupIdx.x);
 
 	const uint i = strandParticleBegin + strandParticleStride * threadIdx;
-	const uint j = threadIdx + 1;// for groupshared memory
+	const uint j = threadIdx + 1;// for data in group shared memory (gs_*)
 
 	// update positions
 	const float3 x0 = _ParticlePositionPrev[i].xyz;
@@ -1077,8 +892,6 @@ void KSolveConstraints_Jacobi(
 			{
 				gs_x[0] = float4(rootPos - rootVec, 0.0);
 				gs_x[1] = float4(rootPos, 0.0);
-				gs_d[0] = 0;
-				gs_d[1] = 0;
 			}
 		}
 		// [threads: root+1..]
@@ -1088,12 +901,26 @@ void KSolveConstraints_Jacobi(
 			const float3 a0 = float3(0.0, _Gravity, 0.0);
 			{
 				gs_x[j] = float4(IntegratePosition(x0, v0, a0), 1.0);
-				gs_d[j] = 0;
 			}
 		}
 	}
 
-	// build material frames from predicted positions
+	// clear corrections
+	{
+		// [threads: root]
+		if (threadIdx == 0)
+		{
+			gs_d[0] = 0;
+			gs_d[1] = 0;
+		}
+		// [threads: root+1..]
+		else
+		{
+			gs_d[j] = 0;
+		}
+	}
+
+	// build material frames
 	{
 		GroupMemoryBarrierWithGroupSync();
 
@@ -1106,7 +933,7 @@ void KSolveConstraints_Jacobi(
 		// [threads: root+1..]
 		else
 		{
-			gs_q[j] = normalize(MakeQuaternionFromBend(gs_x[j - 2].xyz, gs_x[j - 1].xyz, gs_x[j].xyz));
+			gs_q[j] = MakeQuaternionFromBend(gs_x[j - 2].xyz, gs_x[j - 1].xyz, gs_x[j].xyz);
 		}
 
 		for (uint i = 0; i < THREAD_GROUP_SIZE; i++)
@@ -1117,9 +944,10 @@ void KSolveConstraints_Jacobi(
 			{
 				gs_q[j] = QMul(gs_q[j], gs_q[j - 1]);
 				// e.g.
-				// thread 0: gs_q[0] == q_rot_0
-				// thread 1: gs_q[1] == QMul(q_rot_1, q_rot_0);
-				// thread 2: gs_q[2] == QMul(q_rot_2, QMul(q_rot_1, q_rot_0));
+				// thread 0 writes: gs_q[0] = q_rot_0
+				// thread 1 writes: gs_q[1] = QMul(q_rot_1, q_rot_0);
+				// thread 2 writes: gs_q[2] = QMul(q_rot_2, QMul(q_rot_1, q_rot_0));
+				// ...
 			}
 		}
 	}
@@ -1150,13 +978,13 @@ void KSolveConstraints_Jacobi(
 		(ENABLE_DISTANCE_LRA			? 1							: 0) +
 		(ENABLE_DISTANCE_FTL			? 1							: 0) +
 		(ENABLE_CURVATURE				? min(3, 1 + num_tailing)	: 0) +
-		(ENABLE_POSE_GLOBAL_ROTATION	? min(2, 1 + num_tailing)	: 0) +
 		(ENABLE_POSE_LOCAL_BEND_TWIST	? min(2, 1 + num_tailing)	: 0) +
+		(ENABLE_POSE_GLOBAL_ROTATION	? min(2, 1 + num_tailing)	: 0) +
 		0);
 
 	const uint num_acting_q = max(1,
-		(ENABLE_POSE_GLOBAL_ROTATION	? 1							: 0) +
 		(ENABLE_POSE_LOCAL_BEND_TWIST	? min(3, 2 + num_tailing)	: 0) +
+		(ENABLE_POSE_GLOBAL_ROTATION	? 1							: 0) +
 		0);
 
 	// solve constraints by Jacobi iteration
@@ -1221,6 +1049,7 @@ void KSolveConstraints_Jacobi(
 				}
 			}
 
+			/* TODO
 			// solve global rotation constraints
 			if (ENABLE_POSE_GLOBAL_ROTATION)
 			{
@@ -1241,6 +1070,7 @@ void KSolveConstraints_Jacobi(
 
 				corr_q += (q_j + q_j_corr - gs_q[j]) / _SOR;
 			}
+			*/
 
 			// solve local shape constraints
 			if (ENABLE_POSE_LOCAL_BEND_TWIST)
@@ -1299,8 +1129,315 @@ void KSolveConstraints_Jacobi(
 	}
 }
 
-//------------------ for deletion ------------------
 
+//========================================================================
+//------------------ for reference, eventually deletion ------------------
+
+
+//###  early local shape by rebuilding quats
+/*
+void SolveLocalShape()
+{
+	// solve local shape constraints
+	if (ENABLE_POSE_LOCAL_ROTATION || ENABLE_POSE_LOCAL_BEND_TWIST)
+	{
+		float4 rootFrame = QMul(_WorldRotation, _InitialRootFrame[strandIndex]);
+		float3 rootPos = _RootPosition[strandIndex].xyz;
+		float3 rootDir = QMul(rootFrame, float3(0, 1, 0));
+
+		// root
+		float3 p0 = rootPos - rootDir * GetParticleInterval(strandIndex) * 3.0;
+		float3 p1 = rootPos - rootDir * GetParticleInterval(strandIndex) * 2.0;
+		float3 p2 = rootPos - rootDir * GetParticleInterval(strandIndex);
+		float3 p3 = rootPos;
+
+		float4 accuFrame = QMul(rootFrame, _InitialParticleFrameDelta[strandParticleBegin]);
+
+		// root+1
+		{
+			const uint i = strandParticleBegin + strandParticleStride;
+
+			p0 = p1;// root-2
+			p1 = p2;// root-1
+			p2 = p3;// root
+			p3 = _ParticlePosition[i].xyz;
+
+			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 0.0f, 1.0f, 0.0f, p2, p3, frame_p2p3);
+		}
+
+		// root+2..
+		for (uint i = strandParticleBegin + strandParticleStride * 2; i != strandParticleEnd; i += strandParticleStride)
+		{
+			p0 = p1;
+			p1 = p2;
+			p2 = p3;
+			p3 = _ParticlePosition[i].xyz;
+
+			if (ENABLE_POSE_LOCAL_ROTATION)
+			{
+				// calc current frame for segment [p1--p2] and target frame for [p2--p3]
+				float4 frame_p1p2 = QMul(MakeQuaternionFromBend(p0, p1, p2), accuFrame);
+				float4 frame_p2p3 = QMul(frame_p1p2, _InitialParticleFrameDelta[i]);
+
+				// apply material frame constraint
+				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), 0.5 * stiffness * _LocalShape, 1.0f, 1.0f, 0.0f, p2, p3, frame_p2p3);
+
+				// update settled frame
+				accuFrame = QMul(MakeQuaternionFromBend(p0, p1, p2), accuFrame);
+			}
+			else if (ENABLE_POSE_LOCAL_BEND_TWIST)
+			{
+				// calc current frames for segments [p1--p2] and [p2--p3]
+				float4 frame_p1p2 = QMul(MakeQuaternionFromBend(p0, p1, p2), accuFrame);
+				float4 frame_p2p3 = QMul(MakeQuaternionFromBend(p1, p2, p3), frame_p1p2);
+
+				// apply material frame constraints
+				ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, 1.0, 1.0, frame_p1p2, frame_p2p3);
+				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 1.0f, 1.0f, 0.0f, p2, p3, frame_p2p3);
+
+				// update settled frame
+				accuFrame = QMul(MakeQuaternionFromBend(p0, p1, p2), accuFrame);
+			}
+
+			_ParticlePosition[i - strandParticleStride].xyz = p2;
+		}
+
+		_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p3;
+	}
+}
+*/
+
+
+//###  early local shape in sliding window
+/*
+void PartialStrand_SolveNext(
+	inout PartialStrand p,
+	const uint strandIndex, const uint strandParticleStride,
+	const float3 rootPos,
+	const uint i, const uint k, const float stiffness,
+	const float w_minus2, const float w_minus1, const float w_minus0)
+{
+	p.minus4 = p.minus3;
+	p.minus3 = p.minus2;
+	p.minus2 = p.minus1;
+	p.minus1 = p.minus0;
+	p.minus0 = _ParticlePosition[i].xyz;
+	p.frameGlobal = QMul(p.frameGlobal, _InitialParticleFrameDelta[i]);
+
+	if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p.minus0);
+	if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[i].xyz, p.minus0);
+	if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, w_minus1, w_minus0, p.minus1, p.minus0);
+	if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, rootPos, p.minus0);
+	if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, w_minus2, w_minus1, w_minus0, p.minus2, p.minus1, p.minus0);
+
+	if (ENABLE_POSE_GLOBAL_ROTATION)
+	{
+		ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * GetGlobalRotationInfluence(strandIndex, k), w_minus1, w_minus0, 1.0, p.minus1, p.minus0, p.frameGlobal);
+	}
+
+	if (ENABLE_POSE_LOCAL_ROTATION || ENABLE_POSE_LOCAL_BEND_TWIST)
+	{
+		// GS_LIVE_CONSTRAINTS == 3
+		//
+		// - -- frame ---------.
+		// - --- m4 ---------- m3 ---------- m2 ---------- m1 ---------- m0
+		//                                     `--------- solve ---------´
+		//
+		// GS_LIVE_CONSTRAINTS == 2
+		//
+		//         ,--------- frame ---------.
+		// - --- m4 ---------- m3 ---------- m2 ---------- m1 ---------- m0
+		//                                                   `-- solve --´
+		//
+		// GS_LIVE_CONSTRAINTS == 1
+		//
+		//                       ,--------- frame ---------.
+		// - --- m4 ---------- m3 ---------- m2 ---------- m1 ---------- m0
+		//                                                                 `- solve
+
+		// calc frame for segment [m3 -- m2]
+		float4 frame_minus3minus2;
+		{
+			if (GS_LIVE_CONSTRAINTS == 3) frame_minus3minus2 = QMul(MakeQuaternionFromBend(p.minus4, p.minus3, p.minus2), p.frame);
+			if (GS_LIVE_CONSTRAINTS == 2) frame_minus3minus2 = p.frame;
+			if (GS_LIVE_CONSTRAINTS == 1) frame_minus3minus2 = 0;// dummy case to satisfy variants
+		}
+
+		if (ENABLE_POSE_LOCAL_ROTATION)
+		{
+			float wq_minus1 = 0.5 * (w_minus2 + w_minus1);
+			float wq_minus0 = 0.5 * (w_minus1 + w_minus0);
+
+			// calc frame for segment [m2 -- m1] and target frame for [m1 -- m0]
+			float4 frame_minus2minus1 = QMul(MakeQuaternionFromBend(p.minus3, p.minus2, p.minus1), frame_minus3minus2);
+			float4 frame_minus1minus0 = QMul(frame_minus2minus1, _InitialParticleFrameDelta[i]);
+
+			// apply material frame constraint
+			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), 0.5 * stiffness * _LocalShape, w_minus1, w_minus0, 0.0, p.minus1, p.minus0, frame_minus1minus0);
+		}
+		else if (ENABLE_POSE_LOCAL_BEND_TWIST)
+		{
+			float wq_minus1 = 0.5 * (w_minus2 + w_minus1);
+			float wq_minus0 = 0.5 * (w_minus1 + w_minus0);
+
+			// calc frames for segments [m2 -- m1] and [m1 -- m0]
+			float4 frame_minus2minus1 = QMul(MakeQuaternionFromBend(p.minus3, p.minus2, p.minus1), frame_minus3minus2);
+			float4 frame_minus1minus0 = QMul(MakeQuaternionFromBend(p.minus2, p.minus1, p.minus0), frame_minus2minus1);
+
+			// apply material frame constraints
+			ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, wq_minus1, wq_minus0, frame_minus2minus1, frame_minus1minus0);
+
+		#if EX_BEND_TWIST_BIDIRECTIONAL
+			if (w_minus0 != 0.0) ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus1, w_minus0, 0.0, p.minus1, p.minus0, frame_minus1minus0);
+			if (w_minus1 != 0.0) ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus2, w_minus1, 0.0, p.minus2, p.minus1, frame_minus2minus1);
+		#else
+			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus1, w_minus0, 0.0, p.minus1, p.minus0, frame_minus1minus0);
+		#endif
+		}
+	}
+
+	if (ENABLE_DISTANCE_FTL)
+	{
+		if ((GS_LIVE_CONSTRAINTS == 3) && (w_minus2 != 0.0)) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p.minus3, p.minus2, _ParticlePositionCorr[i - strandParticleStride * 3].xyz);
+		if ((GS_LIVE_CONSTRAINTS == 2) && (w_minus1 != 0.0)) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p.minus2, p.minus1, _ParticlePositionCorr[i - strandParticleStride * 2].xyz);
+		if ((GS_LIVE_CONSTRAINTS == 1) && (w_minus0 != 0.0)) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p.minus1, p.minus0, _ParticlePositionCorr[i - strandParticleStride * 1].xyz);
+	}
+
+	if ((GS_LIVE_CONSTRAINTS == 3) && (w_minus2 != 0.0)) _ParticlePosition[i - strandParticleStride * 2].xyz = p.minus2;
+	if ((GS_LIVE_CONSTRAINTS == 2) && (w_minus1 != 0.0)) _ParticlePosition[i - strandParticleStride * 1].xyz = p.minus1;
+	if ((GS_LIVE_CONSTRAINTS == 1) && (w_minus0 != 0.0)) _ParticlePosition[i - strandParticleStride * 0].xyz = p.minus0;
+
+	// GS_LIVE_CONSTRAINTS == 3
+	//
+	//        ,---------- frame ---------.
+	// - --- p0 ---------- p1 ---------- p2 ---------- p3 ---------- p4
+	//                                    |`-------- modify ---------´
+	//                                    |
+	//                                   final
+	//
+	// GS_LIVE_CONSTRAINTS == 2
+	//
+	//                      ,---------- frame ---------.
+	// - --- p0 ---------- p1 ---------- p2 ---------- p3 ---------- p4
+	//                                                  |`- modify --´
+	//                                                  |
+	//                                                 final
+	//
+	// GS_LIVE_CONSTRAINTS == 1
+	//
+	//                                    ,---------- frame ---------.
+	// - --- p0 ---------- p1 ---------- p2 ---------- p3 ---------- p4
+	//                                                                |`- modify
+	//                                                                |
+	//                                                               final
+
+	if ((GS_LIVE_CONSTRAINTS == 3) && (w_minus2 != 0.0)) p.frame = QMul(MakeQuaternionFromBend(p.minus4, p.minus3, p.minus2), p.frame);
+	if ((GS_LIVE_CONSTRAINTS == 2) && (w_minus1 != 0.0)) p.frame = QMul(MakeQuaternionFromBend(p.minus3, p.minus2, p.minus1), p.frame);
+	if ((GS_LIVE_CONSTRAINTS == 1) && (w_minus0 != 0.0)) p.frame = QMul(MakeQuaternionFromBend(p.minus2, p.minus1, p.minus0), p.frame);
+}
+*/
+
+
+//###  early gauss seidel
+/*
+// solve constraints by Gauss-Seidel iteration
+for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
+{
+	const float stiffness = GetIterationStiffness(__iteration);
+
+	float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
+	float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
+	float3 p2 = _ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz;
+	float3 r0 = p0 - _RootDirection[strandIndex].xyz * GetParticleInterval(strandIndex);
+
+	//      p1 <-- solve
+	//     /
+	//--- p0 <-- fixed (root)
+	//    |
+	//    r0 <-- fixed (root-1)
+	if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p1);
+	if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride].xyz, p1);
+	if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.0, 1.0, p0, p1);
+	if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex), p0, p1);
+	if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 0.0, 0.0, 1.0, r0, p0, p1);
+	if (ENABLE_DISTANCE_FTL)
+	{
+		if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleBegin].xyz);
+	}
+
+#if DEBUG_STRAND_31_32 == 2
+	{
+		_ParticlePosition[strandParticleBegin + strandParticleStride].xyz = p1;
+		_ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz = 1e+7;
+		continue;
+	}
+#endif
+
+	//      p2 <-- solve
+	//      |
+	//      p1 <-- solve
+	//     /
+	//--- p0 <-- fixed (root)
+	//    |
+	//    r0
+	if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p2);
+	if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[strandParticleBegin + strandParticleStride * 2].xyz, p2);
+	if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
+	if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * 2, _ParticlePosition[strandParticleBegin].xyz, p2);
+	if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
+	if (ENABLE_DISTANCE_FTL)
+	{
+		if (GS_LIVE_CONSTRAINTS == 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleBegin].xyz);
+		if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[strandParticleBegin + strandParticleStride].xyz);
+	}
+
+	for (uint i = strandParticleBegin + strandParticleStride * 3, k = 3; i != strandParticleEnd; i += strandParticleStride, k++)
+	{
+		r0 = p0;
+		p0 = p1;
+		p1 = p2;
+		p2 = _ParticlePosition[i].xyz;
+
+		//      p2 <-- solve
+		//      |
+		//      p1 <-- solve
+		//     /
+		//    p0 <-- solve
+		//    |
+		//--- r0
+		if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p2);
+		if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[i].xyz, p2);
+		if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), stiffness, 0.5, 0.5, p1, p2);
+		if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, _ParticlePosition[strandParticleBegin].xyz, p2);
+		if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 1.0, 1.0, 1.0, p0, p1, p2);
+		if (ENABLE_DISTANCE_FTL)
+		{
+			if (GS_LIVE_CONSTRAINTS == 3) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), r0, p0, _ParticlePositionCorr[i - strandParticleStride * 3].xyz);
+			if (GS_LIVE_CONSTRAINTS == 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[i - strandParticleStride * 2].xyz);
+			if (GS_LIVE_CONSTRAINTS == 1) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[i - strandParticleStride * 1].xyz);
+		}
+
+		_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
+	}
+
+	//      p2 <-- solve (ftl)
+	//     /
+	//    p1 <-- solve (ftl)
+	//    |
+	//    p0
+	if (ENABLE_DISTANCE_FTL)
+	{
+		if (GS_LIVE_CONSTRAINTS >= 3) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p0, p1, _ParticlePositionCorr[strandParticleEnd - strandParticleStride * 3].xyz);
+		if (GS_LIVE_CONSTRAINTS >= 2) ApplyDistanceFTLConstraint(GetParticleInterval(strandIndex), p1, p2, _ParticlePositionCorr[strandParticleEnd - strandParticleStride * 2].xyz);
+	}
+
+	_ParticlePosition[strandParticleEnd - strandParticleStride * 2].xyz = p1;
+	_ParticlePosition[strandParticleEnd - strandParticleStride].xyz = p2;
+}
+*/
+
+
+//###  early jacobi
 /*
 groupshared float3 gs_x[THREAD_GROUP_SIZE];
 groupshared float3 gs_d[THREAD_GROUP_SIZE];

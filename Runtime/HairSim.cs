@@ -164,12 +164,6 @@ namespace Unity.DemoTeam.Hair
 				GreaterThan,
 			}
 
-			public enum LocalShapeMode
-			{
-				LocalRotation,
-				LocalBendTwist,
-			}
-
 			[LineHeader("Solver")]
 
 			[Tooltip("Constraint solver")]
@@ -220,8 +214,6 @@ namespace Unity.DemoTeam.Hair
 
 			[ToggleGroup, Tooltip("Enable local shape constraint")]
 			public bool localShape;
-			[ToggleGroupItem, Tooltip("Local shape constraint mode")]
-			public LocalShapeMode localShapeMode;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape influence")]
 			public float localShapeInfluence;
 
@@ -267,7 +259,6 @@ namespace Unity.DemoTeam.Hair
 				localCurvatureMode = LocalCurvatureMode.LessThan,
 				localCurvatureValue = 0.1f,
 				localShape = false,
-				localShapeMode = LocalShapeMode.LocalBendTwist,
 				localShapeInfluence = 1.0f,
 
 				globalPosition = false,
@@ -656,8 +647,7 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_CURVATURE_EQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.Equals);
 			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.GreaterThan);
 			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.LessThan);
-			keywords.ENABLE_POSE_LOCAL_ROTATION = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalRotation && solverSettings.localShapeInfluence > 0.0f);
-			keywords.ENABLE_POSE_LOCAL_BEND_TWIST = (solverSettings.localShape && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.LocalBendTwist && solverSettings.localShapeInfluence > 0.0f);
+			keywords.ENABLE_POSE_LOCAL_BEND_TWIST = (solverSettings.localShape && solverSettings.localShapeInfluence > 0.0f);
 			keywords.ENABLE_POSE_GLOBAL_POSITION = (solverSettings.globalPosition && solverSettings.globalPositionInfluence > 0.0f);
 			keywords.ENABLE_POSE_GLOBAL_ROTATION = (solverSettings.globalRotation && solverSettings.globalRotationInfluence > 0.0f);
 		}
@@ -872,7 +862,6 @@ namespace Unity.DemoTeam.Hair
 			target.PushKeyword(cmd, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
 			target.PushKeyword(cmd, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
 			target.PushKeyword(cmd, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_ROTATION", solverData.keywords.ENABLE_POSE_LOCAL_ROTATION);
 			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
 			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
 			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);

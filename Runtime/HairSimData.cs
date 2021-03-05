@@ -153,7 +153,6 @@ namespace Unity.DemoTeam.Hair
 			public bool ENABLE_CURVATURE_EQ;
 			public bool ENABLE_CURVATURE_GEQ;
 			public bool ENABLE_CURVATURE_LEQ;
-			public bool ENABLE_POSE_LOCAL_ROTATION;
 			public bool ENABLE_POSE_LOCAL_BEND_TWIST;
 			public bool ENABLE_POSE_GLOBAL_POSITION;
 			public bool ENABLE_POSE_GLOBAL_ROTATION;
