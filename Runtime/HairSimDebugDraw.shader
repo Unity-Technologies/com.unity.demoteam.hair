@@ -18,6 +18,7 @@
 
 	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
+	#include "HairSimComputeSolverBoundaries.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
 	#include "HairSimDebugDrawUtility.hlsl"
 	
@@ -163,6 +164,28 @@
 		float volumeDivergence = VolumeSampleScalar(_VolumeDivergence, uvw);
 		float volumePressure = VolumeSampleScalar(_VolumePressure, uvw);
 		float3 volumePressureGrad = VolumeSampleVector(_VolumePressureGrad, uvw);
+
+#if 0
+		float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvw);
+		float sd = BoundaryDistance(worldPos);
+		if (abs(sd) < 0.1)
+		{
+			float3 sdNormal = 0.5 + 0.5 * BoundaryNormal(worldPos, sd);
+			return float4(sdNormal, _DebugSliceOpacity);
+		}
+		else
+		{
+			sd *= 50.0;
+			if (sd < 0.0)
+			{
+				return float4(frac(-sd), 0, frac(-sd), _DebugSliceOpacity);
+			}
+			else
+			{
+				return float4(0, frac(sd), frac(sd), _DebugSliceOpacity);
+			}
+		}
+#endif
 
 		// test fake level-set
 		/*

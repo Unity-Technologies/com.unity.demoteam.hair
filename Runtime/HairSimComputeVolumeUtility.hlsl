@@ -140,22 +140,22 @@ float VolumeSampleScalar(Texture3D<float> volume, float3 uvw)
 
 float3 VolumeSampleScalarGradient(Texture3D<float> volume, float3 uvw)
 {
-	const float2 h0 = float2(1.0 / _VolumeCells.x, 0.0);
+	const float2 h = float2(1.0 / _VolumeCells.x, 0.0);
 	
-	float s_xm = VolumeSampleScalar(volume, uvw - h0.xyy, _Volume_trilinear_clamp);
-	float s_ym = VolumeSampleScalar(volume, uvw - h0.yxy, _Volume_trilinear_clamp);
-	float s_zm = VolumeSampleScalar(volume, uvw - h0.yyx, _Volume_trilinear_clamp);
+	float s_xm = VolumeSampleScalar(volume, uvw - h.xyy, _Volume_trilinear_clamp);
+	float s_ym = VolumeSampleScalar(volume, uvw - h.yxy, _Volume_trilinear_clamp);
+	float s_zm = VolumeSampleScalar(volume, uvw - h.yyx, _Volume_trilinear_clamp);
 
-	float s_xp = VolumeSampleScalar(volume, uvw + h0.xyy, _Volume_trilinear_clamp);
-	float s_yp = VolumeSampleScalar(volume, uvw + h0.yxy, _Volume_trilinear_clamp);
-	float s_zp = VolumeSampleScalar(volume, uvw + h0.yyx, _Volume_trilinear_clamp);
+	float s_xp = VolumeSampleScalar(volume, uvw + h.xyy, _Volume_trilinear_clamp);
+	float s_yp = VolumeSampleScalar(volume, uvw + h.yxy, _Volume_trilinear_clamp);
+	float s_zp = VolumeSampleScalar(volume, uvw + h.yyx, _Volume_trilinear_clamp);
 
 	const float3 diff = float3(
 		s_xp - s_xm,
 		s_yp - s_ym,
 		s_zp - s_zm);
 
-	return diff / (2.0 * h0.x);
+	return diff / (2.0 * h.x);
 }
 
 float3 VolumeSampleVector(Texture3D<float3> volume, float3 uvw, SamplerState state)

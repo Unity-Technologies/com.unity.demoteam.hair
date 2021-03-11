@@ -3,10 +3,10 @@
     "rootNamespace": "",
     "references": [
         "GUID:f9dedde5eec30c2468e14d8a7b14626e",
-        "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
-        "GUID:78bd2ddd6e276394a9615c203e574844",
-        "GUID:22f31b74491fb45d5b598e0b935deb31"
+        "GUID:d8b63aba1907145bea998dd612889d6b",
+        "GUID:22f31b74491fb45d5b598e0b935deb31",
+        "GUID:78bd2ddd6e276394a9615c203e574844"
     ],
     "includePlatforms": [
         "Editor"
@@ -21,12 +21,12 @@
         {
             "name": "com.unity.formats.alembic",
             "expression": "2.2.0-exp.1",
-            "define": "UNITY_FORMATS_ALEMBIC"
+            "define": "HAS_PACKAGE_UNITY_ALEMBIC"
         },
         {
             "name": "com.unity.demoteam.digital-human",
             "expression": "0.1.1-preview",
-            "define": "UNITY_DEMOTEAM_DIGITALHUMAN"
+            "define": "HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN"
         }
     ],
     "noEngineReferences": false

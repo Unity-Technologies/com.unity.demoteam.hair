@@ -6,10 +6,10 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.DemoTeam.Attributes;
 
-#if UNITY_DEMOTEAM_DIGITALHUMAN
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 using Unity.DemoTeam.DigitalHuman;
 #endif
-#if UNITY_VISUALEFFECTGRAPH
+#if HAS_PACKAGE_UNITY_VFXGRAPH
 using UnityEngine.VFX;
 #endif
 
@@ -28,7 +28,7 @@ namespace Unity.DemoTeam.Hair
 			public MeshRenderer lineRenderer;
 			public MaterialPropertyBlock lineRendererMPB;
 			public MeshFilter rootFilter;
-#if UNITY_DEMOTEAM_DIGITALHUMAN
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 			public SkinAttachment rootAttachment;
 #endif
 		}
@@ -36,7 +36,7 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsRoots
 		{
-#if UNITY_DEMOTEAM_DIGITALHUMAN
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 			[ToggleGroup]
 			public bool rootsAttach;
 			[ToggleGroupItem]
@@ -47,7 +47,7 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SettingsRoots defaults = new SettingsRoots()
 			{
-#if UNITY_DEMOTEAM_DIGITALHUMAN
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 				rootsAttach = false,
 				rootsAttachTarget = null,
 #endif
@@ -68,7 +68,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				PrimitiveLines,
 				InstancedMesh,//TODO
-#if UNITY_VISUALEFFECTGRAPH
+#if HAS_PACKAGE_UNITY_VFXGRAPH
 				VFXGraph,//TODO
 #endif
 			}
@@ -104,7 +104,7 @@ namespace Unity.DemoTeam.Hair
 			public StrandRenderer strandRenderer;
 			[VisibleIf(nameof(strandRenderer), StrandRenderer.InstancedMesh)]
 			public Mesh strandMesh;
-#if UNITY_VISUALEFFECTGRAPH
+#if HAS_PACKAGE_UNITY_VFXGRAPH
 			[VisibleIf(nameof(strandRenderer), StrandRenderer.VFXGraph)]
 			public VisualEffect strandOutputGraph;
 #endif
@@ -225,7 +225,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			InitializeComponents();
 
-#if UNITY_DEMOTEAM_DIGITALHUMAN
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 	#if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
@@ -272,7 +272,7 @@ namespace Unity.DemoTeam.Hair
 
 		public Quaternion GetRootRotation(in ComponentGroup group)
 		{
-#if UNITY_DEMOTEAM_DIGITALHUMAN
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 			if (settingsRoots.rootsAttach && settingsRoots.rootsAttachTarget != null)
 			{
 				return settingsRoots.rootsAttachTargetBone.skinningBone.rotation;
@@ -824,7 +824,7 @@ namespace Unity.DemoTeam.Hair
 						componentGroup.rootFilter = rootsContainer.AddComponent<MeshFilter>();
 						componentGroup.rootFilter.sharedMesh = strandGroups[i].meshAssetRoots;
 
-#if UNITY_DEMOTEAM_DIGITALHUMAN
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 						componentGroup.rootAttachment = rootsContainer.AddComponent<SkinAttachment>();
 						componentGroup.rootAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
 						componentGroup.rootAttachment.forceRecalculateBounds = true;

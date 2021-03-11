@@ -199,7 +199,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					StructPropertyFieldsWithHeader(_settingsRoots);
 				}
-#if !UNITY_DEMOTEAM_DIGITALHUMAN
+#if !HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 				using (new EditorGUI.IndentLevelScope())
 				{
 					EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human'.", MessageType.None, wide: true);
@@ -287,11 +287,12 @@ namespace Unity.DemoTeam.Hair
 				StructPropertyFieldsWithHeader(_settingsVolume, "Settings Volume");
 				using (new EditorGUI.IndentLevelScope())
 				{
-					var countCapsule = hairInstance.volumeData.cbuffer._BoundaryCapsuleCount;
-					var countSphere = hairInstance.volumeData.cbuffer._BoundarySphereCount;
-					var countTorus = hairInstance.volumeData.cbuffer._BoundaryTorusCount;
-					var countPack = countCapsule + countSphere + countTorus;
-					var countTxt = countPack + " active shapes (" + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus)";
+					var countDiscrete = hairInstance.volumeData.cbuffer._BoundaryCountDiscrete;
+					var countCapsule = hairInstance.volumeData.cbuffer._BoundaryCountCapsule;
+					var countSphere = hairInstance.volumeData.cbuffer._BoundaryCountSphere;
+					var countTorus = hairInstance.volumeData.cbuffer._BoundaryCountTorus;
+					var countPack = countDiscrete + countCapsule + countSphere + countTorus;
+					var countTxt = countPack + " active shapes (" + countDiscrete + " discrete, " + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus)";
 
 					var rectHeight = HairGUIStyles.statusBox.CalcHeight(new GUIContent(string.Empty), 0.0f);
 					var rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
@@ -301,7 +302,7 @@ namespace Unity.DemoTeam.Hair
 						GUI.Box(EditorGUI.IndentedRect(rect), countTxt, HairGUIStyles.statusBox);
 					}
 
-					var discarded = hairInstance.volumeData.boundaryPrevCountDiscarded;
+					var discarded = hairInstance.volumeData.boundaryPrevCountDiscard;
 					if (discarded > 0)
 					{
 						rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));

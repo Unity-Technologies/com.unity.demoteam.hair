@@ -49,13 +49,13 @@ void SolveCollisionConstraint(
 	//         ´
 
 	float depth = BoundaryDistance(p);
-	if (depth < 0.0)
+	if (depth < _BoundaryWorldMargin)
 	{
 		float3 normal = BoundaryNormal(p, depth);
 
 		GUARD(w > 0.0)
 		{
-			d += normal * depth;
+			d += normal * (depth - _BoundaryWorldMargin);
 		}
 	}
 }
@@ -85,10 +85,12 @@ void SolveCollisionFrictionConstraint(
 	//              p
 
 	float depth = BoundaryDistance(p);
-	if (depth < 0.0)
+	if (depth < _BoundaryWorldMargin)
 	{
 		uint index = BoundarySelect(p, depth);
 		float3 normal = BoundaryNormal(p, depth);
+
+		depth -= _BoundaryWorldMargin;
 
 		//const float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
 		const float4x4 M_prev = _BoundaryMatrixW2PrevW[index];

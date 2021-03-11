@@ -47,9 +47,12 @@ CBUFFER_START(VolumeCBuffer)
     float _ResolveUnitVolume;
     float _ResolveUnitDebugWidth;
     float _TargetDensityFactor;
-    int _BoundaryCapsuleCount;
-    int _BoundarySphereCount;
-    int _BoundaryTorusCount;
+    int _BoundaryCountDiscrete;
+    int _BoundaryCountCapsule;
+    int _BoundaryCountSphere;
+    int _BoundaryCountTorus;
+    float _BoundaryWorldEpsilon;
+    float _BoundaryWorldMargin;
 CBUFFER_END
 
 

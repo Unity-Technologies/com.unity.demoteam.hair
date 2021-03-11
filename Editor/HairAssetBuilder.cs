@@ -1,4 +1,4 @@
-﻿//#define ENABLE_VISIBLE_SUBASSETS
+﻿//#define VISIBLE_SUBASSETS
 
 using System;
 using UnityEngine;
@@ -7,7 +7,7 @@ using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
-#if UNITY_FORMATS_ALEMBIC
+#if HAS_PACKAGE_UNITY_ALEMBIC
 using UnityEngine.Formats.Alembic.Importer;
 #endif
 
@@ -91,7 +91,7 @@ namespace Unity.DemoTeam.Hair
 			// dirty the asset
 			EditorUtility.SetDirty(hairAsset);
 
-#if ENABLE_VISIBLE_SUBASSETS
+#if VISIBLE_SUBASSETS
 			// save and re-import to force hierearchy update
 			AssetDatabase.SaveAssets();
 			AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(hairAsset), ImportAssetOptions.ForceUpdate);
@@ -100,7 +100,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsAlembic settings, HairAsset.MemoryLayout memoryLayout)
 		{
-#if UNITY_FORMATS_ALEMBIC
+#if HAS_PACKAGE_UNITY_ALEMBIC
 			// check stream present
 			var alembic = settings.alembicAsset;
 			if (alembic == null)
@@ -155,7 +155,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-#if UNITY_FORMATS_ALEMBIC
+#if HAS_PACKAGE_UNITY_ALEMBIC
 		public static void BuildHairAssetStrandGroup(ref HairAsset.StrandGroup strandGroup, in HairAsset.SettingsAlembic settings, AlembicCurves curveSet, HairAsset.MemoryLayout memoryLayout)
 		{
 			//TODO require resampling if not all curves have same number of points
@@ -372,7 +372,7 @@ namespace Unity.DemoTeam.Hair
 			// prep lines mesh
 			strandGroup.meshAssetLines = new Mesh();
 			strandGroup.meshAssetLines.indexFormat = (curveCount * curvePointCount > 65535) ? IndexFormat.UInt32 : IndexFormat.UInt16;
-#if !ENABLE_VISIBLE_SUBASSETS
+#if !VISIBLE_SUBASSETS
 			strandGroup.meshAssetLines.hideFlags |= HideFlags.HideInHierarchy;
 #endif
 
@@ -455,7 +455,7 @@ namespace Unity.DemoTeam.Hair
 
 			// prep roots mesh
 			strandGroup.meshAssetRoots = new Mesh();
-#if !ENABLE_VISIBLE_SUBASSETS
+#if !VISIBLE_SUBASSETS
 			strandGroup.meshAssetRoots.hideFlags |= HideFlags.HideInHierarchy;
 #endif
 
