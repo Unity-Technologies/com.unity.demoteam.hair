@@ -63,29 +63,38 @@ namespace Unity.DemoTeam.Hair
 			previewUtil.Cleanup();
 		}
 
+		public override bool UseDefaultMargins()
+		{
+			return false;
+		}
+
 		public override void OnInspectorGUI()
 		{
 			var hairAsset = target as HairAsset;
 			if (hairAsset == null)
 				return;
 
-			EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+			EditorGUILayout.BeginVertical(EditorStyles.inspectorFullWidthMargins);
 			{
-				DrawImporterGUI();
+				EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+				{
+					DrawImporterGUI();
+				}
+				EditorGUILayout.EndVertical();
+
+				EditorGUILayout.Space();
+				EditorGUILayout.LabelField("Strand Groups", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+				{
+					DrawStrandGroupsGUI();
+				}
+				EditorGUILayout.EndVertical();
+
+				EditorGUILayout.Space();
+				EditorGUILayout.LabelField(hairAsset.checksum, EditorStyles.centeredGreyMiniLabel);
 			}
 			EditorGUILayout.EndVertical();
-
-			EditorGUILayout.Space();
-			EditorGUILayout.LabelField("Strand Groups", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
-			{
-				DrawStrandGroupsGUI();
-			}
-			EditorGUILayout.EndVertical();
-
-			EditorGUILayout.Space();
-			EditorGUILayout.LabelField(hairAsset.checksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
 		static StructValidation ValidationGUIAlembic(object userData)

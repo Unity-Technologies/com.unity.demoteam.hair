@@ -1,7 +1,6 @@
 ﻿#pragma warning disable 0649 // some fields are assigned via reflection
 
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
@@ -17,9 +16,6 @@ namespace Unity.DemoTeam.Hair
 	public partial class HairSim
 	{
 		static bool s_initialized = false;
-
-		static Collider[] s_boundariesOverlapBuffer = new Collider[64];
-		static List<HairBoundary> s_boundariesCandidate = new List<HairBoundary>();
 
 		static ComputeShader s_solverCS;
 		static ComputeShader s_volumeCS;
@@ -99,7 +95,7 @@ namespace Unity.DemoTeam.Hair
 
 			public static int _BoundarySDF;
 
-			public static int _BoundaryPack;
+			public static int _BoundaryShape;
 			public static int _BoundaryMatrix;
 			public static int _BoundaryMatrixInv;
 			public static int _BoundaryMatrixW2PrevW;
@@ -299,6 +295,12 @@ namespace Unity.DemoTeam.Hair
 				InitialPoseInParticles,
 			}
 
+			public enum GatherMode
+			{
+				JustTags,
+				IncludeColliders,
+			}
+
 			public SplatMethod volumeSplatMethod;
 			[ToggleGroup]
 			public bool volumeSplatDebug;
@@ -324,18 +326,16 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Boundaries")]
 
-			[Min(0.0f)]
-			public float boundaryMargin;
+			[Range(0.0f, 10.0f), Tooltip("Base collision margin (in centimeters)")]
+			public float baseMargin;
 			[ToggleGroup]
-			public bool boundarySDF;
+			public bool boundariesQuery;
 			[ToggleGroupItem]
-			public HairBoundarySDF boundarySDFReference;
-			[ToggleGroup]
-			public bool boundaryShapes;
+			public GatherMode boundariesQueryMode;
 			[ToggleGroupItem(withLabel = true)]
-			public LayerMask boundaryShapesLayerMask;
+			public LayerMask boundariesQueryLayers;
 			[NonReorderable]
-			public HairBoundary[] boundaryShapesResident;
+			public HairBoundary[] boundariesResident;
 
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
@@ -348,16 +348,15 @@ namespace Unity.DemoTeam.Hair
 				volumeGridSquare = true,
 
 				pressureIterations = 3,
-				pressureSolution = PressureSolution.DensityEquals,
+				pressureSolution = PressureSolution.DensityLessThan,
 				targetDensity = TargetDensity.Uniform,
 				targetDensityInfluence = 1.0f,
 
-				boundaryMargin = 0.0f,
-				boundarySDF = false,
-				boundarySDFReference = null,
-				boundaryShapes = true,
-				boundaryShapesLayerMask = Physics.AllLayers,
-				boundaryShapesResident = new HairBoundary[0],
+				baseMargin = 1.0f,
+				boundariesQuery = true,
+				boundariesQueryMode = GatherMode.IncludeColliders,
+				boundariesQueryLayers = Physics.AllLayers,
+				boundariesResident = new HairBoundary[0],
 			};
 		}
 
@@ -369,11 +368,10 @@ namespace Unity.DemoTeam.Hair
 			public bool drawStrandRoots;
 			public bool drawStrandParticles;
 
-			[LineHeader("Volume")]
+			[LineHeader("Volume Cells")]
 
 			public bool drawCellDensity;
 			public bool drawCellGradient;
-
 			[ToggleGroup]
 			public bool drawIsosurface;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Trace threshold")]
@@ -523,7 +521,7 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateVolume(ref volumeData.boundarySDFDummy, "BoundarySDFDummy", 1, RenderTextureFormat.RHalf);
 
-				changed |= CreateBuffer(ref volumeData.boundaryPack, "BoundaryPack", MAX_BOUNDARIES, sizeof(HairBoundary.BoundaryPack));
+				changed |= CreateBuffer(ref volumeData.boundaryShape, "BoundaryShape", MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
 				changed |= CreateBuffer(ref volumeData.boundaryMatrix, "BoundaryMatrix", MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref volumeData.boundaryMatrixInv, "BoundaryMatrixInv", MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref volumeData.boundaryMatrixW2PrevW, "BoundaryMatrixW2PrevW", MAX_BOUNDARIES, sizeof(Matrix4x4));
@@ -571,13 +569,13 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseVolume(ref volumeData.boundarySDFDummy);
 
-			ReleaseBuffer(ref volumeData.boundaryPack);
+			ReleaseBuffer(ref volumeData.boundaryShape);
 			ReleaseBuffer(ref volumeData.boundaryMatrix);
 			ReleaseBuffer(ref volumeData.boundaryMatrixInv);
 			ReleaseBuffer(ref volumeData.boundaryMatrixW2PrevW);
 
-			if (volumeData.boundaryPrev.IsCreated)
-				volumeData.boundaryPrev.Dispose();
+			if (volumeData.boundaryPrevXform.IsCreated)
+				volumeData.boundaryPrevXform.Dispose();
 
 			volumeData = new VolumeData();
 		}
@@ -665,194 +663,162 @@ namespace Unity.DemoTeam.Hair
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
 
-			// gather candidate boundaries
-			s_boundariesCandidate.Clear();
-			{
-				foreach (var shape in volumeSettings.boundaryShapesResident)
-				{
-					if (shape != null && shape.isActiveAndEnabled)
-					{
-						if (s_boundariesCandidate.Contains(shape) == false)
-							s_boundariesCandidate.Add(shape);
-					}
-				}
-
-				if (volumeSettings.boundaryShapes)
-				{
-					var result = s_boundariesOverlapBuffer;
-					var resultCount = Physics.OverlapBoxNonAlloc(volumeBounds.center, volumeBounds.extents, result, Quaternion.identity);
-
-					for (int i = 0; i != resultCount; i++)
-					{
-						var shape = result[i].GetComponent<HairBoundary>();
-						if (shape != null && shape.isActiveAndEnabled)
-						{
-							if (s_boundariesCandidate.Contains(shape) == false)
-								s_boundariesCandidate.Add(shape);
-						}
-					}
-				}
-
-				s_boundariesCandidate.Sort((a, b) => a.GetInstanceID().CompareTo(b.GetInstanceID()));
-			}
-
-			var boundarySDF = (volumeSettings.boundarySDF ? volumeSettings.boundarySDFReference : null);
-			if (boundarySDF != null && (boundarySDF.isActiveAndEnabled == false || boundarySDF.GetSDFTexture() == null))
-			{
-				boundarySDF = null;
-			}
-
 			// update boundary data
-			cbuffer._BoundaryCountDiscrete = 0;
-			cbuffer._BoundaryCountCapsule = 0;
-			cbuffer._BoundaryCountSphere = 0;
-			cbuffer._BoundaryCountTorus = 0;
-
-			cbuffer._BoundaryWorldEpsilon = (boundarySDF != null) ? boundarySDF.GetSDFWorldCellSize() * 0.2f : 1e-4f;
-			cbuffer._BoundaryWorldMargin = volumeSettings.boundaryMargin;
-
-			using (var bufPack = new NativeArray<HairBoundary.BoundaryPack>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufShape = new NativeArray<HairBoundary.RuntimeShape.Data>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufXform = new NativeArray<HairBoundary.RuntimeTransform>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (var bufMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (var bufMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (var bufMatrixW2PrevW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var bufInfo = new NativeArray<VolumeData.BoundaryInfo>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
-				if (volumeData.boundaryPrev.IsCreated && volumeData.boundaryPrev.Length != MAX_BOUNDARIES)
-					volumeData.boundaryPrev.Dispose();
-				if (volumeData.boundaryPrev.IsCreated == false)
-					volumeData.boundaryPrev = new NativeArray<VolumeData.BoundaryInfo>(MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+				if (volumeData.boundaryPrevXform.IsCreated && volumeData.boundaryPrevXform.Length != MAX_BOUNDARIES)
+					volumeData.boundaryPrevXform.Dispose();
+				if (volumeData.boundaryPrevXform.IsCreated == false)
+					volumeData.boundaryPrevXform = new NativeArray<HairBoundary.RuntimeTransform>(MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
 				unsafe
 				{
-					var ptrPack = (HairBoundary.BoundaryPack*)bufPack.GetUnsafePtr();
+					var ptrShape = (HairBoundary.RuntimeShape.Data*)bufShape.GetUnsafePtr();
+					var ptrXform = (HairBoundary.RuntimeTransform*)bufXform.GetUnsafePtr();
+					var ptrXformPrev = (HairBoundary.RuntimeTransform*)volumeData.boundaryPrevXform.GetUnsafePtr();
+
 					var ptrMatrix = (Matrix4x4*)bufMatrix.GetUnsafePtr();
 					var ptrMatrixInv = (Matrix4x4*)bufMatrixInv.GetUnsafePtr();
 					var ptrMatrixW2PrevW = (Matrix4x4*)bufMatrixW2PrevW.GetUnsafePtr();
-					var ptrInfo = (VolumeData.BoundaryInfo*)bufInfo.GetUnsafePtr();
-					var ptrInfoPrev = (VolumeData.BoundaryInfo*)volumeData.boundaryPrev.GetUnsafePtr();
 
-					// count the boundaries
-					int boundaryCount = 0;
+					// gather boundaries
+					var boundaryList = HairBoundaryUtility.Gather(volumeSettings.boundariesResident, volumeSort: false, volumeSettings.boundariesQuery, volumeBounds, Quaternion.identity, volumeSettings.boundariesQueryMode == VolumeSettings.GatherMode.IncludeColliders);
+					var boundaryCount = 0;
+					var boundarySDFIndex = -1;
+					var boundarySDFCellSize = 0.0f;
 
-					//TODO merge HairBoundarySDF under HairBoundary
-					if (boundarySDF != null)
+					// count boundaries
+					cbuffer._BoundaryCountDiscrete = 0;
+					cbuffer._BoundaryCountCapsule = 0;
+					cbuffer._BoundaryCountSphere = 0;
+					cbuffer._BoundaryCountTorus = 0;
+					cbuffer._BoundaryCountCube = 0;
+
+					for (int i = 0; i != boundaryList.Count; i++)
 					{
-						cbuffer._BoundaryCountDiscrete++;
-						boundaryCount++;
+						var data = boundaryList[i];
+						if (data.type == HairBoundary.RuntimeData.Type.SDF)
+						{
+							cbuffer._BoundaryCountDiscrete++;
+							boundaryCount++;
+							boundarySDFIndex = i;
+							boundarySDFCellSize = Mathf.Max(boundarySDFCellSize, data.sdf.worldCellSize);
+							break;
+						}
 					}
 
-					foreach (HairBoundary boundary in s_boundariesCandidate)
+					foreach (var data in boundaryList)
 					{
-						if (boundary == null)
-							continue;
-
-						switch (boundary.type)
+						if (data.type == HairBoundary.RuntimeData.Type.Shape)
 						{
-							case HairBoundary.Type.Capsule:
-								cbuffer._BoundaryCountCapsule++;
-								break;
-							case HairBoundary.Type.Sphere:
-								cbuffer._BoundaryCountSphere++;
-								break;
-							case HairBoundary.Type.Torus:
-								cbuffer._BoundaryCountTorus++;
-								break;
+							switch (data.shape.type)
+							{
+								case HairBoundary.RuntimeShape.Type.Capsule: cbuffer._BoundaryCountCapsule++; break;
+								case HairBoundary.RuntimeShape.Type.Sphere: cbuffer._BoundaryCountSphere++; break;
+								case HairBoundary.RuntimeShape.Type.Torus: cbuffer._BoundaryCountTorus++; break;
+								case HairBoundary.RuntimeShape.Type.Cube: cbuffer._BoundaryCountCube++; break;
+							}
+
+							boundaryCount++;
 						}
 
-						if ((boundaryCount++) == MAX_BOUNDARIES)
+						if (boundaryCount == MAX_BOUNDARIES)
 							break;
 					}
 
-					// pack the boundaries
-					int boundaryCountPack = 0;
+					cbuffer._BoundaryWorldEpsilon = (boundarySDFIndex != -1) ? boundarySDFCellSize * 0.2f : 1e-4f;
+					cbuffer._BoundaryWorldMargin = volumeSettings.baseMargin * 0.01f;
 
-					int boundaryIndexDiscrete = 0;
-					int boundaryIndexCapsule = boundaryIndexDiscrete + cbuffer._BoundaryCountDiscrete;
-					int boundaryIndexSphere = boundaryIndexCapsule + cbuffer._BoundaryCountCapsule;
-					int boundaryIndexTorus = boundaryIndexSphere + cbuffer._BoundaryCountSphere;
+					// pack boundaries
+					int writeIndexDiscrete = 0;
+					int writeIndexCapsule = writeIndexDiscrete + cbuffer._BoundaryCountDiscrete;
+					int writeIndexSphere = writeIndexCapsule + cbuffer._BoundaryCountCapsule;
+					int writeIndexTorus = writeIndexSphere + cbuffer._BoundaryCountSphere;
+					int writeIndexCube = writeIndexTorus + cbuffer._BoundaryCountTorus;
+					int writeCount = 0;
 
-					//TODO merge HairBoundarySDF under HairBoundary
-					if (boundarySDF != null)
+					if (boundarySDFIndex != -1)
 					{
-						var boundarySDFTransform = boundarySDF.GetSDFTransform();
-						if (boundarySDFTransform != null)
-						{
-							ptrInfo[boundaryIndexDiscrete] = new VolumeData.BoundaryInfo { instanceID = boundarySDFTransform.GetInstanceID(), matrix = boundarySDFTransform.localToWorldMatrix };
-						}
-						else
-						{
-							ptrInfo[boundaryIndexDiscrete] = new VolumeData.BoundaryInfo { instanceID = 0, matrix = Matrix4x4.identity };
-						}
-						ptrPack[boundaryIndexDiscrete++] = new HairBoundary.BoundaryPack();
-						boundaryCountPack++;
+						ptrXform[writeIndexDiscrete] = boundaryList[boundarySDFIndex].xform;
+						ptrShape[writeIndexDiscrete++] = new HairBoundary.RuntimeShape.Data();
+						writeCount++;
 					}
 
-					foreach (HairBoundary boundary in s_boundariesCandidate)
+					foreach (HairBoundary.RuntimeData data in boundaryList)
 					{
-						if (boundary == null || !boundary.isActiveAndEnabled)
-							continue;
-
-						switch (boundary.type)
+						if (data.type == HairBoundary.RuntimeData.Type.Shape)
 						{
-							case HairBoundary.Type.Capsule:
-								ptrInfo[boundaryIndexCapsule] = new VolumeData.BoundaryInfo{ instanceID = boundary.transform.GetInstanceID(), matrix = boundary.transform.localToWorldMatrix };
-								ptrPack[boundaryIndexCapsule++] = HairBoundary.Pack(boundary.GetCapsule());
-								break;
-							case HairBoundary.Type.Sphere:
-								ptrInfo[boundaryIndexSphere] = new VolumeData.BoundaryInfo { instanceID = boundary.transform.GetInstanceID(), matrix = boundary.transform.localToWorldMatrix };
-								ptrPack[boundaryIndexSphere++] = HairBoundary.Pack(boundary.GetSphere());
-								break;
-							case HairBoundary.Type.Torus:
-								ptrInfo[boundaryIndexTorus] = new VolumeData.BoundaryInfo { instanceID = boundary.transform.GetInstanceID(), matrix = boundary.transform.localToWorldMatrix };
-								ptrPack[boundaryIndexTorus++] = HairBoundary.Pack(boundary.GetTorus());
-								break;
+							int writeIndex = -1;
+
+							switch (data.shape.type)
+							{
+								case HairBoundary.RuntimeShape.Type.Capsule: writeIndex = writeIndexCapsule++; break;
+								case HairBoundary.RuntimeShape.Type.Sphere: writeIndex = writeIndexSphere++; break;
+								case HairBoundary.RuntimeShape.Type.Torus: writeIndex = writeIndexTorus++; break;
+								case HairBoundary.RuntimeShape.Type.Cube: writeIndex = writeIndexCube++; break;
+							}
+
+							if (writeIndex != -1)
+							{
+								ptrXform[writeIndex] = data.xform;
+								ptrShape[writeIndex] = data.shape.data;
+								writeCount++;
+							}
 						}
 
-						if ((boundaryCountPack++) == MAX_BOUNDARIES)
+						if (writeCount == MAX_BOUNDARIES)
 							break;
 					}
 
 					// update matrices
 					for (int i = 0; i != boundaryCount; i++)
 					{
-						int ptrInfoPrevIndex = -1;
+						int ptrXformPrevIndex = -1;
 
 						for (int j = 0; j != volumeData.boundaryPrevCount; j++)
 						{
-							if (ptrInfoPrev[j].instanceID == ptrInfo[i].instanceID)
+							if (ptrXformPrev[j].handle == ptrXform[i].handle)
 							{
-								ptrInfoPrevIndex = j;
+								ptrXformPrevIndex = j;
 								break;
 							}
 						}
 
-						ptrMatrix[i] = ptrInfo[i].matrix;
+						ptrMatrix[i] = ptrXform[i].matrix;
 						ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i]);
 
 						// world to previous world
-						if (ptrInfoPrevIndex != -1)
-							ptrMatrixW2PrevW[i] = ptrInfoPrev[ptrInfoPrevIndex].matrix * ptrMatrixInv[i];
+						if (ptrXformPrevIndex != -1)
+							ptrMatrixW2PrevW[i] = ptrXformPrev[ptrXformPrevIndex].matrix * ptrMatrixInv[i];
 						else
 							ptrMatrixW2PrevW[i] = Matrix4x4.identity;
 
 						// world to UVW for discrete
-						if (i < cbuffer._BoundaryCountDiscrete && boundarySDF != null)
+						if (i < cbuffer._BoundaryCountDiscrete && boundarySDFIndex != -1)
 						{
-							ptrMatrixInv[i] = boundarySDF.GetSDFWorldToUVW();
+							ptrMatrixInv[i] = boundaryList[boundarySDFIndex].sdf.worldToUVW;
 						}
 					}
 
-					// update buffers
-					volumeData.boundarySDF = boundarySDF?.GetSDFTexture() as RenderTexture;
+					// update sdf
+					if (boundarySDFIndex != -1)
+						volumeData.boundarySDF = boundaryList[boundarySDFIndex].sdf.sdfTexture as RenderTexture;
+					else
+						volumeData.boundarySDF = null;
 
-					volumeData.boundaryPack.SetData(bufPack, 0, 0, boundaryCount);
+					// update buffers
+					volumeData.boundaryShape.SetData(bufShape, 0, 0, boundaryCount);
 					volumeData.boundaryMatrix.SetData(bufMatrix, 0, 0, boundaryCount);
 					volumeData.boundaryMatrixInv.SetData(bufMatrixInv, 0, 0, boundaryCount);
 					volumeData.boundaryMatrixW2PrevW.SetData(bufMatrixW2PrevW, 0, 0, boundaryCount);
 
-					volumeData.boundaryPrev.CopyFrom(bufInfo);
+					volumeData.boundaryPrevXform.CopyFrom(bufXform);
 					volumeData.boundaryPrevCount = boundaryCount;
-					volumeData.boundaryPrevCountDiscard = s_boundariesCandidate.Count - boundaryCount;
+					volumeData.boundaryPrevCountDiscard = boundaryList.Count - boundaryCount;
 				}
 			}
 		}
@@ -924,7 +890,7 @@ namespace Unity.DemoTeam.Hair
 
 			target.PushComputeTexture(cmd, UniformIDs._BoundarySDF, (volumeData.boundarySDF != null) ? volumeData.boundarySDF : volumeData.boundarySDFDummy);
 
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryPack, volumeData.boundaryPack);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryShape, volumeData.boundaryShape);
 			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
 			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
 			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);

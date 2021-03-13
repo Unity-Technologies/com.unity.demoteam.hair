@@ -62,22 +62,20 @@ SamplerState _Volume_trilinear_clamp;
 
 Texture3D<float> _BoundarySDF;
 
-struct BoundaryPack
+struct BoundaryShape
 {
-	//  shape   |  capsule     sphere      torus
-	//  -----------------------------------------------
-	//  float3  |  centerA     center      center
-	//  float   |  radius      radius      radiusA
-	//  float3  |  centerB     __pad       axis
-	//  float   |  __pad       __pad       radiusB
+	//  shape   |  float3     float      float3     float
+	//  -------------------------------------------------------
+	//  capsule |  centerA    radius     centerB    __pad
+	//  sphere  |  center     radius     __pad      __pad
+	//  torus   |  center     radiusA    axis       radiusB
+	//  cube    |  __pad      __pad      __pad      __pad
 
-	float3 pA;
-	float tA;
-	float3 pB;
-	float tB;
+	float3 pA; float tA;
+	float3 pB; float tB;
 };
 
-StructuredBuffer<BoundaryPack> _BoundaryPack;
+StructuredBuffer<BoundaryShape> _BoundaryShape;
 StructuredBuffer<float4x4> _BoundaryMatrix;
 StructuredBuffer<float4x4> _BoundaryMatrixInv;
 StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;

@@ -110,7 +110,7 @@ namespace Unity.DemoTeam.Hair
 #endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
-			public int strandLayer;
+			public int strandLayers;
 
 			[LineHeader("Physics")]
 
@@ -138,7 +138,7 @@ namespace Unity.DemoTeam.Hair
 				strandMaterialValue = null,
 				strandRenderer = StrandRenderer.PrimitiveLines,
 				strandShadows = ShadowCastingMode.On,
-				strandLayer = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
+				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
 
 				simulation = Simulation.Enabled,
 				simulationRate = SimulationRate.Fixed60Hz,
@@ -292,11 +292,7 @@ namespace Unity.DemoTeam.Hair
 			var worldCenter = rootTransform.TransformPoint(localCenter);
 			var worldExtent = rootTransform.TransformVector(localExtent);
 
-			worldExtent.x = Mathf.Abs(worldExtent.x);
-			worldExtent.y = Mathf.Abs(worldExtent.y);
-			worldExtent.z = Mathf.Abs(worldExtent.z);
-
-			return new Bounds(worldCenter, 2.0f * worldExtent);
+			return new Bounds(worldCenter, 2.0f * worldExtent.Abs());
 		}
 
 		public Bounds GetSimulationBounds(bool square = true)
@@ -318,14 +314,9 @@ namespace Unity.DemoTeam.Hair
 			worldBounds.Expand(2.0f * worldMargin);
 
 			if (square)
-			{
-				var size = worldBounds.size;
-				return new Bounds(worldBounds.center, Vector3.one * Mathf.Max(size.x, size.y, size.z));
-			}
+				return new Bounds(worldBounds.center, worldBounds.size.ComponentMax() * Vector3.one);
 			else
-			{
 				return new Bounds(worldBounds.center, worldBounds.size);
-			}
 		}
 
 		public bool GetSimulationActive()
@@ -369,16 +360,16 @@ namespace Unity.DemoTeam.Hair
 
 				case SettingsStrands.StrandScale.UniformLowerBound:
 					{
-						var lossyScale = this.transform.lossyScale;
-						var lossyScaleAbs = new Vector3(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y), Mathf.Abs(lossyScale.z));
-						return Mathf.Min(lossyScaleAbs.x, lossyScaleAbs.y, lossyScaleAbs.z);
+						var lossyScaleAbs = this.transform.lossyScale.Abs();
+						var lossyScaleAbsMin = lossyScaleAbs.ComponentMin();
+						return lossyScaleAbsMin;
 					}
 
 				case SettingsStrands.StrandScale.UniformUpperBound:
 					{
-						var lossyScale = this.transform.lossyScale;
-						var lossyScaleAbs = new Vector3(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y), Mathf.Abs(lossyScale.z));
-						return Mathf.Max(lossyScaleAbs.x, lossyScaleAbs.y, lossyScaleAbs.z);
+						var lossyScaleAbs = this.transform.lossyScale.Abs();
+						var lossyScaleAbsMax = lossyScaleAbs.ComponentMax();
+						return lossyScaleAbsMax;
 					}
 			}
 		}
@@ -534,7 +525,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			lineRenderer.shadowCastingMode = settingsStrands.strandShadows;
-			lineRenderer.renderingLayerMask = (uint)settingsStrands.strandLayer;
+			lineRenderer.renderingLayerMask = (uint)settingsStrands.strandLayers;
 		}
 
 		// when to build runtime data?

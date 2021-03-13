@@ -7,6 +7,12 @@
 //-----------------
 // boundary shapes
 
+float SdDiscrete(const float3 p, const float4x4 invM, Texture3D<float> sdf)
+{
+	float3 uvw = mul(invM, float4(p, 1.0)).xyz;
+	return VolumeSampleScalar(sdf, uvw, _Volume_trilinear_clamp);
+}
+
 float SdCapsule(const float3 p, const float3 centerA, const float3 centerB, const float radius)
 {
 	// see: "distance functions" by Inigo Quilez
@@ -26,15 +32,12 @@ float SdSphere(const float3 p, const float3 center, const float radius)
 	// see: "distance functions" by Inigo Quilez
 	// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
 
-	const float3 a = center;
-	const float r = radius;
-
-	return (length(a - p) - r);
+	return (length(p - center) - radius);
 }
 
 float SdTorus(float3 p, const float3 center, const float3 axis, const float radiusA, const float radiusB)
 {
-	const float3 basisX = (axis.y > 1.0 - 1e-4) ? float3(1.0, 0.0, 0.0) : normalize(cross(axis, float3(0.0, 1.0, 0.0)));
+	const float3 basisX = (abs(axis.y) > 1.0 - 1e-4) ? float3(1.0, 0.0, 0.0) : normalize(cross(axis, float3(0.0, 1.0, 0.0)));
 	const float3 basisY = axis;
 	const float3 basisZ = cross(basisX, axis);
 	const float3x3 invM = float3x3(basisX, basisY, basisZ);
@@ -50,17 +53,29 @@ float SdTorus(float3 p, const float3 center, const float3 axis, const float radi
 	return length(q) - t.y;
 }
 
-float SdCapsule(const float3 p, const BoundaryPack capsule)
+float SdCube(float3 p, const float4x4 invM)
+{
+	p = mul(invM, float4(p, 1.0)).xyz;
+
+	// see: "distance functions" by Inigo Quilez
+	// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+
+	const float3 q = abs(p) - float3(0.5, 0.5, 0.5);
+
+	return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+float SdCapsule(const float3 p, const BoundaryShape capsule)
 {
 	return SdCapsule(p, capsule.pA, capsule.pB, capsule.tA);
 }
 
-float SdSphere(const float3 p, const BoundaryPack sphere)
+float SdSphere(const float3 p, const BoundaryShape sphere)
 {
 	return SdSphere(p, sphere.pA, sphere.tA);
 }
 
-float SdTorus(const float3 p, const BoundaryPack torus)
+float SdTorus(const float3 p, const BoundaryShape torus)
 {
 	return SdTorus(p, torus.pA, torus.pB, torus.tA, torus.tB);
 }
@@ -77,23 +92,27 @@ float BoundaryDistance(const float3 p)
 
 	for (j += _BoundaryCountDiscrete; i != j; i++)
 	{
-		float3 uvw = mul(_BoundaryMatrixInv[i], float4(p, 1.0)).xyz;
-		d = min(d, VolumeSampleScalar(_BoundarySDF, uvw, _Volume_trilinear_clamp));
+		d = min(d, SdDiscrete(p, _BoundaryMatrixInv[i], _BoundarySDF));
 	}
 
 	for (j += _BoundaryCountCapsule; i != j; i++)
 	{
-		d = min(d, SdCapsule(p, _BoundaryPack[i]));
+		d = min(d, SdCapsule(p, _BoundaryShape[i]));
 	}
 
 	for (j += _BoundaryCountSphere; i != j; i++)
 	{
-		d = min(d, SdSphere(p, _BoundaryPack[i]));
+		d = min(d, SdSphere(p, _BoundaryShape[i]));
 	}
 
 	for (j += _BoundaryCountTorus; i != j; i++)
 	{
-		d = min(d, SdTorus(p, _BoundaryPack[i]));
+		d = min(d, SdTorus(p, _BoundaryShape[i]));
+	}
+
+	for (j += _BoundaryCountCube; i != j; i++)
+	{
+		d = min(d, SdCube(p, _BoundaryMatrixInv[i]));
 	}
 
 	return d;
@@ -108,26 +127,31 @@ uint BoundarySelect(const float3 p, const float d)
 
 	for (j += _BoundaryCountDiscrete; i != j; i++)
 	{
-		float3 uvw = mul(_BoundaryMatrixInv[i], float4(p, 1.0)).xyz;
-		if (d == VolumeSampleScalar(_BoundarySDF, uvw, _Volume_trilinear_clamp))
+		if (d == SdDiscrete(p, _BoundaryMatrixInv[i], _BoundarySDF))
 			index = i;
 	}
 
 	for (j += _BoundaryCountCapsule; i < j; i++)
 	{
-		if (d == SdCapsule(p, _BoundaryPack[i]))
+		if (d == SdCapsule(p, _BoundaryShape[i]))
 			index = i;
 	}
 
 	for (j += _BoundaryCountSphere; i < j; i++)
 	{
-		if (d == SdSphere(p, _BoundaryPack[i]))
+		if (d == SdSphere(p, _BoundaryShape[i]))
 			index = i;
 	}
 
 	for (j += _BoundaryCountTorus; i < j; i++)
 	{
-		if (d == SdTorus(p, _BoundaryPack[i]))
+		if (d == SdTorus(p, _BoundaryShape[i]))
+			index = i;
+	}
+
+	for (j += _BoundaryCountCube; i < j; i++)
+	{
+		if (d == SdCube(p, _BoundaryMatrixInv[i]))
 			index = i;
 	}
 

@@ -107,22 +107,17 @@ namespace Unity.DemoTeam.Hair
 			//public float allGroupsMaxStrandLength;
 
 			public RenderTexture boundarySDFDummy;      // (placeholder for when inactive)
-			public RenderTexture boundarySDF;           // x: signed distance 
+			public RenderTexture boundarySDF;           // x: signed distance to arbitrary solid
 
-			public ComputeBuffer boundaryPack;          // arr(Boundary)
+			public ComputeBuffer boundaryShape;         // arr(HairBoundary.RuntimeShape.Data)
 			public ComputeBuffer boundaryMatrix;        // arr(float4x4): local to world
 			public ComputeBuffer boundaryMatrixInv;     // arr(float4x4): world to local
 			public ComputeBuffer boundaryMatrixW2PrevW; // arr(float4x4): world to previous world
 
-			public struct BoundaryInfo
-			{
-				public int instanceID;
-				public Matrix4x4 matrix;
-			}
-
-			public NativeArray<BoundaryInfo> boundaryPrev;
+			public NativeArray<HairBoundary.RuntimeTransform> boundaryPrevXform;
 			public int boundaryPrevCount;
 			public int boundaryPrevCountDiscard;
+			public int boundaryPrevCountUnknown;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
@@ -160,6 +155,7 @@ namespace Unity.DemoTeam.Hair
 			public int _BoundaryCountCapsule;
 			public int _BoundaryCountSphere;
 			public int _BoundaryCountTorus;
+			public int _BoundaryCountCube;
 
 			public float _BoundaryWorldEpsilon;
 			public float _BoundaryWorldMargin;

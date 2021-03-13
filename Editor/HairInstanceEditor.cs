@@ -44,37 +44,46 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public override bool UseDefaultMargins()
+		{
+			return false;
+		}
+
 		public override void OnInspectorGUI()
 		{
 			var hairInstance = target as HairInstance;
 			if (hairInstance == null)
 				return;
 
-			EditorGUILayout.LabelField("Instance", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+			EditorGUILayout.BeginVertical(EditorStyles.inspectorFullWidthMargins);
 			{
-				DrawInstanceGUI();
+				EditorGUILayout.LabelField("Instance", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+				{
+					DrawInstanceGUI();
+				}
+				EditorGUILayout.EndVertical();
+
+				EditorGUILayout.Space();
+				EditorGUILayout.LabelField("Strand Settings", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+				{
+					DrawStrandSettingsGUI();
+				}
+				EditorGUILayout.EndVertical();
+
+				EditorGUILayout.Space();
+				EditorGUILayout.LabelField("Simulation Settings", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+				{
+					DrawSimulationSettingsGUI();
+				}
+				EditorGUILayout.EndVertical();
+
+				EditorGUILayout.Space();
+				EditorGUILayout.LabelField(hairInstance.componentGroupsChecksum, EditorStyles.centeredGreyMiniLabel);
 			}
 			EditorGUILayout.EndVertical();
-
-			EditorGUILayout.Space();
-			EditorGUILayout.LabelField("Strand Settings", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
-			{
-				DrawStrandSettingsGUI();
-			}
-			EditorGUILayout.EndVertical();
-
-			EditorGUILayout.Space();
-			EditorGUILayout.LabelField("Simulation Settings", EditorStyles.centeredGreyMiniLabel);
-			EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
-			{
-				DrawSimulationSettingsGUI();
-			}
-			EditorGUILayout.EndVertical();
-
-			EditorGUILayout.Space();
-			EditorGUILayout.LabelField(hairInstance.componentGroupsChecksum, EditorStyles.centeredGreyMiniLabel);
 		}
 
 		static StructValidation ValidationGUIStrands(object userData)
@@ -202,7 +211,7 @@ namespace Unity.DemoTeam.Hair
 #if !HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 				using (new EditorGUI.IndentLevelScope())
 				{
-					EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human'.", MessageType.None, wide: true);
+					EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human >= 0.1.1-preview'.", MessageType.None, wide: true);
 				}
 #endif
 
@@ -291,8 +300,10 @@ namespace Unity.DemoTeam.Hair
 					var countCapsule = hairInstance.volumeData.cbuffer._BoundaryCountCapsule;
 					var countSphere = hairInstance.volumeData.cbuffer._BoundaryCountSphere;
 					var countTorus = hairInstance.volumeData.cbuffer._BoundaryCountTorus;
-					var countPack = countDiscrete + countCapsule + countSphere + countTorus;
-					var countTxt = countPack + " active shapes (" + countDiscrete + " discrete, " + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus)";
+					var countCube = hairInstance.volumeData.cbuffer._BoundaryCountCube;
+
+					var countAll = countDiscrete + countCapsule + countSphere + countTorus + countCube;
+					var countTxt = countAll + " boundaries (" + countDiscrete + " discrete, " + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus, " + countCube + " cube)";
 
 					var rectHeight = HairGUIStyles.statusBox.CalcHeight(new GUIContent(string.Empty), 0.0f);
 					var rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
@@ -302,14 +313,14 @@ namespace Unity.DemoTeam.Hair
 						GUI.Box(EditorGUI.IndentedRect(rect), countTxt, HairGUIStyles.statusBox);
 					}
 
-					var discarded = hairInstance.volumeData.boundaryPrevCountDiscard;
-					if (discarded > 0)
+					var countDiscarded = hairInstance.volumeData.boundaryPrevCountDiscard;
+					if (countDiscarded > 0)
 					{
 						rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
 
-						using (new ColorScope(Color.red))
+						using (new ColorScope(Color.Lerp(Color.red, Color.yellow, 0.5f)))
 						{
-							GUI.Box(EditorGUI.IndentedRect(rect), discarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox);
+							GUI.Box(EditorGUI.IndentedRect(rect), countDiscarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox);
 						}
 					}
 				}

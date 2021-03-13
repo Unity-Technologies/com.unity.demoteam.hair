@@ -51,6 +51,7 @@ CBUFFER_START(VolumeCBuffer)
     int _BoundaryCountCapsule;
     int _BoundaryCountSphere;
     int _BoundaryCountTorus;
+    int _BoundaryCountCube;
     float _BoundaryWorldEpsilon;
     float _BoundaryWorldMargin;
 CBUFFER_END
