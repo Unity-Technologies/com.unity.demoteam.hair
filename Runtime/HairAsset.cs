@@ -80,6 +80,19 @@ namespace Unity.DemoTeam.Hair
 				StratifiedCurtain,
 			}
 
+			[Flags]
+			public enum SubmeshMask
+			{
+				SubmeshIndex0 = 0x1 << 0,
+				SubmeshIndex1 = 0x1 << 1,
+				SubmeshIndex2 = 0x1 << 2,
+				SubmeshIndex3 = 0x1 << 3,
+				SubmeshIndex4 = 0x1 << 4,
+				SubmeshIndex5 = 0x1 << 5,
+				SubmeshIndex6 = 0x1 << 6,
+				SubmeshIndex7 = 0x1 << 7,
+			}
+
 			public enum CurlSamplingStrategy
 			{
 				RelaxStrandLength,
@@ -96,6 +109,8 @@ namespace Unity.DemoTeam.Hair
 			//public ScriptableObject placementCustom;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on specified triangle mesh")]
 			public Mesh placementMesh;
+			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Included submesh indices")]
+			public SubmeshMask placementMeshInclude;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on mesh according to specified density map (where 0 == Empty region, 1 == Fully populated region)")]
 			public Texture2D placementDensity;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Use strand direction from specified object-space normal map")]
@@ -138,6 +153,7 @@ namespace Unity.DemoTeam.Hair
 				placement = PlacementType.Primitive,
 				placementPrimitive = PrimitiveType.Curtain,
 				placementMesh = null,
+				placementMeshInclude = (SubmeshMask)(-1),
 				placementDensity = null,
 
 				strandCount = 64,

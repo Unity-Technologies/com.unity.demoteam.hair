@@ -630,7 +630,7 @@ namespace Unity.DemoTeam.Hair
 				else if (settings.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
 				{
 					using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.placementMesh))
-					using (var meshSampler = new TriMeshSampler(meshData[0], 0, Allocator.Temp))
+					using (var meshSampler = new TriMeshSampler(meshData[0], 0, Allocator.Temp, (uint)settings.placementMeshInclude))
 					{
 						bool IsTextureReadable(Texture2D texture)
 						{
@@ -675,7 +675,8 @@ namespace Unity.DemoTeam.Hair
 						{
 							for (int i = 0; i != settings.strandCount; i++)
 							{
-								rootDir[i] = Vector3.Normalize((Vector4)settings.paintedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, 0));
+								Vector4 vn = settings.paintedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y);
+								rootDir[i] = Vector3.Normalize(2.0f * (Vector3)vn - Vector3.one);
 							}
 						}
 						else
@@ -729,7 +730,9 @@ namespace Unity.DemoTeam.Hair
 			public int triangleVertexCount;
 			public NativeArray<int> triangleVertexIndices;
 
-			public TriMeshBuffers(Mesh.MeshData meshData, Attribute meshAttributes = Attribute.All, Allocator allocator = Allocator.Temp)
+			public uint submeshMask;
+
+			public TriMeshBuffers(Mesh.MeshData meshData, Attribute meshAttributes = Attribute.All, Allocator allocator = Allocator.Temp, uint submeshMask = ~0u)
 			{
 				vertexCount = meshData.vertexCount;
 				vertexAttributes = meshAttributes;
@@ -751,6 +754,9 @@ namespace Unity.DemoTeam.Hair
 				{
 					for (int i = 0; i != meshData.subMeshCount; i++)
 					{
+						if (((1 << i) & submeshMask) == 0)
+							continue;
+
 						var submesh = meshData.GetSubMesh(i);
 						if (submesh.topology != MeshTopology.Triangles)
 							continue;
@@ -765,6 +771,9 @@ namespace Unity.DemoTeam.Hair
 
 					for (int i = 0; i != meshData.subMeshCount; i++)
 					{
+						if (((1 << i) & submeshMask) == 0)
+							continue;
+
 						var submesh = meshData.GetSubMesh(i);
 						if (submesh.topology != MeshTopology.Triangles)
 							continue;
@@ -782,6 +791,8 @@ namespace Unity.DemoTeam.Hair
 						writeOffset += indexCount;
 					}
 				}
+
+				this.submeshMask = submeshMask;
 			}
 
 			public bool HasAttribute(Attribute attribute)
@@ -814,9 +825,9 @@ namespace Unity.DemoTeam.Hair
 			public Unity.Mathematics.Random randSeed;
 			public Unity.Mathematics.Random rand;
 
-			public TriMeshSampler(Mesh.MeshData meshData, uint seedIndex, Allocator allocator = Allocator.Temp)
+			public TriMeshSampler(Mesh.MeshData meshData, uint seedIndex, Allocator allocator = Allocator.Temp, uint submeshMask = ~0u)
 			{
-				triangleMesh = new TriMeshBuffers(meshData, TriMeshBuffers.Attribute.All, allocator);
+				triangleMesh = new TriMeshBuffers(meshData, TriMeshBuffers.Attribute.All, allocator, submeshMask);
 
 				triangleCount = triangleMesh.triangleVertexCount / 3;
 				triangleAreaSum = 0.0f;
