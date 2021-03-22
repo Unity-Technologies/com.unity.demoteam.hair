@@ -645,13 +645,13 @@ namespace Unity.DemoTeam.Hair
 							for (int i = 0; i != settings.strandCount; i++)
 							{
 								var sample = meshSampler.Next();
-								var sampleDensity = density.GetPixelBilinear(sample.uv0.x, sample.uv0.y);
+								var sampleDensity = density.GetPixelBilinear(sample.uv0.x, sample.uv0.y, mipLevel: 0);
 								var sampleIteration = 0;// safety
 
 								while (sampleDensity.r < densityThreshold.NextFloat() && sampleIteration++ < 200)
 								{
 									sample = meshSampler.Next();
-									sampleDensity = density.GetPixelBilinear(sample.uv0.x, sample.uv0.y, 0);
+									sampleDensity = density.GetPixelBilinear(sample.uv0.x, sample.uv0.y, mipLevel: 0);
 								}
 
 								rootPos[i] = sample.position;
@@ -675,8 +675,18 @@ namespace Unity.DemoTeam.Hair
 						{
 							for (int i = 0; i != settings.strandCount; i++)
 							{
-								Vector4 vn = settings.paintedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y);
-								rootDir[i] = Vector3.Normalize(2.0f * (Vector3)vn - Vector3.one);
+								// assume dxt5nm
+								Vector4 packed = settings.paintedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
+								{
+									packed.x *= packed.w;
+								}
+								Vector3 n;
+								{
+									n.x = packed.x * 2.0f - 1.0f;
+									n.y = packed.y * 2.0f - 1.0f;
+									n.z = Mathf.Sqrt(1.0f - Mathf.Clamp01(n.x * n.x + n.y * n.y));
+								}
+								rootDir[i] = Vector3.Normalize(n);
 							}
 						}
 						else
@@ -692,7 +702,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							for (int i = 0; i != settings.strandCount; i++)
 							{
-								rootVar[i] = (Vector4)settings.paintedParameters.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, 0);
+								rootVar[i] = (Vector4)settings.paintedParameters.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
 							}
 						}
 						else
