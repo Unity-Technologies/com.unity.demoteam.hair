@@ -1089,14 +1089,52 @@ namespace Unity.DemoTeam.Hair
 				length += Vector3.Distance(srcPos[i], srcPos[i - 1]);
 			}
 
+			var dstLength = length;
+			var dstSpacing = dstLength / (dstCount - 1);
+
+			ResampleWithHint(srcPos, srcCount, out var srcIndex, dstPos, dstCount, out var dstIndex, dstSpacing);
+
+			// run a couple of iterations
+			for (int i = 0; i != 2; i++)
+			{
+				if (dstIndex < dstCount || srcIndex < srcCount)
+				{
+					var remainder = Vector3.Distance(srcPos[srcCount - 1], dstPos[dstIndex - 1]);
+
+					dstLength = (dstIndex - 1) * dstSpacing + remainder;
+					dstSpacing = dstLength / (dstCount - 1);
+
+					ResampleWithHint(srcPos, srcCount, out srcIndex, dstPos, dstCount, out dstIndex, dstSpacing);
+				}
+				else
+				{
+					break;
+				}
+			}
+
+			// extrapolate the tail, if any
+			if (dstIndex < dstCount)
+			{
+				var dstPosPrev = dstPos[dstIndex - 1];
+				var dstDirTail = Vector3.Normalize(srcPos[srcCount - 1] - dstPosPrev);
+
+				while (dstIndex < dstCount)
+				{
+					dstPos[dstIndex] = dstPosPrev + dstDirTail * dstSpacing;
+					dstPosPrev = dstPos[dstIndex++];
+				}
+			}
+		}
+
+		public static unsafe void ResampleWithHint(Vector3* srcPos, int srcCount, out int srcIndex, Vector3* dstPos, int dstCount, out int dstIndex, float dstSpacing)
+		{
 			dstPos[0] = srcPos[0];
 
-			var dstPosPrev = dstPos[0];
-			var dstSpacing = length / (dstCount - 1);
-			var dstSpacingSq = dstSpacing * dstSpacing;
+			dstIndex = 1;
+			srcIndex = 1;
 
-			var srcIndex = 1;
-			var dstIndex = 1;
+			var dstPosPrev = dstPos[0];
+			var dstSpacingSq = dstSpacing * dstSpacing;
 
 			while (srcIndex < srcCount && dstIndex < dstCount)
 			{
@@ -1118,18 +1156,6 @@ namespace Unity.DemoTeam.Hair
 				else
 				{
 					srcIndex++;
-				}
-			}
-
-			// just extrapolate the tail, if there is a tail
-			if (dstIndex < dstCount)
-			{
-				var n = Vector3.Normalize(srcPos[srcCount - 1] - dstPosPrev);
-
-				while (dstIndex < dstCount)
-				{
-					dstPos[dstIndex] = dstPosPrev + n * dstSpacing;
-					dstPosPrev = dstPos[dstIndex++];
 				}
 			}
 		}

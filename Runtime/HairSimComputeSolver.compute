@@ -60,6 +60,8 @@
 #define ENABLE_VOLUME_PRESSURE 1
 #define ENABLE_VOLUME_FRICTION 1
 
+#define SECOND_ORDER_PREDICTION 0
+
 //----------
 // includes
 
@@ -153,6 +155,20 @@ float GetDampingDecay()
 float3 IntegratePosition(float3 x0, float3 v0, float3 a0)
 {
 	return x0 + _DT * (v0 * GetDampingDecay() + _DT * a0);
+}
+
+float3 IntegratePosition_SecondOrder(float3 x0, float3 x0_minus1, float3 v0, float3 v0_minus1, float3 a0)
+{
+	// second order prediction
+	// http://www.cs.ubc.ca/~rbridson/docs/english-siggraph08-cloth.pdf
+
+	return (
+		(4.0 / 3.0) * x0 -
+		(1.0 / 3.0) * x0_minus1 +
+		(8.0 / 9.0) * _DT * GetDampingDecay() * v0 -
+		(2.0 / 9.0) * _DT * GetDampingDecay() * v0_minus1 +
+		(4.0 / 9.0) * _DT * _DT * a0
+	);
 }
 
 float GetIterationStiffness(uint iteration)
@@ -769,7 +785,13 @@ void KSolveConstraints_GaussSeidel(
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeImpulse(i, _ParticleVelocityPrev[i].xyz);
 			const float3 a0 = float3(0.0, _Gravity, 0.0);
 			{
+#if SECOND_ORDER_PREDICTION
+				float3 x0_minus1 = _ParticlePosition[i].xyz;
+				float3 v0_minus1 = _ParticleVelocity[i].xyz;
+				float3 xt = IntegratePosition_SecondOrder(x0, x0_minus1, v0, v0_minus1, a0);
+#else
 				float3 xt = IntegratePosition(x0, v0, a0);
+#endif
 
 				// solve global position constraints
 				if (ENABLE_POSE_GLOBAL_POSITION)
@@ -900,7 +922,13 @@ void KSolveConstraints_Jacobi(
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + ParticleVolumeImpulse(i, _ParticleVelocityPrev[i].xyz);
 			const float3 a0 = float3(0.0, _Gravity, 0.0);
 			{
+#if SECOND_ORDER_PREDICTION
+				float3 x0_minus1 = _ParticlePosition[i].xyz;
+				float3 v0_minus1 = _ParticleVelocity[i].xyz;
+				gs_x[j] = float4(IntegratePosition_SecondOrder(x0, x0_minus1, v0, v0_minus1, a0), 1.0);
+#else
 				gs_x[j] = float4(IntegratePosition(x0, v0, a0), 1.0);
+#endif
 			}
 		}
 	}

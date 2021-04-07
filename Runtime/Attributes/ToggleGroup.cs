@@ -181,6 +181,21 @@ namespace Unity.DemoTeam.Attributes
 			return type.GetField(path.Substring(start));
 		}
 
+		static bool TryGetMinAttribute(FieldInfo field, out float min)
+		{
+			var a = field.GetCustomAttribute<MinAttribute>();
+			if (a != null)
+			{
+				min = a.min;
+				return true;
+			}
+			else
+			{
+				min = 0.0f;
+				return false;
+			}
+		}
+
 		static bool TryGetRangeAttribute(FieldInfo field, out float min, out float max)
 		{
 			var a = field.GetCustomAttribute<RangeAttribute>();
