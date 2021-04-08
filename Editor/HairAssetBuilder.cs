@@ -162,14 +162,14 @@ namespace Unity.DemoTeam.Hair
 
 			// get buffers
 			var bufferPos = curveSet.Positions;
-			var bufferPosCount = curveSet.CurvePointCount;
+			var bufferPosOffset = curveSet.CurveOffsets;
 
 			//Debug.Log("curveSet: " + curveSet.name);
 			//Debug.Log("bufferPos.Length = " + bufferPos.Length);
-			//Debug.Log("bufferPointCount.Length = " + bufferPointCount.Length);
+			//Debug.Log("bufferPosOffset.Length = " + bufferPosOffset.Length);
 
 			// get curve counts
-			int curveCount = bufferPosCount.Length;
+			int curveCount = bufferPosOffset.Length;
 			int curvePointCount = (curveCount == 0) ? 0 : (bufferPos.Length / curveCount);
 			int curvePointRemainder = (curveCount == 0) ? 0 : (bufferPos.Length % curveCount);
 
@@ -194,15 +194,17 @@ namespace Unity.DemoTeam.Hair
 					fixed (Vector3* srcBase = bufferPos)
 					fixed (Vector3* dstBase = bufferPosResample)
 					{
-						var srcOffset = 0;
 						var dstOffset = 0;
+						var dstCount = settings.resampleParticleCount;
 
 						for (int i = 0; i != curveCount; i++)
 						{
-							Resample(srcBase + srcOffset, bufferPosCount[i], dstBase + dstOffset, settings.resampleParticleCount);
+							var srcOffset = bufferPosOffset[i];
+							var srcOffsetNext = (i < curveCount - 1) ? bufferPosOffset[i + 1] : bufferPos.Length;
 
-							srcOffset += bufferPosCount[i];
-							dstOffset += settings.resampleParticleCount;
+							Resample(srcBase + srcOffset, srcOffsetNext - srcOffset, dstBase + dstOffset, dstCount);
+
+							dstOffset += dstCount;
 						}
 					}
 				}
