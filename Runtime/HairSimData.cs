@@ -11,6 +11,8 @@ namespace Unity.DemoTeam.Hair
 			public SolverCBuffer cbuffer;
 			public SolverKeywords keywords;
 
+			public ComputeBuffer cbufferStorage;		// constant buffer storage
+
 			public ComputeBuffer rootScale;				// x: relative strand length [0..1] (to group maximum)
 			public ComputeBuffer rootPosition;			// xyz: strand root position, w: -
 			public ComputeBuffer rootDirection;			// xyz: strand root direction, w: -
@@ -32,6 +34,7 @@ namespace Unity.DemoTeam.Hair
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
 		public struct SolverCBuffer
 		{
+			//TODO cleanup
 			public Matrix4x4 _LocalToWorld;
 			public Matrix4x4 _LocalToWorldInvT;
 			public Vector4 _WorldRotation;
@@ -87,6 +90,8 @@ namespace Unity.DemoTeam.Hair
 			public VolumeCBuffer cbuffer;
 			public VolumeKeywords keywords;
 
+			public ComputeBuffer cbufferStorage;        // constant buffer storage
+
 			public RenderTexture accuWeight;            // x: fp accumulated weight
 			public RenderTexture accuWeight0;           // x: fp accumulated target weight
 			public RenderTexture accuVelocityX;         // x: fp accumulated x-velocity
@@ -106,8 +111,8 @@ namespace Unity.DemoTeam.Hair
 			//public float allGroupsMaxStrandDiameter;
 			//public float allGroupsMaxStrandLength;
 
-			public RenderTexture boundarySDFDummy;      // (placeholder for when inactive)
 			public RenderTexture boundarySDF;           // x: signed distance to arbitrary solid
+			public RenderTexture boundarySDFDummy;      // (placeholder for when inactive)
 
 			public ComputeBuffer boundaryShape;         // arr(HairBoundary.RuntimeShape.Data)
 			public ComputeBuffer boundaryMatrix;        // arr(float4x4): local to world

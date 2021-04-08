@@ -102,7 +102,7 @@ namespace Unity.DemoTeam.Hair
 
 		public interface IPushTarget
 		{
-			void PushConstantBuffer<CBType>(CommandBuffer cmd, int nameID, in CBType data) where CBType : struct;
+			void PushConstantBuffer(CommandBuffer cmd, int nameID, ComputeBuffer cbuffer);
 			void PushComputeBuffer(CommandBuffer cmd, int nameID, ComputeBuffer buffer);
 			void PushComputeTexture(CommandBuffer cmd, int nameID, RenderTexture texture);
 			void PushKeyword(CommandBuffer cmd, string name, bool value);
@@ -119,7 +119,7 @@ namespace Unity.DemoTeam.Hair
 				this.kernel = kernel;
 			}
 
-			public void PushConstantBuffer<CBType>(CommandBuffer cmd, int nameID, in CBType data) where CBType : struct => ConstantBuffer.Push(cmd, data, cs, nameID);
+			public void PushConstantBuffer(CommandBuffer cmd, int nameID, ComputeBuffer cbuffer) => cmd.SetComputeConstantBufferParam(cs, nameID, cbuffer, 0, cbuffer.stride);
 			public void PushComputeBuffer(CommandBuffer cmd, int nameID, ComputeBuffer buffer) => cmd.SetComputeBufferParam(cs, kernel, nameID, buffer);
 			public void PushComputeTexture(CommandBuffer cmd, int nameID, RenderTexture texture) => cmd.SetComputeTextureParam(cs, kernel, nameID, texture);
 			public void PushKeyword(CommandBuffer cmd, string name, bool value) => CoreUtils.SetKeyword(cs, name, value);
@@ -136,7 +136,7 @@ namespace Unity.DemoTeam.Hair
 				this.mpb = mpb;
 			}
 
-			public void PushConstantBuffer<CBType>(CommandBuffer cmd, int nameID, in CBType data) where CBType : struct => ConstantBuffer.Push(cmd, data, mat, nameID);
+			public void PushConstantBuffer(CommandBuffer cmd, int nameID, ComputeBuffer cbuffer) => mpb.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
 			public void PushComputeBuffer(CommandBuffer cmd, int nameID, ComputeBuffer buffer) => mpb.SetBuffer(nameID, buffer);
 			public void PushComputeTexture(CommandBuffer cmd, int nameID, RenderTexture texture) => mpb.SetTexture(nameID, texture);
 			public void PushKeyword(CommandBuffer cmd, string name, bool value) => CoreUtils.SetKeyword(mat, name, value);

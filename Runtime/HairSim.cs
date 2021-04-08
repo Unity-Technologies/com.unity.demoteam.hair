@@ -297,7 +297,7 @@ namespace Unity.DemoTeam.Hair
 
 			public enum GatherMode
 			{
-				JustTags,
+				JustTagged,
 				IncludeColliders,
 			}
 
@@ -475,6 +475,8 @@ namespace Unity.DemoTeam.Hair
 				int particleCount = strandCount * strandParticleCount;
 				int particleStride = sizeof(Vector4);
 
+				changed |= CreateBuffer(ref solverData.cbufferStorage, "SolverCBuffer", 1, UnsafeUtility.SizeOf<SolverCBuffer>(), ComputeBufferType.Constant);
+
 				changed |= CreateBuffer(ref solverData.rootScale, "RootScale", strandCount, sizeof(float));
 				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStride);
 				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStride);
@@ -499,6 +501,8 @@ namespace Unity.DemoTeam.Hair
 			unsafe
 			{
 				bool changed = false;
+
+				changed |= CreateBuffer(ref volumeData.cbufferStorage, "VolumeCBuffer", 1, UnsafeUtility.SizeOf<VolumeCBuffer>(), ComputeBufferType.Constant);
 
 				changed |= CreateVolume(ref volumeData.accuWeight, "AccuWeight", volumeCellCount, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt ?
 				changed |= CreateVolume(ref volumeData.accuWeight0, "AccuWeight0", volumeCellCount, GraphicsFormat.R32_SInt);
@@ -532,6 +536,8 @@ namespace Unity.DemoTeam.Hair
 
 		public static void ReleaseSolverData(ref SolverData solverData)
 		{
+			ReleaseBuffer(ref solverData.cbufferStorage);
+
 			ReleaseBuffer(ref solverData.rootScale);
 			ReleaseBuffer(ref solverData.rootPosition);
 			ReleaseBuffer(ref solverData.rootDirection);
@@ -552,6 +558,8 @@ namespace Unity.DemoTeam.Hair
 
 		public static void ReleaseVolumeData(ref VolumeData volumeData)
 		{
+			ReleaseBuffer(ref volumeData.cbufferStorage);
+
 			ReleaseVolume(ref volumeData.accuWeight);
 			ReleaseVolume(ref volumeData.accuWeight0);
 			ReleaseVolume(ref volumeData.accuVelocityX);
@@ -597,19 +605,8 @@ namespace Unity.DemoTeam.Hair
 			cmd.ClearRandomWriteTargets();
 		}
 
-		public static void UpdateSolverData(ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 strandTransform, float strandScale, float dt)
+		public static void UpdateSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 strandTransform, float strandScale, float dt)
 		{
-			ref var cbuffer = ref solverData.cbuffer;
-			ref var keywords = ref solverData.keywords;
-
-			// update strand parameters
-			cbuffer._LocalToWorld = strandTransform;
-			cbuffer._LocalToWorldInvT = strandTransform.inverse.transpose;
-			cbuffer._WorldRotation = new Vector4(strandTransform.rotation.x, strandTransform.rotation.y, strandTransform.rotation.z, strandTransform.rotation.w);
-
-			cbuffer._StrandScale = strandScale;
-
-			// update solver parameters
 			float GetSeconds(SolverSettings.TimeInterval interval)
 			{
 				switch (interval)
@@ -622,6 +619,17 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			ref var cbuffer = ref solverData.cbuffer;
+			ref var keywords = ref solverData.keywords;
+
+			// update strand parameters
+			cbuffer._LocalToWorld = strandTransform;
+			cbuffer._LocalToWorldInvT = strandTransform.inverse.transpose;
+			cbuffer._WorldRotation = new Vector4(strandTransform.rotation.x, strandTransform.rotation.y, strandTransform.rotation.z, strandTransform.rotation.w);
+
+			cbuffer._StrandScale = strandScale;
+
+			// update solver parameters
 			cbuffer._DT = dt;
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
@@ -657,9 +665,17 @@ namespace Unity.DemoTeam.Hair
 			keywords.ENABLE_POSE_LOCAL_BEND_TWIST = (solverSettings.localShape && solverSettings.localShapeInfluence > 0.0f);
 			keywords.ENABLE_POSE_GLOBAL_POSITION = (solverSettings.globalPosition && solverSettings.globalPositionInfluence > 0.0f);
 			keywords.ENABLE_POSE_GLOBAL_ROTATION = (solverSettings.globalRotation && solverSettings.globalRotationInfluence > 0.0f);
+
+			// update cbuffer
+			var cbufferStaging = new NativeArray<SolverCBuffer>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+			{
+				cbufferStaging[0] = cbuffer;
+				cmd.SetComputeBufferData(solverData.cbufferStorage, cbufferStaging);
+				cbufferStaging.Dispose();
+			}
 		}
 
-		public static void UpdateVolumeBoundaries(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
+		public static void UpdateVolumeBoundaries(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
 
@@ -810,20 +826,20 @@ namespace Unity.DemoTeam.Hair
 					else
 						volumeData.boundarySDF = null;
 
-					// update buffers
-					volumeData.boundaryShape.SetData(bufShape, 0, 0, boundaryCount);
-					volumeData.boundaryMatrix.SetData(bufMatrix, 0, 0, boundaryCount);
-					volumeData.boundaryMatrixInv.SetData(bufMatrixInv, 0, 0, boundaryCount);
-					volumeData.boundaryMatrixW2PrevW.SetData(bufMatrixW2PrevW, 0, 0, boundaryCount);
-
 					volumeData.boundaryPrevXform.CopyFrom(bufXform);
 					volumeData.boundaryPrevCount = boundaryCount;
 					volumeData.boundaryPrevCountDiscard = boundaryList.Count - boundaryCount;
+
+					// update buffers
+					cmd.SetComputeBufferData(volumeData.boundaryShape, bufShape);
+					cmd.SetComputeBufferData(volumeData.boundaryMatrix, bufMatrix);
+					cmd.SetComputeBufferData(volumeData.boundaryMatrixInv, bufMatrixInv);
+					cmd.SetComputeBufferData(volumeData.boundaryMatrixW2PrevW, bufMatrixW2PrevW);
 				}
 			}
 		}
 
-		public static void UpdateVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds, float strandDiameter, float strandScale)
+		public static void UpdateVolumeData(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds, float strandDiameter, float strandScale)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
 			ref var keywords = ref volumeData.keywords;
@@ -847,11 +863,34 @@ namespace Unity.DemoTeam.Hair
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
 			keywords.VOLUME_TARGET_INITIAL_POSE = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPose);
 			keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPoseInParticles);
+
+			// update cbuffer
+			var cbufferStaging = new NativeArray<VolumeCBuffer>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+			{
+				cbufferStaging[0] = cbuffer;
+				cmd.SetComputeBufferData(volumeData.cbufferStorage, cbufferStaging);
+				cbufferStaging.Dispose();
+			}
 		}
 
+		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData) => PushSolverData(cmd, new PushTargetCompute(cs, kernel), solverData);
+		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData) => PushSolverData(cmd, new PushTargetMaterial(mat, mpb), solverData);
 		public static void PushSolverData<T>(CommandBuffer cmd, T target, in SolverData solverData) where T : IPushTarget
 		{
-			target.PushConstantBuffer(cmd, UniformIDs.SolverCBuffer, solverData.cbuffer);
+			target.PushConstantBuffer(cmd, UniformIDs.SolverCBuffer, solverData.cbufferStorage);
+
+			target.PushKeyword(cmd, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
+			target.PushKeyword(cmd, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
+			target.PushKeyword(cmd, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
+			target.PushKeyword(cmd, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
+			target.PushKeyword(cmd, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
+			target.PushKeyword(cmd, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
+			target.PushKeyword(cmd, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
+			target.PushKeyword(cmd, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
+			target.PushKeyword(cmd, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
+			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
+			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
+			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
 
 			target.PushComputeBuffer(cmd, UniformIDs._RootScale, solverData.rootScale);
 			target.PushComputeBuffer(cmd, UniformIDs._RootPosition, solverData.rootPosition);
@@ -866,34 +905,17 @@ namespace Unity.DemoTeam.Hair
 			target.PushComputeBuffer(cmd, UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			target.PushComputeBuffer(cmd, UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			target.PushComputeBuffer(cmd, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
-	
-			target.PushKeyword(cmd, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
-			target.PushKeyword(cmd, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
-			target.PushKeyword(cmd, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
-			target.PushKeyword(cmd, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
-			target.PushKeyword(cmd, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
-			target.PushKeyword(cmd, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
-			target.PushKeyword(cmd, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
-			target.PushKeyword(cmd, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
-			target.PushKeyword(cmd, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
-			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
-			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
 		}
 
-		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData) => PushSolverData(cmd, new PushTargetCompute(cs, kernel), solverData);
-		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData) => PushSolverData(cmd, new PushTargetMaterial(mat, mpb), solverData);
-
+		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData) => PushVolumeData(cmd, new PushTargetCompute(cs, kernel), volumeData);
+		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData) => PushVolumeData(cmd, new PushTargetMaterial(mat, mpb), volumeData);
 		public static void PushVolumeData<T>(CommandBuffer cmd, T target, in VolumeData volumeData) where T : IPushTarget
 		{
-			target.PushConstantBuffer(cmd, UniformIDs.VolumeCBuffer, volumeData.cbuffer);
+			target.PushConstantBuffer(cmd, UniformIDs.VolumeCBuffer, volumeData.cbufferStorage);
 
-			target.PushComputeTexture(cmd, UniformIDs._BoundarySDF, (volumeData.boundarySDF != null) ? volumeData.boundarySDF : volumeData.boundarySDFDummy);
-
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryShape, volumeData.boundaryShape);
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
+			target.PushKeyword(cmd, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
+			target.PushKeyword(cmd, "VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
+			target.PushKeyword(cmd, "VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 
 			target.PushComputeTexture(cmd, UniformIDs._AccuWeight, volumeData.accuWeight);
 			target.PushComputeTexture(cmd, UniformIDs._AccuWeight0, volumeData.accuWeight0);
@@ -910,13 +932,13 @@ namespace Unity.DemoTeam.Hair
 			target.PushComputeTexture(cmd, UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
 			target.PushComputeTexture(cmd, UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
 
-			target.PushKeyword(cmd, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
-			target.PushKeyword(cmd, "VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
-			target.PushKeyword(cmd, "VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
-		}
+			target.PushComputeTexture(cmd, UniformIDs._BoundarySDF, (volumeData.boundarySDF != null) ? volumeData.boundarySDF : volumeData.boundarySDFDummy);
 
-		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData) => PushVolumeData(cmd, new PushTargetCompute(cs, kernel), volumeData);
-		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData) => PushVolumeData(cmd, new PushTargetMaterial(mat, mpb), volumeData);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryShape, volumeData.boundaryShape);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
+			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
+		}
 
 		public static void InitSolverParticles(CommandBuffer cmd, in SolverData solverData, Matrix4x4 rootTransform)
 		{

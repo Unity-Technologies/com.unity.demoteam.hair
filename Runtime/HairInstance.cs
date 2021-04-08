@@ -447,17 +447,17 @@ namespace Unity.DemoTeam.Hair
 
 				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, dt);
+				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, strandTransform, strandScale, dt);
 				HairSim.UpdateSolverRoots(cmd, rootMesh, rootTransform, solverData[i]);
 			}
 
 			// update volume boundaries
-			HairSim.UpdateVolumeBoundaries(ref volumeData, volumeSettings, simulationBounds);
+			HairSim.UpdateVolumeBoundaries(cmd, ref volumeData, volumeSettings, simulationBounds);
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
 			{
-				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
+				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
 
@@ -468,7 +468,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// step volume data
-			HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
+			HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 			// update renderers
@@ -678,7 +678,7 @@ namespace Unity.DemoTeam.Hair
 				var strandScale = GetStrandScale();
 				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
 
-				HairSim.UpdateSolverData(ref solverData[i], solverSettings, strandTransform, strandScale, 1.0f);
+				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, strandTransform, strandScale, 1.0f);
 				HairSim.UpdateSolverRoots(cmd, rootMesh, rootTransform, solverData[i]);
 				{
 					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);
@@ -697,7 +697,7 @@ namespace Unity.DemoTeam.Hair
 				var strandDiameter = GetStrandDiameter();
 				var strandScale = GetStrandScale();
 
-				HairSim.UpdateVolumeData(ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
+				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 				for (int i = 0; i != solverData.Length; i++)

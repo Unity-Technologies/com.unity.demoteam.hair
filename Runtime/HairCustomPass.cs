@@ -16,7 +16,7 @@ namespace Unity.DemoTeam.Hair
 			Draw = 1 << 1,
 		}
 
-		private int lastSimulationFrame = -1;
+		private double lastSimulationTime = -1.0;
 
 		protected override void Setup(ScriptableRenderContext renderContext, CommandBuffer cmd)
 		{
@@ -39,8 +39,8 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (dispatch.HasFlag(Dispatch.Step))
 			{
-				int frame = Time.renderedFrameCount;
-				if (frame != lastSimulationFrame)
+				var time = Time.realtimeSinceStartupAsDouble;
+				if (time != lastSimulationTime)
 				{
 					var dt = Time.deltaTime;
 					if (dt != 0.0f)
@@ -51,13 +51,13 @@ namespace Unity.DemoTeam.Hair
 								hairInstance.DispatchTime(context.cmd, dt);
 						}
 
-						lastSimulationFrame = frame;
+						lastSimulationTime = time;
 					}
 				}
 			}
 			else
 			{
-				lastSimulationFrame = -1;
+				lastSimulationTime = -1.0;
 			}
 
 			if (dispatch.HasFlag(Dispatch.Draw))
