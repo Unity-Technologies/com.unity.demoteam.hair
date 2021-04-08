@@ -63,7 +63,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _RootScale;
 			public static int _RootPosition;
 			public static int _RootDirection;
-			//public static int _RootFrame;
+			public static int _RootFrame;
 
 			public static int _InitialRootFrame;
 			public static int _InitialParticleOffset;
@@ -588,26 +588,9 @@ namespace Unity.DemoTeam.Hair
 			volumeData = new VolumeData();
 		}
 
-		public static void UpdateSolverRoots(CommandBuffer cmd, Mesh rootMesh, in Matrix4x4 rootTransform, in SolverData solverData)
+		public static void UpdateSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, in Quaternion strandRotation, float strandScale, float dt)
 		{
-			var solverDataCopy = solverData;
-			{
-				solverDataCopy.cbuffer._LocalToWorld = rootTransform;
-				solverDataCopy.cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
-			}
-
-			PushSolverData(cmd, s_solverRootsMat, s_solverRootsMPB, solverDataCopy);
-
-			cmd.SetRandomWriteTarget(1, solverData.rootPosition);
-			cmd.SetRandomWriteTarget(2, solverData.rootDirection);
-			cmd.SetRandomWriteTarget(3, solverData.rootFrame);
-			cmd.DrawMesh(rootMesh, Matrix4x4.identity, s_solverRootsMat, 0, 0, s_solverRootsMPB);
-			cmd.ClearRandomWriteTargets();
-		}
-
-		public static void UpdateSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 strandTransform, float strandScale, float dt)
-		{
-			float GetSeconds(SolverSettings.TimeInterval interval)
+			float IntervalToSeconds(SolverSettings.TimeInterval interval)
 			{
 				switch (interval)
 				{
@@ -622,10 +605,11 @@ namespace Unity.DemoTeam.Hair
 			ref var cbuffer = ref solverData.cbuffer;
 			ref var keywords = ref solverData.keywords;
 
-			// update strand parameters
-			cbuffer._LocalToWorld = strandTransform;
-			cbuffer._LocalToWorldInvT = strandTransform.inverse.transpose;
-			cbuffer._WorldRotation = new Vector4(strandTransform.rotation.x, strandTransform.rotation.y, strandTransform.rotation.z, strandTransform.rotation.w);
+			// update group parameters
+			cbuffer._LocalToWorld = rootTransform;
+			cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
+
+			cbuffer._WorldRotation = new Vector4(strandRotation.x, strandRotation.y, strandRotation.z, strandRotation.w);
 
 			cbuffer._StrandScale = strandScale;
 
@@ -638,7 +622,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._CellPressure = solverSettings.cellPressure;
 			cbuffer._CellVelocity = solverSettings.cellVelocity;
 			cbuffer._Damping = solverSettings.damping;
-			cbuffer._DampingInterval = GetSeconds(solverSettings.dampingInterval);
+			cbuffer._DampingInterval = IntervalToSeconds(solverSettings.dampingInterval);
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
 
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
@@ -647,7 +631,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._LocalShape = solverSettings.localShapeInfluence;
 
 			cbuffer._GlobalPosition = solverSettings.globalPositionInfluence;
-			cbuffer._GlobalPositionInterval = GetSeconds(solverSettings.globalPositionInterval);
+			cbuffer._GlobalPositionInterval = IntervalToSeconds(solverSettings.globalPositionInterval);
 			cbuffer._GlobalRotation = solverSettings.globalRotationInfluence;
 			cbuffer._GlobalFadeOffset = solverSettings.globalFade ? solverSettings.globalFadeOffset : 1e9f;
 			cbuffer._GlobalFadeExtent = solverSettings.globalFade ? solverSettings.globalFadeExtent : 1e9f;
@@ -673,6 +657,17 @@ namespace Unity.DemoTeam.Hair
 				cmd.SetComputeBufferData(solverData.cbufferStorage, cbufferStaging);
 				cbufferStaging.Dispose();
 			}
+		}
+
+		public static void UpdateSolverRoots(CommandBuffer cmd, in SolverData solverData, Mesh rootMesh)
+		{
+			PushSolverData(cmd, s_solverRootsMat, s_solverRootsMPB, solverData);
+
+			cmd.SetRandomWriteTarget(1, solverData.rootPosition);
+			cmd.SetRandomWriteTarget(2, solverData.rootDirection);
+			cmd.SetRandomWriteTarget(3, solverData.rootFrame);
+			cmd.DrawMesh(rootMesh, Matrix4x4.identity, s_solverRootsMat, 0, 0, s_solverRootsMPB);
+			cmd.ClearRandomWriteTargets();
 		}
 
 		public static void UpdateVolumeBoundaries(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds)
@@ -790,6 +785,12 @@ namespace Unity.DemoTeam.Hair
 							break;
 					}
 
+					// update sdf
+					if (boundarySDFIndex != -1)
+						volumeData.boundarySDF = boundaryList[boundarySDFIndex].sdf.sdfTexture as RenderTexture;
+					else
+						volumeData.boundarySDF = null;
+
 					// update matrices
 					for (int i = 0; i != boundaryCount; i++)
 					{
@@ -820,12 +821,7 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					// update sdf
-					if (boundarySDFIndex != -1)
-						volumeData.boundarySDF = boundaryList[boundarySDFIndex].sdf.sdfTexture as RenderTexture;
-					else
-						volumeData.boundarySDF = null;
-
+					// update previous frame info
 					volumeData.boundaryPrevXform.CopyFrom(bufXform);
 					volumeData.boundaryPrevCount = boundaryCount;
 					volumeData.boundaryPrevCountDiscard = boundaryList.Count - boundaryCount;
@@ -895,6 +891,7 @@ namespace Unity.DemoTeam.Hair
 			target.PushComputeBuffer(cmd, UniformIDs._RootScale, solverData.rootScale);
 			target.PushComputeBuffer(cmd, UniformIDs._RootPosition, solverData.rootPosition);
 			target.PushComputeBuffer(cmd, UniformIDs._RootDirection, solverData.rootDirection);
+			target.PushComputeBuffer(cmd, UniformIDs._RootFrame, solverData.rootFrame);
 
 			target.PushComputeBuffer(cmd, UniformIDs._InitialRootFrame, solverData.initialRootFrame);
 			target.PushComputeBuffer(cmd, UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
@@ -940,19 +937,13 @@ namespace Unity.DemoTeam.Hair
 			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
 		}
 
-		public static void InitSolverParticles(CommandBuffer cmd, in SolverData solverData, Matrix4x4 rootTransform)
+		public static void InitSolverParticles(CommandBuffer cmd, in SolverData solverData)
 		{
-			var solverDataCopy = solverData;
-			{
-				solverDataCopy.cbuffer._LocalToWorld = rootTransform;
-				solverDataCopy.cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
-			}
-
 			int numX = (int)solverData.cbuffer._StrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % PARTICLE_GROUP_SIZE);
 			int numY = 1;
 			int numZ = 1;
 
-			PushSolverData(cmd, s_solverCS, SolverKernels.KInitParticles, solverDataCopy);
+			PushSolverData(cmd, s_solverCS, SolverKernels.KInitParticles, solverData);
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KInitParticles, numX, numY, numZ);
 		}
 

@@ -24,7 +24,7 @@
 	{
 		_UpdatedRootPosition[i].xyz = mul(_LocalToWorld, float4(attribs.positionOS, 1.0)).xyz;
 		_UpdatedRootDirection[i].xyz = normalize(mul(_LocalToWorldInvT, float4(attribs.directionOS, 0.0)).xyz);
-		_UpdatedRootFrame[i] = MakeQuaternionIdentity();
+		_UpdatedRootFrame[i] = QMul(_WorldRotation, _InitialRootFrame[i]);
 		return float4(0, 0, 1, 0);// clip
 	}
 

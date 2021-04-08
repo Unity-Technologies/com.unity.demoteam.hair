@@ -445,10 +445,10 @@ namespace Unity.DemoTeam.Hair
 				var rootMesh = componentGroups[i].rootFilter.sharedMesh;
 				var rootTransform = componentGroups[i].rootFilter.transform.localToWorldMatrix;
 
-				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
+				var strandRotation = GetRootRotation(componentGroups[i]);
 
-				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, strandTransform, strandScale, dt);
-				HairSim.UpdateSolverRoots(cmd, rootMesh, rootTransform, solverData[i]);
+				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandScale, dt);
+				HairSim.UpdateSolverRoots(cmd, solverData[i], rootMesh);
 			}
 
 			// update volume boundaries
@@ -676,12 +676,12 @@ namespace Unity.DemoTeam.Hair
 				var rootTransform = componentGroups[i].rootFilter.transform.localToWorldMatrix;
 
 				var strandScale = GetStrandScale();
-				var strandTransform = Matrix4x4.TRS(Vector3.zero, GetRootRotation(componentGroups[i]), Vector3.one * strandScale);
+				var strandRotation = GetRootRotation(componentGroups[i]);
 
-				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, strandTransform, strandScale, 1.0f);
-				HairSim.UpdateSolverRoots(cmd, rootMesh, rootTransform, solverData[i]);
+				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandScale, 1.0f);
+				HairSim.UpdateSolverRoots(cmd, solverData[i], rootMesh);
 				{
-					HairSim.InitSolverParticles(cmd, solverData[i], strandTransform);
+					HairSim.InitSolverParticles(cmd, solverData[i]);
 				}
 
 				// init renderer

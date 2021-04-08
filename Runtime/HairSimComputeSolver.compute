@@ -226,17 +226,17 @@ void KInitParticles(
 	//TODO move things around here
 
 	float3 rootPos0 = _ParticlePosition[strandParticleBegin].xyz;
-	float3 rootPos = _RootPosition[strandIndex].xyz;
+	float3 rootPosWorld = _RootPosition[strandIndex].xyz;
 	
 	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 	{
-		float3 rootOffset0 = _ParticlePosition[i].xyz - rootPos0;
-		float3 rootOffset = mul(_LocalToWorld, float4(rootOffset0, 0.0)).xyz;
+		float3 particleOffset0 = _ParticlePosition[i].xyz - rootPos0;
+		float3 particleOffsetWorld = QMul(_WorldRotation, particleOffset0 * _StrandScale);
 
-		_InitialParticleOffset[i].xyz = rootOffset0;
+		_InitialParticleOffset[i].xyz = particleOffset0;
 
-		_ParticlePosition[i].xyz = (rootPos + rootOffset);
-		_ParticlePositionPrev[i].xyz = (rootPos + rootOffset);
+		_ParticlePosition[i].xyz = (rootPosWorld + particleOffsetWorld);
+		_ParticlePositionPrev[i].xyz = (rootPosWorld + particleOffsetWorld);
 		_ParticlePositionCorr[i].xyz = 0.0;
 		_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _StrandMaxParticleWeight * _RootScale[strandIndex]);
 		_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _StrandMaxParticleWeight * _RootScale[strandIndex]);
@@ -382,7 +382,7 @@ void KSolveConstraints_GaussSeidelReference(
 		for (uint i = strandParticleBegin + strandParticleStride, k = 1; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
 			float3 r0 = _ParticlePosition[i].xyz - p0;
-			float3 r1 = mul(_LocalToWorld, float4(_InitialParticleOffset[i].xyz, 0.0)).xyz;
+			float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _StrandScale);
 
 			_ParticlePosition[i].xyz = p0 + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, k));
 		}
@@ -493,7 +493,7 @@ void KSolveConstraints_GaussSeidelReference(
 		// solve global rotation constraints
 		if (ENABLE_POSE_GLOBAL_ROTATION)
 		{
-			float4 rootFrame = QMul(_WorldRotation, _InitialRootFrame[strandIndex]);
+			float4 rootFrame = _RootFrame[strandIndex];
 			float3 rootPos = _RootPosition[strandIndex].xyz;
 			float3 rootVec = GetParticleInterval(strandIndex) * QMul(rootFrame, float3(0, 1, 0));
 
@@ -534,7 +534,7 @@ void KSolveConstraints_GaussSeidelReference(
 		// solve local shape constraints
 		if (ENABLE_POSE_LOCAL_BEND_TWIST)
 		{
-			float4 rootFrame = QMul(_WorldRotation, _InitialRootFrame[strandIndex]);
+			float4 rootFrame = _RootFrame[strandIndex];
 			float3 rootPos = _RootPosition[strandIndex].xyz;
 			float3 rootDir = QMul(rootFrame, float3(0, 1, 0));
 
@@ -772,9 +772,8 @@ void KSolveConstraints_GaussSeidel(
 #endif
 
 	// update positions
+	const float3 rootPos = _RootPosition[strandIndex].xyz;
 	{
-		const float3 rootPos = _RootPosition[strandIndex].xyz;
-
 		// root
 		_ParticlePosition[strandParticleBegin].xyz = rootPos;
 
@@ -797,7 +796,7 @@ void KSolveConstraints_GaussSeidel(
 				if (ENABLE_POSE_GLOBAL_POSITION)
 				{
 					float3 r0 = xt - rootPos;
-					float3 r1 = mul(_LocalToWorld, float4(_InitialParticleOffset[i].xyz, 0.0)).xyz;
+					float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _StrandScale);
 
 					xt = rootPos + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, k));
 				}
@@ -818,8 +817,7 @@ void KSolveConstraints_GaussSeidel(
 
 	// solve constraints by Gauss-Seidel iteration
 	{
-		float4 rootFrame = QMul(_WorldRotation, _InitialRootFrame[strandIndex]);
-		float3 rootPos = _ParticlePosition[strandParticleBegin].xyz;
+		float4 rootFrame = _RootFrame[strandIndex];
 		float3 rootVec = GetParticleInterval(strandIndex) * QMul(rootFrame, float3(0, 1, 0));
 
 		for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
@@ -908,7 +906,7 @@ void KSolveConstraints_Jacobi(
 		// [threads: root]
 		if (threadIdx == 0)
 		{
-			const float4 rootFrame = QMul(_WorldRotation, _InitialRootFrame[strandIndex]);
+			const float4 rootFrame = _RootFrame[strandIndex];
 			const float3 rootPos = _RootPosition[strandIndex].xyz;
 			const float3 rootVec = GetParticleInterval(strandIndex) * QMul(rootFrame, float3(0, 1, 0));
 			{
@@ -956,7 +954,7 @@ void KSolveConstraints_Jacobi(
 		if (threadIdx == 0)
 		{
 			gs_q[0] = MakeQuaternionIdentity();
-			gs_q[1] = QMul(_WorldRotation, _InitialRootFrame[strandIndex]);
+			gs_q[1] = _RootFrame[strandIndex];
 		}
 		// [threads: root+1..]
 		else
@@ -989,7 +987,7 @@ void KSolveConstraints_Jacobi(
 		if (threadIdx > 0)
 		{
 			float3 r0 = gs_x[j].xyz - gs_x[1].xyz;
-			float3 r1 = mul(_LocalToWorld, float4(_InitialParticleOffset[i].xyz, 0.0)).xyz;
+			float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _StrandScale);
 
 			gs_x[j].xyz = gs_x[1].xyz + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, threadIdx));
 		}

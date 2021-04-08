@@ -44,6 +44,7 @@
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
+#include "HairSimComputeSolverQuaternion.hlsl"
 
 //--------
 // macros
@@ -225,7 +226,7 @@ void KVolumeSplat(
 	
 #if VOLUME_TARGET_INITIAL_POSE
 	const float3 p0 = _RootPosition[GetStrandIndex(worldIdx.x)].xyz;
-	const float3 r0 = mul(_LocalToWorld, float4(_InitialParticleOffset[worldIdx.x].xyz, 0.0)).xyz;
+	const float3 r0 = QMul(_WorldRotation, _InitialParticleOffset[worldIdx.x].xyz * _StrandScale);
 	InterlockedAddParticleContribution(p0 + r0, (v.w), _AccuWeight0);
 #elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
 	InterlockedMaxParticleContribution(p, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
