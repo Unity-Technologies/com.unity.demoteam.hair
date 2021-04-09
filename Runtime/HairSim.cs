@@ -654,7 +654,11 @@ namespace Unity.DemoTeam.Hair
 			var cbufferStaging = new NativeArray<SolverCBuffer>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 			{
 				cbufferStaging[0] = cbuffer;
+#if UNITY_2021_1_OR_NEWER
+				cmd.SetBufferData(solverData.cbufferStorage, cbufferStaging);
+#else
 				cmd.SetComputeBufferData(solverData.cbufferStorage, cbufferStaging);
+#endif
 				cbufferStaging.Dispose();
 			}
 		}
@@ -827,10 +831,17 @@ namespace Unity.DemoTeam.Hair
 					volumeData.boundaryPrevCountDiscard = boundaryList.Count - boundaryCount;
 
 					// update buffers
+#if UNITY_2021_1_OR_NEWER
+					cmd.SetBufferData(volumeData.boundaryShape, bufShape);
+					cmd.SetBufferData(volumeData.boundaryMatrix, bufMatrix);
+					cmd.SetBufferData(volumeData.boundaryMatrixInv, bufMatrixInv);
+					cmd.SetBufferData(volumeData.boundaryMatrixW2PrevW, bufMatrixW2PrevW);
+#else
 					cmd.SetComputeBufferData(volumeData.boundaryShape, bufShape);
 					cmd.SetComputeBufferData(volumeData.boundaryMatrix, bufMatrix);
 					cmd.SetComputeBufferData(volumeData.boundaryMatrixInv, bufMatrixInv);
 					cmd.SetComputeBufferData(volumeData.boundaryMatrixW2PrevW, bufMatrixW2PrevW);
+#endif
 				}
 			}
 		}
@@ -864,7 +875,11 @@ namespace Unity.DemoTeam.Hair
 			var cbufferStaging = new NativeArray<VolumeCBuffer>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 			{
 				cbufferStaging[0] = cbuffer;
+#if UNITY_2021_1_OR_NEWER
+				cmd.SetBufferData(volumeData.cbufferStorage, cbufferStaging);
+#else
 				cmd.SetComputeBufferData(volumeData.cbufferStorage, cbufferStaging);
+#endif
 				cbufferStaging.Dispose();
 			}
 		}
