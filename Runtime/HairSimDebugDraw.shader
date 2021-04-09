@@ -4,11 +4,11 @@
 
 	#pragma target 5.0
 
-	#pragma multi_compile_local __ LAYOUT_INTERLEAVED
+	#pragma multi_compile __ LAYOUT_INTERLEAVED
 	// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
 	// 1 == particles grouped by index, i.e. root, root, root+1, root+1
 	
-	#pragma multi_compile_local __ VOLUME_TARGET_INITIAL_POSE VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
+	#pragma multi_compile __ VOLUME_TARGET_INITIAL_POSE VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
 	// 0 == uniform target density
 	// 1 == non uniform target density
 

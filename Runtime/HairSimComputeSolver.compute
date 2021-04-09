@@ -10,18 +10,18 @@
 //----------
 // features
 
-#pragma multi_compile_local __ LAYOUT_INTERLEAVED
+#pragma multi_compile __ LAYOUT_INTERLEAVED
 // 0 == particles grouped by strand, i.e. root, root+1, root, root+1
 // 1 == particles grouped by index, i.e. root, root, root+1, root+1
 
-#pragma multi_compile_local __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
-#pragma multi_compile_local __ ENABLE_DISTANCE
-#pragma multi_compile_local __ ENABLE_DISTANCE_LRA
-#pragma multi_compile_local __ ENABLE_DISTANCE_FTL
-#pragma multi_compile_local __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
-#pragma multi_compile_local __ ENABLE_POSE_LOCAL_BEND_TWIST
-#pragma multi_compile_local __ ENABLE_POSE_GLOBAL_POSITION
-#pragma multi_compile_local __ ENABLE_POSE_GLOBAL_ROTATION
+#pragma multi_compile __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
+#pragma multi_compile __ ENABLE_DISTANCE
+#pragma multi_compile __ ENABLE_DISTANCE_LRA
+#pragma multi_compile __ ENABLE_DISTANCE_FTL
+#pragma multi_compile __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
+#pragma multi_compile __ ENABLE_POSE_LOCAL_BEND_TWIST
+#pragma multi_compile __ ENABLE_POSE_GLOBAL_POSITION
+#pragma multi_compile __ ENABLE_POSE_GLOBAL_ROTATION
 
 #ifndef ENABLE_BOUNDARY
 #define ENABLE_BOUNDARY 0

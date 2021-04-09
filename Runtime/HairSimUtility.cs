@@ -122,7 +122,7 @@ namespace Unity.DemoTeam.Hair
 			public void PushConstantBuffer(CommandBuffer cmd, int nameID, ComputeBuffer cbuffer) => cmd.SetComputeConstantBufferParam(cs, nameID, cbuffer, 0, cbuffer.stride);
 			public void PushComputeBuffer(CommandBuffer cmd, int nameID, ComputeBuffer buffer) => cmd.SetComputeBufferParam(cs, kernel, nameID, buffer);
 			public void PushComputeTexture(CommandBuffer cmd, int nameID, RenderTexture texture) => cmd.SetComputeTextureParam(cs, kernel, nameID, texture);
-			public void PushKeyword(CommandBuffer cmd, string name, bool value) => CoreUtils.SetKeyword(cs, name, value);
+			public void PushKeyword(CommandBuffer cmd, string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
 		}
 
 		public struct PushTargetMaterial : IPushTarget
@@ -139,7 +139,7 @@ namespace Unity.DemoTeam.Hair
 			public void PushConstantBuffer(CommandBuffer cmd, int nameID, ComputeBuffer cbuffer) => mpb.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
 			public void PushComputeBuffer(CommandBuffer cmd, int nameID, ComputeBuffer buffer) => mpb.SetBuffer(nameID, buffer);
 			public void PushComputeTexture(CommandBuffer cmd, int nameID, RenderTexture texture) => mpb.SetTexture(nameID, texture);
-			public void PushKeyword(CommandBuffer cmd, string name, bool value) => CoreUtils.SetKeyword(mat, name, value);
+			public void PushKeyword(CommandBuffer cmd, string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
 		}
 
 		//------------
