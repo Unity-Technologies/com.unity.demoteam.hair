@@ -102,8 +102,6 @@ namespace Unity.DemoTeam.Hair
 			[RenderingLayerMask]
 			public int strandLayers;
 
-			public Material testMaterial;
-
 			[LineHeader("Proportions")]
 
 			[Tooltip("Strand scale")]
@@ -291,11 +289,11 @@ namespace Unity.DemoTeam.Hair
 				switch (settingsStrands.strandRenderer)
 				{
 					case SettingsStrands.StrandRenderer.PrimitiveLines:
-						Graphics.DrawMeshInstancedProcedural(hairAsset.strandGroups[i].meshAssetLines, 0, mat, GetSimulationBounds(), 1);
+						Graphics.DrawMeshInstancedProcedural(hairAsset.strandGroups[i].meshAssetLines, 0, mat, GetSimulationBounds(), 1, castShadows: settingsStrands.strandShadows);
 						break;
 
 					case SettingsStrands.StrandRenderer.PrimitiveStrips:
-						Graphics.DrawMeshInstancedProcedural(hairAsset.strandGroups[i].meshAssetStrips, 0, mat, GetSimulationBounds(), 1);
+						Graphics.DrawMeshInstancedProcedural(hairAsset.strandGroups[i].meshAssetStrips, 0, mat, GetSimulationBounds(), 1, castShadows: settingsStrands.strandShadows);
 						break;
 
 					default:
