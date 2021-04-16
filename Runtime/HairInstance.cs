@@ -26,7 +26,6 @@ namespace Unity.DemoTeam.Hair
 			public GameObject container;
 			public MeshFilter lineFilter;
 			public MeshRenderer lineRenderer;
-			public MaterialPropertyBlock lineRendererMPB;
 			public MeshFilter rootFilter;
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 			public SkinAttachment rootAttachment;
@@ -60,25 +59,25 @@ namespace Unity.DemoTeam.Hair
 			public enum StrandScale
 			{
 				Fixed,
-				UniformLowerBound,
-				UniformUpperBound,
+				UniformMin,
+				UniformMax,
 			}
 
 			public enum StrandRenderer
 			{
 				PrimitiveLines,
-				InstancedMesh,//TODO
+				PrimitiveStrips,
 #if HAS_PACKAGE_UNITY_VFXGRAPH
 				VFXGraph,//TODO
 #endif
 			}
 
-			public enum Simulation
-			{
-				Disabled,
-				Enabled,
-				EnabledInPlaymode,
-			}
+			//public enum Simulation
+			//{
+			//	Disabled,
+			//	Enabled,
+			//	EnabledInPlaymode,
+			//}
 
 			public enum SimulationRate
 			{
@@ -88,13 +87,6 @@ namespace Unity.DemoTeam.Hair
 				CustomTimeStep,
 			}
 
-			[LineHeader("Sizing")]
-
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
-			public float strandDiameter;
-			[Tooltip("Strand scale")]
-			public StrandScale strandScale;
-
 			[LineHeader("Rendering")]
 
 			[ToggleGroup]
@@ -102,8 +94,6 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem]
 			public Material strandMaterialValue;
 			public StrandRenderer strandRenderer;
-			[VisibleIf(nameof(strandRenderer), StrandRenderer.InstancedMesh)]
-			public Mesh strandMesh;
 #if HAS_PACKAGE_UNITY_VFXGRAPH
 			[VisibleIf(nameof(strandRenderer), StrandRenderer.VFXGraph)]
 			public VisualEffect strandOutputGraph;
@@ -112,12 +102,25 @@ namespace Unity.DemoTeam.Hair
 			[RenderingLayerMask]
 			public int strandLayers;
 
-			[LineHeader("Physics")]
+			public Material testMaterial;
 
-			[Tooltip("Simulation state")]
-			public Simulation simulation;
-			[Tooltip("Simulation update rate")]
+			[LineHeader("Proportions")]
+
+			[Tooltip("Strand scale")]
+			public StrandScale strandScale;
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
+			public float strandDiameter;
+
+			[LineHeader("Dynamics")]
+
+			//[Tooltip("Simulation state")]
+			//public Simulation simulation;
+			[ToggleGroup, Tooltip("Enable simulation")]
+			public bool simulation;
+			[ToggleGroupItem, Tooltip("Simulation update rate")]
 			public SimulationRate simulationRate;
+			[ToggleGroupItem(withLabel = true), Tooltip("Enable simulation in Edit Mode")]
+			public bool simulationInEditor;
 			[VisibleIf(nameof(simulationRate), SimulationRate.CustomTimeStep), Tooltip("Simulation time step (in seconds)")]
 			public float simulationTimeStep;
 			[ToggleGroup, Tooltip("Enable minimum number of simulation steps per rendered frame")]
@@ -140,8 +143,10 @@ namespace Unity.DemoTeam.Hair
 				strandShadows = ShadowCastingMode.On,
 				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
 
-				simulation = Simulation.Enabled,
+				simulation = true,
 				simulationRate = SimulationRate.Fixed60Hz,
+				simulationInEditor = true,
+
 				simulationTimeStep = 1.0f / 100.0f,
 				stepsMin = false,
 				stepsMinValue = 1,
@@ -270,6 +275,35 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
+		void LateUpdate()
+		{
+			if (solverData == null)
+				return;
+
+			for (int i = 0; i != solverData.Length; i++)
+			{
+				var mat = componentGroups[i].lineRenderer.sharedMaterial;
+				if (mat == null)
+					continue;
+
+				HairSim.PushSolverData(mat, solverData[i]);
+
+				switch (settingsStrands.strandRenderer)
+				{
+					case SettingsStrands.StrandRenderer.PrimitiveLines:
+						Graphics.DrawMeshInstancedProcedural(hairAsset.strandGroups[i].meshAssetLines, 0, mat, GetSimulationBounds(), 1);
+						break;
+
+					case SettingsStrands.StrandRenderer.PrimitiveStrips:
+						Graphics.DrawMeshInstancedProcedural(hairAsset.strandGroups[i].meshAssetStrips, 0, mat, GetSimulationBounds(), 1);
+						break;
+
+					default:
+						break;//TODO
+				}
+			}
+		}
+
 		public Quaternion GetRootRotation(in ComponentGroup group)
 		{
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
@@ -321,13 +355,14 @@ namespace Unity.DemoTeam.Hair
 
 		public bool GetSimulationActive()
 		{
-			switch (settingsStrands.simulation)
+			if (settingsStrands.simulation)
 			{
-				case SettingsStrands.Simulation.Enabled: return true;
-				case SettingsStrands.Simulation.EnabledInPlaymode: return Application.isPlaying;
+				return settingsStrands.simulationInEditor || Application.isPlaying;
 			}
-
-			return false;
+			else
+			{
+				return false;
+			}
 		}
 
 		public float GetSimulationTimeStep()
@@ -358,14 +393,14 @@ namespace Unity.DemoTeam.Hair
 						return 1.0f;
 					}
 
-				case SettingsStrands.StrandScale.UniformLowerBound:
+				case SettingsStrands.StrandScale.UniformMin:
 					{
 						var lossyScaleAbs = this.transform.lossyScale.Abs();
 						var lossyScaleAbsMin = lossyScaleAbs.ComponentMin();
 						return lossyScaleAbsMin;
 					}
 
-				case SettingsStrands.StrandScale.UniformUpperBound:
+				case SettingsStrands.StrandScale.UniformMax:
 					{
 						var lossyScaleAbs = this.transform.lossyScale.Abs();
 						var lossyScaleAbsMax = lossyScaleAbs.ComponentMax();
@@ -447,7 +482,7 @@ namespace Unity.DemoTeam.Hair
 
 				var strandRotation = GetRootRotation(componentGroups[i]);
 
-				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandScale, dt);
+				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, dt);
 				HairSim.UpdateSolverRoots(cmd, solverData[i], rootMesh);
 			}
 
@@ -474,11 +509,11 @@ namespace Unity.DemoTeam.Hair
 			// update renderers
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				UpdateRenderer(cmd, componentGroups[i], solverData[i]);
+				UpdateRenderer(componentGroups[i], solverData[i]);
 			}
 		}
 
-		public void DispatchDraw(CommandBuffer cmd, RTHandle color, RTHandle depth)
+		public void DispatchDraw(CommandBuffer cmd)
 		{
 			if (!InitializeRuntimeData(cmd))
 				return;
@@ -486,17 +521,16 @@ namespace Unity.DemoTeam.Hair
 			// draw solver data
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				HairSim.DrawSolverData(cmd, color, depth, solverData[i], debugSettings);
+				HairSim.DrawSolverData(cmd, solverData[i], debugSettings);
 			}
 
 			// draw volume data
-			HairSim.DrawVolumeData(cmd, color, depth, volumeData, debugSettings);
+			HairSim.DrawVolumeData(cmd, volumeData, debugSettings);
 		}
 
-		public void UpdateRenderer(CommandBuffer cmd, in ComponentGroup componentGroup, in HairSim.SolverData solverData)
+		public void UpdateRenderer(in ComponentGroup componentGroup, in HairSim.SolverData solverData)
 		{
 			var lineRenderer = componentGroup.lineRenderer;
-			var lineRendererMPB = componentGroup.lineRendererMPB;
 
 			var material = GetStrandMaterial();
 			if (material != null)
@@ -518,12 +552,12 @@ namespace Unity.DemoTeam.Hair
 
 			if (lineRenderer.sharedMaterial != null)
 			{
-				HairSim.PushSolverData(cmd, lineRenderer.sharedMaterial, lineRendererMPB, solverData);
+				HairSim.PushSolverData(lineRenderer.sharedMaterial, solverData);
 
 				lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
-				lineRenderer.SetPropertyBlock(componentGroup.lineRendererMPB);
 			}
 
+			lineRenderer.enabled = false;//TODO either get rid of the renderer or swap meshes on there
 			lineRenderer.shadowCastingMode = settingsStrands.strandShadows;
 			lineRenderer.renderingLayerMask = (uint)settingsStrands.strandLayers;
 		}
@@ -549,7 +583,7 @@ namespace Unity.DemoTeam.Hair
 						var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
 						var prefabContents = UnityEditor.PrefabUtility.LoadPrefabContents(prefabPath);
 
-						Debug.Log("... rebuilding underlying prefab");
+						Debug.LogWarning("... rebuilding underlying prefab");
 
 						UnityEditor.PrefabUtility.SaveAsPrefabAsset(prefabContents, prefabPath);
 						UnityEditor.PrefabUtility.UnloadPrefabContents(prefabContents);
@@ -675,20 +709,15 @@ namespace Unity.DemoTeam.Hair
 				var rootMesh = componentGroups[i].rootFilter.sharedMesh;
 				var rootTransform = componentGroups[i].rootFilter.transform.localToWorldMatrix;
 
+				var strandDiameter = GetStrandDiameter();
 				var strandScale = GetStrandScale();
 				var strandRotation = GetRootRotation(componentGroups[i]);
 
-				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandScale, 1.0f);
+				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, 1.0f);
 				HairSim.UpdateSolverRoots(cmd, solverData[i], rootMesh);
 				{
 					HairSim.InitSolverParticles(cmd, solverData[i]);
 				}
-
-				// init renderer
-				if (componentGroups[i].lineRendererMPB == null)
-					componentGroups[i].lineRendererMPB = new MaterialPropertyBlock();
-
-				UpdateRenderer(cmd, componentGroups[i], solverData[i]);
 			}
 
 			// init volume data
@@ -704,6 +733,12 @@ namespace Unity.DemoTeam.Hair
 				{
 					HairSim.InitSolverParticlesPostVolume(cmd, solverData[i], volumeData);
 				}
+			}
+
+			// init renderers
+			for (int i = 0; i != strandGroups.Length; i++)
+			{
+				UpdateRenderer(componentGroups[i], solverData[i]);
 			}
 
 			// ready
@@ -829,66 +864,6 @@ namespace Unity.DemoTeam.Hair
 #if UNITY_EDITOR
 			UnityEditor.EditorUtility.SetDirty(hairInstance);
 #endif
-		}
-	}
-
-	[Serializable]
-	public struct PrimarySkinningBone
-	{
-		public Transform skinningBone;
-		public Matrix4x4 skinningBoneBindPose;
-		public Matrix4x4 skinningBoneBindPoseInverse;
-
-		public PrimarySkinningBone(Transform transform)
-		{
-			this.skinningBone = transform;
-			this.skinningBoneBindPose = Matrix4x4.identity;
-			this.skinningBoneBindPoseInverse = Matrix4x4.identity;
-
-			// search for skinning bone
-			var smr = transform.GetComponent<SkinnedMeshRenderer>();
-			if (smr != null)
-			{
-				var skinningBoneIndex = -1;
-				var skinningBoneWeight = 0.0f;
-
-				unsafe
-				{
-					var boneWeights = smr.sharedMesh.GetAllBoneWeights();
-					var boneWeightPtr = (BoneWeight1*)boneWeights.GetUnsafeReadOnlyPtr();
-
-					for (int i = 0; i != boneWeights.Length; i++)
-					{
-						if (skinningBoneWeight < boneWeightPtr[i].weight)
-						{
-							skinningBoneWeight = boneWeightPtr[i].weight;
-							skinningBoneIndex = boneWeightPtr[i].boneIndex;
-						}
-					}
-				}
-
-				if (skinningBoneIndex != -1)
-				{
-					this.skinningBone = smr.bones[skinningBoneIndex];
-					this.skinningBoneBindPose = smr.sharedMesh.bindposes[skinningBoneIndex];
-					this.skinningBoneBindPoseInverse = skinningBoneBindPose.inverse;
-					//Debug.Log("discovered skinning bone for " + smr.name + " : " + skinningBone.name);
-				}
-				else if (smr.rootBone != null)
-				{
-					this.skinningBone = smr.rootBone;
-				}
-			}
-		}
-
-		public Matrix4x4 GetWorldToLocalSkinning()
-		{
-			return skinningBoneBindPoseInverse * skinningBone.worldToLocalMatrix;
-		}
-
-		public Matrix4x4 GetLocalSkinningToWorld()
-		{
-			return skinningBone.localToWorldMatrix * skinningBoneBindPose;
 		}
 	}
 }

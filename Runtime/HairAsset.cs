@@ -8,7 +8,7 @@ using UnityEngine.Formats.Alembic.Importer;
 
 namespace Unity.DemoTeam.Hair
 {
-	[CreateAssetMenu(menuName = "Hair/Hair Asset", order = 250), PreferBinarySerialization]
+	[CreateAssetMenu(menuName = "Hair/Hair Asset", order = 350), PreferBinarySerialization]
 	public class HairAsset : ScriptableObject
 	{
 		public enum Type
@@ -54,11 +54,14 @@ namespace Unity.DemoTeam.Hair
 			public bool resampleCurves;
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
 			public int resampleParticleCount;
+			[Range(1, 5), Tooltip("Number of resampling iterations")]
+			public int resampleQuality;
 
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
 			{
 				resampleCurves = true,
 				resampleParticleCount = 16,
+				resampleQuality = 1,
 			};
 		}
 
@@ -191,6 +194,7 @@ namespace Unity.DemoTeam.Hair
 
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetRoots;
+			[HideInInspector] public Mesh meshAssetStrips;
 		}
 
 		public Material defaultMaterial;

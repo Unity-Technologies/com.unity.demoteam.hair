@@ -62,10 +62,12 @@ namespace Unity.DemoTeam.Hair
 
 			if (dispatch.HasFlag(Dispatch.Draw))
 			{
+				CoreUtils.SetRenderTarget(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);
+
 				foreach (var hairInstance in HairInstance.s_instances)
 				{
 					if (hairInstance != null && hairInstance.isActiveAndEnabled)
-						hairInstance.DispatchDraw(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);
+						hairInstance.DispatchDraw(context.cmd);
 				}
 			}
 		}

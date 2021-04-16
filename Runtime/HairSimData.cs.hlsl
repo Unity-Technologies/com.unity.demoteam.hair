@@ -15,6 +15,7 @@ CBUFFER_START(SolverCBuffer)
     float _StrandMaxParticleInterval;
     float _StrandMaxParticleWeight;
     float _StrandScale;
+    float _StrandDiameter;
     float _DT;
     uint _Iterations;
     float _Stiffness;

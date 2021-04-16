@@ -528,7 +528,7 @@ namespace Unity.DemoTeam.Hair
 		//------------------
 		// debugging gizmos
 
-		public void OnDrawGizmos()
+		public void OnDrawGizmosSelected()
 		{
 			var data = new RuntimeData();
 

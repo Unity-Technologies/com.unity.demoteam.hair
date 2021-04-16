@@ -35,6 +35,12 @@ namespace Unity.DemoTeam.Hair
 					AssetDatabase.RemoveObjectFromAsset(strandGroup.meshAssetRoots);
 					Mesh.DestroyImmediate(strandGroup.meshAssetRoots);
 				}
+
+				if (strandGroup.meshAssetStrips != null)
+				{
+					AssetDatabase.RemoveObjectFromAsset(strandGroup.meshAssetStrips);
+					Mesh.DestroyImmediate(strandGroup.meshAssetStrips);
+				}
 			}
 
 			// clear
@@ -82,9 +88,11 @@ namespace Unity.DemoTeam.Hair
 				{
 					AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetLines, hairAsset);
 					AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetRoots, hairAsset);
+					AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetStrips, hairAsset);
 
 					hairAsset.strandGroups[i].meshAssetLines.name = "Lines:" + i;
 					hairAsset.strandGroups[i].meshAssetRoots.name = "Roots:" + i;
+					hairAsset.strandGroups[i].meshAssetStrips.name = "Strips:" + i;
 				}
 			}
 
@@ -202,7 +210,7 @@ namespace Unity.DemoTeam.Hair
 							var srcOffset = bufferPosOffset[i];
 							var srcOffsetNext = (i < curveCount - 1) ? bufferPosOffset[i + 1] : bufferPos.Length;
 
-							Resample(srcBase + srcOffset, srcOffsetNext - srcOffset, dstBase + dstOffset, dstCount);
+							Resample(srcBase + srcOffset, srcOffsetNext - srcOffset, dstBase + dstOffset, dstCount, settings.resampleQuality);
 
 							dstOffset += dstCount;
 						}
@@ -373,26 +381,53 @@ namespace Unity.DemoTeam.Hair
 
 			// prep lines mesh
 			strandGroup.meshAssetLines = new Mesh();
-			strandGroup.meshAssetLines.indexFormat = (curveCount * curvePointCount > 65535) ? IndexFormat.UInt32 : IndexFormat.UInt16;
 #if !VISIBLE_SUBASSETS
 			strandGroup.meshAssetLines.hideFlags |= HideFlags.HideInHierarchy;
 #endif
 
 			// build lines mesh
-			var wireStrandLineCount = curvePointCount - 1;
-			var wireStrandPointCount = wireStrandLineCount * 2;
-
-			using (var particleTangent = new NativeArray<Vector3>(curveCount * curvePointCount, Allocator.Temp))
-			using (var particleUV = new NativeArray<Vector2>(curveCount * curvePointCount, Allocator.Temp))
-			using (var indices = new NativeArray<int>(curveCount * wireStrandPointCount, Allocator.Temp))
+			unsafe
 			{
-				unsafe
+				var lineVertices = curvePointCount;
+				var lineSegments = lineVertices - 1;
+				var lineIndices = lineSegments * 2;
+
+				using (var vertexTangent = new NativeArray<Vector3>(curveCount * lineVertices, Allocator.Temp))
+				using (var vertexUVID = new NativeArray<Vector4>(curveCount * lineVertices, Allocator.Temp))
+				using (var indices = new NativeArray<int>(curveCount * lineIndices, Allocator.Temp))
 				{
-					var particleTangentPtr = (Vector3*)particleTangent.GetUnsafePtr();
-					var particleUVPtr = (Vector2*)particleUV.GetUnsafePtr();
+					var vertexTangentPtr = (Vector3*)vertexTangent.GetUnsafePtr();
+					var vertexUVIDPtr = (Vector4*)vertexUVID.GetUnsafePtr();
 					var indicesPtr = (int*)indices.GetUnsafePtr();
 
-					// write index data
+					// write vertex tangents
+					for (int i = 0; i != curveCount; i++)
+					{
+						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+						for (int j = strandParticleBegin; j != strandParticleEnd - strandParticleStride; j += strandParticleStride)
+						{
+							ref var p0 = ref strandGroup.particlePosition[j];
+							ref var p1 = ref strandGroup.particlePosition[j + strandParticleStride];
+
+							vertexTangentPtr[j] = Vector3.Normalize(p1 - p0);
+						}
+
+						vertexTangentPtr[strandParticleEnd - strandParticleStride] = vertexTangentPtr[strandParticleEnd - 2 * strandParticleStride];
+					}
+
+					// write vertex UV+ID
+					for (int i = 0; i != curveCount; i++)
+					{
+						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+						for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
+						{
+							vertexUVIDPtr[j] = new Vector4(0.5f, k * (1.0f / lineSegments), i, j);// texCoord, strandIndex, particleIndex
+						}
+					}
+
+					// write index buffer
 					switch (strandGroup.particleMemoryLayout)
 					{
 						//TODO profile this again, first look indicated slower
@@ -412,7 +447,7 @@ namespace Unity.DemoTeam.Hair
 							{
 								DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
-								for (int j = 0; j != wireStrandLineCount; j++)
+								for (int j = 0; j != lineSegments; j++)
 								{
 									*(indicesPtr++) = strandParticleBegin + strandParticleStride * j;
 									*(indicesPtr++) = strandParticleBegin + strandParticleStride * (j + 1);
@@ -421,38 +456,14 @@ namespace Unity.DemoTeam.Hair
 							break;
 					}
 
-					// write tangents
-					for (int i = 0; i != curveCount; i++)
-					{
-						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+					// apply to mesh
+					strandGroup.meshAssetLines.SetVertices(strandGroup.particlePosition);
+					strandGroup.meshAssetLines.SetNormals(vertexTangent);
+					strandGroup.meshAssetLines.SetUVs(0, vertexUVID);
 
-						for (int j = strandParticleBegin; j != strandParticleEnd - strandParticleStride; j += strandParticleStride)
-						{
-							ref var p0 = ref strandGroup.particlePosition[j];
-							ref var p1 = ref strandGroup.particlePosition[j + strandParticleStride];
-
-							particleTangentPtr[j] = Vector3.Normalize(p1 - p0);
-						}
-
-						particleTangentPtr[strandParticleEnd - strandParticleStride] = particleTangentPtr[strandParticleEnd - 2 * strandParticleStride];
-					}
-
-					// write uvs
-					for (int i = 0; i != curveCount; i++)
-					{
-						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
-						{
-							particleUVPtr[j] = new Vector2(j, i);// particle index + strand index
-						}
-					}
+					strandGroup.meshAssetLines.indexFormat = (indices.Length > UInt16.MaxValue) ? IndexFormat.UInt32 : IndexFormat.UInt16;
+					strandGroup.meshAssetLines.SetIndices(indices, MeshTopology.Lines, 0);
 				}
-
-				strandGroup.meshAssetLines.SetVertices(strandGroup.particlePosition);
-				strandGroup.meshAssetLines.SetNormals(particleTangent);
-				strandGroup.meshAssetLines.SetUVs(0, particleUV);
-				strandGroup.meshAssetLines.SetIndices(indices, MeshTopology.Lines, 0);
 			}
 
 			// prep roots mesh
@@ -462,22 +473,116 @@ namespace Unity.DemoTeam.Hair
 #endif
 
 			// build roots mesh
-			using (var indices = new NativeArray<int>(curveCount, Allocator.Temp))
+			unsafe
 			{
-				unsafe
+				using (var indices = new NativeArray<int>(curveCount, Allocator.Temp))
 				{
 					var indicesPtr = (int*)indices.GetUnsafePtr();
 
-					// write index data
+					// write index buffer
 					for (int i = 0; i != curveCount; i++)
 					{
 						*(indicesPtr++) = i;
 					}
-				}
 
-				strandGroup.meshAssetRoots.SetVertices(strandGroup.rootPosition);
-				strandGroup.meshAssetRoots.SetNormals(strandGroup.rootDirection);
-				strandGroup.meshAssetRoots.SetIndices(indices, MeshTopology.Points, 0);
+					strandGroup.meshAssetRoots.indexFormat = (curveCount > 65535) ? IndexFormat.UInt32 : IndexFormat.UInt16;
+
+					// apply to mesh
+					strandGroup.meshAssetRoots.SetVertices(strandGroup.rootPosition);
+					strandGroup.meshAssetRoots.SetNormals(strandGroup.rootDirection);
+
+					strandGroup.meshAssetRoots.indexFormat = (indices.Length > UInt16.MaxValue) ? IndexFormat.UInt32 : IndexFormat.UInt16;
+					strandGroup.meshAssetRoots.SetIndices(indices, MeshTopology.Points, 0);
+				}
+			}
+
+			// prep strips mesh
+			strandGroup.meshAssetStrips = new Mesh();
+#if !VISIBLE_SUBASSETS
+			strandGroup.meshAssetStrips.hideFlags |= HideFlags.HideInHierarchy;
+#endif
+
+			// build strips mesh
+			unsafe
+			{
+				var stripVertices = 2 * curvePointCount;
+				var stripSegments = curvePointCount - 1;
+				var stripTriangles = 2 * stripSegments;
+				var stripsIndices = stripTriangles * 3;
+
+				using (var vertexPosition = new NativeArray<Vector3>(curveCount * stripVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				using (var vertexUVID = new NativeArray<Vector4>(curveCount * stripVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				using (var indices = new NativeArray<int>(curveCount * stripsIndices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				{
+					var vertexPositionPtr = (Vector3*)vertexPosition.GetUnsafePtr();
+					var vertexUVIDPtr = (Vector4*)vertexUVID.GetUnsafePtr();
+					var indicesPtr = (int*)indices.GetUnsafePtr();
+
+					// write vertex position
+					for (int i = 0; i != curveCount; i++)
+					{
+						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+						{
+							// two vertices per particle
+							*(vertexPositionPtr++) = strandGroup.particlePosition[j];// position
+							*(vertexPositionPtr++) = strandGroup.particlePosition[j];// ...
+						}
+					}
+
+					// write vertex UV+ID
+					for (int i = 0; i != curveCount; i++)
+					{
+						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandGroup.strandCount, strandGroup.strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+						for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
+						{
+							// two vertices per particle
+							*(vertexUVIDPtr++) = new Vector4(0.0f, k * (1.0f / stripSegments), i, j);// texCoord, strandIndex, particleIndex
+							*(vertexUVIDPtr++) = new Vector4(1.0f, k * (1.0f / stripSegments), i, j);// ...
+						}
+					}
+
+					// write index buffer
+					for (int i = 0, segmentBase = 0; i != curveCount; i++, segmentBase += 2)
+					{
+						for (int j = 0; j != stripSegments; j++, segmentBase += 2)
+						{
+							//  :  .   :
+							//  |,     |
+							//  4------5
+							//  |    ,´|
+							//  |  ,´  |      etc.
+							//  |,´    |    
+							//  2------3    12----13
+							//  |    ,´|    |    ,´|
+							//  |  ,´  |    |  ,´  |
+							//  |,´    |    |,´    |
+							//  0------1    10----11
+							//  .
+							//  |
+							//  '--- segmentBase
+
+							// indices for first triangle
+							*(indicesPtr++) = segmentBase + 0;
+							*(indicesPtr++) = segmentBase + 1;
+							*(indicesPtr++) = segmentBase + 3;
+
+							// indices for second triangle
+							*(indicesPtr++) = segmentBase + 0;
+							*(indicesPtr++) = segmentBase + 3;
+							*(indicesPtr++) = segmentBase + 2;
+						}
+					}
+
+					// apply to mesh
+					strandGroup.meshAssetStrips.SetVertices(vertexPosition);
+					strandGroup.meshAssetStrips.SetUVs(0, vertexUVID);
+
+					strandGroup.meshAssetStrips.indexFormat = (indices.Length > UInt16.MaxValue) ? IndexFormat.UInt32 : IndexFormat.UInt16;
+					strandGroup.meshAssetStrips.SetIndices(indices, MeshTopology.Triangles, 0);
+				}
 			}
 		}
 
@@ -1082,7 +1187,7 @@ namespace Unity.DemoTeam.Hair
 			strandParticleEnd = strandParticleBegin + strandParticleStride * strandParticleCount;
 		}
 
-		public static unsafe void Resample(Vector3* srcPos, int srcCount, Vector3* dstPos, int dstCount)
+		public static unsafe void Resample(Vector3* srcPos, int srcCount, Vector3* dstPos, int dstCount, int iterations)
 		{
 			var length = 0.0f;
 
@@ -1097,7 +1202,7 @@ namespace Unity.DemoTeam.Hair
 			ResampleWithHint(srcPos, srcCount, out var srcIndex, dstPos, dstCount, out var dstIndex, dstSpacing);
 
 			// run a couple of iterations
-			for (int i = 0; i != 2; i++)
+			for (int i = 0; i != iterations; i++)
 			{
 				if (dstIndex < dstCount || srcIndex < srcCount)
 				{

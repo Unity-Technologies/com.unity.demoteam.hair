@@ -45,6 +45,8 @@ namespace Unity.DemoTeam.Hair
 			public float _StrandMaxParticleWeight;		// group max particle weight (relative to all groups within volume)
 			public float _StrandScale;					// group scale
 
+			public float _StrandDiameter;//TODO fold under maximum + group scale scheme
+
 			public float _DT;
 			public uint _Iterations;
 			public float _Stiffness;

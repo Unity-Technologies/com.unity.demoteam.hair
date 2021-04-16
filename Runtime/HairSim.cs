@@ -21,10 +21,7 @@ namespace Unity.DemoTeam.Hair
 		static ComputeShader s_volumeCS;
 
 		static Material s_solverRootsMat;
-		static MaterialPropertyBlock s_solverRootsMPB;
-
 		static Material s_volumeRasterMat;
-		static MaterialPropertyBlock s_volumeRasterMPB;
 
 		static Mesh s_debugDrawCube;
 		static Material s_debugDrawMat;
@@ -327,13 +324,13 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Boundaries")]
 
 			[Range(0.0f, 10.0f), Tooltip("Base collision margin (in centimeters)")]
-			public float baseMargin;
+			public float collisionMargin;
 			[ToggleGroup]
-			public bool boundariesQuery;
+			public bool boundariesGather;
 			[ToggleGroupItem]
-			public GatherMode boundariesQueryMode;
+			public GatherMode boundariesGatherMode;
 			[ToggleGroupItem(withLabel = true)]
-			public LayerMask boundariesQueryLayers;
+			public LayerMask boundariesGatherLayers;
 			[NonReorderable]
 			public HairBoundary[] boundariesResident;
 
@@ -352,10 +349,10 @@ namespace Unity.DemoTeam.Hair
 				targetDensity = TargetDensity.Uniform,
 				targetDensityInfluence = 1.0f,
 
-				baseMargin = 1.0f,
-				boundariesQuery = true,
-				boundariesQueryMode = GatherMode.IncludeColliders,
-				boundariesQueryLayers = Physics.AllLayers,
+				collisionMargin = 0.25f,
+				boundariesGather = true,
+				boundariesGatherMode = GatherMode.IncludeColliders,
+				boundariesGatherLayers = Physics.AllLayers,
 				boundariesResident = new HairBoundary[0],
 			};
 		}
@@ -434,11 +431,9 @@ namespace Unity.DemoTeam.Hair
 
 					s_solverRootsMat = new Material(resources.computeRoots);
 					s_solverRootsMat.hideFlags = HideFlags.HideAndDontSave;
-					s_solverRootsMPB = new MaterialPropertyBlock();
 
 					s_volumeRasterMat = new Material(resources.computeVolumeRaster);
 					s_volumeRasterMat.hideFlags = HideFlags.HideAndDontSave;
-					s_volumeRasterMPB = new MaterialPropertyBlock();
 
 					s_debugDrawCube = resources.debugDrawCube;
 					s_debugDrawMat = new Material(resources.debugDraw);
@@ -588,7 +583,7 @@ namespace Unity.DemoTeam.Hair
 			volumeData = new VolumeData();
 		}
 
-		public static void UpdateSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, in Quaternion strandRotation, float strandScale, float dt)
+		public static void UpdateSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, in Quaternion strandRotation, float strandDiameter, float strandScale, float dt)
 		{
 			float IntervalToSeconds(SolverSettings.TimeInterval interval)
 			{
@@ -612,6 +607,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._WorldRotation = new Vector4(strandRotation.x, strandRotation.y, strandRotation.z, strandRotation.w);
 
 			cbuffer._StrandScale = strandScale;
+			cbuffer._StrandDiameter = strandDiameter * 0.001f;
 
 			// update solver parameters
 			cbuffer._DT = dt;
@@ -665,12 +661,12 @@ namespace Unity.DemoTeam.Hair
 
 		public static void UpdateSolverRoots(CommandBuffer cmd, in SolverData solverData, Mesh rootMesh)
 		{
-			PushSolverData(cmd, s_solverRootsMat, s_solverRootsMPB, solverData);
+			PushSolverData(cmd, solverData);
 
 			cmd.SetRandomWriteTarget(1, solverData.rootPosition);
 			cmd.SetRandomWriteTarget(2, solverData.rootDirection);
 			cmd.SetRandomWriteTarget(3, solverData.rootFrame);
-			cmd.DrawMesh(rootMesh, Matrix4x4.identity, s_solverRootsMat, 0, 0, s_solverRootsMPB);
+			cmd.DrawMesh(rootMesh, Matrix4x4.identity, s_solverRootsMat);
 			cmd.ClearRandomWriteTargets();
 		}
 
@@ -701,7 +697,7 @@ namespace Unity.DemoTeam.Hair
 					var ptrMatrixW2PrevW = (Matrix4x4*)bufMatrixW2PrevW.GetUnsafePtr();
 
 					// gather boundaries
-					var boundaryList = HairBoundaryUtility.Gather(volumeSettings.boundariesResident, volumeSort: false, volumeSettings.boundariesQuery, volumeBounds, Quaternion.identity, volumeSettings.boundariesQueryMode == VolumeSettings.GatherMode.IncludeColliders);
+					var boundaryList = HairBoundaryUtility.Gather(volumeSettings.boundariesResident, volumeSort: false, volumeSettings.boundariesGather, volumeBounds, Quaternion.identity, volumeSettings.boundariesGatherMode == VolumeSettings.GatherMode.IncludeColliders);
 					var boundaryCount = 0;
 					var boundarySDFIndex = -1;
 					var boundarySDFCellSize = 0.0f;
@@ -746,7 +742,7 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					cbuffer._BoundaryWorldEpsilon = (boundarySDFIndex != -1) ? boundarySDFCellSize * 0.2f : 1e-4f;
-					cbuffer._BoundaryWorldMargin = volumeSettings.baseMargin * 0.01f;
+					cbuffer._BoundaryWorldMargin = volumeSettings.collisionMargin * 0.01f;
 
 					// pack boundaries
 					int writeIndexDiscrete = 0;
@@ -884,72 +880,74 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData) => PushSolverData(cmd, new PushTargetCompute(cs, kernel), solverData);
-		public static void PushSolverData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in SolverData solverData) => PushSolverData(cmd, new PushTargetMaterial(mat, mpb), solverData);
-		public static void PushSolverData<T>(CommandBuffer cmd, T target, in SolverData solverData) where T : IPushTarget
+		public static void PushSolverData(Material mat, in SolverData solverData) => PushSolverData(new PushTargetMaterial(mat), solverData);
+		public static void PushSolverData(CommandBuffer cmd, in SolverData solverData) => PushSolverData(new PushTargetGlobalCmd(cmd), solverData); 
+		public static void PushSolverData(CommandBuffer cmd, ComputeShader cs, int kernel, in SolverData solverData) => PushSolverData(new PushTargetComputeCmd(cmd, cs, kernel), solverData);
+		public static void PushSolverData<T>(T target, in SolverData solverData) where T : IPushTarget
 		{
-			target.PushConstantBuffer(cmd, UniformIDs.SolverCBuffer, solverData.cbufferStorage);
+			target.PushConstantBuffer(UniformIDs.SolverCBuffer, solverData.cbufferStorage);
 
-			target.PushKeyword(cmd, "LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
-			target.PushKeyword(cmd, "ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
-			target.PushKeyword(cmd, "ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
-			target.PushKeyword(cmd, "ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
-			target.PushKeyword(cmd, "ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
-			target.PushKeyword(cmd, "ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
-			target.PushKeyword(cmd, "ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
-			target.PushKeyword(cmd, "ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
-			target.PushKeyword(cmd, "ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			target.PushKeyword(cmd, "ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
-			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
-			target.PushKeyword(cmd, "ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
+			target.PushKeyword("LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
+			target.PushKeyword("ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
+			target.PushKeyword("ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
+			target.PushKeyword("ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
+			target.PushKeyword("ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
+			target.PushKeyword("ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
+			target.PushKeyword("ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
+			target.PushKeyword("ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
+			target.PushKeyword("ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
+			target.PushKeyword("ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
+			target.PushKeyword("ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
+			target.PushKeyword("ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
 
-			target.PushComputeBuffer(cmd, UniformIDs._RootScale, solverData.rootScale);
-			target.PushComputeBuffer(cmd, UniformIDs._RootPosition, solverData.rootPosition);
-			target.PushComputeBuffer(cmd, UniformIDs._RootDirection, solverData.rootDirection);
-			target.PushComputeBuffer(cmd, UniformIDs._RootFrame, solverData.rootFrame);
+			target.PushComputeBuffer(UniformIDs._RootScale, solverData.rootScale);
+			target.PushComputeBuffer(UniformIDs._RootPosition, solverData.rootPosition);
+			target.PushComputeBuffer(UniformIDs._RootDirection, solverData.rootDirection);
+			target.PushComputeBuffer(UniformIDs._RootFrame, solverData.rootFrame);
 
-			target.PushComputeBuffer(cmd, UniformIDs._InitialRootFrame, solverData.initialRootFrame);
-			target.PushComputeBuffer(cmd, UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
-			target.PushComputeBuffer(cmd, UniformIDs._InitialParticleFrameDelta, solverData.initialParticleFrameDelta);
+			target.PushComputeBuffer(UniformIDs._InitialRootFrame, solverData.initialRootFrame);
+			target.PushComputeBuffer(UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
+			target.PushComputeBuffer(UniformIDs._InitialParticleFrameDelta, solverData.initialParticleFrameDelta);
 
-			target.PushComputeBuffer(cmd, UniformIDs._ParticlePosition, solverData.particlePosition);
-			target.PushComputeBuffer(cmd, UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
-			target.PushComputeBuffer(cmd, UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
-			target.PushComputeBuffer(cmd, UniformIDs._ParticleVelocity, solverData.particleVelocity);
-			target.PushComputeBuffer(cmd, UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+			target.PushComputeBuffer(UniformIDs._ParticlePosition, solverData.particlePosition);
+			target.PushComputeBuffer(UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
+			target.PushComputeBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
+			target.PushComputeBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
+			target.PushComputeBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
 		}
 
-		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData) => PushVolumeData(cmd, new PushTargetCompute(cs, kernel), volumeData);
-		public static void PushVolumeData(CommandBuffer cmd, Material mat, MaterialPropertyBlock mpb, in VolumeData volumeData) => PushVolumeData(cmd, new PushTargetMaterial(mat, mpb), volumeData);
-		public static void PushVolumeData<T>(CommandBuffer cmd, T target, in VolumeData volumeData) where T : IPushTarget
+		public static void PushVolumeData(Material mat, in VolumeData volumeData) => PushVolumeData(new PushTargetMaterial(mat), volumeData);
+		public static void PushVolumeData(CommandBuffer cmd, VolumeData volumeData) => PushVolumeData(new PushTargetGlobalCmd(cmd), volumeData);
+		public static void PushVolumeData(CommandBuffer cmd, ComputeShader cs, int kernel, in VolumeData volumeData) => PushVolumeData(new PushTargetComputeCmd(cmd, cs, kernel), volumeData);
+		public static void PushVolumeData<T>(T target, in VolumeData volumeData) where T : IPushTarget
 		{
-			target.PushConstantBuffer(cmd, UniformIDs.VolumeCBuffer, volumeData.cbufferStorage);
+			target.PushConstantBuffer(UniformIDs.VolumeCBuffer, volumeData.cbufferStorage);
 
-			target.PushKeyword(cmd, "VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
-			target.PushKeyword(cmd, "VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
-			target.PushKeyword(cmd, "VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
+			target.PushKeyword("VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
+			target.PushKeyword("VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
+			target.PushKeyword("VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 
-			target.PushComputeTexture(cmd, UniformIDs._AccuWeight, volumeData.accuWeight);
-			target.PushComputeTexture(cmd, UniformIDs._AccuWeight0, volumeData.accuWeight0);
-			target.PushComputeTexture(cmd, UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
-			target.PushComputeTexture(cmd, UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
-			target.PushComputeTexture(cmd, UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
+			target.PushComputeTexture(UniformIDs._AccuWeight, volumeData.accuWeight);
+			target.PushComputeTexture(UniformIDs._AccuWeight0, volumeData.accuWeight0);
+			target.PushComputeTexture(UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
+			target.PushComputeTexture(UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
+			target.PushComputeTexture(UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
 
-			target.PushComputeTexture(cmd, UniformIDs._VolumeDensity, volumeData.volumeDensity);
-			target.PushComputeTexture(cmd, UniformIDs._VolumeDensity0, volumeData.volumeDensity0);
-			target.PushComputeTexture(cmd, UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
-			target.PushComputeTexture(cmd, UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
+			target.PushComputeTexture(UniformIDs._VolumeDensity, volumeData.volumeDensity);
+			target.PushComputeTexture(UniformIDs._VolumeDensity0, volumeData.volumeDensity0);
+			target.PushComputeTexture(UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
+			target.PushComputeTexture(UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
 
-			target.PushComputeTexture(cmd, UniformIDs._VolumePressure, volumeData.volumePressure);
-			target.PushComputeTexture(cmd, UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
-			target.PushComputeTexture(cmd, UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
+			target.PushComputeTexture(UniformIDs._VolumePressure, volumeData.volumePressure);
+			target.PushComputeTexture(UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
+			target.PushComputeTexture(UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
 
-			target.PushComputeTexture(cmd, UniformIDs._BoundarySDF, (volumeData.boundarySDF != null) ? volumeData.boundarySDF : volumeData.boundarySDFDummy);
+			target.PushComputeTexture(UniformIDs._BoundarySDF, (volumeData.boundarySDF != null) ? volumeData.boundarySDF : volumeData.boundarySDFDummy);
 
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryShape, volumeData.boundaryShape);
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
-			target.PushComputeBuffer(cmd, UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
+			target.PushComputeBuffer(UniformIDs._BoundaryShape, volumeData.boundaryShape);
+			target.PushComputeBuffer(UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
+			target.PushComputeBuffer(UniformIDs._BoundaryMatrixInv, volumeData.boundaryMatrixInv);
+			target.PushComputeBuffer(UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
 		}
 
 		public static void InitSolverParticles(CommandBuffer cmd, in SolverData solverData)
@@ -1108,9 +1106,9 @@ namespace Unity.DemoTeam.Hair
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_Rasterization))
 							{
 								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
-								PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
-								PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
-								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, particleCount, 1, s_volumeRasterMPB);
+								PushVolumeData(cmd, volumeData);
+								PushSolverData(cmd, solverData);
+								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, particleCount, 1);
 							}
 						}
 						break;
@@ -1120,9 +1118,9 @@ namespace Unity.DemoTeam.Hair
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_RasterizationNoGS))
 							{
 								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
-								PushVolumeData(cmd, s_volumeRasterMat, s_volumeRasterMPB, volumeData);
-								PushSolverData(cmd, s_volumeRasterMat, s_volumeRasterMPB, solverData);
-								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, particleCount * 8, 1, s_volumeRasterMPB);
+								PushVolumeData(cmd, volumeData);
+								PushSolverData(cmd, solverData);
+								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, particleCount * 8, 1);
 							}
 						}
 						break;
@@ -1198,7 +1196,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void DrawSolverData(CommandBuffer cmd, RTHandle color, RTHandle depth, in SolverData solverData, in DebugSettings debugSettings)
+		public static void DrawSolverData(CommandBuffer cmd, in SolverData solverData, in DebugSettings debugSettings)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawSolverData))
 			{
@@ -1206,25 +1204,23 @@ namespace Unity.DemoTeam.Hair
 					!debugSettings.drawStrandParticles)
 					return;
 
-				PushSolverData(cmd, s_debugDrawMat, s_debugDrawMPB, solverData);
-
-				CoreUtils.SetRenderTarget(cmd, color, depth);
+				PushSolverData(cmd, solverData);
 
 				// strand roots
 				if (debugSettings.drawStrandRoots)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Lines, 2, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Lines, 2, (int)solverData.cbuffer._StrandCount);
 				}
 
 				// strand particles
 				if (debugSettings.drawStrandParticles)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
 				}
 			}
 		}
 
-		public static void DrawVolumeData(CommandBuffer cmd, RTHandle color, RTHandle depth, in VolumeData volumeData, in DebugSettings debugSettings)
+		public static void DrawVolumeData(CommandBuffer cmd, in VolumeData volumeData, in DebugSettings debugSettings)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawVolumeData))
 			{
@@ -1236,20 +1232,18 @@ namespace Unity.DemoTeam.Hair
 					!debugSettings.drawIsosurface)
 					return;
 
-				CoreUtils.SetRenderTarget(cmd, color, depth);
-
-				PushVolumeData(cmd, s_debugDrawMat, s_debugDrawMPB, volumeData);
+				PushVolumeData(cmd, volumeData);
 
 				// cell density
 				if (debugSettings.drawCellDensity)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 2, MeshTopology.Points, GetCellCount(volumeData), 1, s_debugDrawMPB);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 2, MeshTopology.Points, GetVolumeCellCount(volumeData), 1);
 				}
 
 				// cell gradient
 				if (debugSettings.drawCellGradient)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Lines, 2 * GetCellCount(volumeData), 1, s_debugDrawMPB);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Lines, 2 * GetVolumeCellCount(volumeData), 1);
 				}
 
 				// volume slices
@@ -1323,7 +1317,7 @@ namespace Unity.DemoTeam.Hair
 			return cellSize.x * cellSize.y * cellSize.z;
 		}
 
-		public static int GetCellCount(in VolumeData volumeData)
+		public static int GetVolumeCellCount(in VolumeData volumeData)
 		{
 			var nx = (int)volumeData.cbuffer._VolumeCells.x;
 			var ny = (int)volumeData.cbuffer._VolumeCells.y;

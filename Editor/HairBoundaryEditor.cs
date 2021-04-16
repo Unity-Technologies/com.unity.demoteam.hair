@@ -95,7 +95,7 @@ namespace Unity.DemoTeam.Hair
 
 					if (HairBoundary.TryGetMatchingComponent(hairBoundary, out var component))
 					{
-						using (new ColorScope(Color.white, ColorScope.Type.ContentColor))
+						using (new ColorScope(Color.white))
 						using (new ColorScope(Color.green, ColorScope.Type.BackgroundColor))
 						{
 							GUILayout.Box("Bound to component: " + component.GetType().Name, GUILayout.ExpandWidth(true));
