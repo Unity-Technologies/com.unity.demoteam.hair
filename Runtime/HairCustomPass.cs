@@ -48,7 +48,7 @@ namespace Unity.DemoTeam.Hair
 						foreach (var hairInstance in HairInstance.s_instances)
 						{
 							if (hairInstance != null && hairInstance.isActiveAndEnabled)
-								hairInstance.DispatchTime(context.cmd, dt);
+								hairInstance.DispatchStepAccumulated(context.cmd, dt);
 						}
 
 						lastSimulationTime = time;

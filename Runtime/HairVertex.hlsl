@@ -4,6 +4,10 @@
 #include "HairSimData.hlsl"
 #include "HairSimDebugDrawUtility.hlsl"
 
+#ifndef HAIR_VERTEX_DYNAMIC
+#define HAIR_VERTEX_DYNAMIC 0
+#endif
+
 #if LAYOUT_INTERLEAVED
   #define DECLARE_STRAND(x)							\
 	const uint strandIndex = x;						\
@@ -27,25 +31,30 @@ struct HairVertex
 	float4 uv;
 };
 
-HairVertex HairVertex_Dynamic(float4 uvID)
+HairVertex GetHairVertex(in float3 staticPos, in float3 staticDir, in float4 uvID)
 {
 	DECLARE_STRAND(uvID.z);
 	const uint i = uvID.w;
 
+#if HAIR_VERTEX_DYNAMIC
 	float3 p = _ParticlePosition[i].xyz;
-	float3 r_prev = (i == strandParticleBegin) ? normalize(_RootDirection[strandIndex].xyz)	: normalize(p - _ParticlePosition[i - strandParticleStride].xyz);
+	float3 r_prev = (i == strandParticleBegin) ? normalize(_RootDirection[strandIndex].xyz) : normalize(p - _ParticlePosition[i - strandParticleStride].xyz);
 	float3 r_next = (i == strandParticleEnd - strandParticleStride) ? r_prev : normalize(_ParticlePosition[i + strandParticleStride].xyz - p);
 
+	//TODO
+	//float3 motion = GetCameraRelativePositionWS(p - _ParticlePositionPrev[i].xyz);
 	float3 position = GetCameraRelativePositionWS(p);
-	float3 motion = GetCameraRelativePositionWS(p - _ParticlePositionPrev[i].xyz);
-
 	float3 bitangent = normalize(r_prev + r_next);
+#else
+	float3 position = GetCameraRelativePositionWS(staticPos);
+	float3 bitangent = staticDir;
+#endif
 	float3 tangent = normalize(cross(bitangent, GetWorldSpaceNormalizeViewDir(position)));
 	float3 normal = cross(tangent, bitangent);
 
 	HairVertex v;
 	{
-#if 1 || HAIR_DYNAMIC_STRIP//TODO
+#if HAIR_VERTEX_DYNAMIC
 		v.position = TransformWorldToObject(position + tangent * (_StrandDiameter * _StrandScale) * (uvID.x - 0.5));
 #else
 		v.position = TransformWorldToObject(position);
@@ -59,9 +68,19 @@ HairVertex HairVertex_Dynamic(float4 uvID)
 	return v;
 }
 
-void HairVertex_float(in float4 in_uvID, out float3 out_position, out float3 out_normal, out float3 out_tangent, out float3 out_bitangent, out float4 out_uv, out float3 out_tsCylinder, out float3 out_debugColor)
+void HairVertex_float(
+	in float3 in_staticPos,
+	in float3 in_staticDir,
+	in float4 in_uvID,
+	out float3 out_position,
+	out float3 out_normal,
+	out float3 out_tangent,
+	out float3 out_bitangent,
+	out float4 out_uv,
+	out float3 out_tsCylinder,
+	out float3 out_debugColor)
 {
-	HairVertex v = HairVertex_Dynamic(in_uvID);
+	HairVertex v = GetHairVertex(in_staticPos, in_staticDir, in_uvID);
 	{
 		out_position = v.position;
 		out_normal = v.normal;

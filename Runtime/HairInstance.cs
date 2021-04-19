@@ -420,7 +420,7 @@ namespace Unity.DemoTeam.Hair
 			return mat;
 		}
 
-		public void DispatchTime(CommandBuffer cmd, float dt)
+		public void DispatchStepAccumulated(CommandBuffer cmd, float dt)
 		{
 			var active = GetSimulationActive();
 			var stepDT = GetSimulationTimeStep();
@@ -552,7 +552,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				HairSim.PushSolverData(lineRenderer.sharedMaterial, solverData);
 
-				lineRenderer.sharedMaterial.EnableKeyword("HAIRSIMVERTEX_ENABLE_POSITION");
+				lineRenderer.sharedMaterial.EnableKeyword("HAIR_VERTEX_DYNAMIC");
 			}
 
 			lineRenderer.enabled = false;//TODO either get rid of the renderer or swap meshes on there
@@ -581,7 +581,7 @@ namespace Unity.DemoTeam.Hair
 						var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
 						var prefabContents = UnityEditor.PrefabUtility.LoadPrefabContents(prefabPath);
 
-						Debug.LogWarning("... rebuilding underlying prefab");
+						Debug.LogWarningFormat(this, "{0} rebuilding underlying prefab", this.name);
 
 						UnityEditor.PrefabUtility.SaveAsPrefabAsset(prefabContents, prefabPath);
 						UnityEditor.PrefabUtility.UnloadPrefabContents(prefabContents);
