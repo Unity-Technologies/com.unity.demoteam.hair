@@ -840,6 +840,18 @@ namespace Unity.DemoTeam.Hair
 #endif
 				}
 			}
+
+			// update cbuffer
+			var cbufferStaging = new NativeArray<VolumeCBuffer>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+			{
+				cbufferStaging[0] = cbuffer;
+#if UNITY_2021_1_OR_NEWER
+				cmd.SetBufferData(volumeData.cbufferStorage, cbufferStaging);
+#else
+				cmd.SetComputeBufferData(volumeData.cbufferStorage, cbufferStaging);
+#endif
+				cbufferStaging.Dispose();
+			}
 		}
 
 		public static void UpdateVolumeData(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds, float strandDiameter, float strandScale)
