@@ -25,6 +25,7 @@ namespace Unity.DemoTeam.Attributes
 			SmoothIncreasing,
 		}
 
+#if UNITY_EDITOR
 		public static Vector2 Ramp(Rect position, Vector2 value, Vector2 limit, RampStyle style = RampStyle.LinearDecreasing)
 		{
 			GUI.Box(position, GUIContent.none);
@@ -142,6 +143,7 @@ namespace Unity.DemoTeam.Attributes
 			// done
 			return value;
 		}
+#endif
 	}
 
 	public class RampAttribute : PropertyAttribute
