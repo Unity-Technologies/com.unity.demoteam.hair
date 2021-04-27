@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -16,8 +17,8 @@ namespace Unity.DemoTeam.Hair
 		Vector2 previewAngle;
 		float previewZoom;
 
-		ComputeBuffer[] previewBuffers;
-		string previewBuffersChecksum;
+		HairSim.SolverData[] previewData;
+		string previewDataChecksum;
 
 		SerializedProperty _settingsBasic;
 		SerializedProperty _settingsBasic_type;
@@ -45,7 +46,7 @@ namespace Unity.DemoTeam.Hair
 
 			previewRenderer.lights[0].transform.SetParent(previewRenderer.camera.transform, worldPositionStays: false);
 			previewRenderer.lights[0].transform.localPosition = Vector3.up;
-			previewRenderer.lights[0].intensity = 1.5f;
+			previewRenderer.lights[0].intensity = 1.0f;
 
 			for (int i = 1; i != previewRenderer.lights.Length; i++)
 			{
@@ -64,7 +65,7 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDisable()
 		{
-			ReleasePreviewBuffers();
+			ReleasePreviewData();
 
 			if (previewRenderer != null)
 			{
@@ -213,9 +214,9 @@ namespace Unity.DemoTeam.Hair
 					numParticles += hairAsset.strandGroups[i].strandCount * hairAsset.strandGroups[i].strandParticleCount;
 				}
 
-				if (previewBuffersChecksum != hairAsset.checksum)
+				if (previewDataChecksum != hairAsset.checksum)
 				{
-					InitializePreviewBuffers(hairAsset);
+					InitializePreviewData(hairAsset);
 				}
 
 				EditorGUILayout.LabelField("Summary", EditorStyles.miniBoldLabel);
@@ -280,24 +281,18 @@ namespace Unity.DemoTeam.Hair
 								if (sourceMaterial == null)
 									sourceMaterial = hairAsset.defaultMaterial;
 
-								if (previewMaterial.shader != sourceMaterial.shader)
-									previewMaterial.shader = sourceMaterial.shader;
+								if (sourceMaterial != null)
+								{
+									if (previewMaterial.shader != sourceMaterial.shader)
+										previewMaterial.shader = sourceMaterial.shader;
 
-								previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
+									previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
+								}
 
-								previewMaterial.SetBuffer("_ParticlePosition", previewBuffers[i]);
-								previewMaterial.SetInt("_StrandCount", hairAsset.strandGroups[i].strandCount);
-								previewMaterial.SetInt("_StrandParticleCount", hairAsset.strandGroups[i].strandParticleCount);
-								previewMaterial.SetFloat("_StrandDiameter", 0.01f);
-								previewMaterial.SetFloat("_StrandScale", 1.0f);
+								HairSim.PushSolverData(previewMaterial, previewData[i]);
 
-								if (hairAsset.strandGroups[i].particleMemoryLayout == HairAsset.MemoryLayout.Interleaved)
-									previewMaterial.EnableKeyword("LAYOUT_INTERLEAVED");
-								else
-									previewMaterial.DisableKeyword("LAYOUT_INTERLEAVED");
-
-								previewMaterial.EnableKeyword("HAIR_VERTEX_DYNAMIC");
-								previewMaterial.EnableKeyword("HAIR_VERTEX_PREVIEW");
+								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_LIVE", true);
+								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_LIVE_STRIPS", false);
 
 								previewRenderer.BeginPreview(rect, GUIStyle.none);
 								previewRenderer.DrawMesh(meshLines, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
@@ -325,53 +320,68 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void ReleasePreviewBuffers()
+		void ReleasePreviewData()
 		{
-			if (previewBuffers != null)
+			if (previewData != null)
 			{
-				for (int i = 0; i != previewBuffers.Length; i++)
+				for (int i = 0; i != previewData.Length; i++)
 				{
-					if (previewBuffers[i] != null)
-						previewBuffers[i].Release();
+					HairSim.ReleaseSolverData(ref previewData[i]);
 				}
 			}
 
-			previewBuffers = null;
-			previewBuffersChecksum = string.Empty;
+			previewData = null;
+			previewDataChecksum = string.Empty;
 		}
 
-		void InitializePreviewBuffers(HairAsset hairAsset)
+		void InitializePreviewData(HairAsset hairAsset)
 		{
-			ReleasePreviewBuffers();
+			ReleasePreviewData();
 
-			if (hairAsset == null || hairAsset.strandGroups == null)
+			if (hairAsset == null)
+				return;
+
+			var strandGroups = hairAsset.strandGroups;
+			if (strandGroups == null)
 				return;
 
 			unsafe
 			{
-				previewBuffers = new ComputeBuffer[hairAsset.strandGroups.Length];
+				previewData = new HairSim.SolverData[strandGroups.Length];
 
-				for (int i = 0; i != previewBuffers.Length; i++)
+				for (int i = 0; i != previewData.Length; i++)
 				{
-					ref var assetData = ref hairAsset.strandGroups[i].particlePosition;
+					ref var strandGroup = ref strandGroups[i];
 
-					using (var previewData = new NativeArray<Vector4>(assetData.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+					HairSim.PrepareSolverData(ref previewData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
 					{
-						unsafe
-						{
-							fixed (void* sourcePtr = assetData)
-							{
-								UnsafeUtility.MemCpyStride(previewData.GetUnsafePtr(), sizeof(Vector4), sourcePtr, sizeof(Vector3), sizeof(Vector3), assetData.Length);
-							}
-						}
+						previewData[i].memoryLayout = strandGroup.particleMemoryLayout;
+						previewData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
+						previewData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
+					}
 
-						previewBuffers[i] = new ComputeBuffer(assetData.Length, sizeof(Vector4), ComputeBufferType.Default);
-						previewBuffers[i].name = "PreviewBuffer:" + i;
-						previewBuffers[i].SetData(previewData);
+					using (var stagingData = new NativeArray<Vector4>(strandGroup.particlePosition.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+					{
+						fixed (void* sourcePtr = strandGroup.particlePosition)
+						{
+							UnsafeUtility.MemCpyStride(stagingData.GetUnsafePtr(), sizeof(Vector4), sourcePtr, sizeof(Vector3), sizeof(Vector3), stagingData.Length);
+						}
+						previewData[i].particlePosition.SetData(stagingData);
 					}
 				}
 
-				previewBuffersChecksum = hairAsset.checksum;
+				var cmd = CommandBufferPool.Get();
+				{
+					for (int i = 0; i != previewData.Length; i++)
+					{
+						HairSim.UpdateSolverData(cmd, ref previewData[i], HairSim.SolverSettings.defaults, Matrix4x4.identity, Quaternion.identity, 1.0f, 1.0f, 1.0f);
+					}
+
+					Graphics.ExecuteCommandBuffer(cmd);
+				}
+				CommandBufferPool.Release(cmd);
+
+				previewDataChecksum = hairAsset.checksum;
 			}
 		}
 

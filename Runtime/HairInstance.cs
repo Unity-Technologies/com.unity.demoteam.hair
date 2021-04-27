@@ -60,13 +60,6 @@ namespace Unity.DemoTeam.Hair
 #endif
 			}
 
-			//public enum Simulation
-			//{
-			//	Disabled,
-			//	Enabled,
-			//	EnabledInPlaymode,
-			//}
-
 			public enum SimulationRate
 			{
 				Fixed30Hz,
@@ -99,8 +92,6 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Dynamics")]
 
-			//[Tooltip("Simulation state")]
-			//public Simulation simulation;
 			[ToggleGroup, Tooltip("Enable simulation")]
 			public bool simulation;
 			[ToggleGroupItem, Tooltip("Simulation update rate")]
@@ -285,7 +276,12 @@ namespace Unity.DemoTeam.Hair
 					if (hairAsset.checksum != strandGroupInstancesChecksum)
 					{
 						var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+
+#if UNITY_2021_2_OR_NEWER
+						var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+#else
 						var prefabStage = UnityEditor.Experimental.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+#endif
 						if (prefabStage != null && prefabStage.assetPath == prefabPath)
 							return;// do nothing if prefab is already open
 
@@ -306,6 +302,11 @@ namespace Unity.DemoTeam.Hair
 						ReleaseRuntimeData();
 					}
 				}
+				else
+				{
+					ReleaseRuntimeData();
+				}
+
 				return;
 			}
 #endif
@@ -314,7 +315,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (hairAsset.checksum != strandGroupInstancesChecksum)
 				{
-					HairInstanceBuilder.BuildHairInstance(this, hairAsset);
+					HairInstanceBuilder.BuildHairInstance(this, hairAsset, HideFlags.NotEditable);
 					ReleaseRuntimeData();
 				}
 			}
@@ -325,12 +326,10 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void UpdateStrandGroupHideFlags()
+		void UpdateStrandGroupHideFlags(HideFlags hideFlags = HideFlags.NotEditable)
 		{
 			if (strandGroupInstances == null)
 				return;
-
-			var hideFlags = HideFlags.NotEditable;
 
 			foreach (var strandGroupInstance in strandGroupInstances)
 			{
@@ -471,8 +470,8 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.PushSolverData(materialInstance, solverData);
 
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_DYNAMIC", true);
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_STRIPS", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinStrips);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_LIVE", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinLines);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_LIVE_STRIPS", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinStrips);
 			}
 			else
 			{
@@ -717,13 +716,13 @@ namespace Unity.DemoTeam.Hair
 				ref var strandGroup = ref strandGroups[i];
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
-
-				solverData[i].memoryLayout = strandGroup.particleMemoryLayout;
-
-				solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
-				solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
-				solverData[i].cbuffer._StrandMaxParticleInterval = strandGroup.maxParticleInterval;
-				solverData[i].cbuffer._StrandMaxParticleWeight = strandGroup.maxParticleInterval / volumeData.allGroupsMaxParticleInterval;
+				{
+					solverData[i].memoryLayout = strandGroup.particleMemoryLayout;
+					solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
+					solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
+					solverData[i].cbuffer._StrandMaxParticleInterval = strandGroup.maxParticleInterval;
+					solverData[i].cbuffer._StrandMaxParticleWeight = strandGroup.maxParticleInterval / volumeData.allGroupsMaxParticleInterval;
+				}
 
 				int strandGroupParticleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 
@@ -838,7 +837,7 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
-		public static void BuildHairInstance(HairInstance hairInstance, HairAsset hairAsset)
+		public static void BuildHairInstance(HairInstance hairInstance, HairAsset hairAsset, HideFlags hideFlags = HideFlags.NotEditable)
 		{
 			ClearHairInstance(hairInstance);
 
@@ -848,18 +847,15 @@ namespace Unity.DemoTeam.Hair
 
 			// prep strand group instances
 			hairInstance.strandGroupInstances = new HairInstance.StrandGroupInstance[strandGroups.Length];
-			hairInstance.strandGroupInstancesChecksum = hairAsset.checksum;
 
 			// build strand group instances
-			var hideFlags = HideFlags.NotEditable;
-
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
 				ref var strandGroupInstance = ref hairInstance.strandGroupInstances[i];
 
 				strandGroupInstance.container = CreateContainer("Group:" + i, hairInstance.gameObject, hideFlags);
 
-				// scene objects for roots
+				// create scene objects for roots
 				strandGroupInstance.rootContainer = CreateContainer("Roots:" + i, strandGroupInstance.container, hideFlags);
 				{
 					strandGroupInstance.rootFilter = CreateComponent<MeshFilter>(strandGroupInstance.rootContainer, hideFlags);
@@ -872,13 +868,15 @@ namespace Unity.DemoTeam.Hair
 #endif
 				}
 
-				// scene objects for strands
+				// create scene objects for strands
 				strandGroupInstance.strandContainer = CreateContainer("Strands:" + i, strandGroupInstance.container, hideFlags);
 				{
 					strandGroupInstance.strandFilter = CreateComponent<MeshFilter>(strandGroupInstance.strandContainer, hideFlags);
 					strandGroupInstance.strandRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.strandContainer, hideFlags);
 				}
 			}
+
+			hairInstance.strandGroupInstancesChecksum = hairAsset.checksum;
 
 #if UNITY_EDITOR
 			UnityEditor.EditorUtility.SetDirty(hairInstance);

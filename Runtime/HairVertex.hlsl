@@ -3,28 +3,15 @@
 
 #pragma editor_sync_compilation
 
-#ifndef HAIR_VERTEX_DYNAMIC
-#define HAIR_VERTEX_DYNAMIC 0
-#endif
-
-#ifndef HAIR_VERTEX_STRIPS
-#define HAIR_VERTEX_STRIPS 0
-#endif
-
-#ifndef HAIR_VERTEX_PREVIEW
-#define HAIR_VERTEX_PREVIEW 0
-#endif
-
-#if HAIR_VERTEX_PREVIEW
-	StructuredBuffer<float4> _ParticlePosition;
-	uint _StrandCount;
-	uint _StrandParticleCount;
-	float _StrandDiameter;
-	float _StrandScale;
-#else
-	#include "HairSimData.hlsl"
-#endif
+#include "HairSimData.hlsl"
 #include "HairSimDebugDrawUtility.hlsl"
+
+#ifndef HAIR_VERTEX_LIVE
+#define HAIR_VERTEX_LIVE 0
+#endif
+#ifndef HAIR_VERTEX_LIVE_STRIPS
+#define HAIR_VERTEX_LIVE_STRIPS 0
+#endif
 
 #if LAYOUT_INTERLEAVED
   #define DECLARE_STRAND(x)							\
@@ -52,9 +39,9 @@ struct HairVertex
 	float3 debugColor;
 };
 
-HairVertex GetHairVertex_Dynamic(in uint particleID, in float2 particleUV)
+HairVertex GetHairVertex_Live(in uint particleID, in float2 particleUV)
 {
-#if HAIR_VERTEX_STRIPS
+#if HAIR_VERTEX_LIVE_STRIPS
 	uint linearParticleIndex = particleID >> 1;
 #else
 	uint linearParticleIndex = particleID;
@@ -85,7 +72,7 @@ HairVertex GetHairVertex_Dynamic(in uint particleID, in float2 particleUV)
 
 	HairVertex v;
 	{
-#if HAIR_VERTEX_STRIPS
+#if HAIR_VERTEX_LIVE_STRIPS
 		v.positionOS = TransformWorldToObject(positionWS + tangentWS * (_StrandDiameter * _StrandScale * (particleUV.x - 0.5)));
 #else
 		v.positionOS = TransformWorldToObject(positionWS);
@@ -137,8 +124,8 @@ void HairVertex_float(
 	out float3 out_strandNormalTS,
 	out float3 out_debugColor)
 {
-#if HAIR_VERTEX_DYNAMIC
-	HairVertex v = GetHairVertex_Dynamic(in_particleID, in_particleUV);
+#if (HAIR_VERTEX_LIVE || HAIR_VERTEX_LIVE_STRIPS)
+	HairVertex v = GetHairVertex_Live(in_particleID, in_particleUV);
 #else
 	HairVertex v = GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 #endif

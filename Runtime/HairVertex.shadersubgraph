@@ -8,13 +8,7 @@
             "m_Id": "a8df33b2efa54718a41220d363de0787"
         },
         {
-            "m_Id": "ce0b111acb9746e0afeadebf939c5321"
-        },
-        {
-            "m_Id": "90157ed7608349279a772933cb359e6b"
-        },
-        {
-            "m_Id": "758cc693472b464c81e9607c754685c2"
+            "m_Id": "713b1bf6463c468aba186a6346036b5c"
         }
     ],
     "m_Nodes": [
@@ -294,10 +288,10 @@
         "m_Expanded": true,
         "m_Position": {
             "serializedVersion": "2",
-            "x": 261.0000305175781,
-            "y": -181.99998474121095,
-            "width": 118.00000762939453,
-            "height": 221.00001525878907
+            "x": 288.8000183105469,
+            "y": -182.40000915527345,
+            "width": 144.0,
+            "height": 244.8000030517578
         }
     },
     "m_Slots": [
@@ -707,6 +701,41 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
+    "m_ObjectId": "713b1bf6463c468aba186a6346036b5c",
+    "m_Guid": {
+        "m_GuidSerialized": "3450c46d-7b7d-4872-a758-78bdb3a478b2"
+    },
+    "m_Name": "HAIR_VERTEX",
+    "m_DefaultReferenceName": "ENUM_713B1BF6463C468ABA186A6346036B5C",
+    "m_OverrideReferenceName": "HAIR_VERTEX",
+    "m_GeneratePropertyBlock": true,
+    "m_KeywordType": 1,
+    "m_KeywordDefinition": 1,
+    "m_KeywordScope": 0,
+    "m_Entries": [
+        {
+            "id": 3,
+            "displayName": "STATIC",
+            "referenceName": "STATIC"
+        },
+        {
+            "id": 1,
+            "displayName": "LIVE",
+            "referenceName": "LIVE"
+        },
+        {
+            "id": 2,
+            "displayName": "LIVE_STRIPS",
+            "referenceName": "LIVE_STRIPS"
+        }
+    ],
+    "m_Value": 0,
+    "m_IsEditable": true
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
     "m_ObjectId": "74ab0201ea674934923073b77509e252",
     "m_Id": 0,
@@ -726,25 +755,6 @@
         "z": 0.0
     },
     "m_Labels": []
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
-    "m_ObjectId": "758cc693472b464c81e9607c754685c2",
-    "m_Guid": {
-        "m_GuidSerialized": "71637cb2-0224-492b-94cd-b32ad2081da6"
-    },
-    "m_Name": "HAIR_VERTEX_STRIPS",
-    "m_DefaultReferenceName": "",
-    "m_OverrideReferenceName": "HAIR_VERTEX_STRIPS",
-    "m_GeneratePropertyBlock": true,
-    "m_KeywordType": 0,
-    "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_Entries": [],
-    "m_Value": 0,
-    "m_IsEditable": true
 }
 
 {
@@ -843,25 +853,6 @@
         "z": 0.0
     },
     "m_Labels": []
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
-    "m_ObjectId": "90157ed7608349279a772933cb359e6b",
-    "m_Guid": {
-        "m_GuidSerialized": "093883d0-2da1-45b7-8afb-5661ff6ad3ef"
-    },
-    "m_Name": "HAIR_VERTEX_PREVIEW",
-    "m_DefaultReferenceName": "BOOLEAN_90157ED7608349279A772933CB359E6B_ON",
-    "m_OverrideReferenceName": "HAIR_VERTEX_PREVIEW",
-    "m_GeneratePropertyBlock": true,
-    "m_KeywordType": 0,
-    "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_Entries": [],
-    "m_Value": 0,
-    "m_IsEditable": true
 }
 
 {
@@ -1065,25 +1056,6 @@
         "z": 0.0
     },
     "m_Labels": []
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
-    "m_ObjectId": "ce0b111acb9746e0afeadebf939c5321",
-    "m_Guid": {
-        "m_GuidSerialized": "63841a05-56a7-46a6-9bc0-c7de69dc5301"
-    },
-    "m_Name": "HAIR_VERTEX_DYNAMIC",
-    "m_DefaultReferenceName": "BOOLEAN_CE0B111ACB9746E0AFEADEBF939C5321_ON",
-    "m_OverrideReferenceName": "HAIR_VERTEX_DYNAMIC",
-    "m_GeneratePropertyBlock": true,
-    "m_KeywordType": 0,
-    "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_Entries": [],
-    "m_Value": 0,
-    "m_IsEditable": true
 }
 
 {

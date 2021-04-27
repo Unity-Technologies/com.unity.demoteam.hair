@@ -162,7 +162,6 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Solver")]
 
 			[Tooltip("Constraint solver")]
-
 			public Method method;
 			[Range(1, 100), Tooltip("Constraint iterations")]
 			public int iterations;
