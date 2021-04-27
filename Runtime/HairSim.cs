@@ -253,7 +253,7 @@ namespace Unity.DemoTeam.Hair
 				localCurvature = false,
 				localCurvatureMode = LocalCurvatureMode.LessThan,
 				localCurvatureValue = 0.1f,
-				localShape = false,
+				localShape = true,
 				localShapeInfluence = 1.0f,
 
 				globalPosition = false,

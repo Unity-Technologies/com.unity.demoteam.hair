@@ -187,16 +187,6 @@ namespace Unity.DemoTeam.Hair
 			UpdateStrandGroupInstances();
 			UpdateStrandGroupHideFlags();
 
-			var cmd = CommandBufferPool.Get(this.name);
-			{
-				if (InitializeRuntimeData(cmd))
-				{
-					UpdateRendererState();
-					Graphics.ExecuteCommandBuffer(cmd);
-				}
-			}
-			CommandBufferPool.Release(cmd);
-
 			s_instances.Add(this);
 		}
 
@@ -216,7 +206,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (strandGroupInstances != null)
 			{
-				// draw volume bounds
+				// volume bounds
 				Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
 				Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData), 2.0f * HairSim.GetVolumeExtent(volumeData));
 			}
@@ -228,7 +218,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				foreach (var strandGroupInstance in strandGroupInstances)
 				{
-					// draw root filter bounds
+					// root bounds
 					var rootFilter = strandGroupInstance.rootFilter;
 					if (rootFilter != null)
 					{
@@ -244,7 +234,7 @@ namespace Unity.DemoTeam.Hair
 					}
 
 #if false
-					// draw strand filter bounds
+					// strand bounds
 					var strandFilter = strandGroupInstance.strandFilter;
 					if (strandFilter != null)
 					{
@@ -271,7 +261,16 @@ namespace Unity.DemoTeam.Hair
 
 		void LateUpdate()
 		{
-			UpdateSimulationState();
+			var cmd = CommandBufferPool.Get(this.name);
+			{
+				if (InitializeRuntimeData(cmd))
+				{
+					UpdateSimulationState(cmd);
+					UpdateRendererState();
+					Graphics.ExecuteCommandBuffer(cmd);
+				}
+			}
+			CommandBufferPool.Release(cmd);
 		}
 
 		void UpdateStrandGroupInstances()
@@ -280,22 +279,33 @@ namespace Unity.DemoTeam.Hair
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
 			{
-				//TODO reenable this after figuring out how to check if the component is enabled in the prefab
+				if (hairAsset != null)
+				{
+					// did the asset change since the prefab was built?
+					if (hairAsset.checksum != strandGroupInstancesChecksum)
+					{
+						var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+						var prefabStage = UnityEditor.Experimental.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+						if (prefabStage != null && prefabStage.assetPath == prefabPath)
+							return;// do nothing if prefab is already open
 
-				//if (hairAsset != null)
-				//{
-				//	// did the underlying asset change since prefab was built?
-				//	if (hairAsset.checksum != strandGroupInstancesChecksum)
-				//	{
-				//		var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
-				//		var prefabContents = UnityEditor.PrefabUtility.LoadPrefabContents(prefabPath);
+						Debug.LogFormat(this, "{0}: rebuilding governing prefab '{1}'...", this.name, prefabPath);
 
-				//		Debug.LogWarningFormat(this, "{0} rebuilding underlying prefab", this.name);
+						var prefabContainer = UnityEditor.PrefabUtility.LoadPrefabContents(prefabPath);
+						if (prefabContainer != null)
+						{
+							foreach (var prefabHairInstance in prefabContainer.GetComponentsInChildren<HairInstance>(includeInactive: true))
+							{
+								prefabHairInstance.UpdateStrandGroupInstances();
+							}
 
-				//		UnityEditor.PrefabUtility.SaveAsPrefabAsset(prefabContents, prefabPath);
-				//		UnityEditor.PrefabUtility.UnloadPrefabContents(prefabContents);
-				//	}
-				//}
+							UnityEditor.PrefabUtility.SaveAsPrefabAsset(prefabContainer, prefabPath);
+							UnityEditor.PrefabUtility.UnloadPrefabContents(prefabContainer);
+						}
+
+						ReleaseRuntimeData();
+					}
+				}
 				return;
 			}
 #endif
@@ -306,16 +316,6 @@ namespace Unity.DemoTeam.Hair
 				{
 					HairInstanceBuilder.BuildHairInstance(this, hairAsset);
 					ReleaseRuntimeData();
-
-					var cmd = CommandBufferPool.Get(this.name);
-					{
-						if (InitializeRuntimeData(cmd))
-						{
-							UpdateRendererState();
-							Graphics.ExecuteCommandBuffer(cmd);
-						}
-					}
-					CommandBufferPool.Release(cmd);
 				}
 			}
 			else
@@ -330,11 +330,13 @@ namespace Unity.DemoTeam.Hair
 			if (strandGroupInstances == null)
 				return;
 
+			var hideFlags = HideFlags.NotEditable;
+
 			foreach (var strandGroupInstance in strandGroupInstances)
 			{
-				strandGroupInstance.container.hideFlags = HideFlags.NotEditable;
-				strandGroupInstance.rootContainer.hideFlags = HideFlags.NotEditable;
-				strandGroupInstance.strandContainer.hideFlags = HideFlags.NotEditable;
+				strandGroupInstance.container.hideFlags = hideFlags;
+				strandGroupInstance.rootContainer.hideFlags = hideFlags;
+				strandGroupInstance.strandContainer.hideFlags = hideFlags;
 			}
 		}
 
@@ -344,11 +346,11 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-#if UNITY_EDITOR
+	#if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
 				return;
-#endif
+	#endif
 
 			var attachmentsChanged = false;
 			{
@@ -379,23 +381,16 @@ namespace Unity.DemoTeam.Hair
 			{
 				settingsRoots.rootsAttachTarget.CommitSubjectsIfRequired();
 				settingsRoots.rootsAttachTargetBone = new PrimarySkinningBone(settingsRoots.rootsAttachTarget.transform);
-#if UNITY_EDITOR
+	#if UNITY_EDITOR
 				UnityEditor.EditorUtility.SetDirty(settingsRoots.rootsAttachTarget);
-#endif
+	#endif
 			}
 #endif
 		}
 
-		void UpdateSimulationState()
+		void UpdateSimulationState(CommandBuffer cmd)
 		{
-			var cmd = CommandBufferPool.Get(this.name);
-			{
-				DispatchStepAccumulated(cmd, Time.deltaTime);
-				{
-					Graphics.ExecuteCommandBuffer(cmd);
-				}
-			}
-			CommandBufferPool.Release(cmd);
+			DispatchStepAccumulated(cmd, Time.deltaTime);
 		}
 
 		void UpdateRendererState()
@@ -856,30 +851,32 @@ namespace Unity.DemoTeam.Hair
 			hairInstance.strandGroupInstancesChecksum = hairAsset.checksum;
 
 			// build strand group instances
+			var hideFlags = HideFlags.NotEditable;
+
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
 				ref var strandGroupInstance = ref hairInstance.strandGroupInstances[i];
 
-				strandGroupInstance.container = CreateContainer("Group:" + i, hairInstance.gameObject, HideFlags.NotEditable);
+				strandGroupInstance.container = CreateContainer("Group:" + i, hairInstance.gameObject, hideFlags);
 
 				// scene objects for roots
-				strandGroupInstance.rootContainer = CreateContainer("Roots:" + i, strandGroupInstance.container, HideFlags.NotEditable);
+				strandGroupInstance.rootContainer = CreateContainer("Roots:" + i, strandGroupInstance.container, hideFlags);
 				{
-					strandGroupInstance.rootFilter = CreateComponent<MeshFilter>(strandGroupInstance.rootContainer, HideFlags.NotEditable);
+					strandGroupInstance.rootFilter = CreateComponent<MeshFilter>(strandGroupInstance.rootContainer, hideFlags);
 					strandGroupInstance.rootFilter.sharedMesh = strandGroups[i].meshAssetRoots;
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-					strandGroupInstance.rootAttachment = CreateComponent<SkinAttachment>(strandGroupInstance.rootContainer, HideFlags.NotEditable);
+					strandGroupInstance.rootAttachment = CreateComponent<SkinAttachment>(strandGroupInstance.rootContainer, hideFlags);
 					strandGroupInstance.rootAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
 					strandGroupInstance.rootAttachment.forceRecalculateBounds = true;
 #endif
 				}
 
 				// scene objects for strands
-				strandGroupInstance.strandContainer = CreateContainer("Strands:" + i, strandGroupInstance.container, HideFlags.NotEditable);
+				strandGroupInstance.strandContainer = CreateContainer("Strands:" + i, strandGroupInstance.container, hideFlags);
 				{
-					strandGroupInstance.strandFilter = CreateComponent<MeshFilter>(strandGroupInstance.strandContainer, HideFlags.NotEditable);
-					strandGroupInstance.strandRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.strandContainer, HideFlags.NotEditable);
+					strandGroupInstance.strandFilter = CreateComponent<MeshFilter>(strandGroupInstance.strandContainer, hideFlags);
+					strandGroupInstance.strandRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.strandContainer, hideFlags);
 				}
 			}
 
