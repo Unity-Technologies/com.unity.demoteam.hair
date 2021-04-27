@@ -97,7 +97,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				for (int i = 0; i != s_gatherList.Count; i++)
 				{
-					float sortKey = SignedDistance(volumeBounds.center, s_gatherList[i]);//TODO
+					float sortKey = SdBoundary(volumeBounds.center, s_gatherList[i]);//TODO sort boundaries by sdfn
 					//....
 				}
 			}
@@ -116,7 +116,7 @@ namespace Unity.DemoTeam.Hair
 		//---------------------------
 		// signed distance functions
 
-		public static float SignedDistance(in Vector3 p, in HairBoundary.RuntimeData data)
+		public static float SdBoundary(in Vector3 p, in HairBoundary.RuntimeData data)
 		{
 			switch (data.type)
 			{

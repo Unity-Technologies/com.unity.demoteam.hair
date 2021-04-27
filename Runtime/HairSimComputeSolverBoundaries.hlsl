@@ -131,25 +131,25 @@ uint BoundarySelect(const float3 p, const float d)
 			index = i;
 	}
 
-	for (j += _BoundaryCountCapsule; i < j; i++)
+	for (j += _BoundaryCountCapsule; i != j; i++)
 	{
 		if (d == SdCapsule(p, _BoundaryShape[i]))
 			index = i;
 	}
 
-	for (j += _BoundaryCountSphere; i < j; i++)
+	for (j += _BoundaryCountSphere; i != j; i++)
 	{
 		if (d == SdSphere(p, _BoundaryShape[i]))
 			index = i;
 	}
 
-	for (j += _BoundaryCountTorus; i < j; i++)
+	for (j += _BoundaryCountTorus; i != j; i++)
 	{
 		if (d == SdTorus(p, _BoundaryShape[i]))
 			index = i;
 	}
 
-	for (j += _BoundaryCountCube; i < j; i++)
+	for (j += _BoundaryCountCube; i != j; i++)
 	{
 		if (d == SdCube(p, _BoundaryMatrixInv[i]))
 			index = i;

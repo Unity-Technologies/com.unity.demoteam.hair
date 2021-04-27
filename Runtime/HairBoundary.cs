@@ -199,7 +199,7 @@ namespace Unity.DemoTeam.Hair
 			var lossyScaleAbsPlanar = Vector3.Scale(lossyScaleAbs, s_planar[axis]);
 
 			var worldCenter = transform.TransformPoint(center);
-			var worldRadius = radius * lossyScaleAbsPlanar.ComponentMax();
+			var worldRadius = radius * lossyScaleAbsPlanar.CMax();
 			var worldHeight = Mathf.Max(height * lossyScaleAbs[axis], 2.0f * worldRadius);
 			var worldExtent = transform.rotation * (s_normal[axis] * (0.5f * worldHeight - worldRadius));
 
@@ -229,7 +229,7 @@ namespace Unity.DemoTeam.Hair
 		public static RuntimeData GetRuntimeSphere(int handle, Transform transform, in Vector3 center, float radius)
 		{
 			var lossyScaleAbs = transform.lossyScale.Abs();
-			var lossyScaleAbsMax = lossyScaleAbs.ComponentMax();
+			var lossyScaleAbsMax = lossyScaleAbs.CMax();
 
 			var worldCenter = transform.TransformPoint(center);
 			var worldRadius = radius * lossyScaleAbsMax;
@@ -258,7 +258,7 @@ namespace Unity.DemoTeam.Hair
 		public static RuntimeData GetRuntimeTorus(int handle, Transform transform, in Vector3 center, int axis, float radiusAxis, float radiusRing)
 		{
 			var lossyScaleAbs = transform.lossyScale.Abs();
-			var lossyScaleAbsMax = lossyScaleAbs.ComponentMax();
+			var lossyScaleAbsMax = lossyScaleAbs.CMax();
 
 			var worldCenter = transform.TransformPoint(center);
 			var worldAxis = transform.rotation * s_normal[axis];
@@ -343,7 +343,7 @@ namespace Unity.DemoTeam.Hair
 				sdf = new RuntimeSDF()
 				{
 					sdfTexture = sdfTexture,
-					worldCellSize = worldCellSize.ComponentMax(),
+					worldCellSize = worldCellSize.CMax(),
 					worldToUVW = Matrix4x4.Scale(worldSizeToUVW) * Matrix4x4.Translate(-worldBounds.min),
 				},
 			};

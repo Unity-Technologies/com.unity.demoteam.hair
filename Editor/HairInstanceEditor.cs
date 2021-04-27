@@ -44,6 +44,20 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public bool HasFrameBounds()
+		{
+			var hairInstance = target as HairInstance;
+			if (hairInstance == null)
+				return false;
+			else
+				return true;
+		}
+
+		public Bounds OnGetFrameBounds()
+		{
+			return (target as HairInstance).GetSimulationBounds().WithScale(0.5f);
+		}
+
 		public override bool UseDefaultMargins()
 		{
 			return false;
@@ -81,7 +95,7 @@ namespace Unity.DemoTeam.Hair
 				EditorGUILayout.EndVertical();
 
 				EditorGUILayout.Space();
-				EditorGUILayout.LabelField(hairInstance.componentGroupsChecksum, EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.LabelField(hairInstance.strandGroupInstancesChecksum, EditorStyles.centeredGreyMiniLabel);
 			}
 			EditorGUILayout.EndVertical();
 		}
@@ -175,19 +189,19 @@ namespace Unity.DemoTeam.Hair
 				{
 					if (GUILayout.Button("Reload"))
 					{
-						hairInstance.componentGroupsChecksum = string.Empty;
+						hairInstance.strandGroupInstancesChecksum = string.Empty;
 					}
 
 					if (GUILayout.Button("Unlock", GUILayout.Width(60.0f)))
 					{
-						var componentGroups = hairInstance.componentGroups;
-						if (componentGroups != null)
+						var strandGroupInstances = hairInstance.strandGroupInstances;
+						if (strandGroupInstances != null)
 						{
-							foreach (var componentGroup in hairInstance.componentGroups)
+							foreach (var strandGroupInstance in hairInstance.strandGroupInstances)
 							{
-								componentGroup.container.hideFlags &= ~HideFlags.NotEditable;
-								componentGroup.lineFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
-								componentGroup.rootFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
+								strandGroupInstance.container.hideFlags &= ~HideFlags.NotEditable;
+								strandGroupInstance.rootFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
+								strandGroupInstance.strandFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
 							}
 						}
 					}

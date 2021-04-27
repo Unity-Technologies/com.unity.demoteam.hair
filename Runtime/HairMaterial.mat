@@ -178,7 +178,7 @@ Material:
     - _DistortionVectorBias: -1
     - _DistortionVectorScale: 2
     - _DoubleSidedEnable: 0
-    - _DoubleSidedNormalMode: 2
+    - _DoubleSidedNormalMode: 0
     - _DstBlend: 0
     - _EmissiveColorMode: 1
     - _EmissiveExposureWeight: 1
@@ -264,12 +264,12 @@ Material:
     - Color_176191224d9a4233962725cd1ff09079: {r: 1, g: 0.70980394, b: 0.40000004, a: 0}
     - Color_62c64135deeb4c0f8f8dd2dd4d258618: {r: 0.5254902, g: 0.34509805, b: 0.33333334, a: 1}
     - Color_808fa7985ea04aae8fd9e29e269a6cbe: {r: 1, g: 0.71, b: 0.39999998, a: 0}
-    - Color_ef1f857a65f143afae0a6362fd9a650e: {r: 1, g: 0.70980394, b: 0.40000004, a: 1}
+    - Color_ef1f857a65f143afae0a6362fd9a650e: {r: 1, g: 0.61922556, b: 0, a: 1}
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _BaseColorMap_MipInfo: {r: 0, g: 0, b: 0, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DiffusionProfileAsset: {r: 0.001549049, g: 6.537953e-17, b: 78.9151, a: 0.00037284626}
-    - _DoubleSidedConstants: {r: 1, g: 1, b: 1, a: 0}
+    - _DoubleSidedConstants: {r: -1, g: -1, b: -1, a: 0}
     - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
     - _EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
     - _EmissiveColorLDR: {r: 0, g: 0, b: 0, a: 1}

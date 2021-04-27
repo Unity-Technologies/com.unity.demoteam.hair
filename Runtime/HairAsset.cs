@@ -50,7 +50,7 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Processing")]
 
-			[Tooltip("Resample curves to ensure a specific number of particles along each strand")]
+			[Tooltip("Resample curves to ensure a specific number of equidistant particles along each strand")]
 			public bool resampleCurves;
 			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
 			public int resampleParticleCount;
@@ -185,6 +185,8 @@ namespace Unity.DemoTeam.Hair
 			public float maxStrandLength;
 			public float maxParticleInterval;
 
+			[HideInInspector] public Bounds bounds;
+
 			[HideInInspector] public float[] rootScale;
 			[HideInInspector] public Vector3[] rootPosition;
 			[HideInInspector] public Vector3[] rootDirection;
@@ -192,8 +194,8 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
-			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetRoots;
+			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetStrips;
 		}
 
@@ -207,8 +209,5 @@ namespace Unity.DemoTeam.Hair
 		public bool strandGroupsAutoBuild;
 
 		public string checksum;
-
-		public HairSim.SolverSettings settingsSolver = HairSim.SolverSettings.defaults;
-		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults;
 	}
 }

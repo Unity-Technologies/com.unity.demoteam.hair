@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 using UnityEditor;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -8,12 +10,14 @@ namespace Unity.DemoTeam.Hair
 	[CustomEditor(typeof(HairAsset))]
 	public class HairAssetEditor : Editor
 	{
-		static Material s_previewMat;
+		PreviewRenderUtility previewRenderer;
 
-		PreviewRenderUtility previewUtil;
-		MaterialPropertyBlock previewUtilMPB;
-		Vector2 previewDrag;
+		Material previewMaterial;
+		Vector2 previewAngle;
 		float previewZoom;
+
+		ComputeBuffer[] previewBuffers;
+		string previewBuffersChecksum;
 
 		SerializedProperty _settingsBasic;
 		SerializedProperty _settingsBasic_type;
@@ -26,26 +30,26 @@ namespace Unity.DemoTeam.Hair
 
 		void OnEnable()
 		{
-			if (previewUtil != null)
-				previewUtil.Cleanup();
+			previewMaterial = new Material((target as HairAsset).defaultMaterial);//TODO change this to a RP agnostic default
+			previewMaterial.hideFlags = HideFlags.HideAndDontSave;
+			previewAngle = Vector2.zero;
+			previewZoom = 0.0f;
 
-			previewUtil = new PreviewRenderUtility();
-			previewUtilMPB = new MaterialPropertyBlock();
-			previewDrag = Vector2.zero;
+			previewRenderer = new PreviewRenderUtility();
+			previewRenderer.camera.backgroundColor = Color.black;// Color.Lerp(Color.black, Color.grey, 0.5f);
+			previewRenderer.camera.nearClipPlane = 0.001f;
+			previewRenderer.camera.farClipPlane = 50.0f;
+			previewRenderer.camera.fieldOfView = 50.0f;
+			previewRenderer.camera.transform.position = Vector3.zero;
+			previewRenderer.camera.transform.LookAt(Vector3.forward, Vector3.up);
 
-			previewUtil.camera.backgroundColor = Color.black;// Color.Lerp(Color.black, Color.grey, 0.5f);
-			previewUtil.camera.nearClipPlane = 0.001f;
-			previewUtil.camera.farClipPlane = 50.0f;
-			previewUtil.camera.fieldOfView = 50.0f;
-			previewUtil.camera.transform.position = Vector3.zero;
-			previewUtil.camera.transform.LookAt(Vector3.forward, Vector3.up);
+			previewRenderer.lights[0].transform.SetParent(previewRenderer.camera.transform, worldPositionStays: false);
+			previewRenderer.lights[0].transform.localPosition = Vector3.up;
+			previewRenderer.lights[0].intensity = 1.5f;
 
-			previewUtil.lights[0].transform.position = Vector3.zero + Vector3.up;
-			previewUtil.lights[0].intensity = 4.0f;
-
-			for (int i = 1; i != previewUtil.lights.Length; i++)
+			for (int i = 1; i != previewRenderer.lights.Length; i++)
 			{
-				previewUtil.lights[i].enabled = false;
+				previewRenderer.lights[i].enabled = false;
 			}
 
 			_settingsBasic = serializedObject.FindProperty("settingsBasic");
@@ -60,7 +64,19 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDisable()
 		{
-			previewUtil.Cleanup();
+			ReleasePreviewBuffers();
+
+			if (previewRenderer != null)
+			{
+				previewRenderer.Cleanup();
+				previewRenderer = null;
+			}
+
+			if (previewMaterial != null)
+			{
+				Material.DestroyImmediate(previewMaterial);
+				previewMaterial = null;
+			}
 		}
 
 		public override bool UseDefaultMargins()
@@ -102,7 +118,7 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_UNITY_ALEMBIC
 			return StructValidation.Pass;
 #else
-			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.0-exp.1", MessageType.Warning, wide: true);
+			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.0-exp.2", MessageType.Warning, wide: true);
 			return StructValidation.Inaccessible;
 #endif
 		}
@@ -197,6 +213,11 @@ namespace Unity.DemoTeam.Hair
 					numParticles += hairAsset.strandGroups[i].strandCount * hairAsset.strandGroups[i].strandParticleCount;
 				}
 
+				if (previewBuffersChecksum != hairAsset.checksum)
+				{
+					InitializePreviewBuffers(hairAsset);
+				}
+
 				EditorGUILayout.LabelField("Summary", EditorStyles.miniBoldLabel);
 				using (new EditorGUI.IndentLevelScope())
 				using (new EditorGUI.DisabledScope(true))
@@ -220,46 +241,68 @@ namespace Unity.DemoTeam.Hair
 								rect = EditorGUI.IndentedRect(rect);
 
 								GUI.Box(rect, Texture2D.blackTexture, EditorStyles.textField);
+								{
+									rect.xMin += 1;
+									rect.yMin += 1;
+									rect.xMax -= 1;
+									rect.yMax -= 1;
+								}
 
-								rect.xMin += 1;
-								rect.yMin += 1;
-								rect.xMax -= 1;
-								rect.yMax -= 1;
-
+								// apply zoom
 								var e = Event.current;
 								if (e.alt && e.type == EventType.ScrollWheel && rect.Contains(e.mousePosition))
 								{
 									previewZoom -= 0.05f * e.delta.y;
 									previewZoom = Mathf.Clamp01(previewZoom);
 									e.Use();
-
-									//EditorUtility.SetDirty(hairAsset);
 								}
 
-								if (Drag2D(ref previewDrag, rect))
+								// apply rotation
+								var drag = Vector2.zero;
+								if (Drag2D(ref drag, rect))
 								{
-									//EditorUtility.SetDirty(hairAsset);
+									drag *= Vector2.one;
 								}
 
-								var meshRoots = hairAsset.strandGroups[i].meshAssetRoots;
+								// draw preview
 								var meshLines = hairAsset.strandGroups[i].meshAssetLines;
-								var meshCenter = meshLines.bounds.center;
-								var meshRadius = meshLines.bounds.extents.magnitude * Mathf.Lerp(1.0f, 0.5f, previewZoom);
+								var meshCenter = hairAsset.strandGroups[i].bounds.center;
+								var meshRadius = hairAsset.strandGroups[i].bounds.extents.magnitude * Mathf.Lerp(1.0f, 0.5f, previewZoom);
 
-								var modelDistance = meshRadius / Mathf.Sin(0.5f * Mathf.Deg2Rad * previewUtil.cameraFieldOfView);
-								var modelRotation = Quaternion.Euler(-previewDrag.y, 0.0f, 0.0f) * Quaternion.Euler(0.0f, -previewDrag.x, 0.0f);
-								var modelMatrix = Matrix4x4.TRS(modelDistance * Vector3.forward, modelRotation, Vector3.one) * Matrix4x4.Translate(-meshCenter);
+								var cameraDistance = meshRadius / Mathf.Sin(0.5f * Mathf.Deg2Rad * previewRenderer.cameraFieldOfView);
+								var cameraTransform = previewRenderer.camera.transform;
+								{
+									cameraTransform.Rotate(drag.y, drag.x, 0.0f, Space.Self);
+									cameraTransform.position = meshCenter - cameraDistance * cameraTransform.forward;
+								}
 
-								var material = _settingsBasic_material.objectReferenceValue as Material;
-								if (material == null)
-									material = hairAsset.defaultMaterial;
+								var sourceMaterial = _settingsBasic_material.objectReferenceValue as Material;
+								if (sourceMaterial == null)
+									sourceMaterial = hairAsset.defaultMaterial;
 
-								previewUtilMPB.SetInt("_StrandCount", hairAsset.strandGroups[i].strandCount);
+								if (previewMaterial.shader != sourceMaterial.shader)
+									previewMaterial.shader = sourceMaterial.shader;
 
-								previewUtil.BeginPreview(rect, GUIStyle.none);
-								previewUtil.DrawMesh(meshLines, modelMatrix, material, 0, previewUtilMPB);
-								previewUtil.Render(true, true);
-								previewUtil.EndAndDrawPreview(rect);
+								previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
+
+								previewMaterial.SetBuffer("_ParticlePosition", previewBuffers[i]);
+								previewMaterial.SetInt("_StrandCount", hairAsset.strandGroups[i].strandCount);
+								previewMaterial.SetInt("_StrandParticleCount", hairAsset.strandGroups[i].strandParticleCount);
+								previewMaterial.SetFloat("_StrandDiameter", 0.01f);
+								previewMaterial.SetFloat("_StrandScale", 1.0f);
+
+								if (hairAsset.strandGroups[i].particleMemoryLayout == HairAsset.MemoryLayout.Interleaved)
+									previewMaterial.EnableKeyword("LAYOUT_INTERLEAVED");
+								else
+									previewMaterial.DisableKeyword("LAYOUT_INTERLEAVED");
+
+								previewMaterial.EnableKeyword("HAIR_VERTEX_DYNAMIC");
+								previewMaterial.EnableKeyword("HAIR_VERTEX_PREVIEW");
+
+								previewRenderer.BeginPreview(rect, GUIStyle.none);
+								previewRenderer.DrawMesh(meshLines, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
+								previewRenderer.Render(true, true);
+								previewRenderer.EndAndDrawPreview(rect);
 							}
 						}
 						EditorGUILayout.EndVertical();
@@ -282,6 +325,56 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		void ReleasePreviewBuffers()
+		{
+			if (previewBuffers != null)
+			{
+				for (int i = 0; i != previewBuffers.Length; i++)
+				{
+					if (previewBuffers[i] != null)
+						previewBuffers[i].Release();
+				}
+			}
+
+			previewBuffers = null;
+			previewBuffersChecksum = string.Empty;
+		}
+
+		void InitializePreviewBuffers(HairAsset hairAsset)
+		{
+			ReleasePreviewBuffers();
+
+			if (hairAsset == null || hairAsset.strandGroups == null)
+				return;
+
+			unsafe
+			{
+				previewBuffers = new ComputeBuffer[hairAsset.strandGroups.Length];
+
+				for (int i = 0; i != previewBuffers.Length; i++)
+				{
+					ref var assetData = ref hairAsset.strandGroups[i].particlePosition;
+
+					using (var previewData = new NativeArray<Vector4>(assetData.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+					{
+						unsafe
+						{
+							fixed (void* sourcePtr = assetData)
+							{
+								UnsafeUtility.MemCpyStride(previewData.GetUnsafePtr(), sizeof(Vector4), sourcePtr, sizeof(Vector3), sizeof(Vector3), assetData.Length);
+							}
+						}
+
+						previewBuffers[i] = new ComputeBuffer(assetData.Length, sizeof(Vector4), ComputeBufferType.Default);
+						previewBuffers[i].name = "PreviewBuffer:" + i;
+						previewBuffers[i].SetData(previewData);
+					}
+				}
+
+				previewBuffersChecksum = hairAsset.checksum;
+			}
+		}
+
 		static bool Drag2D(ref Vector2 delta, Rect rect)
 		{
 			int i = GUIUtility.GetControlID("HairAssetEditor.Drag2D".GetHashCode(), FocusType.Passive);
@@ -301,10 +394,15 @@ namespace Unity.DemoTeam.Hair
 				case EventType.MouseDown:
 					if (rect.Contains(e.mousePosition))
 					{
-						GUIUtility.hotControl = i;
-						e.Use();
-						EditorGUIUtility.SetWantsMouseJumping(1);
-						return true;// dragging
+						if (GUIUtility.hotControl == 0)
+							GUIUtility.hotControl = i;
+
+						if (GUIUtility.hotControl == i)
+						{
+							e.Use();
+							EditorGUIUtility.SetWantsMouseJumping(1);
+							return true;// dragging
+						}
 					}
 					break;
 

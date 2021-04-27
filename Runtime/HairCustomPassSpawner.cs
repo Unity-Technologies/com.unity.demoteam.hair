@@ -20,8 +20,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				var instance = ComponentSingleton<HairCustomPassSpawner>.instance;
 				{
-					CreateCustomPass(instance.gameObject, HairCustomPass.Dispatch.Step, CustomPassInjectionPoint.BeforeRendering);
-					CreateCustomPass(instance.gameObject, HairCustomPass.Dispatch.Draw, CustomPassInjectionPoint.BeforePreRefraction);
+					CreateCustomPass(instance.gameObject, CustomPassInjectionPoint.BeforePreRefraction);
 
 					instance.gameObject.SetActive(true);
 				}
@@ -34,14 +33,13 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		static void CreateCustomPass(GameObject container, HairCustomPass.Dispatch dispatch, CustomPassInjectionPoint injectionPoint)
+		static void CreateCustomPass(GameObject container, CustomPassInjectionPoint injectionPoint)
 		{
 			var hairPassVolume = container.AddComponent<CustomPassVolume>();
 			var hairPass = hairPassVolume.AddPassOfType<HairCustomPass>() as HairCustomPass;
 
 			hairPassVolume.injectionPoint = injectionPoint;
 			hairPassVolume.isGlobal = true;
-			hairPass.dispatch = dispatch;
 		}
 	}
 }

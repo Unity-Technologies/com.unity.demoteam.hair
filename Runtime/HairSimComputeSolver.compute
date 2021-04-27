@@ -187,22 +187,22 @@ float GetBendingRadius(uint strandIndex)
 	return _LocalCurvature * GetParticleInterval(strandIndex);
 }
 
-float GetGlobalAttenuation(uint strandIndex, uint linearParticleIndex)
+float GetGlobalAttenuation(uint strandIndex, uint strandParticleNumber)
 {
-	float t = _RootScale[strandIndex] * (linearParticleIndex / (float)(_StrandParticleCount - 1));
+	float t = _RootScale[strandIndex] * (strandParticleNumber / (float)(_StrandParticleCount - 1));
 	float k = saturate((t - _GlobalFadeOffset) / _GlobalFadeExtent);
 	return 1.0 - k;
 }
 
-float GetGlobalPositionInfluence(uint strandIndex, uint linearParticleIndex)
+float GetGlobalPositionInfluence(uint strandIndex, uint strandParticleNumber)
 {
-	float k = _GlobalPosition * GetGlobalAttenuation(strandIndex, linearParticleIndex);
+	float k = _GlobalPosition * GetGlobalAttenuation(strandIndex, strandParticleNumber);
 	return 1.0 - GetDecay(1.0 - k, _GlobalPositionInterval);// fits into lerp
 }
 
-float GetGlobalRotationInfluence(uint strandIndex, uint linearParticleIndex)
+float GetGlobalRotationInfluence(uint strandIndex, uint strandParticleNumber)
 {
-	float k = _GlobalRotation * GetGlobalAttenuation(strandIndex, linearParticleIndex);
+	float k = _GlobalRotation * GetGlobalAttenuation(strandIndex, strandParticleNumber);
 	return k;
 }
 

@@ -7,68 +7,23 @@ namespace Unity.DemoTeam.Hair
 {
 	public class HairCustomPass : CustomPass
 	{
-		public Dispatch dispatch;
-
-		[Flags]
-		public enum Dispatch
-		{
-			Step = 1 << 0,
-			Draw = 1 << 1,
-		}
-
-		private double lastSimulationTime = -1.0;
-
 		protected override void Setup(ScriptableRenderContext renderContext, CommandBuffer cmd)
 		{
 			base.Setup(renderContext, cmd);
-			base.name = "HairPass (" + dispatch + ")";
+			base.name = "HairDebugDraw";
 
-			if (dispatch.HasFlag(Dispatch.Draw))
-			{
-				base.targetColorBuffer = TargetBuffer.Camera;
-				base.targetDepthBuffer = TargetBuffer.Camera;
-			}
-			else
-			{
-				base.targetColorBuffer = TargetBuffer.None;
-				base.targetDepthBuffer = TargetBuffer.None;
-			}
+			base.targetColorBuffer = TargetBuffer.Camera;
+			base.targetDepthBuffer = TargetBuffer.Camera;
 		}
 
 		protected override void Execute(CustomPassContext context)
 		{
-			if (dispatch.HasFlag(Dispatch.Step))
-			{
-				var time = Time.realtimeSinceStartupAsDouble;
-				if (time != lastSimulationTime)
-				{
-					var dt = Time.deltaTime;
-					if (dt != 0.0f)
-					{
-						foreach (var hairInstance in HairInstance.s_instances)
-						{
-							if (hairInstance != null && hairInstance.isActiveAndEnabled)
-								hairInstance.DispatchStepAccumulated(context.cmd, dt);
-						}
+			CoreUtils.SetRenderTarget(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);
 
-						lastSimulationTime = time;
-					}
-				}
-			}
-			else
+			foreach (var hairInstance in HairInstance.s_instances)
 			{
-				lastSimulationTime = -1.0;
-			}
-
-			if (dispatch.HasFlag(Dispatch.Draw))
-			{
-				CoreUtils.SetRenderTarget(context.cmd, context.cameraColorBuffer, context.cameraDepthBuffer);
-
-				foreach (var hairInstance in HairInstance.s_instances)
-				{
-					if (hairInstance != null && hairInstance.isActiveAndEnabled)
-						hairInstance.DispatchDraw(context.cmd);
-				}
+				if (hairInstance != null && hairInstance.isActiveAndEnabled)
+					hairInstance.DispatchDraw(context.cmd);
 			}
 		}
 
