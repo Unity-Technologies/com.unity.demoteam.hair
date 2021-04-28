@@ -4,6 +4,10 @@ using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
+#if HAS_PACKAGE_UNITY_ALEMBIC
+using UnityEngine.Formats.Alembic.Importer;
+#endif
+
 namespace Unity.DemoTeam.Hair
 {
 	using static HairGUILayout;
@@ -117,6 +121,15 @@ namespace Unity.DemoTeam.Hair
 		static StructValidation ValidationGUIAlembic(object userData)
 		{
 #if HAS_PACKAGE_UNITY_ALEMBIC
+			var hairAsset = userData as HairAsset;
+			if (hairAsset != null)
+			{
+				var alembicAsset = hairAsset.settingsAlembic.alembicAsset;
+				if (alembicAsset != null && alembicAsset.GetComponentInChildren<AlembicCurves>(includeInactive: true) == null)
+				{
+					EditorGUILayout.HelpBox("Configuration warning: Unable to locate curves in the assigned alembic asset.", MessageType.Warning, wide: true);
+				}
+			}
 			return StructValidation.Pass;
 #else
 			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.0-exp.2", MessageType.Warning, wide: true);
@@ -130,7 +143,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (texture != null && texture.isReadable == false)
 				{
-					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' map will be ignored as the asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
+					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' will be ignored since the assigned texture asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
 				}
 			}
 

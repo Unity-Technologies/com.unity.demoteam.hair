@@ -139,7 +139,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// fetch all curve sets 
-			var curveSets = alembic.gameObject.GetComponentsInChildren<AlembicCurves>(true);
+			var curveSets = alembic.gameObject.GetComponentsInChildren<AlembicCurves>(includeInactive: true);
 			if (curveSets.Length == 0)
 				return;
 
@@ -1056,7 +1056,7 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			// extrapolate the tail, if any
+			// extrapolate tail for vertices that remain to be placed
 			if (dstIndex < dstCount)
 			{
 				var dstPosPrev = dstPos[dstIndex - 1];

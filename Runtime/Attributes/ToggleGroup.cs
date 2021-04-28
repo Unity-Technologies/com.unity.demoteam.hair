@@ -52,7 +52,7 @@ namespace Unity.DemoTeam.Attributes
 
 			using (new EditorGUI.DisabledScope(!property.boolValue))
 			{
-				while (property.Next(false))
+				while (property.Next(enterChildren: false))
 				{
 					var target = property.serializedObject.targetObject;
 					if (target == null)
