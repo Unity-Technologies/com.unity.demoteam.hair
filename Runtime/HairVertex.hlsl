@@ -51,13 +51,11 @@ HairVertex GetHairVertex_Live(in uint particleID, in float2 particleUV)
 	const uint i = strandParticleBegin + (linearParticleIndex % _StrandParticleCount) * strandParticleStride;
 
 	float3 p = _ParticlePosition[i].xyz;
-	
 	float3 r0 = (i == strandParticleBegin)
 		? normalize(_ParticlePosition[i + strandParticleStride].xyz - p)
 		: normalize(p - _ParticlePosition[i - strandParticleStride].xyz);
-
 	float3 r1 = (i == strandParticleEnd - strandParticleStride)
-		? normalize(p - _ParticlePosition[i - strandParticleStride].xyz)
+		? r0
 		: normalize(_ParticlePosition[i + strandParticleStride].xyz - p);
 
 	float3 positionWS = GetCameraRelativePositionWS(p);
@@ -77,10 +75,9 @@ HairVertex GetHairVertex_Live(in uint particleID, in float2 particleUV)
 #else
 		v.positionOS = TransformWorldToObject(positionWS);
 #endif
-		//TODO fix these breaking underh non-uniform scaling (maybe just replace with QMul)
-		v.normalOS = TransformWorldToObjectDir(normalWS);
-		v.tangentOS = TransformWorldToObjectDir(tangentWS);
-		v.bitangentOS = TransformWorldToObjectDir(bitangentWS);
+		v.normalOS = TransformWorldToObjectNormal(normalWS);
+		v.tangentOS = TransformWorldToObjectNormal(tangentWS);
+		v.bitangentOS = TransformWorldToObjectNormal(bitangentWS);
 
 		v.rootUV = float2(0.0, 0.0);
 		v.strandUV = particleUV;
