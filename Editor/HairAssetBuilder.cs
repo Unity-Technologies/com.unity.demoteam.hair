@@ -1,4 +1,5 @@
 ﻿//#define VISIBLE_SUBASSETS
+#define CLEAR_ALL_SUBASSETS
 
 using System;
 using UnityEngine;
@@ -22,6 +23,20 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			// unlink and destroy any sub-assets
+#if CLEAR_ALL_SUBASSETS
+			var subAssetsPath = AssetDatabase.GetAssetPath(hairAsset);
+			var subAssets = AssetDatabase.LoadAllAssetsAtPath(subAssetsPath);
+			{
+				foreach (var subAsset in subAssets)
+				{
+					if (subAsset != hairAsset)
+					{
+						AssetDatabase.RemoveObjectFromAsset(subAsset);
+						UnityEngine.Object.DestroyImmediate(subAsset);
+					}
+				}
+			}
+#else
 			foreach (var strandGroup in hairAsset.strandGroups)
 			{
 				if (strandGroup.meshAssetRoots != null)
@@ -42,6 +57,7 @@ namespace Unity.DemoTeam.Hair
 					Mesh.DestroyImmediate(strandGroup.meshAssetStrips);
 				}
 			}
+#endif
 
 			// clear
 			hairAsset.strandGroups = null;
