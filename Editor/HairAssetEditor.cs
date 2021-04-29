@@ -176,7 +176,7 @@ namespace Unity.DemoTeam.Hair
 				switch ((HairAsset.Type)_settingsBasic_type.enumValueIndex)
 				{
 					case HairAsset.Type.Alembic:
-						StructPropertyFieldsWithHeader(_settingsAlembic, ValidationGUIAlembic);
+						StructPropertyFieldsWithHeader(_settingsAlembic, ValidationGUIAlembic, hairAsset);
 						break;
 					case HairAsset.Type.Procedural:
 						StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
@@ -236,9 +236,9 @@ namespace Unity.DemoTeam.Hair
 				using (new EditorGUI.IndentLevelScope())
 				using (new EditorGUI.DisabledScope(true))
 				{
-					EditorGUILayout.IntField("Groups", hairAsset.strandGroups.Length);
-					EditorGUILayout.IntField("Total strands", numStrands);
-					EditorGUILayout.IntField("Total particles", numParticles);
+					EditorGUILayout.IntField("Number of groups", hairAsset.strandGroups.Length);
+					EditorGUILayout.IntField("Number of strands (total)", numStrands);
+					EditorGUILayout.IntField("Number of particles (total)", numParticles);
 				}
 
 				for (int i = 0; i != hairAsset.strandGroups.Length; i++)

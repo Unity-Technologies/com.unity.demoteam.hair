@@ -140,16 +140,16 @@ namespace Unity.DemoTeam.Hair
 
 			// fetch all curve sets 
 			var curveSets = alembic.gameObject.GetComponentsInChildren<AlembicCurves>(includeInactive: true);
-			if (curveSets.Length == 0)
-				return;
-
-			// prep strand groups in hair asset
-			hairAsset.strandGroups = new HairAsset.StrandGroup[curveSets.Length];
-
-			// build strand groups in hair asset
-			for (int i = 0; i != hairAsset.strandGroups.Length; i++)
+			if (curveSets.Length > 0)
 			{
-				BuildHairAssetStrandGroup(ref hairAsset.strandGroups[i], settings, curveSets[i], memoryLayout);
+				// prep strand groups in hair asset
+				hairAsset.strandGroups = new HairAsset.StrandGroup[curveSets.Length];
+
+				// build strand groups in hair asset
+				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
+				{
+					BuildHairAssetStrandGroup(ref hairAsset.strandGroups[i], settings, curveSets[i], memoryLayout);
+				}
 			}
 
 			// destroy container
@@ -182,81 +182,123 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_UNITY_ALEMBIC
 		public static void BuildHairAssetStrandGroup(ref HairAsset.StrandGroup strandGroup, in HairAsset.SettingsAlembic settings, AlembicCurves curveSet, HairAsset.MemoryLayout memoryLayout)
 		{
-			//TODO require resampling if not all curves have same number of points
-			//TODO require/recommend/? if not all pairs are equidistant
+			//TODO require/recommend resampling or WARN if not all pairs are equidistant?
 
-			// get buffers
-			var bufferPos = curveSet.Positions;
-			var bufferPosOffset = curveSet.CurveOffsets;
+			// get curve data
+			var curveVertexDataPosition = curveSet.Positions;
+			var curveVertexOffsets = curveSet.CurveOffsets;
 
-			//Debug.Log("curveSet: " + curveSet.name);
-			//Debug.Log("bufferPos.Length = " + bufferPos.Length);
-			//Debug.Log("bufferPosOffset.Length = " + bufferPosOffset.Length);
+			var curveVertexCount = -1;
+			var curveCount = curveVertexOffsets.Length;
 
-			// get curve counts
-			int curveCount = bufferPosOffset.Length;
-			int curvePointCount = (curveCount == 0) ? 0 : (bufferPos.Length / curveCount);
-			int curvePointRemainder = (curveCount == 0) ? 0 : (bufferPos.Length % curveCount);
-
-			Debug.Assert(curveCount > 0);
-			Debug.Assert(curvePointCount >= 2);
-			Debug.Assert(curvePointRemainder == 0);
-
-			if (curveCount == 0 || curvePointCount < 2 || curvePointRemainder > 0)
+			// validate curve data, conditionally apply resampling
+			using (var curveVertexCountBuffer = new NativeArray<int>(curveCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
-				curveCount = 0;
-				curvePointCount = 0;
-				curvePointRemainder = 0;
-			}
-
-			// resample curves
-			if (settings.resampleCurves)
-			{
-				var bufferPosResample = new Vector3[curveCount * settings.resampleParticleCount];
+				var curveVertexCountMin = -1;
+				var curveVertexCountMax = -1;
 
 				unsafe
 				{
-					fixed (Vector3* srcBase = bufferPos)
-					fixed (Vector3* dstBase = bufferPosResample)
+					int* curveVertexCountPtr = (int*)curveVertexCountBuffer.GetUnsafePtr();
+
+					// check min-max vertex count
+					if (curveCount > 0)
 					{
-						var dstOffset = 0;
-						var dstCount = settings.resampleParticleCount;
-
-						for (int i = 0; i != curveCount; i++)
+						for (int i = 1; i != curveCount; i++)
 						{
-							var srcOffset = bufferPosOffset[i];
-							var srcOffsetNext = (i < curveCount - 1) ? bufferPosOffset[i + 1] : bufferPos.Length;
+							curveVertexCountPtr[i - 1] = curveVertexOffsets[i] - curveVertexOffsets[i - 1];
+						}
 
-							Resample(srcBase + srcOffset, srcOffsetNext - srcOffset, dstBase + dstOffset, dstCount, settings.resampleQuality);
+						curveVertexCountPtr[curveCount - 1] = curveVertexDataPosition.Length - curveVertexOffsets[curveCount - 1];
+						curveVertexCountMin = curveVertexCountPtr[0];
+						curveVertexCountMax = curveVertexCountPtr[0];
 
-							dstOffset += dstCount;
+						for (int i = 1; i != curveCount; i++)
+						{
+							Mathf.Min(curveVertexCountMin, curveVertexCountPtr[i]);
+							Mathf.Max(curveVertexCountMax, curveVertexCountPtr[i]);
 						}
 					}
+
+					// skip group if it has obviously degenerate curves
+					if (curveVertexCountMin < 2)
+					{
+						Debug.LogWarningFormat("Strand Importer: skipping strand group due to degenerate curves with less than two vertices.");
+
+						curveCount = 0;
+						curveVertexCount = 0;
+						curveVertexCountMin = 0;
+						curveVertexCountMax = 0;
+					}
+
+					// resample curves if selected
+					var resampling = settings.resampleCurves;
+					var resamplingCount = settings.resampleParticleCount;
+					var resamplingQuality = settings.resampleQuality;
+
+					// resample always if there are curves with varying vertex count
+					var resamplingRequired = !settings.resampleCurves && (curveVertexCountMin != curveVertexCountMax);
+					if (resamplingRequired)
+					{
+						Debug.LogWarningFormat("Strand Importer: resampling strand group (to maximum vertex count within group) due to curves with varying vertex count.");
+
+						resampling = true;
+						resamplingCount = curveVertexCountMax;
+						resamplingQuality = 1;
+					}
+
+					// apply resampling if selected or required
+					if (resampling)
+					{
+						var curveVertexPositionsResampled = new Vector3[curveCount * resamplingCount];
+
+						unsafe
+						{
+							fixed (Vector3* srcBasePtr = curveVertexDataPosition)
+							fixed (Vector3* dstBasePtr = curveVertexPositionsResampled)
+							{
+								var dstOffset = 0;
+								var dstCount = resamplingCount;
+
+								for (int i = 0; i != curveCount; i++)
+								{
+									var srcOffset = curveVertexOffsets[i];
+									var srcCount = curveVertexCountPtr[i];
+
+									Resample(srcBasePtr + srcOffset, srcCount, dstBasePtr + dstOffset, dstCount, resamplingQuality);
+
+									dstOffset += dstCount;
+								}
+							}
+						}
+
+						curveVertexDataPosition = curveVertexPositionsResampled;
+						curveVertexCount = resamplingCount;
+					}
+					else
+					{
+						curveVertexCount = curveVertexCountMin;
+					}
 				}
-
-				bufferPos = bufferPosResample;
-
-				curvePointCount = settings.resampleParticleCount;
-				curvePointRemainder = 0;
 			}
 
 			// set curve counts
 			strandGroup.strandCount = curveCount;
-			strandGroup.strandParticleCount = curvePointCount;
+			strandGroup.strandParticleCount = curveVertexCount;
 
 			// prep curve buffers
 			strandGroup.rootScale = new float[curveCount];
 			strandGroup.rootPosition = new Vector3[curveCount];
 			strandGroup.rootDirection = new Vector3[curveCount];
-			strandGroup.particlePosition = new Vector3[curveCount * curvePointCount];
+			strandGroup.particlePosition = new Vector3[curveCount * curveVertexCount];
 
 			// build curve buffers
-			bufferPos.CopyTo(strandGroup.particlePosition, 0);
+			curveVertexDataPosition.CopyTo(strandGroup.particlePosition, 0);
 
 			for (int i = 0; i != curveCount; i++)
 			{
-				ref var p0 = ref strandGroup.particlePosition[i * curvePointCount];
-				ref var p1 = ref strandGroup.particlePosition[i * curvePointCount + 1];
+				ref var p0 = ref strandGroup.particlePosition[i * curveVertexCount];
+				ref var p1 = ref strandGroup.particlePosition[i * curveVertexCount + 1];
 
 				strandGroup.rootPosition[i] = p0;
 				strandGroup.rootDirection[i] = Vector3.Normalize(p1 - p0);
