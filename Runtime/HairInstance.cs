@@ -173,8 +173,12 @@ namespace Unity.DemoTeam.Hair
 		[NonSerialized] public float stepsLastFrameSmooth;
 		[NonSerialized] public int stepsLastFrameSkipped;
 
+		[NonSerialized] public string cachedName;
+
 		void OnEnable()
 		{
+			cachedName = this.name;
+
 			UpdateStrandGroupInstances();
 			UpdateStrandGroupHideFlags();
 
@@ -252,7 +256,7 @@ namespace Unity.DemoTeam.Hair
 
 		void LateUpdate()
 		{
-			var cmd = CommandBufferPool.Get(this.name);
+			var cmd = CommandBufferPool.Get();
 			{
 				if (InitializeRuntimeData(cmd))
 				{
@@ -432,14 +436,16 @@ namespace Unity.DemoTeam.Hair
 			switch (settingsStrands.strandRenderer)
 			{
 				case SettingsStrands.StrandRenderer.BuiltinLines:
-					meshFilter.sharedMesh = meshInstanceLines;
+					if (meshFilter.sharedMesh != meshInstanceLines)
+						meshFilter.sharedMesh = meshInstanceLines;
 					break;
 				case SettingsStrands.StrandRenderer.BuiltinStrips:
-					meshFilter.sharedMesh = meshInstanceStrips;
+					if (meshFilter.sharedMesh != meshInstanceStrips)
+						meshFilter.sharedMesh = meshInstanceStrips;
 					break;
 			}
 
-			//TODO better renderer bounds
+			//TODO tighten renderer bounds
 			//meshFilter.sharedMesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
 			meshFilter.sharedMesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
 
@@ -663,9 +669,6 @@ namespace Unity.DemoTeam.Hair
 			// step volume data
 			HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
-
-			// update renderers
-			UpdateRendererState();
 		}
 
 		public void DispatchDraw(CommandBuffer cmd)

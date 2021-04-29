@@ -16,12 +16,12 @@ namespace Unity.DemoTeam.Hair
 
 		public static float CMin(this Vector3 value)
 		{
-			return Mathf.Min(value.x, value.y, value.z);
+			return Mathf.Min(Mathf.Min(value.x, value.y), value.z);
 		}
 
 		public static float CMax(this Vector3 value)
 		{
-			return Mathf.Max(value.x, value.y, value.z);
+			return Mathf.Max(Mathf.Max(value.x, value.y), value.z);
 		}
 	}
 

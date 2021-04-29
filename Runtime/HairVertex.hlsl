@@ -59,14 +59,13 @@ HairVertex GetHairVertex_Live(in uint particleID, in float2 particleUV)
 		: normalize(_ParticlePosition[i + strandParticleStride].xyz - p);
 
 	float3 positionWS = GetCameraRelativePositionWS(p);
-	float3 viewDirWS = GetWorldSpaceNormalizeViewDir(positionWS);
+	//TODO motion vector
+	//float3 motionWS = _ParticlePosition[i].xyz -  _ParticlePositionPrev[i].xyz
 
 	float3 bitangentWS = normalize(r0 + r1);
-	float3 tangentWS = normalize(cross(bitangentWS, viewDirWS));
+	float3 tangentWS = normalize(cross(bitangentWS, GetWorldSpaceNormalizeViewDir(positionWS)));
 	float3 normalWS = cross(tangentWS, bitangentWS);
 
-	//TODO motion
-	//float3 motionWS = _ParticlePosition[i].xyz -  _ParticlePositionPrev[i].xyz
 
 	HairVertex v;
 	{

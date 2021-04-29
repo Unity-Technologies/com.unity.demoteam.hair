@@ -14,11 +14,6 @@ namespace Unity.DemoTeam.Hair
 			{
 				EditorApplication.update += ConditionalPlayerLoop;
 
-				//AssemblyReloadEvents.beforeAssemblyReload += () =>
-				//{
-				//	EditorApplication.update -= ConditionalPlayerLoop;
-				//};
-
 				s_initialized = true;
 			}
 		}
