@@ -143,7 +143,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (texture != null && texture.isReadable == false)
 				{
-					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' will be ignored since the assigned texture asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
+					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' map will be ignored since the assigned texture asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
 				}
 			}
 

@@ -71,7 +71,7 @@ namespace Unity.DemoTeam.Hair
 			public enum PlacementType
 			{
 				Primitive,
-				//Custom,//TODO
+				//Custom,//TODO support custom root/strand generators
 				Mesh,
 			}
 
@@ -125,7 +125,7 @@ namespace Unity.DemoTeam.Hair
 
 			[Range(64, HairSim.MAX_STRAND_COUNT), Tooltip("Number of strands")]
 			public int strandCount;
-			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
+			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of equidistant particles along each strand")]
 			public int strandParticleCount;
 			[Range(0.001f, 5.0f), Tooltip("Strand length (in meters)")]
 			public float strandLength;
@@ -155,9 +155,12 @@ namespace Unity.DemoTeam.Hair
 			{
 				placement = PlacementType.Primitive,
 				placementPrimitive = PrimitiveType.Curtain,
+				//placementCustom = null,
 				placementMesh = null,
 				placementMeshInclude = (SubmeshMask)(-1),
 				placementDensity = null,
+				paintedDirection = null,
+				paintedParameters = null,
 
 				strandCount = 64,
 				strandParticleCount = 32,
