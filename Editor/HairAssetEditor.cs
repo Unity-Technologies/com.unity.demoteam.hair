@@ -15,14 +15,7 @@ namespace Unity.DemoTeam.Hair
 	[CustomEditor(typeof(HairAsset))]
 	public class HairAssetEditor : Editor
 	{
-		PreviewRenderUtility previewRenderer;
-
-		Material previewMaterial;
-		Vector2 previewAngle;
-		float previewZoom;
-
-		HairSim.SolverData[] previewData;
-		string previewDataChecksum;
+		Editor rootGeneratorEditor;
 
 		SerializedProperty _settingsBasic;
 		SerializedProperty _settingsBasic_type;
@@ -32,6 +25,15 @@ namespace Unity.DemoTeam.Hair
 
 		SerializedProperty _strandGroups;
 		SerializedProperty _strandGroupsAutoBuild;
+
+		PreviewRenderUtility previewRenderer;
+
+		Material previewMaterial;
+		Vector2 previewAngle;
+		float previewZoom;
+
+		HairSim.SolverData[] previewData;
+		string previewDataChecksum;
 
 		void OnEnable()
 		{
@@ -69,6 +71,11 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDisable()
 		{
+			if (rootGeneratorEditor)
+			{
+				DestroyImmediate(rootGeneratorEditor);
+			}
+
 			ReleasePreviewData();
 
 			if (previewRenderer != null)
@@ -155,6 +162,15 @@ namespace Unity.DemoTeam.Hair
 				WarnIfMissingReadable(hairAsset.settingsProcedural.paintedParameters, "Painted Parameters");
 			}
 
+			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom)
+			{
+				var rootGenerator = hairAsset.settingsProcedural.placementGenerator as HairAssetBuilder.IRootGenerator;
+				if (rootGenerator == null)
+				{
+					EditorGUILayout.HelpBox("Configuration error: 'Placement Generator' must implement interface 'HairAssetBuilder.IGenerateRoots'", MessageType.Error);
+				}
+			}
+
 			return StructValidation.Pass;
 		}
 
@@ -178,8 +194,22 @@ namespace Unity.DemoTeam.Hair
 					case HairAsset.Type.Alembic:
 						StructPropertyFieldsWithHeader(_settingsAlembic, ValidationGUIAlembic, hairAsset);
 						break;
+
 					case HairAsset.Type.Procedural:
 						StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
+						{
+							if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom &&
+								hairAsset.settingsProcedural.placementGenerator is HairAssetBuilder.IRootGenerator)
+							{
+								Editor.CreateCachedEditor(hairAsset.settingsProcedural.placementGenerator, editorType: null, ref rootGeneratorEditor);
+								EditorGUILayout.Space();
+								EditorGUILayout.LabelField("Settings Custom Generator", EditorStyles.miniBoldLabel);
+								using (new EditorGUI.IndentLevelScope())
+								{
+									rootGeneratorEditor.DrawDefaultInspector();
+								}
+							}
+						}
 						break;
 				}
 			}

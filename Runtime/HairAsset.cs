@@ -71,7 +71,7 @@ namespace Unity.DemoTeam.Hair
 			public enum PlacementType
 			{
 				Primitive,
-				//Custom,//TODO support custom root/strand generators
+				Custom,
 				Mesh,
 			}
 
@@ -108,8 +108,8 @@ namespace Unity.DemoTeam.Hair
 			public PlacementType placement;
 			[VisibleIf(nameof(placement), PlacementType.Primitive), Tooltip("Place strands using builtin primitive generator")]
 			public PrimitiveType placementPrimitive;
-			//[VisibleIf(nameof(placement), PlacementType.Custom)]
-			//public ScriptableObject placementCustom;
+			[VisibleIf(nameof(placement), PlacementType.Custom)]
+			public ScriptableObject placementGenerator;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on specified triangle mesh")]
 			public Mesh placementMesh;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Included submesh indices")]
@@ -193,6 +193,7 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public float[] rootScale;
 			[HideInInspector] public Vector3[] rootPosition;
 			[HideInInspector] public Vector3[] rootDirection;
+			//[HideInInspector] public Vector2[] rootTexCoord;
 
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
