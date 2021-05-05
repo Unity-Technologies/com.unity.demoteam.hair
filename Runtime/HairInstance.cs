@@ -475,6 +475,10 @@ namespace Unity.DemoTeam.Hair
 				meshRenderer.renderingLayerMask = (uint)settingsStrands.strandLayers;
 
 				HairSim.PushSolverData(materialInstance, solverData);
+				HairSim.PushVolumeData(materialInstance, volumeData);
+
+				materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
+				materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
 
 				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_LIVE", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinLines);
 				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_LIVE_STRIPS", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinStrips);
