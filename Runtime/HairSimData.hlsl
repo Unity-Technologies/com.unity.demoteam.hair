@@ -14,6 +14,7 @@
 #define HAIRSIM_SOLVERDATA StructuredBuffer
 #endif
 
+StructuredBuffer<float2> _RootUV;					// xy: strand root uv
 StructuredBuffer<float> _RootScale;					// x: relative strand length [0..1] (to group maximum)
 StructuredBuffer<float4> _RootPosition;				// xyz: strand root position, w: -
 StructuredBuffer<float4> _RootDirection;			// xyz: strand root direction, w: -

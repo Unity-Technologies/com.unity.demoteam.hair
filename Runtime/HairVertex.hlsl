@@ -66,7 +66,6 @@ HairVertex GetHairVertex_Live(in uint particleID, in float2 particleUV)
 	float3 tangentWS = normalize(cross(bitangentWS, GetWorldSpaceNormalizeViewDir(positionWS)));
 	float3 normalWS = cross(tangentWS, bitangentWS);
 
-
 	HairVertex v;
 	{
 #if HAIR_VERTEX_LIVE_STRIPS
@@ -78,7 +77,7 @@ HairVertex GetHairVertex_Live(in uint particleID, in float2 particleUV)
 		v.tangentOS = TransformWorldToObjectNormal(tangentWS);
 		v.bitangentOS = TransformWorldToObjectNormal(bitangentWS);
 
-		v.rootUV = float2(0.0, 0.0);
+		v.rootUV = _RootUV[strandIndex];
 		v.strandUV = particleUV;
 		v.strandNormalTS.x = saturate(2.0 * particleUV.x - 1.0);
 		v.strandNormalTS.y = 0.0;

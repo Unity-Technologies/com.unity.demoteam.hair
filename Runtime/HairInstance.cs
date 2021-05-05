@@ -729,27 +729,29 @@ namespace Unity.DemoTeam.Hair
 
 				int strandGroupParticleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 
-				using (var tmpRootPosition = new NativeArray<Vector4>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (var tmpRootDirection = new NativeArray<Vector4>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (var tmpParticlePosition = new NativeArray<Vector4>(strandGroupParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var alignedRootPosition = new NativeArray<Vector4>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var alignedRootDirection = new NativeArray<Vector4>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var alignedParticlePosition = new NativeArray<Vector4>(strandGroupParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
 					unsafe
 					{
-						fixed (void* srcRootPosition = strandGroup.rootPosition)
-						fixed (void* srcRootDirection = strandGroup.rootDirection)
-						fixed (void* srcParticlePosition = strandGroup.particlePosition)
+						fixed (void* rootPositionPtr = strandGroup.rootPosition)
+						fixed (void* rootDirectionPtr = strandGroup.rootDirection)
+						fixed (void* particlePositionPtr = strandGroup.particlePosition)
 						{
-							UnsafeUtility.MemCpyStride(tmpRootPosition.GetUnsafePtr(), sizeof(Vector4), srcRootPosition, sizeof(Vector3), sizeof(Vector3), strandGroup.strandCount);
-							UnsafeUtility.MemCpyStride(tmpRootDirection.GetUnsafePtr(), sizeof(Vector4), srcRootDirection, sizeof(Vector3), sizeof(Vector3), strandGroup.strandCount);
-							UnsafeUtility.MemCpyStride(tmpParticlePosition.GetUnsafePtr(), sizeof(Vector4), srcParticlePosition, sizeof(Vector3), sizeof(Vector3), strandGroupParticleCount);
+							UnsafeUtility.MemCpyStride(alignedRootPosition.GetUnsafePtr(), sizeof(Vector4), rootPositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroup.strandCount);
+							UnsafeUtility.MemCpyStride(alignedRootDirection.GetUnsafePtr(), sizeof(Vector4), rootDirectionPtr, sizeof(Vector3), sizeof(Vector3), strandGroup.strandCount);
+							UnsafeUtility.MemCpyStride(alignedParticlePosition.GetUnsafePtr(), sizeof(Vector4), particlePositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupParticleCount);
 						}
 					}
 
+					if (strandGroup.rootUV != null)//TODO remove condition
+					solverData[i].rootUV.SetData(strandGroup.rootUV);
 					solverData[i].rootScale.SetData(strandGroup.rootScale);
-					solverData[i].rootPosition.SetData(tmpRootPosition);
-					solverData[i].rootDirection.SetData(tmpRootDirection);
+					solverData[i].rootPosition.SetData(alignedRootPosition);
+					solverData[i].rootDirection.SetData(alignedRootDirection);
 
-					solverData[i].particlePosition.SetData(tmpParticlePosition);
+					solverData[i].particlePosition.SetData(alignedParticlePosition);
 
 					// NOTE: the rest of these buffers are initialized in KInitParticles
 					//solverData[i].particlePositionPrev.SetData(tmpParticlePosition);

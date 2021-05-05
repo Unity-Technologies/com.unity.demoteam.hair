@@ -1,0 +1,17 @@
+{
+    "name": "HairSim_Demo",
+    "rootNamespace": "",
+    "references": [
+        "Unity.DemoTeam.Hair.Runtime",
+        "Unity.DemoTeam.Hair.Editor"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

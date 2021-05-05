@@ -203,7 +203,7 @@ namespace Unity.DemoTeam.Hair
 							{
 								Editor.CreateCachedEditor(hairAsset.settingsProcedural.placementGenerator, editorType: null, ref rootGeneratorEditor);
 								EditorGUILayout.Space();
-								EditorGUILayout.LabelField("Settings Custom Generator", EditorStyles.miniBoldLabel);
+								EditorGUILayout.LabelField("Settings Procedural Custom", EditorStyles.miniBoldLabel);
 								using (new EditorGUI.IndentLevelScope())
 								{
 									rootGeneratorEditor.DrawDefaultInspector();

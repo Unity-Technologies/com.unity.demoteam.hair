@@ -310,7 +310,8 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.particleMemoryLayout = memoryLayout;
 
 			// prep strand buffers
-			strandGroup.rootScale = new float[curveCount];
+			strandGroup.rootUV = new Vector2[curveCount];
+			strandGroup.rootScale = new float[curveCount];// written in FinalizeStrandGroup(..)
 			strandGroup.rootPosition = new Vector3[curveCount];
 			strandGroup.rootDirection = new Vector3[curveCount];
 			strandGroup.particlePosition = new Vector3[curveCount * curveVertexCount];
@@ -322,6 +323,7 @@ namespace Unity.DemoTeam.Hair
 					ref var p0 = ref curveVertexDataPosition[i * curveVertexCount];
 					ref var p1 = ref curveVertexDataPosition[i * curveVertexCount + 1];
 
+					strandGroup.rootUV[i] = Vector2.zero;//TODO alembic root UV's
 					strandGroup.rootPosition[i] = p0;
 					strandGroup.rootDirection[i] = Vector3.Normalize(p1 - p0);
 				}
@@ -390,7 +392,8 @@ namespace Unity.DemoTeam.Hair
 				strandGroup.particleMemoryLayout = memoryLayout;
 
 				// prep strand buffers
-				strandGroup.rootScale = new float[generatedStrandCount];
+				strandGroup.rootUV = new Vector2[generatedStrandCount];
+				strandGroup.rootScale = new float[generatedStrandCount];// written in FinalizeStrandGroup(..)
 				strandGroup.rootPosition = new Vector3[generatedStrandCount];
 				strandGroup.rootDirection = new Vector3[generatedStrandCount];
 				strandGroup.particlePosition = new Vector3[generatedStrandCount * generatedStrandParticleCount];
@@ -398,6 +401,7 @@ namespace Unity.DemoTeam.Hair
 				// populate strand buffers
 				if (generatedStrandCount * generatedStrandParticleCount > 0)
 				{
+					generatedRoots.rootUV.CopyTo(strandGroup.rootUV);
 					generatedRoots.rootPosition.CopyTo(strandGroup.rootPosition);
 					generatedRoots.rootDirection.CopyTo(strandGroup.rootDirection);
 					generatedStrands.particlePosition.CopyTo(strandGroup.particlePosition);
@@ -419,7 +423,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				unsafe
 				{
-					// calc strand lengths
+					// calc individual lengths
 					var strandLengthsPtr = (float*)strandLengths.GetUnsafePtr();
 
 					for (int i = 0; i != strandCount; i++)
@@ -489,7 +493,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					var indicesPtr = (int*)indices.GetUnsafePtr();
 
-					// write index buffer
+					// write indices
 					for (int i = 0; i != strandCount; i++)
 					{
 						*(indicesPtr++) = i;
@@ -531,38 +535,13 @@ namespace Unity.DemoTeam.Hair
 				var unormU0 = (uint)(UInt16.MaxValue * 0.5f);
 				var unormVk = UInt16.MaxValue / (float)perLineSegments;
 
-				using (var staticPos = new NativeArray<Vector3>(strandCount * perLineVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var staticDir = new NativeArray<Vector3>(strandCount * perLineVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 				using (var vertexID = new NativeArray<float>(strandCount * perLineVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 				using (var vertexUV = new NativeArray<uint>(strandCount * perLineVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 				using (var indices = new NativeArray<int>(strandCount * perLineIndices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 				{
-					var staticPosPtr = (Vector3*)staticPos.GetUnsafePtr();
-					var staticDirPtr = (Vector3*)staticDir.GetUnsafePtr();
-
 					var vertexIDPtr = (float*)vertexID.GetUnsafePtr();
 					var vertexUVPtr = (uint*)vertexUV.GetUnsafePtr();
 					var indicesPtr = (int*)indices.GetUnsafePtr();
-
-					// write static position, direction
-					for (int i = 0; i != strandCount; i++)
-					{
-						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-						for (int j = strandParticleBegin; j != strandParticleEnd - strandParticleStride; j += strandParticleStride)
-						{
-							ref var p0 = ref strandGroup.particlePosition[j];
-							ref var p1 = ref strandGroup.particlePosition[j + strandParticleStride];
-
-							*(staticPosPtr++) = p0;
-							*(staticDirPtr++) = Vector3.Normalize(p1 - p0);
-						}
-
-						var lastStaticDir = staticDirPtr[-1];
-
-						*(staticPosPtr++) = strandGroup.particlePosition[strandParticleEnd - strandParticleStride];
-						*(staticDirPtr++) = lastStaticDir;
-					}
 
 					// write vertex ID
 					for (int i = 0, k = 0; i != strandCount; i++)
@@ -589,7 +568,7 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					// write index buffer
+					// write indices
 					for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase++)
 					{
 						for (int j = 0; j != perLineSegments; j++, segmentBase++)
@@ -674,7 +653,7 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					// write index buffer
+					// write indices
 					for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase += 2)
 					{
 						for (int j = 0; j != perStripSegments; j++, segmentBase += 2)
@@ -730,14 +709,14 @@ namespace Unity.DemoTeam.Hair
 
 		public struct GeneratedRoots : IDisposable
 		{
-			public struct Params4
+			public struct StrandParameters
 			{
 				public float normalizedStrandLength;
 				public float normalizedStrandDiameter;
 				public float normalizedCurlRadius;
 				public float normalizedCurlSlope;
 
-				public static readonly Params4 defaults = new Params4()
+				public static readonly StrandParameters defaults = new StrandParameters()
 				{
 					normalizedStrandLength = 1.0f,
 					normalizedStrandDiameter = 1.0f,
@@ -747,33 +726,33 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public int strandCount;
+			public NativeArray<Vector2> rootUV;
 			public NativeArray<Vector3> rootPosition;
 			public NativeArray<Vector3> rootDirection;
-			public NativeArray<Vector2> rootTexCoord;
-			public NativeArray<Params4> rootParameters;// R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope
+			public NativeArray<StrandParameters> rootParameters;// R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope
 
 			public GeneratedRoots(int strandCount, Allocator allocator = Allocator.Temp)
 			{
 				this.strandCount = strandCount;
+				rootUV = new NativeArray<Vector2>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
 				rootPosition = new NativeArray<Vector3>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
 				rootDirection = new NativeArray<Vector3>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
-				rootTexCoord = new NativeArray<Vector2>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
-				rootParameters = new NativeArray<Params4>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				rootParameters = new NativeArray<StrandParameters>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
 			}
 
-			public unsafe void GetUnsafePtrs(out Vector3* rootPositionPtr, out Vector3* rootDirectionPtr, out Vector2* rootTexCoordPtr, out Params4* rootParametersPtr)
+			public unsafe void GetUnsafePtrs(out Vector3* rootPositionPtr, out Vector3* rootDirectionPtr, out Vector2* rootUVPtr, out StrandParameters* rootParametersPtr)
 			{
+				rootUVPtr = (Vector2*)rootUV.GetUnsafePtr();
 				rootPositionPtr = (Vector3*)rootPosition.GetUnsafePtr();
 				rootDirectionPtr = (Vector3*)rootDirection.GetUnsafePtr();
-				rootTexCoordPtr = (Vector2*)rootTexCoord.GetUnsafePtr();
-				rootParametersPtr = (Params4*)rootParameters.GetUnsafePtr();
+				rootParametersPtr = (StrandParameters*)rootParameters.GetUnsafePtr();
 			}
 
 			public void Dispose()
 			{
+				rootUV.Dispose();
 				rootPosition.Dispose();
 				rootDirection.Dispose();
-				rootTexCoord.Dispose();
 				rootParameters.Dispose();
 			}
 		}
@@ -829,78 +808,74 @@ namespace Unity.DemoTeam.Hair
 		{
 			generatedRoots.GetUnsafePtrs(out var rootPos, out var rootDir, out var rootUV0, out var rootVar);
 
+			var randSeq = new Unity.Mathematics.Random(257);
+
 			switch (settings.placementPrimitive)
 			{
 				case HairAsset.SettingsProcedural.PrimitiveType.Curtain:
 					{
-						var strandSpan = 1.0f;
-						var strandInterval = strandSpan / (settings.strandCount - 1);
+						var step = 1.0f / (settings.strandCount - 1);
 
-						var startPos = (-0.5f * strandSpan) * Vector3.right;
-						var startDir = Vector3.down;
+						var localDim = new Vector3(1.0f, 0.0f, 0.0f);
+						var localDir = Vector3.down;
 
 						for (int i = 0; i != settings.strandCount; i++)
 						{
-							rootPos[i] = startPos + i * strandInterval * Vector3.right;
-							rootDir[i] = startDir;
-							rootUV0[i] = Vector2.zero;
+							var uv = new Vector2(i * step, 0.5f);
+
+							rootPos[i] = new Vector3(localDim.x * (uv.x - 0.5f), 0.0f, 0.0f);
+							rootDir[i] = localDir;
+							rootUV0[i] = uv;
 						}
 					}
 					break;
 
 				case HairAsset.SettingsProcedural.PrimitiveType.StratifiedCurtain:
 					{
-						var strandSpan = 1.0f;
-						var strandInterval = strandSpan / settings.strandCount;
-						var strandIntervalNoise = 0.5f;
+						var step = 1.0f / settings.strandCount;
 
-						var xorshift = new Unity.Mathematics.Random(257);
+						var localDim = new Vector3(1.0f, 0.0f, step);
+						var localDir = Vector3.down;
 
 						for (int i = 0; i != settings.strandCount; i++)
 						{
-							var localRnd = strandIntervalNoise * xorshift.NextFloat2(-1.0f, 1.0f);
-							var localPos = -0.5f * strandSpan + (i + 0.5f + 0.5f * localRnd.x) * strandInterval;
+							var uvCell = randSeq.NextFloat2(0.0f, 1.0f);
+							var uv = new Vector2((i + uvCell.x) * step, uvCell.y);
 
-							rootPos[i] = new Vector3(localPos, 0.0f, 0.5f * localRnd.y * strandInterval);
-							rootDir[i] = Vector3.down;
-							rootUV0[i] = Vector2.zero;
+							rootPos[i] = new Vector3(localDim.x * (uv.x - 0.5f), 0.0f, localDim.z * (uv.y - 0.5f));
+							rootDir[i] = localDir;
+							rootUV0[i] = uv;
 						}
 					}
 					break;
 
 				case HairAsset.SettingsProcedural.PrimitiveType.Brush:
 					{
-						var localExt = 0.5f * Vector3.one;
-						var localMin = new Vector2(-localExt.x, -localExt.z);
-						var localMax = new Vector2(localExt.x, localExt.z);
-
-						var xorshift = new Unity.Mathematics.Random(257);
+						var localDim = new Vector3(1.0f, 0.0f, 1.0f);
+						var localDir = Vector3.down;
 
 						for (int i = 0; i != settings.strandCount; i++)
 						{
-							var localPos = xorshift.NextFloat2(localMin, localMax);
+							var uv = randSeq.NextFloat2(0.0f, 1.0f);
 
-							rootPos[i] = new Vector3(localPos.x, 0.0f, localPos.y);
-							rootDir[i] = Vector3.down;
-							rootUV0[i] = Vector2.zero;
+							rootPos[i] = new Vector3(localDim.x * (uv.x - 0.5f), 0.0f, localDim.z * (uv.y - 0.5f));
+							rootDir[i] = localDir;
+							rootUV0[i] = uv;
 						}
 					}
 					break;
 
 				case HairAsset.SettingsProcedural.PrimitiveType.Cap:
 					{
-						var localExt = 0.5f;
-						var xorshift = new Unity.Mathematics.Random(257);
-
 						for (int i = 0; i != settings.strandCount; i++)
 						{
-							var localDir = xorshift.NextFloat3Direction();
+							var localDir = randSeq.NextFloat3Direction();
 							if (localDir.y < 0.0f)
 								localDir.y = -localDir.y;
 
-							rootPos[i] = (Vector3)localDir * localExt;
-							rootDir[i] = (Vector3)localDir;
-							rootUV0[i] = Vector2.zero;
+							rootPos[i] = new Vector3(localDir.x * 0.5f, localDir.y * 0.5f, localDir.z * 0.5f);
+							rootDir[i] = localDir;
+							rootUV0[i] = new Vector2(localDir.x * 0.5f + 0.5f, localDir.z * 0.5f + 0.5f);
 						}
 					}
 					break;
@@ -908,7 +883,7 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != settings.strandCount; i++)
 			{
-				rootVar[i] = GeneratedRoots.Params4.defaults;
+				rootVar[i] = GeneratedRoots.StrandParameters.defaults;
 			}
 
 			return true;// success
@@ -1000,7 +975,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					for (int i = 0; i != settings.strandCount; i++)
 					{
-						rootVar[i] = GeneratedRoots.Params4.defaults;
+						rootVar[i] = GeneratedRoots.StrandParameters.defaults;
 					}
 				}
 			}

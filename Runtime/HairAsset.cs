@@ -120,6 +120,10 @@ namespace Unity.DemoTeam.Hair
 			public Texture2D paintedDirection;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Use strand parameters from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)")]
 			public Texture2D paintedParameters;
+			//[ToggleGroup, Tooltip("Randomization seed")]
+			//public bool seed;
+			//[ToggleGroupItem, Min(1)]
+			//public uint seedValue;
 
 			[LineHeader("Strands")]
 
@@ -155,12 +159,14 @@ namespace Unity.DemoTeam.Hair
 			{
 				placement = PlacementType.Primitive,
 				placementPrimitive = PrimitiveType.Curtain,
-				//placementCustom = null,
+				placementGenerator = null,
 				placementMesh = null,
 				placementMeshInclude = (SubmeshMask)(-1),
 				placementDensity = null,
 				paintedDirection = null,
 				paintedParameters = null,
+				//seed = false,
+				//seedValue = 1,
 
 				strandCount = 64,
 				strandParticleCount = 32,
@@ -190,10 +196,10 @@ namespace Unity.DemoTeam.Hair
 
 			[HideInInspector] public Bounds bounds;
 
+			[HideInInspector] public Vector2[] rootUV;
 			[HideInInspector] public float[] rootScale;
 			[HideInInspector] public Vector3[] rootPosition;
 			[HideInInspector] public Vector3[] rootDirection;
-			//[HideInInspector] public Vector2[] rootTexCoord;
 
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;

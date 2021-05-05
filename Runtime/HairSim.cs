@@ -57,6 +57,7 @@ namespace Unity.DemoTeam.Hair
 			// solver
 			public static int SolverCBuffer;
 
+			public static int _RootUV;
 			public static int _RootScale;
 			public static int _RootPosition;
 			public static int _RootDirection;
@@ -466,25 +467,29 @@ namespace Unity.DemoTeam.Hair
 			{
 				bool changed = false;
 
+				int stride1 = sizeof(float);
+				int stride2 = sizeof(Vector2);
+				int stride4 = sizeof(Vector4);
+
 				int particleCount = strandCount * strandParticleCount;
-				int particleStride = sizeof(Vector4);
 
 				changed |= CreateBuffer(ref solverData.cbufferStorage, "SolverCBuffer", 1, UnsafeUtility.SizeOf<SolverCBuffer>(), ComputeBufferType.Constant);
 
-				changed |= CreateBuffer(ref solverData.rootScale, "RootScale", strandCount, sizeof(float));
-				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStride);
-				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStride);
-				changed |= CreateBuffer(ref solverData.rootFrame, "RootFrame", strandCount, particleStride);
+				changed |= CreateBuffer(ref solverData.rootUV, "RootUV", strandCount, stride2);
+				changed |= CreateBuffer(ref solverData.rootScale, "RootScale", strandCount, stride1);
+				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, stride4);
+				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, stride4);
+				changed |= CreateBuffer(ref solverData.rootFrame, "RootFrame", strandCount, stride4);
 
-				changed |= CreateBuffer(ref solverData.initialRootFrame, "InitialRootFrame", strandCount, particleStride);
-				changed |= CreateBuffer(ref solverData.initialParticleOffset, "InitialParticleOffset", particleCount, particleStride);
-				changed |= CreateBuffer(ref solverData.initialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStride);
+				changed |= CreateBuffer(ref solverData.initialRootFrame, "InitialRootFrame", strandCount, stride4);
+				changed |= CreateBuffer(ref solverData.initialParticleOffset, "InitialParticleOffset", particleCount, stride4);
+				changed |= CreateBuffer(ref solverData.initialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, stride4);
 
-				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, particleStride);
-				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, particleStride);
-				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, particleStride);
-				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStride);
-				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStride);
+				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, stride4);
+				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, stride4);
+				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, stride4);
+				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, stride4);
+				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, stride4);
 
 				return changed;
 			}
@@ -532,6 +537,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			ReleaseBuffer(ref solverData.cbufferStorage);
 
+			ReleaseBuffer(ref solverData.rootUV);
 			ReleaseBuffer(ref solverData.rootScale);
 			ReleaseBuffer(ref solverData.rootPosition);
 			ReleaseBuffer(ref solverData.rootDirection);
@@ -911,6 +917,7 @@ namespace Unity.DemoTeam.Hair
 			target.PushKeyword("ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
 			target.PushKeyword("ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
 
+			target.PushComputeBuffer(UniformIDs._RootUV, solverData.rootUV);
 			target.PushComputeBuffer(UniformIDs._RootScale, solverData.rootScale);
 			target.PushComputeBuffer(UniformIDs._RootPosition, solverData.rootPosition);
 			target.PushComputeBuffer(UniformIDs._RootDirection, solverData.rootDirection);

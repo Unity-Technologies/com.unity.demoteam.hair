@@ -8,11 +8,12 @@ namespace Unity.DemoTeam.Hair
 	{
 		public struct SolverData
 		{
-			public SolverCBuffer cbuffer;
 			public SolverKeywords keywords;
 
+			public SolverCBuffer cbuffer;
 			public ComputeBuffer cbufferStorage;		// constant buffer storage
 
+			public ComputeBuffer rootUV;				// xy: strand root uv
 			public ComputeBuffer rootScale;				// x: relative strand length [0..1] (to group maximum)
 			public ComputeBuffer rootPosition;			// xyz: strand root position, w: -
 			public ComputeBuffer rootDirection;			// xyz: strand root direction, w: -
@@ -29,6 +30,22 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: weight
 
 			public HairAsset.MemoryLayout memoryLayout;
+		}
+
+		public struct SolverKeywords
+		{
+			public bool LAYOUT_INTERLEAVED;
+			public bool ENABLE_BOUNDARY;
+			public bool ENABLE_BOUNDARY_FRICTION;
+			public bool ENABLE_DISTANCE;
+			public bool ENABLE_DISTANCE_LRA;
+			public bool ENABLE_DISTANCE_FTL;
+			public bool ENABLE_CURVATURE_EQ;
+			public bool ENABLE_CURVATURE_GEQ;
+			public bool ENABLE_CURVATURE_LEQ;
+			public bool ENABLE_POSE_LOCAL_BEND_TWIST;
+			public bool ENABLE_POSE_GLOBAL_POSITION;
+			public bool ENABLE_POSE_GLOBAL_ROTATION;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
@@ -70,27 +87,11 @@ namespace Unity.DemoTeam.Hair
 			public float _GlobalFadeExtent;
 		}
 
-		public struct SolverKeywords
-		{
-			public bool LAYOUT_INTERLEAVED;
-			public bool ENABLE_BOUNDARY;
-			public bool ENABLE_BOUNDARY_FRICTION;
-			public bool ENABLE_DISTANCE;
-			public bool ENABLE_DISTANCE_LRA;
-			public bool ENABLE_DISTANCE_FTL;
-			public bool ENABLE_CURVATURE_EQ;
-			public bool ENABLE_CURVATURE_GEQ;
-			public bool ENABLE_CURVATURE_LEQ;
-			public bool ENABLE_POSE_LOCAL_BEND_TWIST;
-			public bool ENABLE_POSE_GLOBAL_POSITION;
-			public bool ENABLE_POSE_GLOBAL_ROTATION;
-		}
-
 		public struct VolumeData
 		{
-			public VolumeCBuffer cbuffer;
 			public VolumeKeywords keywords;
 
+			public VolumeCBuffer cbuffer;
 			public ComputeBuffer cbufferStorage;		// constant buffer storage
 
 			public RenderTexture accuWeight;			// x: fp accumulated weight
@@ -124,6 +125,13 @@ namespace Unity.DemoTeam.Hair
 			public int boundaryPrevCount;
 			public int boundaryPrevCountDiscard;
 			public int boundaryPrevCountUnknown;
+		}
+
+		public struct VolumeKeywords
+		{
+			public bool VOLUME_SUPPORT_CONTRACTION;
+			public bool VOLUME_TARGET_INITIAL_POSE;
+			public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
@@ -165,13 +173,6 @@ namespace Unity.DemoTeam.Hair
 
 			public float _BoundaryWorldEpsilon;
 			public float _BoundaryWorldMargin;
-		}
-
-		public struct VolumeKeywords
-		{
-			public bool VOLUME_SUPPORT_CONTRACTION;
-			public bool VOLUME_TARGET_INITIAL_POSE;
-			public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
 		}
 	}
 }
