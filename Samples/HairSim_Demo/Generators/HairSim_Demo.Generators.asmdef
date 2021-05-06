@@ -1,10 +1,14 @@
 {
-    "name": "HairSim_Demo",
+    "name": "HairSim_Demo.Generators",
     "rootNamespace": "",
-    "references": [],
-    "includePlatforms": [],
+    "references": [
+        "GUID:8f7035be1433e7b42bb810f12982480e"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": false,
