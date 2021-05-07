@@ -7,9 +7,6 @@ namespace Unity.DemoTeam.Hair
 	public class HairInstanceUpdater
 	{
 		static bool s_initialized = false;
-		static bool s_initializedSceneViews = false;
-
-		static HashSet<SceneView> s_sceneViews = new HashSet<SceneView>();
 
 		[InitializeOnLoadMethod]
 		static void StaticInitialize()
@@ -17,7 +14,6 @@ namespace Unity.DemoTeam.Hair
 			if (s_initialized == false)
 			{
 				EditorApplication.update += ConditionalPlayerLoop;
-				SceneView.duringSceneGui += AddSceneView;
 
 				s_initialized = true;
 			}
@@ -44,27 +40,18 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		static void AddSceneView(SceneView sceneView)
-		{
-			if (s_sceneViews.Contains(sceneView) == false)
-				s_sceneViews.Add(sceneView);
-
-			s_initializedSceneViews = true;
-		}
-
 		static bool AnySceneViewAlwaysRefresh()
 		{
-			s_sceneViews.RemoveWhere(sceneView => (sceneView == null));
-
-			foreach (var sceneView in s_sceneViews)
+			var sceneViews = SceneView.sceneViews;
+			for (int i = 0; i != sceneViews.Count; i++)
 			{
-				if (sceneView.sceneViewState.alwaysRefreshEnabled)
+				var sceneView = sceneViews[i] as SceneView;
+				if (sceneView != null && sceneView.sceneViewState.alwaysRefreshEnabled)
 				{
 					return true;
 				}
 			}
-
-			return !s_initializedSceneViews;
+			return false;
 		}
 	}
 }
