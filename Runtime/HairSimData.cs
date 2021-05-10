@@ -114,7 +114,7 @@ namespace Unity.DemoTeam.Hair
 			//public float allGroupsMaxStrandLength;
 
 			public RenderTexture boundarySDF;			// x: signed distance to arbitrary solid
-			public RenderTexture boundarySDFDummy;		// (placeholder for when inactive)
+			public RenderTexture boundarySDF_undefined;	// (placeholder for when inactive)
 
 			public ComputeBuffer boundaryShape;			// arr(HairBoundary.RuntimeShape.Data)
 			public ComputeBuffer boundaryMatrix;		// arr(float4x4): local to world

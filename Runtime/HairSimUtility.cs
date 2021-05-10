@@ -60,9 +60,9 @@ namespace Unity.DemoTeam.Hair
 			return true;
 		}
 
-		public static bool CreateVolume(ref RenderTexture volume, string name, int cells, GraphicsFormat format)
+		public static bool CreateVolume(ref RenderTexture volume, string name, int cellCount, GraphicsFormat cellFormat)
 		{
-			if (volume != null && volume.width == cells && volume.graphicsFormat == format)
+			if (volume != null && volume.width == cellCount && volume.graphicsFormat == cellFormat)
 				return false;
 
 			if (volume != null)
@@ -71,10 +71,10 @@ namespace Unity.DemoTeam.Hair
 			RenderTextureDescriptor volumeDesc = new RenderTextureDescriptor()
 			{
 				dimension = TextureDimension.Tex3D,
-				width = cells,
-				height = cells,
-				volumeDepth = cells,
-				graphicsFormat = format,
+				width = cellCount,
+				height = cellCount,
+				volumeDepth = cellCount,
+				graphicsFormat = cellFormat,
 				enableRandomWrite = true,
 				msaaSamples = 1,
 			};

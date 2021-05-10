@@ -362,6 +362,7 @@ void SolveMaterialFrameBendTwistConstraint(
 
 	// apply eq. 40 to calc corrections
 	float W_inv = stiffness / (w0 + w1);
+	GUARD(W_inv > 0.0)
 	{
 		delta.w = 0.0;// zero scalar part
 		d0 += (w0 * W_inv) * QMul(q1, delta);
@@ -385,6 +386,7 @@ void SolveMaterialFrameStretchShearConstraint(
 
 	// apply eq. 37 to calc corrections
 	float W_inv = stiffness / (w0 + w1 + 4.0 * wq * distance0 * distance0);
+	GUARD(W_inv > 0.0)
 	{
 		d0 += (w0 * W_inv * distance0) * r;
 		d1 -= (w1 * W_inv * distance0) * r;

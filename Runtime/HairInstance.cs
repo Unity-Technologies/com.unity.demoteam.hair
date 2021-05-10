@@ -194,7 +194,7 @@ namespace Unity.DemoTeam.Hair
 
 		void OnValidate()
 		{
-			volumeSettings.volumeGridResolution = (Mathf.Max(8, volumeSettings.volumeGridResolution) / 8) * 8;
+			volumeSettings.gridResolution = (Mathf.Max(8, volumeSettings.gridResolution) / 8) * 8;
 		}
 
 		void OnDrawGizmos()
@@ -658,7 +658,7 @@ namespace Unity.DemoTeam.Hair
 			HairSim.UpdateVolumeBoundaries(cmd, ref volumeData, volumeSettings, simulationBounds);
 
 			// pre-step volume if resolution changed
-			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false))
+			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings))
 			{
 				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
@@ -706,7 +706,7 @@ namespace Unity.DemoTeam.Hair
 				return true;
 
 			// prep volume data
-			HairSim.PrepareVolumeData(ref volumeData, volumeSettings.volumeGridResolution, halfPrecision: false);
+			HairSim.PrepareVolumeData(ref volumeData, volumeSettings);
 
 			volumeData.allGroupsMaxParticleInterval = 0.0f;
 

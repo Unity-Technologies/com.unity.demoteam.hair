@@ -279,6 +279,12 @@ namespace Unity.DemoTeam.Hair
 				RasterizationNoGS,
 			}
 
+			public enum GridPrecision
+			{
+				Full,
+				Half,
+			}
+
 			public enum PressureSolution
 			{
 				DensityEquals,
@@ -298,17 +304,20 @@ namespace Unity.DemoTeam.Hair
 				IncludeColliders,
 			}
 
-			public SplatMethod volumeSplatMethod;
+			[UnityEngine.Serialization.FormerlySerializedAs("volumeSplatMethod")]
+			public SplatMethod splatMethod;
 			[ToggleGroup]
-			public bool volumeSplatDebug;
+			public bool splatDebug;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 9.0f)]
-			public float volumeSplatDebugWidth;
-			[Range(8, 160)]
-			public int volumeGridResolution;
+			public float splatDebugWidth;
+
+			[UnityEngine.Serialization.FormerlySerializedAs("volumeSplatMethod"), Range(8, 160)]
+			public int gridResolution;
+			public GridPrecision gridPrecision;
 			[HideInInspector, Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
-			public bool volumeGridStaggered;
+			public bool gridStaggered;
 			[HideInInspector]
-			public bool volumeGridSquare;
+			public bool gridSquare;
 
 			[LineHeader("Pressure")]
 
@@ -336,13 +345,14 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
-				volumeSplatMethod = SplatMethod.Compute,
-				volumeSplatDebug = false,
-				volumeSplatDebugWidth = 1.0f,
+				splatMethod = SplatMethod.Compute,
+				splatDebug = false,
+				splatDebugWidth = 1.0f,
 
-				volumeGridResolution = 32,
-				volumeGridStaggered = false,
-				volumeGridSquare = true,
+				gridResolution = 32,
+				gridPrecision = GridPrecision.Full,
+				gridStaggered = false,
+				gridSquare = true,
 
 				pressureIterations = 3,
 				pressureSolution = PressureSolution.DensityLessThan,
@@ -467,62 +477,65 @@ namespace Unity.DemoTeam.Hair
 			{
 				bool changed = false;
 
-				int stride1 = sizeof(float);
-				int stride2 = sizeof(Vector2);
-				int stride4 = sizeof(Vector4);
-
 				int particleCount = strandCount * strandParticleCount;
 
-				changed |= CreateBuffer(ref solverData.cbufferStorage, "SolverCBuffer", 1, UnsafeUtility.SizeOf<SolverCBuffer>(), ComputeBufferType.Constant);
+				int particleStrideScalar = sizeof(float);
+				int particleStrideVector2 = sizeof(Vector2);
+				int particleStrideVector4 = sizeof(Vector4);
 
-				changed |= CreateBuffer(ref solverData.rootUV, "RootUV", strandCount, stride2);
-				changed |= CreateBuffer(ref solverData.rootScale, "RootScale", strandCount, stride1);
-				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, stride4);
-				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, stride4);
-				changed |= CreateBuffer(ref solverData.rootFrame, "RootFrame", strandCount, stride4);
+				changed |= CreateBuffer(ref solverData.cbufferStorage, "SolverCBuffer", 1, sizeof(SolverCBuffer), ComputeBufferType.Constant);
 
-				changed |= CreateBuffer(ref solverData.initialRootFrame, "InitialRootFrame", strandCount, stride4);
-				changed |= CreateBuffer(ref solverData.initialParticleOffset, "InitialParticleOffset", particleCount, stride4);
-				changed |= CreateBuffer(ref solverData.initialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, stride4);
+				changed |= CreateBuffer(ref solverData.rootUV, "RootUV", strandCount, particleStrideVector2);
+				changed |= CreateBuffer(ref solverData.rootScale, "RootScale", strandCount, particleStrideScalar);
+				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.rootFrame, "RootFrame", strandCount, particleStrideVector4);
 
-				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, stride4);
-				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, stride4);
-				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, stride4);
-				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, stride4);
-				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, stride4);
+				changed |= CreateBuffer(ref solverData.initialRootFrame, "InitialRootFrame", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.initialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.initialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStrideVector4);
+
+				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStrideVector4);
 
 				return changed;
 			}
 		}
 
-		public static bool PrepareVolumeData(ref VolumeData volumeData, int volumeCellCount, bool halfPrecision)
+		public static bool PrepareVolumeData(ref VolumeData volumeData, in VolumeSettings volumeSettings)
 		{
 			unsafe
 			{
 				bool changed = false;
 
-				changed |= CreateBuffer(ref volumeData.cbufferStorage, "VolumeCBuffer", 1, UnsafeUtility.SizeOf<VolumeCBuffer>(), ComputeBufferType.Constant);
+				var cellCount = volumeSettings.gridResolution;
+				var cellPrecision = volumeSettings.gridPrecision;
 
-				changed |= CreateVolume(ref volumeData.accuWeight, "AccuWeight", volumeCellCount, GraphicsFormat.R32_SInt);//TODO switch to R16_SInt ?
-				changed |= CreateVolume(ref volumeData.accuWeight0, "AccuWeight0", volumeCellCount, GraphicsFormat.R32_SInt);
-				changed |= CreateVolume(ref volumeData.accuVelocityX, "AccuVelocityX", volumeCellCount, GraphicsFormat.R32_SInt);
-				changed |= CreateVolume(ref volumeData.accuVelocityY, "AccuVelocityY", volumeCellCount, GraphicsFormat.R32_SInt);
-				changed |= CreateVolume(ref volumeData.accuVelocityZ, "AccuVelocityZ", volumeCellCount, GraphicsFormat.R32_SInt);
+				var cellFormatAccu = GraphicsFormat.R32_SInt;//TODO switch to R16_SInt ?
+				var cellFormatScalar = (cellPrecision == VolumeSettings.GridPrecision.Half) ? RenderTextureFormat.RHalf : RenderTextureFormat.RFloat;
+				var cellFormatVector = (cellPrecision == VolumeSettings.GridPrecision.Half) ? RenderTextureFormat.ARGBHalf : RenderTextureFormat.ARGBFloat;
 
-				var fmtFloatR = halfPrecision ? RenderTextureFormat.RHalf : RenderTextureFormat.RFloat;
-				var fmtFloatRGBA = halfPrecision ? RenderTextureFormat.ARGBHalf : RenderTextureFormat.ARGBFloat;
-				{
-					changed |= CreateVolume(ref volumeData.volumeDensity, "VolumeDensity", volumeCellCount, fmtFloatR);
-					changed |= CreateVolume(ref volumeData.volumeDensity0, "VolumeDensity0", volumeCellCount, fmtFloatR);
-					changed |= CreateVolume(ref volumeData.volumeVelocity, "VolumeVelocity", volumeCellCount, fmtFloatRGBA);
-					changed |= CreateVolume(ref volumeData.volumeDivergence, "VolumeDivergence", volumeCellCount, fmtFloatR);
+				changed |= CreateBuffer(ref volumeData.cbufferStorage, "VolumeCBuffer", 1, sizeof(VolumeCBuffer), ComputeBufferType.Constant);
 
-					changed |= CreateVolume(ref volumeData.volumePressure, "VolumePressure_0", volumeCellCount, fmtFloatR);
-					changed |= CreateVolume(ref volumeData.volumePressureNext, "VolumePressure_1", volumeCellCount, fmtFloatR);
-					changed |= CreateVolume(ref volumeData.volumePressureGrad, "VolumePressureGrad", volumeCellCount, fmtFloatRGBA);
-				}
+				changed |= CreateVolume(ref volumeData.accuWeight, "AccuWeight", cellCount, cellFormatAccu);//TODO switch to R16_SInt ?
+				changed |= CreateVolume(ref volumeData.accuWeight0, "AccuWeight0", cellCount, cellFormatAccu);
+				changed |= CreateVolume(ref volumeData.accuVelocityX, "AccuVelocityX", cellCount, cellFormatAccu);
+				changed |= CreateVolume(ref volumeData.accuVelocityY, "AccuVelocityY", cellCount, cellFormatAccu);
+				changed |= CreateVolume(ref volumeData.accuVelocityZ, "AccuVelocityZ", cellCount, cellFormatAccu);
 
-				changed |= CreateVolume(ref volumeData.boundarySDFDummy, "BoundarySDFDummy", 1, RenderTextureFormat.RHalf);
+				changed |= CreateVolume(ref volumeData.volumeDensity, "VolumeDensity", cellCount, cellFormatScalar);
+				changed |= CreateVolume(ref volumeData.volumeDensity0, "VolumeDensity0", cellCount, cellFormatScalar);
+				changed |= CreateVolume(ref volumeData.volumeVelocity, "VolumeVelocity", cellCount, cellFormatVector);
+
+				changed |= CreateVolume(ref volumeData.volumeDivergence, "VolumeDivergence", cellCount, cellFormatScalar);
+				changed |= CreateVolume(ref volumeData.volumePressure, "VolumePressure_0", cellCount, cellFormatScalar);
+				changed |= CreateVolume(ref volumeData.volumePressureNext, "VolumePressure_1", cellCount, cellFormatScalar);
+				changed |= CreateVolume(ref volumeData.volumePressureGrad, "VolumePressureGrad", cellCount, cellFormatVector);
+
+				changed |= CreateVolume(ref volumeData.boundarySDF_undefined, "BoundarySDF_undefined", 1, RenderTextureFormat.RHalf);
 
 				changed |= CreateBuffer(ref volumeData.boundaryShape, "BoundaryShape", MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
 				changed |= CreateBuffer(ref volumeData.boundaryMatrix, "BoundaryMatrix", MAX_BOUNDARIES, sizeof(Matrix4x4));
@@ -575,7 +588,7 @@ namespace Unity.DemoTeam.Hair
 			ReleaseVolume(ref volumeData.volumePressureNext);
 			ReleaseVolume(ref volumeData.volumePressureGrad);
 
-			ReleaseVolume(ref volumeData.boundarySDFDummy);
+			ReleaseVolume(ref volumeData.boundarySDF_undefined);
 
 			ReleaseBuffer(ref volumeData.boundaryShape);
 			ReleaseBuffer(ref volumeData.boundaryMatrix);
@@ -865,7 +878,7 @@ namespace Unity.DemoTeam.Hair
 			ref var keywords = ref volumeData.keywords;
 
 			// update grid parameters
-			cbuffer._VolumeCells = volumeSettings.volumeGridResolution * Vector3.one;
+			cbuffer._VolumeCells = volumeSettings.gridResolution * Vector3.one;
 			cbuffer._VolumeWorldMin = volumeBounds.min;
 			cbuffer._VolumeWorldMax = volumeBounds.max;
 
@@ -874,7 +887,7 @@ namespace Unity.DemoTeam.Hair
 			float resolveUnitVolume = (1000.0f * volumeData.allGroupsMaxParticleInterval) * resolveCrossSection;
 
 			cbuffer._ResolveUnitVolume = resolveUnitVolume * (strandScale * strandScale * strandScale);
-			cbuffer._ResolveUnitDebugWidth = volumeSettings.volumeSplatDebugWidth;
+			cbuffer._ResolveUnitDebugWidth = volumeSettings.splatDebugWidth;
 
 			// update pressure parameters
 			cbuffer._TargetDensityFactor = volumeSettings.targetDensityInfluence;
@@ -960,7 +973,7 @@ namespace Unity.DemoTeam.Hair
 			target.PushComputeTexture(UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
 			target.PushComputeTexture(UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
 
-			target.PushComputeTexture(UniformIDs._BoundarySDF, (volumeData.boundarySDF != null) ? volumeData.boundarySDF : volumeData.boundarySDFDummy);
+			target.PushComputeTexture(UniformIDs._BoundarySDF, (volumeData.boundarySDF != null) ? volumeData.boundarySDF : volumeData.boundarySDF_undefined);
 
 			target.PushComputeBuffer(UniformIDs._BoundaryShape, volumeData.boundaryShape);
 			target.PushComputeBuffer(UniformIDs._BoundaryMatrix, volumeData.boundaryMatrix);
@@ -1060,9 +1073,9 @@ namespace Unity.DemoTeam.Hair
 
 		private static void StepVolumeData_Clear(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings)
 		{
-			int numX = volumeSettings.volumeGridResolution / 8;
-			int numY = volumeSettings.volumeGridResolution / 8;
-			int numZ = volumeSettings.volumeGridResolution;
+			int numX = volumeSettings.gridResolution / 8;
+			int numY = volumeSettings.gridResolution / 8;
+			int numZ = volumeSettings.gridResolution;
 
 			// clear
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
@@ -1083,7 +1096,7 @@ namespace Unity.DemoTeam.Hair
 			// accumulate
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat))
 			{
-				switch (volumeSettings.volumeSplatMethod)
+				switch (volumeSettings.splatMethod)
 				{
 					case VolumeSettings.SplatMethod.Compute:
 						{
@@ -1148,12 +1161,12 @@ namespace Unity.DemoTeam.Hair
 
 		private static void StepVolumeData_Resolve(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings)
 		{
-			int numX = volumeSettings.volumeGridResolution / 8;
-			int numY = volumeSettings.volumeGridResolution / 8;
-			int numZ = volumeSettings.volumeGridResolution;
+			int numX = volumeSettings.gridResolution / 8;
+			int numY = volumeSettings.gridResolution / 8;
+			int numZ = volumeSettings.gridResolution;
 
 			// resolve accumulated
-			switch (volumeSettings.volumeSplatMethod)
+			switch (volumeSettings.splatMethod)
 			{
 				case VolumeSettings.SplatMethod.Compute:
 				case VolumeSettings.SplatMethod.ComputeSplit:
