@@ -1185,7 +1185,7 @@ namespace Unity.DemoTeam.Hair
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_2_ResolveFromRasterization))
 						{
 							PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeResolveFromRasterization, volumeData);
-							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolveFromRasterization, numX, numX, numX);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolveFromRasterization, numX, numY, numZ);
 						}
 					}
 					break;
