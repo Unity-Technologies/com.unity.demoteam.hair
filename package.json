@@ -11,6 +11,6 @@
     "com.unity.collections": "0.15.0-preview.21",
     "com.unity.render-pipelines.core": "10.2.2",
     "com.unity.render-pipelines.high-definition": "10.2.2",
-    "com.unity.formats.alembic": "2.2.0-exp.2"
+    "com.unity.formats.alembic": "2.2.0-pre.4"
   }
 }

@@ -139,7 +139,7 @@ namespace Unity.DemoTeam.Hair
 			}
 			return StructValidation.Pass;
 #else
-			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.0-exp.2", MessageType.Warning, wide: true);
+			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.0-pre.4", MessageType.Warning, wide: true);
 			return StructValidation.Inaccessible;
 #endif
 		}
