@@ -69,6 +69,7 @@ namespace Unity.DemoTeam.Hair
 
 			public static int _ParticlePosition;
 			public static int _ParticlePositionPrev;
+			public static int _ParticlePositionPrevPrev;
 			public static int _ParticlePositionCorr;
 			public static int _ParticleVelocity;
 			public static int _ParticleVelocityPrev;
@@ -166,6 +167,8 @@ namespace Unity.DemoTeam.Hair
 			public Method method;
 			[Range(1, 100), Tooltip("Constraint iterations")]
 			public int iterations;
+			[Range(1, 12), Tooltip("Solver substeps")]
+			public int substeps;
 			[Range(0.0f, 1.0f), Tooltip("Constraint stiffness")]
 			public float stiffness;
 			[Range(1.0f, 2.0f), Tooltip("Successive-over-relaxation factor")]
@@ -235,6 +238,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				method = Method.GaussSeidel,
 				iterations = 5,
+				substeps = 1,
 				stiffness = 1.0f,
 				kSOR = 1.0f,
 
@@ -311,7 +315,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 9.0f)]
 			public float splatDebugWidth;
 
-			[UnityEngine.Serialization.FormerlySerializedAs("volumeSplatMethod"), Range(8, 160)]
+			[UnityEngine.Serialization.FormerlySerializedAs("volumeGridResolution"), Range(8, 160)]
 			public int gridResolution;
 			public GridPrecision gridPrecision;
 			[HideInInspector, Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
@@ -497,6 +501,7 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.particlePositionPrevPrev, "ParticlePosition_2", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStrideVector4);
@@ -562,6 +567,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref solverData.particlePosition);
 			ReleaseBuffer(ref solverData.particlePositionPrev);
+			ReleaseBuffer(ref solverData.particlePositionPrevPrev);
 			ReleaseBuffer(ref solverData.particlePositionCorr);
 			ReleaseBuffer(ref solverData.particleVelocity);
 			ReleaseBuffer(ref solverData.particleVelocityPrev);
@@ -628,7 +634,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._StrandDiameter = strandDiameter * 0.001f;
 
 			// update solver parameters
-			cbuffer._DT = dt;
+			cbuffer._DT = dt / Mathf.Max(1, solverSettings.substeps);
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
 			cbuffer._SOR = (solverSettings.iterations > 1) ? solverSettings.kSOR : 1.0f;
@@ -652,6 +658,7 @@ namespace Unity.DemoTeam.Hair
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == HairAsset.MemoryLayout.Interleaved);
+			keywords.APPLY_VOLUME_IMPULSE = (solverSettings.cellPressure > 0.0f) || (solverSettings.cellVelocity > 0.0f);
 			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
 			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f);
 			keywords.ENABLE_DISTANCE = solverSettings.distance;
@@ -918,6 +925,7 @@ namespace Unity.DemoTeam.Hair
 			target.PushConstantBuffer(UniformIDs.SolverCBuffer, solverData.cbufferStorage);
 
 			target.PushKeyword("LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
+			target.PushKeyword("APPLY_VOLUME_IMPULSE", solverData.keywords.APPLY_VOLUME_IMPULSE);
 			target.PushKeyword("ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
 			target.PushKeyword("ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
 			target.PushKeyword("ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
@@ -942,6 +950,7 @@ namespace Unity.DemoTeam.Hair
 
 			target.PushComputeBuffer(UniformIDs._ParticlePosition, solverData.particlePosition);
 			target.PushComputeBuffer(UniformIDs._ParticlePositionPrev, solverData.particlePositionPrev);
+			target.PushComputeBuffer(UniformIDs._ParticlePositionPrevPrev, solverData.particlePositionPrevPrev);
 			target.PushComputeBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			target.PushComputeBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			target.PushComputeBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
@@ -1006,53 +1015,61 @@ namespace Unity.DemoTeam.Hair
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
-				int kernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
 				int numX = (int)solverData.cbuffer._StrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % PARTICLE_GROUP_SIZE);
 				int numY = 1;
 				int numZ = 1;
 
+				int kernelSolveConstraints = SolverKernels.KSolveConstraints_GaussSeidelReference;
+
 				switch (solverSettings.method)
 				{
 					case SolverSettings.Method.GaussSeidelReference:
-						kernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
+						kernelSolveConstraints = SolverKernels.KSolveConstraints_GaussSeidelReference;
 						break;
 
 					case SolverSettings.Method.GaussSeidel:
-						kernel = SolverKernels.KSolveConstraints_GaussSeidel;
+						kernelSolveConstraints = SolverKernels.KSolveConstraints_GaussSeidel;
 						break;
 
 					case SolverSettings.Method.Jacobi:
 						switch (solverData.cbuffer._StrandParticleCount)
 						{
 							case 16:
-								kernel = SolverKernels.KSolveConstraints_Jacobi_16;
-								numX = (int)solverData.cbuffer._StrandCount;
+								kernelSolveConstraints = SolverKernels.KSolveConstraints_Jacobi_16;
 								break;
 
 							case 32:
-								kernel = SolverKernels.KSolveConstraints_Jacobi_32;
-								numX = (int)solverData.cbuffer._StrandCount;
+								kernelSolveConstraints = SolverKernels.KSolveConstraints_Jacobi_32;
 								break;
 
 							case 64:
-								kernel = SolverKernels.KSolveConstraints_Jacobi_64;
-								numX = (int)solverData.cbuffer._StrandCount;
+								kernelSolveConstraints = SolverKernels.KSolveConstraints_Jacobi_64;
 								break;
 
 							case 128:
-								kernel = SolverKernels.KSolveConstraints_Jacobi_128;
-								numX = (int)solverData.cbuffer._StrandCount;
+								kernelSolveConstraints = SolverKernels.KSolveConstraints_Jacobi_128;
 								break;
 						}
+						numX = (int)solverData.cbuffer._StrandCount;
 						break;
 				}
 
-				CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);
-				CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
+				PushVolumeData(cmd, s_solverCS, kernelSolveConstraints, volumeData);
 
-				PushVolumeData(cmd, s_solverCS, kernel, volumeData);
-				PushSolverData(cmd, s_solverCS, kernel, solverData);
-				cmd.DispatchCompute(s_solverCS, kernel, numX, numY, numZ);
+				var stateApplyVolumeImpulse = solverData.keywords.APPLY_VOLUME_IMPULSE;
+
+				for (int i = 0; i != Mathf.Max(1, solverSettings.substeps); i++)
+				{
+					CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);       // [0 1 2] -> (1 0 2)
+					CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);   // (1 0 2) -> [2 0 1]
+					CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
+
+					PushSolverData(cmd, s_solverCS, kernelSolveConstraints, solverData);
+					cmd.DispatchCompute(s_solverCS, kernelSolveConstraints, numX, numY, numZ);
+
+					// volume impulse is only applied for first substep
+					solverData.keywords.APPLY_VOLUME_IMPULSE = false;
+				}
 			}
 		}
 
@@ -1209,6 +1226,7 @@ namespace Unity.DemoTeam.Hair
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_5_PressureSolve))
 			{
 				PushVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumePressureSolve, volumeData);
+
 				for (int i = 0; i != volumeSettings.pressureIterations; i++)
 				{
 					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureSolve, numX, numY, numZ);

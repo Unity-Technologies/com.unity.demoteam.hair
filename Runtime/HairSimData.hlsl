@@ -25,10 +25,11 @@ HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;		// xyz: initial particle off
 HAIRSIM_SOLVERDATA<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 
 HAIRSIM_SOLVERDATA<float4> _ParticlePosition;		// xyz: position, w: initial local accumulated weight (gather)
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;	// xyz: position, w: initial local accumulated weight (gather)
+HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;		// ...
+HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrevPrev;	// ...
 HAIRSIM_SOLVERDATA<float4> _ParticlePositionCorr;	// xyz: ftl correction, w: -
-HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;		// xyz: velocity, w: weight
-HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;	// xyz: velocity, w: weight
+HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;		// xyz: velocity, w: splatting weight
+HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;	// xyz: velocity, w: splatting weight
 
 //-------------
 // volume data

@@ -24,10 +24,11 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer initialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 
 			public ComputeBuffer particlePosition;		// xyz: position, w: initial local accumulated weight (gather)
-			public ComputeBuffer particlePositionPrev;	// xyz: position, w: initial local accumulated weight (gather)
+			public ComputeBuffer particlePositionPrev;		// ...
+			public ComputeBuffer particlePositionPrevPrev;	// ...
 			public ComputeBuffer particlePositionCorr;	// xyz: ftl correction, w: -
-			public ComputeBuffer particleVelocity;		// xyz: velocity, w: weight
-			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: weight
+			public ComputeBuffer particleVelocity;		// xyz: velocity, w: splatting weight
+			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: splatting weight
 
 			public HairAsset.MemoryLayout memoryLayout;
 		}
@@ -35,6 +36,7 @@ namespace Unity.DemoTeam.Hair
 		public struct SolverKeywords
 		{
 			public bool LAYOUT_INTERLEAVED;
+			public bool APPLY_VOLUME_IMPULSE;
 			public bool ENABLE_BOUNDARY;
 			public bool ENABLE_BOUNDARY_FRICTION;
 			public bool ENABLE_DISTANCE;

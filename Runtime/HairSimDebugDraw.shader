@@ -175,7 +175,7 @@
 		}
 		else
 		{
-			sd *= 50.0;
+			sd *= 10.0;
 			if (sd < 0.0)
 			{
 				return float4(frac(-sd), 0, frac(-sd), _DebugSliceOpacity);
@@ -344,7 +344,6 @@
 		Pass// 4 == VOLUME SLICE
 		{
 			Blend SrcAlpha OneMinusSrcAlpha
-			ZTest LEqual
 
 			HLSLPROGRAM
 
