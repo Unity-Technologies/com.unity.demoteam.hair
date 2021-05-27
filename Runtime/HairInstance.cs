@@ -44,13 +44,6 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsStrands
 		{
-			public enum StrandScale
-			{
-				Fixed,
-				UniformMin,
-				UniformMax,
-			}
-
 			public enum StrandRenderer
 			{
 				BuiltinLines,
@@ -58,6 +51,13 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_UNITY_VFXGRAPH
 				VFXGraph,//TODO
 #endif
+			}
+
+			public enum StrandScale
+			{
+				Fixed,
+				HierarchyWorldMin,
+				HierarchyWorldMax,
 			}
 
 			public enum SimulationRate
@@ -85,10 +85,12 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Proportions")]
 
-			[Tooltip("Strand scale")]
-			public StrandScale strandScale;
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
 			public float strandDiameter;
+			[Range(0.0f, 100.0f), Tooltip("Strand margin (in millimeters)")]
+			public float strandMargin;
+			[Tooltip("Behaviour of propertions when transform hiearchy is scaled")]
+			public StrandScale strandScale;
 
 			[LineHeader("Dynamics")]
 
@@ -554,6 +556,11 @@ namespace Unity.DemoTeam.Hair
 			return settingsStrands.strandDiameter;
 		}
 
+		public float GetStrandMargin()
+		{
+			return settingsStrands.strandMargin;
+		}
+
 		public float GetStrandScale()
 		{
 			switch (settingsStrands.strandScale)
@@ -563,13 +570,13 @@ namespace Unity.DemoTeam.Hair
 					{
 						return 1.0f;
 					}
-				case SettingsStrands.StrandScale.UniformMin:
+				case SettingsStrands.StrandScale.HierarchyWorldMin:
 					{
 						var lossyScaleAbs = this.transform.lossyScale.Abs();
 						var lossyScaleAbsMin = lossyScaleAbs.CMin();
 						return lossyScaleAbsMin;
 					}
-				case SettingsStrands.StrandScale.UniformMax:
+				case SettingsStrands.StrandScale.HierarchyWorldMax:
 					{
 						var lossyScaleAbs = this.transform.lossyScale.Abs();
 						var lossyScaleAbsMax = lossyScaleAbs.CMax();
@@ -641,6 +648,7 @@ namespace Unity.DemoTeam.Hair
 			// get bounds and scale
 			var simulationBounds = GetSimulationBounds();
 			var strandDiameter = GetStrandDiameter();
+			var strandMargin = GetStrandMargin();
 			var strandScale = GetStrandScale();
 
 			// update solver roots
@@ -660,7 +668,7 @@ namespace Unity.DemoTeam.Hair
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings))
 			{
-				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
+				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
 
@@ -671,7 +679,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// step volume data
-			HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
+			HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 		}
 
@@ -782,9 +790,10 @@ namespace Unity.DemoTeam.Hair
 			{
 				var simulationBounds = GetSimulationBounds();
 				var strandDiameter = GetStrandDiameter();
+				var strandMargin = GetStrandMargin();
 				var strandScale = GetStrandScale();
 
-				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter, strandScale);
+				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 				for (int i = 0; i != solverData.Length; i++)
