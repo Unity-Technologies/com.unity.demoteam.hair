@@ -676,7 +676,7 @@ namespace Unity.DemoTeam.Hair
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == HairAsset.MemoryLayout.Interleaved);
-			keywords.APPLY_VOLUME_IMPULSE = (solverSettings.cellVelocity > 0.0f) || (solverSettings.cellVelocity > 0.0f);
+			keywords.APPLY_VOLUME_IMPULSE = (solverSettings.cellPressure > 0.0f) || (solverSettings.cellVelocity > 0.0f);
 			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
 			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f);
 			keywords.ENABLE_DISTANCE = solverSettings.distance;

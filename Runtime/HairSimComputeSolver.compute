@@ -175,9 +175,9 @@ float GetIterationStiffness(uint iteration)
 	return 1.0 - pow(saturate(1.0 - _Stiffness), 1.0 / (1 + iteration));
 }
 
-float GetDecay(float smoothing, float interval)
+float GetDecay(float remainder, float interval)
 {
-	return pow(max(1e-5, smoothing), _DT / interval);
+	return pow(max(1e-5, remainder), _DT / interval);
 }
 
 float3 IntegratePosition(float3 x0, float3 v0, float3 a0)
@@ -273,7 +273,7 @@ void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
 		float3 w = LinearToAngular(r, v);
 
 		float3 v_tan = AngularToLinear(r, w);
-		float3 v_tan_damp = v_tan * GetDecay(1.0 - _AngularDamping, _AngularDampingInterval);
+		float3 v_tan_damp = v_tan * (1.0 - GetDecay(1.0 - _AngularDamping, _AngularDampingInterval));
 
 		v0 += v_tan_damp;
 		v1 -= v_tan_damp;
