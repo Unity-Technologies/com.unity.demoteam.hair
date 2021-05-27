@@ -61,8 +61,8 @@
 #define ENABLE_POSE_GLOBAL_ROTATION 0
 #endif
 
-#define ENABLE_VOLUME_PRESSURE 1
-#define ENABLE_VOLUME_FRICTION 1
+//-----------------------
+// features experimental
 
 #define SECOND_ORDER_UPDATE 0
 
@@ -143,16 +143,15 @@ float3 ApplyVolumeImpulse(float3 x0, float3 v0)
 	{
 		float3 uvw = VolumeWorldToUVW(x0);
 
-		#if ENABLE_VOLUME_PRESSURE
+		// volume pressure
 		{
 			float3 pressureGrad = VolumeSampleVector(_VolumePressureGrad, uvw);
 			{
 				impulse += _CellPressure * -pressureGrad;
 			}
 		}
-		#endif
 
-		#if ENABLE_VOLUME_FRICTION
+		// volume velocity
 		{
 			#if SPLAT_TRILINEAR
 			SamplerState ss = _Volume_trilinear_clamp;
@@ -164,7 +163,6 @@ float3 ApplyVolumeImpulse(float3 x0, float3 v0)
 				impulse += _CellVelocity * (v - v0);
 			}
 		}
-		#endif
 	}
 	#endif
 
@@ -182,14 +180,9 @@ float GetDecay(float smoothing, float interval)
 	return pow(max(1e-5, smoothing), _DT / interval);
 }
 
-float GetDampingDecay()
-{
-	return GetDecay(1.0 - _Damping, _DampingInterval);
-}
-
 float3 IntegratePosition(float3 x0, float3 v0, float3 a0)
 {
-	return x0 + _DT * (v0 * GetDampingDecay() + _DT * a0);
+	return x0 + _DT * (v0 + _DT * a0);
 }
 
 float3 IntegratePosition_SecondOrder(float3 x0, float3 x0_minus1, float3 v0, float3 v0_minus1, float3 a0)
@@ -200,8 +193,8 @@ float3 IntegratePosition_SecondOrder(float3 x0, float3 x0_minus1, float3 v0, flo
 	return (
 		(4.0 / 3.0) * x0 -
 		(1.0 / 3.0) * x0_minus1 +
-		(8.0 / 9.0) * _DT * GetDampingDecay() * v0 -
-		(2.0 / 9.0) * _DT * GetDampingDecay() * v0_minus1 +
+		(8.0 / 9.0) * _DT * v0 -
+		(2.0 / 9.0) * _DT * v0_minus1 +
 		(4.0 / 9.0) * _DT * _DT * a0
 	);
 }
@@ -209,6 +202,7 @@ float3 IntegratePosition_SecondOrder(float3 x0, float3 x0_minus1, float3 v0, flo
 float3 DeriveVelocity(float3 x1, float3 x0)
 {
 	return (x1 - x0) / _DT;
+	//TODO clamp?
 }
 
 float3 DeriveVelocity_SecondOrder(float3 x1, float3 x0, float3 x0_minus1)
@@ -223,13 +217,67 @@ float3 DeriveVelocity_SecondOrder(float3 x1, float3 x0, float3 x0_minus1)
 	) / _DT;
 }
 
-float3 DeriveParticleVelocity(uint particleIndex)
+void DeriveParticleVelocity(uint particleIndex, out float3 x1, out float3 v1)
 {
+	x1 = _ParticlePosition[particleIndex].xyz;
 #if SECOND_ORDER_VELOCITY
-	return DeriveVelocity_SecondOrder(_ParticlePosition[particleIndex].xyz, _ParticlePositionPrev[particleIndex].xyz, _ParticlePositionPrevPrev[particleIndex].xyz);
+	v1 = DeriveVelocity_SecondOrder(x1, _ParticlePositionPrev[particleIndex].xyz, _ParticlePositionPrevPrev[particleIndex].xyz);
 #else
-	return DeriveVelocity(_ParticlePosition[particleIndex].xyz, _ParticlePositionPrev[particleIndex].xyz);
+	v1 = DeriveVelocity(x1, _ParticlePositionPrev[particleIndex].xyz);
 #endif
+}
+
+float3 LinearToAngular(float3 r, float3 v)
+{
+	float3 w = cross(r, v) / dot(r, r);
+	return w;
+}
+
+float3 LinearToAngular(float3 pFrame, float3 vFrame, float3 p, float3 v)
+{
+	float3 w = LinearToAngular(p - pFrame, v - vFrame);
+	return w;
+}
+
+float3 AngularToLinear(float3 r, float3 w)
+{
+	float3 v = cross(w, r);
+	return v;
+}
+
+float3 AngularToLinear(float3 pFrame, float3 vFrame, float3 p, float3 w)
+{
+	float3 v = vFrame + AngularToLinear(p - pFrame, w);
+	return v;
+}
+
+void ApplyDampingFTL(inout float3 v, float3 d)
+{
+	v -= (_FTLDamping / _DT) * d;
+}
+
+void ApplyDampingLinear(inout float3 v)
+{
+	v *= GetDecay(1.0 - _Damping, _DampingInterval);
+}
+
+void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
+{
+	if (_AngularDamping > 0.0)
+	{
+		float3 p_frame = 0.5 * (p0 + p1);
+		float3 v_frame = 0.5 * (v0 + v1);
+
+		float3 r = p1 - p_frame;
+		float3 v = (v1 - v0);
+		float3 w = LinearToAngular(r, v);
+
+		float3 v_tan = AngularToLinear(r, w);
+		float3 v_tan_damp = v_tan * GetDecay(1.0 - _AngularDamping, _AngularDampingInterval);
+
+		v0 += v_tan_damp;
+		v1 -= v_tan_damp;
+	}
 }
 
 float GetParticleInterval(uint strandIndex)
@@ -672,16 +720,33 @@ void KSolveConstraints_GaussSeidelReference(
 	// update velocities
 	{
 		// root
-		_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin);
+		float3 p0;
+		float3 v0;
+		DeriveParticleVelocity(strandParticleBegin, p0, v0);
 
 		// root+1..
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
+			float3 p1;
+			float3 v1;
+			DeriveParticleVelocity(i, p1, v1);
+
 			if (ENABLE_DISTANCE_FTL)
-				_ParticleVelocity[i].xyz = DeriveParticleVelocity(i) - (_FTLDamping / _DT) * _ParticlePositionCorr[i].xyz;
-			else
-				_ParticleVelocity[i].xyz = DeriveParticleVelocity(i);
+			{
+				ApplyDampingFTL(v1, _ParticlePositionCorr[i].xyz);
+			}
+
+			ApplyDampingLinear(v1);
+			ApplyDampingAngular(p0, p1, v0, v1);
+
+			_ParticleVelocity[i - strandParticleStride].xyz = v0;
+
+			p0 = p1;
+			v0 = v1;
 		}
+
+		// ..n-1
+		_ParticleVelocity[strandParticleEnd - strandParticleStride].xyz = v0;
 	}
 }
 
@@ -774,7 +839,18 @@ void PartialStrand_SolveNext(
 		float wq_minus0 = 0.5 * (w_minus1 + w_minus0);
 
 		ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], stiffness * _LocalShape, wq_minus1, wq_minus0, q.minus1, q.minus0);
+
+	#if 0
+		float3 v0 = QMul(q.minus1, float3(0, GetParticleInterval(strandIndex), 0));
+		float3 v1 = QMul(q.minus0, float3(0, GetParticleInterval(strandIndex), 0));
+		ApplyDualEdgeVectorConstraint(
+			v0, v1, stiffness * _LocalShape,
+			w_minus2, w_minus1, w_minus0,
+			p.minus2, p.minus1, p.minus0
+		);
+	#else
 		ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus1, w_minus0, wq_minus0, p.minus1, p.minus0, q.minus0);
+	#endif
 #endif
 	}
 
@@ -937,7 +1013,7 @@ void KSolveConstraints_GaussSeidel(
 				PartialStrand_SolveNext(p, q, strandIndex, strandParticleStride, rootPos, i, k, stiffness, 1.0, 1.0, 1.0);
 			}
 
-			// n-2, n-1
+			// ..n-2, n-1
 			PartialStrand_SolveTail(p, strandIndex, strandParticleStride, strandParticleEnd);
 		}
 	}
@@ -945,23 +1021,40 @@ void KSolveConstraints_GaussSeidel(
 	// update velocities
 	{
 		// root
-		_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin);
+		float3 p0;
+		float3 v0;
+		DeriveParticleVelocity(strandParticleBegin, p0, v0);
 
 		// root+1..
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
+			float3 p1;
+			float3 v1;
+			DeriveParticleVelocity(i, p1, v1);
+
 			if (ENABLE_DISTANCE_FTL)
-				_ParticleVelocity[i].xyz = DeriveParticleVelocity(i) - (_FTLDamping / _DT) * _ParticlePositionCorr[i].xyz;
-			else
-				_ParticleVelocity[i].xyz = DeriveParticleVelocity(i);
+			{
+				ApplyDampingFTL(v1, _ParticlePositionCorr[i].xyz);
+			}
+
+			ApplyDampingLinear(v1);
+			ApplyDampingAngular(p0, p1, v0, v1);
+
+			_ParticleVelocity[i - strandParticleStride].xyz = v0;
+
+			p0 = p1;
+			v0 = v1;
 		}
+
+		// ..n-1
+		_ParticleVelocity[strandParticleEnd - strandParticleStride].xyz = v0;
 	}
 }
 
 // pad head so that index 0 == root-1
 groupshared float4 gs_x[1 + THREAD_GROUP_SIZE];// xyz: position, w: weight
-groupshared float3 gs_d[1 + THREAD_GROUP_SIZE];// xyz: ftl correction
 groupshared float4 gs_q[1 + THREAD_GROUP_SIZE];// quat(xyz,w): material frame
+groupshared float3 gs_d[1 + THREAD_GROUP_SIZE];// xyz: ftl correction
 
 // one thread group per strand
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
@@ -1053,7 +1146,7 @@ void KSolveConstraints_Jacobi(
 				// thread 0 writes: gs_q[0] = q_rot_0
 				// thread 1 writes: gs_q[1] = QMul(q_rot_1, q_rot_0);
 				// thread 2 writes: gs_q[2] = QMul(q_rot_2, QMul(q_rot_1, q_rot_0));
-				// ...
+				// etc.
 			}
 		}
 	}
@@ -1238,11 +1331,127 @@ void KSolveConstraints_Jacobi(
 #endif
 
 		if (ENABLE_DISTANCE_FTL)
-			_ParticleVelocity[i].xyz = v - (_FTLDamping / _DT) * gs_d[j];
-		else
-			_ParticleVelocity[i].xyz = v;
+		{
+			ApplyDampingFTL(v, gs_d[j]);
+		}
+
+		ApplyDampingLinear(v);
+		//ApplyDampingAngular(p0, p1, v0, v1);
+		//TODO support angular damping
+
+		_ParticleVelocity[i].xyz = v;
 	}
 }
+
+//-----------------
+// kernels staging
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KStaging(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	DECLARE_STRAND(worldIdx.x);
+
+	float4 rootFrame = _RootFrame[strandIndex];
+	float3 rootDir = normalize(QMul(rootFrame, float3(0, 1, 0)));
+
+	float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
+	float3 r0 = rootDir;
+
+	for (uint i = strandParticleBegin; i != strandParticleEnd - strandParticleStride; i += strandParticleStride)
+	{
+		float3 p1 = _ParticlePosition[i + strandParticleStride].xyz;
+		float3 r1 = normalize(p1 - p0);
+
+		_StagingPosition[i].xyz = p0;
+		_StagingTangent[i].xyz = normalize(r0 + r1);
+
+		p0 = p1;
+		r0 = r1;
+	}
+
+	_StagingPosition[strandParticleEnd - strandParticleStride].xyz = p0;
+	_StagingTangent[strandParticleEnd - strandParticleStride].xyz = r0;
+}
+
+void CatmullRomPositionTangent(float3 p0, float3 r0, float3 p1, float3 r1, float t, out float3 p0_t, out float3 r0_t)
+{
+	float tt = t * t;
+	float ttt = t * tt;
+
+	p0_t =
+		p0 * (2 * ttt - 3 * tt + 1) +
+		r0 * (ttt - 2 * tt + t) +
+		p1 * (-2 * ttt + 3 * tt) +
+		r1 * (ttt - tt);
+
+	r0_t =
+		p0 * (6 * tt - 6 * t) +
+		r0 * (3 * tt - 4 * t + 1) +
+		p1 * (-6 * tt + 6 * t) +
+		r1 * (3 * tt - 2 * t);
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KStagingSubdivision(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	DECLARE_STRAND(worldIdx.x);
+
+	float4 rootFrame = _RootFrame[strandIndex];
+	float3 rootVec = GetParticleInterval(strandIndex) * QMul(rootFrame, float3(0, 1, 0));
+
+	float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
+	float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
+	float3 r0 = rootVec;
+
+	const uint _SubdivisionSegmentCount = 2;
+	const float subdivisionSegmentStep = 1.0 / _SubdivisionSegmentCount;
+
+	uint writeIndex = strandIndex * (_SubdivisionSegmentCount * (_StrandParticleCount - 1) + 1);
+
+	for (uint i = strandParticleBegin + strandParticleStride; i < strandParticleEnd - strandParticleStride; i += strandParticleStride)
+	{
+		float3 p2 = _ParticlePosition[i + strandParticleStride].xyz;
+		float3 r1 = 0.5 * (p2 - p0);
+
+		for (uint k = 0; k != _SubdivisionSegmentCount; k++)
+		{
+			float3 p0_t;
+			float3 r0_t;
+
+			CatmullRomPositionTangent(p0, r0, p1, r1, subdivisionSegmentStep * k, p0_t, r0_t);
+
+			_StagingPosition[writeIndex].xyz = p0_t;
+			_StagingTangent[writeIndex].xyz = r0_t;
+
+			writeIndex++;
+		}
+
+		p0 = p1;
+		p1 = p2;
+		r0 = r1;
+	}
+
+	_StagingPosition[writeIndex].xyz = p0;
+	_StagingTangent[writeIndex].xyz = r0;
+}
+
+
 
 
 //========================================================================

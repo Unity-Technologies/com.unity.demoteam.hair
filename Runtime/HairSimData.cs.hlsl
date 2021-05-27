@@ -20,10 +20,12 @@ CBUFFER_START(SolverCBuffer)
     uint _Iterations;
     float _Stiffness;
     float _SOR;
-    float _CellPressure;
-    float _CellVelocity;
     float _Damping;
     float _DampingInterval;
+    float _AngularDamping;
+    float _AngularDampingInterval;
+    float _CellPressure;
+    float _CellVelocity;
     float _Gravity;
     float _BoundaryFriction;
     float _FTLDamping;

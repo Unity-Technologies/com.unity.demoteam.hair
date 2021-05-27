@@ -176,14 +176,24 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Integration")]
 
+			[ToggleGroup, Tooltip("Enable linear damping")]
+			public bool damping;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Linear damping factor (fraction of linear velocity to subtract per interval of time)")]
+			public float dampingFactor;
+			[ToggleGroupItem, Tooltip("Interval of time over which to subtract fraction of linear velocity")]
+			public TimeInterval dampingInterval;
+
+			[ToggleGroup, Tooltip("Enable angular damping")]
+			public bool angularDamping;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Angular damping factor (fraction of angular velocity to subtract per interval of time)")]
+			public float angularDampingFactor;
+			[ToggleGroupItem, Tooltip("Interval of time over which to subtract fraction of angular velocity")]
+			public TimeInterval angularDampingInterval;
+
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume pressure impulse")]
 			public float cellPressure;
 			[Range(0.0f, 1.0f), Tooltip("Scaling factor for volume velocity impulse (where 0 == FLIP, 1 == PIC)")]
 			public float cellVelocity;
-			[Range(0.0f, 1.0f), Tooltip("Linear damping factor (fraction of linear velocity to subtract per interval of time)")]
-			public float damping;
-			[HideInInspector, Tooltip("Interval of time over which to subtract fraction of linear velocity")]
-			public TimeInterval dampingInterval;
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
 
@@ -242,10 +252,14 @@ namespace Unity.DemoTeam.Hair
 				stiffness = 1.0f,
 				kSOR = 1.0f,
 
+				damping = false,
+				dampingFactor = 0.5f,
+				dampingInterval = TimeInterval.PerSecond,
+				angularDamping = false,
+				angularDampingFactor = 0.5f,
+				angularDampingInterval = TimeInterval.PerSecond,
 				cellPressure = 1.0f,
 				cellVelocity = 0.05f,
-				damping = 0.0f,
-				dampingInterval = TimeInterval.PerSecond,
 				gravity = 1.0f,
 
 				boundaryCollision = true,
@@ -302,11 +316,13 @@ namespace Unity.DemoTeam.Hair
 				InitialPoseInParticles,
 			}
 
-			public enum GatherMode
+			public enum CollectMode
 			{
 				JustTagged,
 				IncludeColliders,
 			}
+
+			[LineHeader("Volume")]
 
 			[UnityEngine.Serialization.FormerlySerializedAs("volumeSplatMethod")]
 			public SplatMethod splatMethod;
@@ -336,16 +352,16 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Boundaries")]
 
-			[Range(0.0f, 10.0f), Tooltip("Base collision margin (in centimeters)")]
+			[Range(0.0f, 10.0f), Tooltip("Collision margin (in centimeters)")]
 			public float collisionMargin;
-			[ToggleGroup]
-			public bool boundariesGather;
-			[ToggleGroupItem]
-			public GatherMode boundariesGatherMode;
+			[ToggleGroup, Tooltip("Collect boundaries from physics")]
+			public bool boundariesCollect;
+			[ToggleGroupItem, Tooltip("Collect just tagged boundaries, or also include untagged colliders")]
+			public CollectMode boundariesCollectMode;
 			[ToggleGroupItem(withLabel = true)]
-			public LayerMask boundariesGatherLayers;
-			[NonReorderable]
-			public HairBoundary[] boundariesResident;
+			public LayerMask boundariesCollectLayer;
+			[NonReorderable, Tooltip("Always-included boundaries (these take priority over boundaries collected from physics)")]
+			public HairBoundary[] boundariesPriority;
 
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
@@ -364,10 +380,10 @@ namespace Unity.DemoTeam.Hair
 				targetDensityInfluence = 1.0f,
 
 				collisionMargin = 0.25f,
-				boundariesGather = true,
-				boundariesGatherMode = GatherMode.IncludeColliders,
-				boundariesGatherLayers = Physics.AllLayers,
-				boundariesResident = new HairBoundary[0],
+				boundariesCollect = true,
+				boundariesCollectMode = CollectMode.IncludeColliders,
+				boundariesCollectLayer = Physics.AllLayers,
+				boundariesPriority = new HairBoundary[0],
 			};
 		}
 
@@ -639,10 +655,12 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._Stiffness = solverSettings.stiffness;
 			cbuffer._SOR = (solverSettings.iterations > 1) ? solverSettings.kSOR : 1.0f;
 
+			cbuffer._Damping = solverSettings.damping ? solverSettings.dampingFactor : 0.0f;
+			cbuffer._DampingInterval = IntervalToSeconds(solverSettings.dampingInterval);
+			cbuffer._AngularDamping = solverSettings.angularDamping ? solverSettings.angularDampingFactor : 0.0f;
+			cbuffer._AngularDampingInterval = IntervalToSeconds(solverSettings.angularDampingInterval);
 			cbuffer._CellPressure = solverSettings.cellPressure;
 			cbuffer._CellVelocity = solverSettings.cellVelocity;
-			cbuffer._Damping = solverSettings.damping;
-			cbuffer._DampingInterval = IntervalToSeconds(solverSettings.dampingInterval);
 			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
 
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
@@ -658,7 +676,7 @@ namespace Unity.DemoTeam.Hair
 
 			// update keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == HairAsset.MemoryLayout.Interleaved);
-			keywords.APPLY_VOLUME_IMPULSE = (solverSettings.cellPressure > 0.0f) || (solverSettings.cellVelocity > 0.0f);
+			keywords.APPLY_VOLUME_IMPULSE = (solverSettings.cellVelocity > 0.0f) || (solverSettings.cellVelocity > 0.0f);
 			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
 			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f);
 			keywords.ENABLE_DISTANCE = solverSettings.distance;
@@ -722,7 +740,7 @@ namespace Unity.DemoTeam.Hair
 					var ptrMatrixW2PrevW = (Matrix4x4*)bufMatrixW2PrevW.GetUnsafePtr();
 
 					// gather boundaries
-					var boundaryList = HairBoundaryUtility.Gather(volumeSettings.boundariesResident, volumeSort: false, volumeSettings.boundariesGather, volumeBounds, Quaternion.identity, volumeSettings.boundariesGatherMode == VolumeSettings.GatherMode.IncludeColliders);
+					var boundaryList = HairBoundaryUtility.Gather(volumeSettings.boundariesPriority, volumeSort: false, volumeSettings.boundariesCollect, volumeBounds, Quaternion.identity, volumeSettings.boundariesCollectMode == VolumeSettings.CollectMode.IncludeColliders);
 					var boundaryCount = 0;
 					var boundarySDFIndex = -1;
 					var boundarySDFCellSize = 0.0f;
