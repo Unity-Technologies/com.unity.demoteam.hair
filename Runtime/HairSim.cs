@@ -394,6 +394,7 @@ namespace Unity.DemoTeam.Hair
 
 			public bool drawStrandRoots;
 			public bool drawStrandParticles;
+			public bool drawStrandVelocities;
 
 			[LineHeader("Volume Cells")]
 
@@ -427,6 +428,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				drawStrandRoots = false,
 				drawStrandParticles = false,
+				drawStrandVelocities = false,
 				drawCellDensity = false,
 				drawCellGradient = false,
 
@@ -1268,7 +1270,8 @@ namespace Unity.DemoTeam.Hair
 			using (new ProfilingScope(cmd, MarkersGPU.DrawSolverData))
 			{
 				if (!debugSettings.drawStrandRoots &&
-					!debugSettings.drawStrandParticles)
+					!debugSettings.drawStrandParticles &&
+					!debugSettings.drawStrandVelocities)
 					return;
 
 				PushSolverData(cmd, solverData);
@@ -1283,6 +1286,12 @@ namespace Unity.DemoTeam.Hair
 				if (debugSettings.drawStrandParticles)
 				{
 					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
+				}
+
+				// strand velocities
+				if (debugSettings.drawStrandVelocities)
+				{
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 1, MeshTopology.Lines, (int)solverData.cbuffer._StrandParticleCount * 4, (int)solverData.cbuffer._StrandCount);
 				}
 			}
 		}

@@ -53,16 +53,48 @@
 		uint i = strandParticleBegin + strandParticleStride * vertexID;
 		float3 worldPos = _ParticlePosition[i].xyz;
 
-		//float volumeDensityShadow = 8.0;
-		//float volumeDensity = VolumeSampleScalar(_VolumeDensity, VolumeWorldToUVW(worldPos));
-		//float volumeOcclusion = saturate((volumeDensityShadow - volumeDensity) / volumeDensityShadow);// pow(1.0 - saturate(volumeDensity / 200.0), 4.0);
-
 		DebugVaryings output;
 		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
 		output.color = float4(ColorCycle(instanceID, _StrandCount), 1.0);
 		return output;
 	}
 
+	DebugVaryings DebugVert_StrandParticleWorldVelocity(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+	{
+	#if LAYOUT_INTERLEAVED
+		const uint strandParticleBegin = instanceID;
+		const uint strandParticleStride = _StrandCount;
+	#else
+		const uint strandParticleBegin = instanceID * _StrandParticleCount;
+		const uint strandParticleStride = 1;
+	#endif
+
+		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 2);
+		float3 worldPos = _ParticlePosition[i].xyz;
+
+		if (vertexID & 2)
+		{
+			if (!(vertexID & 1))
+			{
+				worldPos -= 4.0 * _DT * _ParticleVelocityPrev[i].xyz;
+			}
+		}
+		else
+		{
+			if (vertexID & 1)
+			{
+				worldPos += 4.0 * _DT * _ParticleVelocity[i].xyz;
+			}
+		}
+
+		DebugVaryings output;
+		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
+		output.color = float4(0.0, vertexID & 1, vertexID & 2, 1.0);
+		return output;
+
+	}
+
+	/*
 	DebugVaryings DebugVert_StrandParticleMotion(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
 	#if LAYOUT_INTERLEAVED
@@ -88,6 +120,7 @@
 		output.color = float4(0.5 * (ndc1 - ndc0), 0, 0);
 		return output;
 	}
+	*/
 
 	DebugVaryings DebugVert_VolumeDensity(uint vertexID : SV_VertexID)
 	{
@@ -311,11 +344,11 @@
 			ENDHLSL
 		}
 
-		Pass// 1 == STRAND PARTICLE MOTION
+		Pass// 1 == STRAND PARTICLE WORLD VELOCITY
 		{
 			HLSLPROGRAM
 
-			#pragma vertex DebugVert_StrandParticleMotion
+			#pragma vertex DebugVert_StrandParticleWorldVelocity
 			#pragma fragment DebugFrag
 
 			ENDHLSL

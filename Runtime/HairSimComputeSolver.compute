@@ -233,9 +233,9 @@ float3 LinearToAngular(float3 r, float3 v)
 	return w;
 }
 
-float3 LinearToAngular(float3 pFrame, float3 vFrame, float3 p, float3 v)
+float3 LinearToAngularPoint(float3 pF, float3 vF, float3 p, float3 v)
 {
-	float3 w = LinearToAngular(p - pFrame, v - vFrame);
+	float3 w = LinearToAngular(p - pF, v - vF);
 	return w;
 }
 
@@ -245,9 +245,9 @@ float3 AngularToLinear(float3 r, float3 w)
 	return v;
 }
 
-float3 AngularToLinear(float3 pFrame, float3 vFrame, float3 p, float3 w)
+float3 AngularToLinearPoint(float3 pF, float3 vF, float3 p, float3 w)
 {
-	float3 v = vFrame + AngularToLinear(p - pFrame, w);
+	float3 v = vF + AngularToLinear(p - pF, w);
 	return v;
 }
 
@@ -265,11 +265,11 @@ void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
 {
 	if (_AngularDamping > 0.0)
 	{
-		float3 p_frame = 0.5 * (p0 + p1);
-		float3 v_frame = 0.5 * (v0 + v1);
+		float3 pF = 0.5 * (p0 + p1);
+		float3 vF = 0.5 * (v0 + v1);
 
-		float3 r = p1 - p_frame;
-		float3 v = (v1 - v0);
+		float3 r = p1 - pF;
+		float3 v = 1.0 * (v1 - v0);
 		float3 w = LinearToAngular(r, v);
 
 		float3 v_tan = AngularToLinear(r, w);
@@ -278,6 +278,18 @@ void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
 		v0 += v_tan_damp;
 		v1 -= v_tan_damp;
 	}
+}
+
+void ApplyDampingDistance(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
+{
+	//TODO separate damping coeff or group with linear/point?
+	return;// disabled until then
+
+	float3 n = normalize(p1 - p0);
+	float3 v = v1 - v0;
+
+	v0 += 0.5 * n * dot(n, v);
+	v1 -= 0.5 * n * dot(n, v);
 }
 
 float GetParticleInterval(uint strandIndex)
@@ -738,6 +750,7 @@ void KSolveConstraints_GaussSeidelReference(
 
 			ApplyDampingLinear(v1);
 			ApplyDampingAngular(p0, p1, v0, v1);
+			ApplyDampingDistance(p0, p1, v0, v1);
 
 			_ParticleVelocity[i - strandParticleStride].xyz = v0;
 
@@ -1039,6 +1052,7 @@ void KSolveConstraints_GaussSeidel(
 
 			ApplyDampingLinear(v1);
 			ApplyDampingAngular(p0, p1, v0, v1);
+			ApplyDampingDistance(p0, p1, v0, v1);
 
 			_ParticleVelocity[i - strandParticleStride].xyz = v0;
 
@@ -1337,6 +1351,7 @@ void KSolveConstraints_Jacobi(
 
 		ApplyDampingLinear(v);
 		//ApplyDampingAngular(p0, p1, v0, v1);
+		//ApplyDampingDistance(p0, p1, v0, v1);
 		//TODO support angular damping
 
 		_ParticleVelocity[i].xyz = v;

@@ -85,12 +85,12 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Proportions")]
 
+			[Tooltip("Behaviour of propertions when transform hiearchy is scaled")]
+			public StrandScale strandScale;
 			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
 			public float strandDiameter;
 			[Range(0.0f, 100.0f), Tooltip("Strand margin (in millimeters)")]
 			public float strandMargin;
-			[Tooltip("Behaviour of propertions when transform hiearchy is scaled")]
-			public StrandScale strandScale;
 
 			[LineHeader("Dynamics")]
 
@@ -542,7 +542,7 @@ namespace Unity.DemoTeam.Hair
 				rootMargin = Mathf.Max(hairAsset.strandGroups[i].maxStrandLength * strandScale, rootMargin);
 			}
 
-			rootMargin *= 1.5f;
+			rootMargin *= 1.25f;
 			rootBounds.Expand(2.0f * rootMargin);
 
 			if (worldSquare)
