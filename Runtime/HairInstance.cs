@@ -475,6 +475,7 @@ namespace Unity.DemoTeam.Hair
 				meshRenderer.sharedMaterial = materialInstance;
 				meshRenderer.shadowCastingMode = settingsStrands.strandShadows;
 				meshRenderer.renderingLayerMask = (uint)settingsStrands.strandLayers;
+				meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.Camera;
 
 				HairSim.PushSolverData(materialInstance, solverData);
 				HairSim.PushVolumeData(materialInstance, volumeData);
