@@ -1,11 +1,13 @@
-﻿#pragma kernel KInitParticles							THREAD_GROUP_SIZE=64
-#pragma kernel KInitParticlesPostVolume					THREAD_GROUP_SIZE=64
-#pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64
-#pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64
-#pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
-#pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
-#pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
-#pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
+﻿#pragma kernel KInitialize								THREAD_GROUP_SIZE=64
+#pragma kernel KInitializePostVolume					THREAD_GROUP_SIZE=64
+#pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64	F_SOLVER
+#pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64	F_SOLVER
+#pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
+#pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
+#pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
+#pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
+#pragma kernel KStaging									THREAD_GROUP_SIZE=64	F_STAGING
+#pragma kernel KStagingSubdivision						THREAD_GROUP_SIZE=64	F_STAGING
 
 //----------
 // features
@@ -59,6 +61,14 @@
 #endif
 #ifndef ENABLE_POSE_GLOBAL_ROTATION
 #define ENABLE_POSE_GLOBAL_ROTATION 0
+#endif
+
+#pragma multi_compile __ STAGING_COMPRESSION
+// 0 == staging data full precision
+// 1 == staging data compressed
+
+#ifndef STAGING_COMPRESSION
+#define STAGING_COMPRESSION 0
 #endif
 
 //-----------------------
@@ -325,7 +335,7 @@ float GetGlobalRotationInfluence(uint strandIndex, uint strandParticleNumber)
 // kernels init
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
-void KInitParticles(
+void KInitialize(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -405,7 +415,7 @@ void KInitParticles(
 }
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
-void KInitParticlesPostVolume(
+void KInitializePostVolume(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -1375,7 +1385,7 @@ void KStaging(
 	DECLARE_STRAND(worldIdx.x);
 
 	float4 rootFrame = _RootFrame[strandIndex];
-	float3 rootDir = normalize(QMul(rootFrame, float3(0, 1, 0)));
+	float3 rootDir = QMul(rootFrame, float3(0, 1, 0));
 
 	float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 	float3 r0 = rootDir;
@@ -1385,33 +1395,33 @@ void KStaging(
 		float3 p1 = _ParticlePosition[i + strandParticleStride].xyz;
 		float3 r1 = normalize(p1 - p0);
 
-		_StagingPosition[i].xyz = p0;
-		_StagingTangent[i].xyz = normalize(r0 + r1);
+		StoreStagingPosition(i, p0);
+		//_StagingTangent[i].xyz = normalize(r0 + r1);
 
 		p0 = p1;
 		r0 = r1;
 	}
 
-	_StagingPosition[strandParticleEnd - strandParticleStride].xyz = p0;
-	_StagingTangent[strandParticleEnd - strandParticleStride].xyz = r0;
+	StoreStagingPosition(strandParticleEnd - strandParticleStride, p0);
+	//_StagingTangent[strandParticleEnd - strandParticleStride].xyz = r0;
 }
 
-void CatmullRomPositionTangent(float3 p0, float3 r0, float3 p1, float3 r1, float t, out float3 p0_t, out float3 r0_t)
+void CatmullRomPositionTangent(float3 p0, float3 m0, float3 p1, float3 m1, float t, out float3 x0_t, out float3 v0_t)
 {
 	float tt = t * t;
 	float ttt = t * tt;
 
-	p0_t =
+	x0_t =
 		p0 * (2 * ttt - 3 * tt + 1) +
-		r0 * (ttt - 2 * tt + t) +
+		m0 * (ttt - 2 * tt + t) +
 		p1 * (-2 * ttt + 3 * tt) +
-		r1 * (ttt - tt);
+		m1 * (ttt - tt);
 
-	r0_t =
+	v0_t =
 		p0 * (6 * tt - 6 * t) +
-		r0 * (3 * tt - 4 * t + 1) +
+		m0 * (3 * tt - 4 * t + 1) +
 		p1 * (-6 * tt + 6 * t) +
-		r1 * (3 * tt - 2 * t);
+		m1 * (3 * tt - 2 * t);
 }
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
@@ -1432,38 +1442,63 @@ void KStagingSubdivision(
 
 	float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 	float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
-	float3 r0 = rootVec;
+	float3 m0 = lerp(rootVec, p1 - p0, 0.75);
 
-	const uint _SubdivisionSegmentCount = 2;
-	const float subdivisionSegmentStep = 1.0 / _SubdivisionSegmentCount;
+	const uint segmentStepCount = _StagingSubdivisions + 1;
+	const float segmentStep = 1.0 / segmentStepCount;
 
-	uint writeIndex = strandIndex * (_SubdivisionSegmentCount * (_StrandParticleCount - 1) + 1);
+#if LAYOUT_INTERLEAVED
+	uint writeIndex = strandIndex;
+	uint writeStride = _StrandCount;
+#else
+	uint writeIndex = strandIndex * _StagingVertexCount;
+	uint writeStride = 1;
+#endif
 
-	for (uint i = strandParticleBegin + strandParticleStride; i < strandParticleEnd - strandParticleStride; i += strandParticleStride)
+	// segment 1..N-1
+	for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd - strandParticleStride; i += strandParticleStride)
 	{
 		float3 p2 = _ParticlePosition[i + strandParticleStride].xyz;
-		float3 r1 = 0.5 * (p2 - p0);
+		float3 m1 = 0.5 * (p2 - p0);
 
-		for (uint k = 0; k != _SubdivisionSegmentCount; k++)
+		for (uint k = 0; k != segmentStepCount; k++, writeIndex += writeStride)
 		{
-			float3 p0_t;
-			float3 r0_t;
+			float3 x0_t;
+			float3 v0_t;
 
-			CatmullRomPositionTangent(p0, r0, p1, r1, subdivisionSegmentStep * k, p0_t, r0_t);
+			CatmullRomPositionTangent(p0, m0, p1, m1, segmentStep * k, x0_t, v0_t);
 
-			_StagingPosition[writeIndex].xyz = p0_t;
-			_StagingTangent[writeIndex].xyz = r0_t;
-
-			writeIndex++;
+			StoreStagingPosition(writeIndex, x0_t);
+			//_StagingTangent[writeIndex].xyz = v0_t;
 		}
 
 		p0 = p1;
 		p1 = p2;
-		r0 = r1;
+		m0 = m1;
 	}
 
-	_StagingPosition[writeIndex].xyz = p0;
-	_StagingTangent[writeIndex].xyz = r0;
+	// segment N
+	{
+		float3 m1 = lerp(m0, p1 - p0, 2.0);
+
+		for (uint k = 0; k != segmentStepCount; k++, writeIndex += writeStride)
+		{
+			float3 x0_t;
+			float3 v0_t;
+
+			CatmullRomPositionTangent(p0, m0, p1, m1, segmentStep * k, x0_t, v0_t);
+
+			StoreStagingPosition(writeIndex, x0_t);
+			//_StagingTangent[writeIndex].xyz = v0_t;
+		}
+
+		p0 = p1;
+		m0 = m1;
+	}
+
+	// cap
+	StoreStagingPosition(writeIndex, p0);
+	//_StagingTangent[writeIndex].xyz = m0;
 }
 
 

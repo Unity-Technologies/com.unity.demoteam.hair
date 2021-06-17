@@ -220,4 +220,29 @@ namespace Unity.DemoTeam.Hair
 
 		public string checksum;
 	}
+
+	public static class HairAssetUtility
+	{
+		public static void DeclareStrandIterator(HairAsset.MemoryLayout memoryLayout, int strandIndex, int strandCount, int strandParticleCount,
+			out int strandParticleBegin,
+			out int strandParticleStride,
+			out int strandParticleEnd)
+		{
+			switch (memoryLayout)
+			{
+				default:
+				case HairAsset.MemoryLayout.Sequential:
+					strandParticleBegin = strandIndex * strandParticleCount;
+					strandParticleStride = 1;
+					break;
+
+				case HairAsset.MemoryLayout.Interleaved:
+					strandParticleBegin = strandIndex;
+					strandParticleStride = strandCount;
+					break;
+			}
+
+			strandParticleEnd = strandParticleBegin + strandParticleStride * strandParticleCount;
+		}
+	}
 }

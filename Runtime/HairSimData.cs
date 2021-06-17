@@ -30,6 +30,9 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particleVelocity;		// xyz: velocity, w: splatting weight
 			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: splatting weight
 
+			public ComputeBuffer stagingPosition;
+			public ComputeBuffer stagingPositionPrev;
+
 			public HairAsset.MemoryLayout memoryLayout;
 		}
 
@@ -48,6 +51,7 @@ namespace Unity.DemoTeam.Hair
 			public bool ENABLE_POSE_LOCAL_BEND_TWIST;
 			public bool ENABLE_POSE_GLOBAL_POSITION;
 			public bool ENABLE_POSE_GLOBAL_ROTATION;
+			public bool STAGING_COMPRESSION;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
@@ -55,16 +59,21 @@ namespace Unity.DemoTeam.Hair
 		{
 			public Matrix4x4 _LocalToWorld;				// root mesh vertex transform
 			public Matrix4x4 _LocalToWorldInvT;			// ...
-
 			public Vector4 _WorldRotation;				// primary skinning bone rotation
+
+			public Vector4 _StagingOriginExtent;				// xyz: origin, w: scale
+			public Vector4 _StagingOriginExtentPrev;			// ...
 
 			public uint _StrandCount;					// group strand count
 			public uint _StrandParticleCount;			// group strand particle count
+
 			public float _StrandMaxParticleInterval;	// group max particle interval
 			public float _StrandMaxParticleWeight;		// group max particle weight (relative to all groups within volume)
 			public float _StrandScale;					// group scale
-
 			public float _StrandDiameter;//TODO fold under maximum + group scale scheme
+
+			public uint _StagingVertexCount;			// staging strand vertex count
+			public uint _StagingSubdivisions;			// staging subdivisions (per segment)
 
 			public float _DT;
 			public uint _Iterations;
@@ -169,11 +178,11 @@ namespace Unity.DemoTeam.Hair
 
 			public float _TargetDensityFactor;
 
-			public int _BoundaryCountDiscrete;
-			public int _BoundaryCountCapsule;
-			public int _BoundaryCountSphere;
-			public int _BoundaryCountTorus;
-			public int _BoundaryCountCube;
+			public uint _BoundaryCountDiscrete;
+			public uint _BoundaryCountCapsule;
+			public uint _BoundaryCountSphere;
+			public uint _BoundaryCountTorus;
+			public uint _BoundaryCountCube;
 
 			public float _BoundaryWorldEpsilon;
 			public float _BoundaryWorldMargin;

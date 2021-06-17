@@ -332,7 +332,7 @@ namespace Unity.DemoTeam.Hair
 									previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
 								}
 
-								HairSim.PushSolverData(previewMaterial, previewData[i]);
+								HairSim.BindSolverData(previewMaterial, previewData[i]);
 
 								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_LIVE", true);
 								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_LIVE_STRIPS", false);
@@ -417,7 +417,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					for (int i = 0; i != previewData.Length; i++)
 					{
-						HairSim.UpdateSolverData(cmd, ref previewData[i], HairSim.SolverSettings.defaults, Matrix4x4.identity, Quaternion.identity, 1.0f, 1.0f, 1.0f);
+						HairSim.PushSolverParams(cmd, ref previewData[i], HairSim.SolverSettings.defaults, Matrix4x4.identity, Quaternion.identity, 1.0f, 1.0f, 1.0f);
 					}
 
 					Graphics.ExecuteCommandBuffer(cmd);

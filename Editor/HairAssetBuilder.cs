@@ -126,9 +126,9 @@ namespace Unity.DemoTeam.Hair
 					AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetLines, hairAsset);
 					AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetStrips, hairAsset);
 
-					hairAsset.strandGroups[i].meshAssetRoots.name = "Roots:" + i;
-					hairAsset.strandGroups[i].meshAssetLines.name = "X-Lines:" + i;
-					hairAsset.strandGroups[i].meshAssetStrips.name = "X-Strips:" + i;
+					hairAsset.strandGroups[i].meshAssetRoots.name += (":" + i);
+					hairAsset.strandGroups[i].meshAssetLines.name += (":" + i);
+					hairAsset.strandGroups[i].meshAssetStrips.name += (":" + i);
 				}
 			}
 
@@ -430,7 +430,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						var accuLength = 0.0f;
 
-						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+						HairAssetUtility.DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 						for (int j = strandParticleBegin + strandParticleStride; j != strandParticleEnd; j += strandParticleStride)
 						{
@@ -481,229 +481,34 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			// build roots mesh
+			// build mesh assets
 			unsafe
 			{
-				strandGroup.meshAssetRoots = new Mesh();
-#if !VISIBLE_SUBASSETS
-				strandGroup.meshAssetRoots.hideFlags |= HideFlags.HideInHierarchy;
+#if VISIBLE_SUBASSETS
+				var hideFlags = HideFlags.None;
+#else
+				var hideFlags = HideFlags.HideInHierarchy;
 #endif
 
-				using (var indices = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				{
-					var indicesPtr = (int*)indices.GetUnsafePtr();
+				strandGroup.meshAssetRoots = HairInstanceBuilder.CreateMeshRoots(
+					hideFlags,
+					strandGroup.strandCount,
+					strandGroup.rootPosition,
+					strandGroup.rootDirection);
 
-					// write indices
-					for (int i = 0; i != strandCount; i++)
-					{
-						*(indicesPtr++) = i;
-					}
+				strandGroup.meshAssetLines = HairInstanceBuilder.CreateMeshLines(
+					hideFlags,
+					strandGroup.particleMemoryLayout,
+					strandGroup.strandCount,
+					strandGroup.strandParticleCount,
+					strandGroup.bounds);
 
-					// apply to mesh
-					var meshAsset = strandGroup.meshAssetRoots;
-					var meshVertexCount = strandCount;
-					var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
-					{
-						meshAsset.SetVertexBufferParams(meshVertexCount,
-							new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, dimension: 3, stream: 0),
-							new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, dimension: 3, stream: 1)
-						);
-
-						meshAsset.SetVertexBufferData(strandGroup.rootPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
-						meshAsset.SetVertexBufferData(strandGroup.rootDirection, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
-
-						meshAsset.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
-						meshAsset.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
-						meshAsset.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Points), meshUpdateFlags);
-						meshAsset.RecalculateBounds();
-					}
-				}
-			}
-
-			// build lines mesh
-			unsafe
-			{
-				strandGroup.meshAssetLines = new Mesh();
-#if !VISIBLE_SUBASSETS
-				strandGroup.meshAssetLines.hideFlags |= HideFlags.HideInHierarchy;
-#endif
-
-				var perLineVertices = strandParticleCount;
-				var perLineSegments = perLineVertices - 1;
-				var perLineIndices = perLineSegments * 2;
-
-				var unormU0 = (uint)(UInt16.MaxValue * 0.5f);
-				var unormVk = UInt16.MaxValue / (float)perLineSegments;
-
-				using (var vertexID = new NativeArray<float>(strandCount * perLineVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var vertexUV = new NativeArray<uint>(strandCount * perLineVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var indices = new NativeArray<int>(strandCount * perLineIndices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				{
-					var vertexIDPtr = (float*)vertexID.GetUnsafePtr();
-					var vertexUVPtr = (uint*)vertexUV.GetUnsafePtr();
-					var indicesPtr = (int*)indices.GetUnsafePtr();
-
-					// write vertex ID
-					for (int i = 0, k = 0; i != strandCount; i++)
-					{
-						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
-						{
-							*(vertexIDPtr++) = k++;// vertexID
-						}
-					}
-
-					// write vertex UV
-					for (int i = 0; i != strandCount; i++)
-					{
-						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-						for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
-						{
-							var unormV = (uint)(unormVk * k);
-							{
-								*(vertexUVPtr++) = (unormV << 16) | unormU0;// texCoord
-							}
-						}
-					}
-
-					// write indices
-					for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase++)
-					{
-						for (int j = 0; j != perLineSegments; j++, segmentBase++)
-						{
-							*(indicesPtr++) = segmentBase;
-							*(indicesPtr++) = segmentBase + 1;
-						}
-					}
-
-					// apply to mesh
-					var meshAsset = strandGroup.meshAssetLines;
-					var meshVertexCount = strandCount * perLineVertices;
-					var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
-					{
-						meshAsset.SetVertexBufferParams(meshVertexCount,
-							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
-							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
-						);
-
-						meshAsset.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
-						meshAsset.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
-
-						meshAsset.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
-						meshAsset.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
-						meshAsset.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Lines), meshUpdateFlags);
-						meshAsset.bounds = strandGroup.bounds;
-					}
-				}
-			}
-
-			// build strips mesh
-			unsafe
-			{
-				strandGroup.meshAssetStrips = new Mesh();
-#if !VISIBLE_SUBASSETS
-				strandGroup.meshAssetStrips.hideFlags |= HideFlags.HideInHierarchy;
-#endif
-
-				var perStripVertices = 2 * strandParticleCount;
-				var perStripSegments = strandParticleCount - 1;
-				var perStripTriangles = 2 * perStripSegments;
-				var perStripsIndices = perStripTriangles * 3;
-
-				var unormU0 = (uint)(UInt16.MaxValue * 0.0f);
-				var unormU1 = (uint)(UInt16.MaxValue * 1.0f);
-				var unormVs = UInt16.MaxValue / (float)perStripSegments;
-
-				using (var vertexID = new NativeArray<float>(strandCount * perStripVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var vertexUV = new NativeArray<uint>(strandCount * perStripVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var indices = new NativeArray<int>(strandCount * perStripsIndices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				{
-					var vertexIDPtr = (float*)vertexID.GetUnsafePtr();
-					var vertexUVPtr = (uint*)vertexUV.GetUnsafePtr();
-					var indicesPtr = (int*)indices.GetUnsafePtr();
-
-					// write vertex ID
-					for (int i = 0, k = 0; i != strandCount; i++)
-					{
-						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
-						{
-							// two vertices per particle
-							*(vertexIDPtr++) = k++;// vertexID
-							*(vertexIDPtr++) = k++;// ...
-						}
-					}
-
-					// write vertex UV
-					for (int i = 0; i != strandCount; i++)
-					{
-						DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-						for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
-						{
-							var unormV = (uint)(unormVs * k);
-							{
-								// two vertices per particle
-								*(vertexUVPtr++) = (unormV << 16) | unormU0;// texCoord
-								*(vertexUVPtr++) = (unormV << 16) | unormU1;// ...
-							}
-						}
-					}
-
-					// write indices
-					for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase += 2)
-					{
-						for (int j = 0; j != perStripSegments; j++, segmentBase += 2)
-						{
-							//  :  .   :
-							//  |,     |
-							//  4------5
-							//  |    ,´|
-							//  |  ,´  |      etc.
-							//  |,´    |    
-							//  2------3    12----13
-							//  |    ,´|    |    ,´|
-							//  |  ,´  |    |  ,´  |
-							//  |,´    |    |,´    |
-							//  0------1    10----11
-							//  .
-							//  |
-							//  '--- segmentBase
-
-							// indices for first triangle
-							*(indicesPtr++) = segmentBase + 0;
-							*(indicesPtr++) = segmentBase + 1;
-							*(indicesPtr++) = segmentBase + 3;
-
-							// indices for second triangle
-							*(indicesPtr++) = segmentBase + 0;
-							*(indicesPtr++) = segmentBase + 3;
-							*(indicesPtr++) = segmentBase + 2;
-						}
-					}
-
-					// apply to mesh asset
-					var meshAsset = strandGroup.meshAssetStrips;
-					var meshVertexCount = strandCount * perStripVertices;
-					var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
-					{
-						meshAsset.SetVertexBufferParams(meshVertexCount,
-							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
-							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
-						);
-
-						meshAsset.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
-						meshAsset.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
-
-						meshAsset.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
-						meshAsset.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
-						meshAsset.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Triangles), meshUpdateFlags);
-						meshAsset.bounds = strandGroup.bounds;
-					}
-				}
+				strandGroup.meshAssetStrips = HairInstanceBuilder.CreateMeshStrips(
+					hideFlags,
+					strandGroup.particleMemoryLayout,
+					strandGroup.strandCount,
+					strandGroup.strandParticleCount,
+					strandGroup.bounds);
 			}
 		}
 
@@ -1007,7 +812,7 @@ namespace Unity.DemoTeam.Hair
 				var curPos = rootPos[i];
 				var curDir = rootDir[i];
 
-				DeclareStrandIterator(memoryLayout, i, settings.strandCount, settings.strandParticleCount, out var strandParticleBegin, out var strandParticleStride, out var strandParticleEnd);
+				HairAssetUtility.DeclareStrandIterator(memoryLayout, i, settings.strandCount, settings.strandParticleCount, out var strandParticleBegin, out var strandParticleStride, out var strandParticleEnd);
 
 				if (settings.curl)
 				{
@@ -1078,28 +883,6 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			return true;// success
-		}
-
-		public static void DeclareStrandIterator(HairAsset.MemoryLayout memoryLayout, int strandIndex, int strandCount, int strandParticleCount,
-			out int strandParticleBegin,
-			out int strandParticleStride,
-			out int strandParticleEnd)
-		{
-			switch (memoryLayout)
-			{
-				default:
-				case HairAsset.MemoryLayout.Sequential:
-					strandParticleBegin = strandIndex * strandParticleCount;
-					strandParticleStride = 1;
-					break;
-
-				case HairAsset.MemoryLayout.Interleaved:
-					strandParticleBegin = strandIndex;
-					strandParticleStride = strandCount;
-					break;
-			}
-
-			strandParticleEnd = strandParticleBegin + strandParticleStride * strandParticleCount;
 		}
 
 		public static unsafe void Resample(Vector3* srcPos, int srcCount, Vector3* dstPos, int dstCount, int iterations)

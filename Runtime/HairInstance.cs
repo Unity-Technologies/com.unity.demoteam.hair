@@ -44,6 +44,19 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsStrands
 		{
+			public enum StrandScale
+			{
+				Fixed,
+				UniformWorldMin,
+				UniformWorldMax,
+			}
+
+			public enum StagingPrecision
+			{
+				Full,
+				Half,
+			}
+
 			public enum StrandRenderer
 			{
 				BuiltinLines,
@@ -53,13 +66,6 @@ namespace Unity.DemoTeam.Hair
 #endif
 			}
 
-			public enum StrandScale
-			{
-				Fixed,
-				HierarchyWorldMin,
-				HierarchyWorldMax,
-			}
-
 			public enum SimulationRate
 			{
 				Fixed30Hz,
@@ -67,6 +73,24 @@ namespace Unity.DemoTeam.Hair
 				Fixed120Hz,
 				CustomTimeStep,
 			}
+
+			[LineHeader("Proportions")]
+
+			[Tooltip("Behaviour when transform hierarchy is scaled")]
+			public StrandScale strandScale;
+			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
+			public float strandDiameter;//TODO per-group
+			[Range(0.0f, 100.0f), Tooltip("Strand margin (in millimeters)")]
+			public float strandMargin;//TODO per-group
+
+			[LineHeader("Geometry")]
+
+			[ToggleGroup]
+			public bool staging;
+			[ToggleGroupItem(withLabel = true), Range(0, 10)]
+			public uint stagingSubdivisions;
+			[EditableIf(nameof(staging), true)]
+			public StagingPrecision stagingPrecision;
 
 			[LineHeader("Rendering")]
 
@@ -83,16 +107,7 @@ namespace Unity.DemoTeam.Hair
 			[RenderingLayerMask]
 			public int strandLayers;
 
-			[LineHeader("Proportions")]
-
-			[Tooltip("Behaviour of propertions when transform hiearchy is scaled")]
-			public StrandScale strandScale;
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
-			public float strandDiameter;
-			[Range(0.0f, 100.0f), Tooltip("Strand margin (in millimeters)")]
-			public float strandMargin;
-
-			[LineHeader("Dynamics")]
+			[LineHeader("Simulation")]
 
 			[ToggleGroup, Tooltip("Enable simulation")]
 			public bool simulation;
@@ -113,8 +128,13 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SettingsStrands defaults = new SettingsStrands()
 			{
-				strandDiameter = 1.0f,
 				strandScale = StrandScale.Fixed,
+				strandDiameter = 1.0f,
+				strandMargin = 0.0f,
+
+				staging = false,
+				stagingSubdivisions = 0,
+				stagingPrecision = StagingPrecision.Half,
 
 				strandMaterial = false,
 				strandMaterialValue = null,
@@ -152,6 +172,7 @@ namespace Unity.DemoTeam.Hair
 			[NonSerialized] public Material materialInstance;
 			[NonSerialized] public Mesh meshInstanceLines;
 			[NonSerialized] public Mesh meshInstanceStrips;
+			[NonSerialized] public uint meshInstanceSubdivisionCount;
 		}
 
 		public HairAsset hairAsset;
@@ -263,7 +284,7 @@ namespace Unity.DemoTeam.Hair
 				if (InitializeRuntimeData(cmd))
 				{
 					UpdateSimulationState(cmd);
-					UpdateRendererState();
+					UpdateRenderingState(cmd);
 					Graphics.ExecuteCommandBuffer(cmd);
 				}
 			}
@@ -398,10 +419,34 @@ namespace Unity.DemoTeam.Hair
 			DispatchStepAccumulated(cmd, Time.deltaTime);
 		}
 
-		void UpdateRendererState()
+		void UpdateRenderingState(CommandBuffer cmd)
 		{
 			if (strandGroupInstances == null)
 				return;
+
+			for (int i = 0; i != solverData.Length; i++)
+			{
+				if (settingsStrands.staging)
+				{
+					var stagingCompression = (settingsStrands.stagingPrecision == SettingsStrands.StagingPrecision.Half);
+					var stagingSubdivisions = settingsStrands.stagingSubdivisions;
+
+					if (HairSim.PrepareSolverStaging(ref solverData[i], stagingCompression, stagingSubdivisions))
+					{
+						HairSim.PushSolverStaging(cmd, ref solverData[i], stagingCompression, stagingSubdivisions, volumeData);
+						HairSim.PushSolverStaging(cmd, ref solverData[i], stagingCompression, stagingSubdivisions, volumeData);
+					}
+					else
+					{
+						HairSim.PushSolverStaging(cmd, ref solverData[i], stagingCompression, stagingSubdivisions, volumeData);
+					}
+				}
+				else
+				{
+					solverData[i].cbuffer._StagingVertexCount = 0;// forces re-init after enable (see PrepareSolverStaging)
+					solverData[i].cbuffer._StagingSubdivisions = 0;// ...
+				}
+			}
 
 			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
@@ -432,24 +477,54 @@ namespace Unity.DemoTeam.Hair
 			ref var meshInstanceLines = ref strandGroupInstance.meshInstanceLines;
 			ref var meshInstanceStrips = ref strandGroupInstance.meshInstanceStrips;
 
-			HairInstanceBuilder.CreateInstanceIfNull(ref meshInstanceLines, strandGroup.meshAssetLines, HideFlags.HideAndDontSave);
-			HairInstanceBuilder.CreateInstanceIfNull(ref meshInstanceStrips, strandGroup.meshAssetStrips, HideFlags.HideAndDontSave);
+			var subdivisionCount = solverData.cbuffer._StagingSubdivisions;
+			if (subdivisionCount != strandGroupInstance.meshInstanceSubdivisionCount)
+			{
+				strandGroupInstance.meshInstanceSubdivisionCount = subdivisionCount;
+
+				CoreUtils.Destroy(meshInstanceLines);
+				CoreUtils.Destroy(meshInstanceStrips);
+			}
 
 			switch (settingsStrands.strandRenderer)
 			{
 				case SettingsStrands.StrandRenderer.BuiltinLines:
-					if (meshFilter.sharedMesh != meshInstanceLines)
-						meshFilter.sharedMesh = meshInstanceLines;
+					{
+						if (subdivisionCount == 0)
+						{
+							HairInstanceBuilder.CreateInstanceIfNull(ref meshInstanceLines, strandGroup.meshAssetLines, HideFlags.HideAndDontSave);
+						}
+						else
+						{
+							HairInstanceBuilder.CreateMeshLinesIfNull(ref meshInstanceLines, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+						}
+
+						if (meshFilter.sharedMesh != meshInstanceLines)
+							meshFilter.sharedMesh = meshInstanceLines;
+					}
 					break;
+
 				case SettingsStrands.StrandRenderer.BuiltinStrips:
-					if (meshFilter.sharedMesh != meshInstanceStrips)
-						meshFilter.sharedMesh = meshInstanceStrips;
+					{
+						if (subdivisionCount == 0)
+						{
+							HairInstanceBuilder.CreateInstanceIfNull(ref meshInstanceStrips, strandGroup.meshAssetStrips, HideFlags.HideAndDontSave);
+						}
+						else
+						{
+							HairInstanceBuilder.CreateMeshStripsIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+						}
+
+						if (meshFilter.sharedMesh != meshInstanceStrips)
+							meshFilter.sharedMesh = meshInstanceStrips;
+					}
 					break;
 			}
 
 			//TODO tighten renderer bounds
 			//meshFilter.sharedMesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
-			meshFilter.sharedMesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
+			if (meshFilter.sharedMesh != null)
+				meshFilter.sharedMesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
 
 			var materialAsset = GetStrandMaterial();
 			if (materialAsset != null)
@@ -477,18 +552,29 @@ namespace Unity.DemoTeam.Hair
 				meshRenderer.renderingLayerMask = (uint)settingsStrands.strandLayers;
 				meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.Camera;
 
-				HairSim.PushSolverData(materialInstance, solverData);
-				HairSim.PushVolumeData(materialInstance, volumeData);
+				HairSim.BindSolverData(materialInstance, solverData);
+				HairSim.BindVolumeData(materialInstance, volumeData);
 
 				materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
 				materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
 
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_LIVE", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinLines);
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_LIVE_STRIPS", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinStrips);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinLines);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinStrips);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
 			}
 			else
 			{
 				meshRenderer.enabled = false;
+			}
+		}
+
+		public static Bounds GetRootBounds(in StrandGroupInstance strandGroupInstance, Matrix4x4? worldTransform = null)
+		{
+			var rootLocalBounds = strandGroupInstance.rootFilter.sharedMesh.bounds;
+			var rootLocalToWorld = strandGroupInstance.rootFilter.transform.localToWorldMatrix;
+			{
+				return rootLocalBounds.WithTransform((worldTransform != null) ? (worldTransform.Value * rootLocalToWorld) : rootLocalToWorld);
 			}
 		}
 
@@ -501,15 +587,6 @@ namespace Unity.DemoTeam.Hair
 			}
 #endif
 			return strandGroupInstance.rootFilter.transform.rotation;
-		}
-
-		public static Bounds GetRootBounds(in StrandGroupInstance strandGroupInstance, Matrix4x4? worldTransform = null)
-		{
-			var rootLocalBounds = strandGroupInstance.rootFilter.sharedMesh.bounds;
-			var rootLocalToWorld = strandGroupInstance.rootFilter.transform.localToWorldMatrix;
-			{
-				return rootLocalBounds.WithTransform((worldTransform != null) ? (worldTransform.Value * rootLocalToWorld) : rootLocalToWorld);
-			}
 		}
 
 		public bool GetSimulationActive()
@@ -571,13 +648,13 @@ namespace Unity.DemoTeam.Hair
 					{
 						return 1.0f;
 					}
-				case SettingsStrands.StrandScale.HierarchyWorldMin:
+				case SettingsStrands.StrandScale.UniformWorldMin:
 					{
 						var lossyScaleAbs = this.transform.lossyScale.Abs();
 						var lossyScaleAbsMin = lossyScaleAbs.CMin();
 						return lossyScaleAbsMin;
 					}
-				case SettingsStrands.StrandScale.HierarchyWorldMax:
+				case SettingsStrands.StrandScale.UniformWorldMax:
 					{
 						var lossyScaleAbs = this.transform.lossyScale.Abs();
 						var lossyScaleAbsMax = lossyScaleAbs.CMax();
@@ -599,7 +676,7 @@ namespace Unity.DemoTeam.Hair
 			return mat;
 		}
 
-		public void DispatchStepAccumulated(CommandBuffer cmd, float dt)
+		public int DispatchStepAccumulated(CommandBuffer cmd, float dt)
 		{
 			var active = GetSimulationActive();
 			var stepDT = GetSimulationTimeStep();
@@ -610,7 +687,7 @@ namespace Unity.DemoTeam.Hair
 				stepsLastFrame = 0;
 				stepsLastFrameSmooth = 0.0f;
 				stepsLastFrameSkipped = 0;
-				return;
+				return 0;
 			}
 
 			// calc number of steps
@@ -639,6 +716,9 @@ namespace Unity.DemoTeam.Hair
 			stepsLastFrame = stepCount;
 			stepsLastFrameSmooth = Mathf.Lerp(stepsLastFrameSmooth, stepsLastFrame, 1.0f - Mathf.Pow(0.01f, dt / 0.2f));
 			stepsLastFrameSkipped = Mathf.Max(0, stepCountRT - stepCount);
+
+			// return steps
+			return stepCount;
 		}
 
 		public void DispatchStep(CommandBuffer cmd, float dt)
@@ -659,17 +739,17 @@ namespace Unity.DemoTeam.Hair
 				var rootTransform = strandGroupInstances[i].rootFilter.transform.localToWorldMatrix;
 				var strandRotation = GetRootRotation(strandGroupInstances[i]);
 
-				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, dt);
-				HairSim.UpdateSolverRoots(cmd, solverData[i], rootMesh);
+				HairSim.PushSolverParams(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, dt);
+				HairSim.PushSolverRoots(cmd, solverData[i], rootMesh);// TODO handle substeps within frame
 			}
 
 			// update volume boundaries
-			HairSim.UpdateVolumeBoundaries(cmd, ref volumeData, volumeSettings, simulationBounds);
+			HairSim.PushVolumeBoundaries(cmd, ref volumeData, volumeSettings, simulationBounds);// TODO handle substeps within frame
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings))
 			{
-				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
+				HairSim.PushVolumeParams(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
 
@@ -680,7 +760,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// step volume data
-			HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
+			HairSim.PushVolumeParams(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 		}
 
@@ -758,7 +838,7 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					if (strandGroup.rootUV != null)//TODO remove condition
+					if (strandGroup.rootUV != null)//TODO remove condition, version the data
 					solverData[i].rootUV.SetData(strandGroup.rootUV);
 					solverData[i].rootScale.SetData(strandGroup.rootScale);
 					solverData[i].rootPosition.SetData(alignedRootPosition);
@@ -780,10 +860,10 @@ namespace Unity.DemoTeam.Hair
 				var strandScale = GetStrandScale();
 				var strandRotation = GetRootRotation(strandGroupInstances[i]);
 
-				HairSim.UpdateSolverData(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, 1.0f);
-				HairSim.UpdateSolverRoots(cmd, solverData[i], rootMesh);
+				HairSim.PushSolverParams(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, 1.0f);
+				HairSim.PushSolverRoots(cmd, solverData[i], rootMesh);
 				{
-					HairSim.InitSolverParticles(cmd, solverData[i]);
+					HairSim.InitSolverData(cmd, solverData[i]);
 				}
 			}
 
@@ -794,12 +874,12 @@ namespace Unity.DemoTeam.Hair
 				var strandMargin = GetStrandMargin();
 				var strandScale = GetStrandScale();
 
-				HairSim.UpdateVolumeData(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
+				HairSim.PushVolumeParams(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 				for (int i = 0; i != solverData.Length; i++)
 				{
-					HairSim.InitSolverParticlesPostVolume(cmd, solverData[i], volumeData);
+					HairSim.InitSolverDataPostVolume(cmd, solverData[i], volumeData);
 				}
 			}
 
@@ -900,6 +980,261 @@ namespace Unity.DemoTeam.Hair
 #if UNITY_EDITOR
 			UnityEditor.EditorUtility.SetDirty(hairInstance);
 #endif
+		}
+
+		public static unsafe void BuildMeshRoots(Mesh meshRoots, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		{
+			using (var indices = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			{
+				var indicesPtr = (int*)indices.GetUnsafePtr();
+
+				// write indices
+				for (int i = 0; i != strandCount; i++)
+				{
+					*(indicesPtr++) = i;
+				}
+
+				// apply to mesh
+				var meshVertexCount = strandCount;
+				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				{
+					meshRoots.SetVertexBufferParams(meshVertexCount,
+						new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, dimension: 3, stream: 0),
+						new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, dimension: 3, stream: 1)
+					);
+
+					meshRoots.SetVertexBufferData(rootPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+					meshRoots.SetVertexBufferData(rootDirection, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+
+					meshRoots.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
+					meshRoots.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
+					meshRoots.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Points), meshUpdateFlags);
+					meshRoots.RecalculateBounds();
+				}
+			}
+		}
+
+		public static unsafe void BuildMeshLines(Mesh meshLines, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			var perLineVertices = strandParticleCount;
+			var perLineSegments = perLineVertices - 1;
+			var perLineIndices = perLineSegments * 2;
+
+			var unormU0 = (uint)(UInt16.MaxValue * 0.5f);
+			var unormVk = UInt16.MaxValue / (float)perLineSegments;
+
+			using (var vertexID = new NativeArray<float>(strandCount * perLineVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var vertexUV = new NativeArray<uint>(strandCount * perLineVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var indices = new NativeArray<int>(strandCount * perLineIndices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			{
+				var vertexIDPtr = (float*)vertexID.GetUnsafePtr();
+				var vertexUVPtr = (uint*)vertexUV.GetUnsafePtr();
+				var indicesPtr = (int*)indices.GetUnsafePtr();
+
+				// write vertex ID
+				for (int i = 0, k = 0; i != strandCount; i++)
+				{
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+					{
+						*(vertexIDPtr++) = k++;// vertexID
+					}
+				}
+
+				// write vertex UV
+				for (int i = 0; i != strandCount; i++)
+				{
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
+					{
+						var unormV = (uint)(unormVk * k);
+						{
+							*(vertexUVPtr++) = (unormV << 16) | unormU0;// texCoord
+						}
+					}
+				}
+
+				// write indices
+				for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase++)
+				{
+					for (int j = 0; j != perLineSegments; j++, segmentBase++)
+					{
+						*(indicesPtr++) = segmentBase;
+						*(indicesPtr++) = segmentBase + 1;
+					}
+				}
+
+				// apply to mesh
+				var meshVertexCount = strandCount * perLineVertices;
+				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				{
+					meshLines.SetVertexBufferParams(meshVertexCount,
+						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
+						new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
+					);
+
+					meshLines.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+					meshLines.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+
+					meshLines.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
+					meshLines.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
+					meshLines.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Lines), meshUpdateFlags);
+					meshLines.bounds = bounds;
+				}
+			}
+		}
+
+		public static unsafe void BuildMeshStrips(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			var perStripVertices = 2 * strandParticleCount;
+			var perStripSegments = strandParticleCount - 1;
+			var perStripTriangles = 2 * perStripSegments;
+			var perStripsIndices = perStripTriangles * 3;
+
+			var unormU0 = (uint)(UInt16.MaxValue * 0.0f);
+			var unormU1 = (uint)(UInt16.MaxValue * 1.0f);
+			var unormVs = UInt16.MaxValue / (float)perStripSegments;
+
+			using (var vertexID = new NativeArray<float>(strandCount * perStripVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var vertexUV = new NativeArray<uint>(strandCount * perStripVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var indices = new NativeArray<int>(strandCount * perStripsIndices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			{
+				var vertexIDPtr = (float*)vertexID.GetUnsafePtr();
+				var vertexUVPtr = (uint*)vertexUV.GetUnsafePtr();
+				var indicesPtr = (int*)indices.GetUnsafePtr();
+
+				// write vertex ID
+				for (int i = 0, k = 0; i != strandCount; i++)
+				{
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+					{
+						// two vertices per particle
+						*(vertexIDPtr++) = k++;// vertexID
+						*(vertexIDPtr++) = k++;// ...
+					}
+				}
+
+				// write vertex UV
+				for (int i = 0; i != strandCount; i++)
+				{
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
+					{
+						var unormV = (uint)(unormVs * k);
+						{
+							// two vertices per particle
+							*(vertexUVPtr++) = (unormV << 16) | unormU0;// texCoord
+							*(vertexUVPtr++) = (unormV << 16) | unormU1;// ...
+						}
+					}
+				}
+
+				// write indices
+				for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase += 2)
+				{
+					for (int j = 0; j != perStripSegments; j++, segmentBase += 2)
+					{
+						//  :  .   :
+						//  |,     |
+						//  4------5
+						//  |    ,´|
+						//  |  ,´  |      etc.
+						//  |,´    |    
+						//  2------3    12----13
+						//  |    ,´|    |    ,´|
+						//  |  ,´  |    |  ,´  |
+						//  |,´    |    |,´    |
+						//  0------1    10----11
+						//  .
+						//  |
+						//  '--- segmentBase
+
+						// indices for first triangle
+						*(indicesPtr++) = segmentBase + 0;
+						*(indicesPtr++) = segmentBase + 1;
+						*(indicesPtr++) = segmentBase + 3;
+
+						// indices for second triangle
+						*(indicesPtr++) = segmentBase + 0;
+						*(indicesPtr++) = segmentBase + 3;
+						*(indicesPtr++) = segmentBase + 2;
+					}
+				}
+
+				// apply to mesh asset
+				var meshVertexCount = strandCount * perStripVertices;
+				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				{
+					meshStrips.SetVertexBufferParams(meshVertexCount,
+						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
+						new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
+					);
+
+					meshStrips.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+					meshStrips.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+
+					meshStrips.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
+					meshStrips.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
+					meshStrips.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Triangles), meshUpdateFlags);
+					meshStrips.bounds = bounds;
+				}
+			}
+		}
+
+		public static unsafe Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		{
+			var meshRoots = new Mesh();
+			{
+				meshRoots.hideFlags = hideFlags;
+				meshRoots.name = "Roots";
+				BuildMeshRoots(meshRoots, strandCount, rootPosition, rootDirection);
+			}
+			return meshRoots;
+		}
+
+		public static unsafe void CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		{
+			if (meshRoots == null)
+				meshRoots = CreateMeshRoots(hideFlags, strandCount, rootPosition, rootDirection);
+		}
+
+		public static unsafe Mesh CreateMeshLines(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			var meshLines = new Mesh();
+			{
+				meshLines.hideFlags = hideFlags;
+				meshLines.name = "X-Lines";
+				BuildMeshLines(meshLines, memoryLayout, strandCount, strandParticleCount, bounds);
+			}
+			return meshLines;
+		}
+
+		public static unsafe void CreateMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			if (meshLines == null)
+				meshLines = CreateMeshLines(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+		}
+
+		public static unsafe Mesh CreateMeshStrips(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			var meshStrips = new Mesh();
+			{
+				meshStrips.hideFlags = hideFlags;
+				meshStrips.name = "X-Strips";
+				BuildMeshStrips(meshStrips, memoryLayout, strandCount, strandParticleCount, bounds);
+			}
+			return meshStrips;
+		}
+
+		public static unsafe void CreateMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			if (meshStrips == null)
+				meshStrips = CreateMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 		}
 
 		//---------

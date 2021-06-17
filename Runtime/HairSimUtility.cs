@@ -2,6 +2,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
+using Unity.Collections;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -97,59 +98,85 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		//------------------
-		// gpu push targets
+		//----------
+		// gpu data
 
-		public interface IPushTarget
+		public static void PushComputeBufferData<T>(CommandBuffer cmd, in ComputeBuffer buffer, in NativeArray<T> bufferData) where T : struct
 		{
-			void PushConstantBuffer(int nameID, ComputeBuffer cbuffer);
-			void PushComputeBuffer(int nameID, ComputeBuffer buffer);
-			void PushComputeTexture(int nameID, RenderTexture texture);
-			void PushKeyword(string name, bool value);
+#if UNITY_2021_1_OR_NEWER
+			cmd.SetBufferData(buffer, bufferData);
+#else
+			cmd.SetComputeBufferData(buffer, bufferData);
+#endif
 		}
 
-		public struct PushTargetCompute : IPushTarget
+		public static void PushConstantBufferData<T>(CommandBuffer cmd, in ComputeBuffer cbuffer, in T cbufferData) where T : struct
+		{
+			var cbufferStaging = new NativeArray<T>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+			{
+				cbufferStaging[0] = cbufferData;
+#if UNITY_2021_1_OR_NEWER
+				cmd.SetBufferData(cbuffer, dataStaging);
+#else
+				cmd.SetComputeBufferData(cbuffer, cbufferStaging);
+#endif
+				cbufferStaging.Dispose();
+			}
+		}
+
+		//------------------
+		// gpu bind targets
+
+		public interface IBindTarget
+		{
+			void BindConstantBuffer(int nameID, ComputeBuffer cbuffer);
+			void BindComputeBuffer(int nameID, ComputeBuffer buffer);
+			void BindComputeTexture(int nameID, RenderTexture texture);
+			void BindKeyword(string name, bool value);
+		}
+
+		public struct BindTargetCompute : IBindTarget
 		{
 			public ComputeShader cs;
 			public int kernel;
 
-			public PushTargetCompute(ComputeShader cs, int kernel)
+			public BindTargetCompute(ComputeShader cs, int kernel)
 			{
 				this.cs = cs;
 				this.kernel = kernel;
 			}
 
-			public void PushConstantBuffer(int nameID, ComputeBuffer cbuffer) => cs.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
-			public void PushComputeBuffer(int nameID, ComputeBuffer buffer) => cs.SetBuffer(kernel, nameID, buffer);
-			public void PushComputeTexture(int nameID, RenderTexture texture) => cs.SetTexture(kernel, nameID, texture);
-			public void PushKeyword(string name, bool value) => CoreUtils.SetKeyword(cs, name, value);
+			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cs.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
+			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cs.SetBuffer(kernel, nameID, buffer);
+			public void BindComputeTexture(int nameID, RenderTexture texture) => cs.SetTexture(kernel, nameID, texture);
+			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cs, name, value);
 		}
 
-		public struct PushTargetComputeCmd : IPushTarget
+		public struct BindTargetComputeCmd : IBindTarget
 		{
 			public CommandBuffer cmd;
 			public ComputeShader cs;
 			public int kernel;
 
-			public PushTargetComputeCmd(CommandBuffer cmd, ComputeShader cs, int kernel)
+			public BindTargetComputeCmd(CommandBuffer cmd, ComputeShader cs, int kernel)
 			{
 				this.cmd = cmd;
 				this.cs = cs;
 				this.kernel = kernel;
 			}
 
-			public void PushConstantBuffer(int nameID, ComputeBuffer cbuffer) => cmd.SetComputeConstantBufferParam(cs, nameID, cbuffer, 0, cbuffer.stride);
-			public void PushComputeBuffer(int nameID, ComputeBuffer buffer) => cmd.SetComputeBufferParam(cs, kernel, nameID, buffer);
-			public void PushComputeTexture(int nameID, RenderTexture texture) => cmd.SetComputeTextureParam(cs, kernel, nameID, texture);
-			public void PushKeyword(string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
+			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cmd.SetComputeConstantBufferParam(cs, nameID, cbuffer, 0, cbuffer.stride);
+			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cmd.SetComputeBufferParam(cs, kernel, nameID, buffer);
+			public void BindComputeTexture(int nameID, RenderTexture texture) => cmd.SetComputeTextureParam(cs, kernel, nameID, texture);
+			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
 		}
 
-		public struct PushTargetGlobal : IPushTarget
+		public struct BindTargetGlobal : IBindTarget
 		{
-			public void PushConstantBuffer(int nameID, ComputeBuffer cbuffer) => Shader.SetGlobalConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
-			public void PushComputeBuffer(int nameID, ComputeBuffer buffer) => Shader.SetGlobalBuffer(nameID, buffer);
-			public void PushComputeTexture(int nameID, RenderTexture texture) => Shader.SetGlobalTexture(nameID, texture);
-			public void PushKeyword(string name, bool value)
+			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => Shader.SetGlobalConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
+			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => Shader.SetGlobalBuffer(nameID, buffer);
+			public void BindComputeTexture(int nameID, RenderTexture texture) => Shader.SetGlobalTexture(nameID, texture);
+			public void BindKeyword(string name, bool value)
 			{
 				if (value)
 					Shader.EnableKeyword(name);
@@ -158,34 +185,34 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public struct PushTargetGlobalCmd : IPushTarget
+		public struct BindTargetGlobalCmd : IBindTarget
 		{
 			public CommandBuffer cmd;
 
-			public PushTargetGlobalCmd(CommandBuffer cmd)
+			public BindTargetGlobalCmd(CommandBuffer cmd)
 			{
 				this.cmd = cmd;
 			}
 
-			public void PushConstantBuffer(int nameID, ComputeBuffer cbuffer) => cmd.SetGlobalConstantBuffer(cbuffer, nameID, 0, cbuffer.stride);
-			public void PushComputeBuffer(int nameID, ComputeBuffer buffer) => cmd.SetGlobalBuffer(nameID, buffer);
-			public void PushComputeTexture(int nameID, RenderTexture texture) => cmd.SetGlobalTexture(nameID, texture);
-			public void PushKeyword(string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
+			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cmd.SetGlobalConstantBuffer(cbuffer, nameID, 0, cbuffer.stride);
+			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cmd.SetGlobalBuffer(nameID, buffer);
+			public void BindComputeTexture(int nameID, RenderTexture texture) => cmd.SetGlobalTexture(nameID, texture);
+			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
 		}
 
-		public struct PushTargetMaterial : IPushTarget
+		public struct BindTargetMaterial : IBindTarget
 		{
 			public Material mat;
 
-			public PushTargetMaterial(Material mat)
+			public BindTargetMaterial(Material mat)
 			{
 				this.mat = mat;
 			}
 
-			public void PushConstantBuffer(int nameID, ComputeBuffer cbuffer) => mat.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
-			public void PushComputeBuffer(int nameID, ComputeBuffer buffer) => mat.SetBuffer(nameID, buffer);
-			public void PushComputeTexture(int nameID, RenderTexture texture) => mat.SetTexture(nameID, texture);
-			public void PushKeyword(string name, bool value) => CoreUtils.SetKeyword(mat, name, value);
+			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => mat.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
+			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => mat.SetBuffer(nameID, buffer);
+			public void BindComputeTexture(int nameID, RenderTexture texture) => mat.SetTexture(nameID, texture);
+			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(mat, name, value);
 		}
 
 		//------------

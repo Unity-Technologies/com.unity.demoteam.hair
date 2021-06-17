@@ -31,8 +31,17 @@ HAIRSIM_SOLVERDATA<float4> _ParticlePositionCorr;	// xyz: ftl correction, w: -
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;		// xyz: velocity, w: splatting weight
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;	// xyz: velocity, w: splatting weight
 
-HAIRSIM_SOLVERDATA<float4> _StagingPosition;	//TODO
-HAIRSIM_SOLVERDATA<float4> _StagingTangent;		//TODO
+//----------------
+// solver staging
+
+#if STAGING_COMPRESSION
+HAIRSIM_SOLVERDATA<uint2> _StagingPosition;			// xy: position encoded
+HAIRSIM_SOLVERDATA<uint2> _StagingPositionPrev;		// ...
+#else
+HAIRSIM_SOLVERDATA<float3> _StagingPosition;		// xyz: position
+HAIRSIM_SOLVERDATA<float3> _StagingPositionPrev;	// ...
+#endif
+
 
 //-------------
 // volume data
@@ -84,5 +93,55 @@ StructuredBuffer<BoundaryShape> _BoundaryShape;
 StructuredBuffer<float4x4> _BoundaryMatrix;
 StructuredBuffer<float4x4> _BoundaryMatrixInv;
 StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;
+
+//---------
+// utility
+
+uint2 EncodePosition(float3 p, float4 originExtent)
+{
+	uint3 p_f16 = f32tof16((p - originExtent.xyz) / originExtent.w);
+	uint2 p_enc;
+	{
+		p_enc.x = p_f16.x << 16 | p_f16.y;
+		p_enc.y = p_f16.z;
+	}
+	return p_enc;
+}
+
+float3 DecodePosition(uint2 p_enc, float4 originExtent)
+{
+	uint3 p_f16 = uint3(p_enc.x >> 16, p_enc.x & 0xffff, p_enc.y);
+	float3 p = f16tof32(p_f16) * originExtent.w + originExtent.xyz;
+	return p;
+}
+
+float3 LoadStagingPosition(uint i)
+{
+#if STAGING_COMPRESSION
+	return DecodePosition(_StagingPosition[i], _StagingOriginExtent);
+#else
+	return _StagingPosition[i].xyz;
+#endif
+}
+
+float3 LoadStagingPositionPrev(uint i)
+{
+#if STAGING_COMPRESSION
+	return DecodePosition(_StagingPositionPrev[i], _StagingOriginExtentPrev);
+#else
+	return _StagingPositionPrev[i].xyz;
+#endif
+}
+
+void StoreStagingPosition(uint i, float3 p)
+{
+#if HAIRSIM_WRITEABLE_SOLVERDATA
+#if STAGING_COMPRESSION
+	_StagingPosition[i] = EncodePosition(p, _StagingOriginExtent);
+#else
+	_StagingPosition[i].xyz = p;
+#endif
+#endif
+}
 
 #endif//__HAIRSIMDATA_HLSL__
