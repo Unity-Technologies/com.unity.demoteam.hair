@@ -157,17 +157,23 @@ namespace Unity.DemoTeam.Hair
 			var hairAsset = userData as HairAsset;
 			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
 			{
-				WarnIfMissingReadable(hairAsset.settingsProcedural.placementDensity, "Placement Density");
-				WarnIfMissingReadable(hairAsset.settingsProcedural.paintedDirection, "Painted Direction");
-				WarnIfMissingReadable(hairAsset.settingsProcedural.paintedParameters, "Painted Parameters");
+				var mesh = hairAsset.settingsProcedural.placementMesh;
+				if (mesh == null)
+				{
+					EditorGUILayout.HelpBox("Configuration error: 'Placement Mesh' is not assigned.", MessageType.Error);
+				}
+
+				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedDensity, "Placement Density");
+				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedDirection, "Painted Direction");
+				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedParameters, "Painted Parameters");
 			}
 
 			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom)
 			{
-				var rootGenerator = hairAsset.settingsProcedural.placementGenerator as HairAssetBuilder.IRootGenerator;
+				var rootGenerator = hairAsset.settingsProcedural.placementCustom;
 				if (rootGenerator == null)
 				{
-					EditorGUILayout.HelpBox("Configuration error: 'Placement Generator' must implement interface 'HairAssetBuilder.IGenerateRoots'", MessageType.Error);
+					EditorGUILayout.HelpBox("Configuration error: 'Placement Generator' is not assigned.", MessageType.Error);
 				}
 			}
 
@@ -199,11 +205,11 @@ namespace Unity.DemoTeam.Hair
 						StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
 						{
 							if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom &&
-								hairAsset.settingsProcedural.placementGenerator is HairAssetBuilder.IRootGenerator)
+								hairAsset.settingsProcedural.placementCustom is HairAssetProvider)
 							{
-								Editor.CreateCachedEditor(hairAsset.settingsProcedural.placementGenerator, editorType: null, ref rootGeneratorEditor);
+								Editor.CreateCachedEditor(hairAsset.settingsProcedural.placementCustom, editorType: null, ref rootGeneratorEditor);
 								EditorGUILayout.Space();
-								EditorGUILayout.LabelField("Settings Procedural Custom", EditorStyles.miniBoldLabel);
+								EditorGUILayout.LabelField("Settings Placement Custom", EditorStyles.miniBoldLabel);
 								using (new EditorGUI.IndentLevelScope())
 								{
 									rootGeneratorEditor.DrawDefaultInspector();

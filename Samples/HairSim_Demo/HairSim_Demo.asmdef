@@ -1,10 +1,12 @@
 {
     "name": "HairSim_Demo",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "GUID:f9dedde5eec30c2468e14d8a7b14626e"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": false,

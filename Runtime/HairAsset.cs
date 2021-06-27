@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Unity.DemoTeam.Attributes;
 
 #if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
@@ -108,18 +109,18 @@ namespace Unity.DemoTeam.Hair
 			public PlacementType placement;
 			[VisibleIf(nameof(placement), PlacementType.Primitive), Tooltip("Place strands using builtin primitive generator")]
 			public PrimitiveType placementPrimitive;
-			[VisibleIf(nameof(placement), PlacementType.Custom)]
-			public ScriptableObject placementGenerator;
+			[VisibleIf(nameof(placement), PlacementType.Custom), Tooltip("Place strands using specified custom generator"), FormerlySerializedAs("placementGenerator")]
+			public HairAssetProvider placementCustom;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on specified triangle mesh")]
 			public Mesh placementMesh;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Included submesh indices")]
-			public SubmeshMask placementMeshInclude;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on mesh according to specified density map (where 0 == Empty region, 1 == Fully populated region)")]
-			public Texture2D placementDensity;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Use strand direction from specified object-space normal map")]
-			public Texture2D paintedDirection;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Use strand parameters from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)")]
-			public Texture2D paintedParameters;
+			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Included submesh indices"), FormerlySerializedAs("placementMeshInclude")]
+			public SubmeshMask placementMeshGroups;
+			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on mesh according to specified density map (where 0 == Empty region, 1 == Fully populated region)"), FormerlySerializedAs("placementDensity")]
+			public Texture2D mappedDensity;
+			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Obtain strand direction from specified object-space normal map"), FormerlySerializedAs("paintedDirection")]
+			public Texture2D mappedDirection;
+			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Obtain normalized strand parameters from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)"), FormerlySerializedAs("paintedParameters")]
+			public Texture2D mappedParameters;
 			//[ToggleGroup, Tooltip("Randomization seed")]
 			//public bool seed;
 			//[ToggleGroupItem, Min(1)]
@@ -159,12 +160,12 @@ namespace Unity.DemoTeam.Hair
 			{
 				placement = PlacementType.Primitive,
 				placementPrimitive = PrimitiveType.Curtain,
-				placementGenerator = null,
+				placementCustom = null,
 				placementMesh = null,
-				placementMeshInclude = (SubmeshMask)(-1),
-				placementDensity = null,
-				paintedDirection = null,
-				paintedParameters = null,
+				placementMeshGroups = (SubmeshMask)(-1),
+				mappedDensity = null,
+				mappedDirection = null,
+				mappedParameters = null,
 				//seed = false,
 				//seedValue = 1,
 

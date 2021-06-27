@@ -982,6 +982,9 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
+		//--------
+		// meshes
+
 		public static unsafe void BuildMeshRoots(Mesh meshRoots, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
 			using (var indices = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))

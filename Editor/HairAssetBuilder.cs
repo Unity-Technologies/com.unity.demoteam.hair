@@ -370,8 +370,8 @@ namespace Unity.DemoTeam.Hair
 			var generatedStrandParticleCount = settings.strandParticleCount;
 
 			// prep temporaries
-			using (var generatedRoots = new GeneratedRoots(generatedStrandCount))
-			using (var generatedStrands = new GeneratedStrands(generatedStrandCount, generatedStrandParticleCount))
+			using (var generatedRoots = new HairAssetProvider.GeneratedRoots(generatedStrandCount))
+			using (var generatedStrands = new HairAssetProvider.GeneratedStrands(generatedStrandCount, generatedStrandParticleCount))
 			{
 				// build temporaries
 				if (GenerateRoots(generatedRoots, settings))
@@ -512,86 +512,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public struct GeneratedRoots : IDisposable
-		{
-			public struct StrandParameters
-			{
-				public float normalizedStrandLength;
-				public float normalizedStrandDiameter;
-				public float normalizedCurlRadius;
-				public float normalizedCurlSlope;
-
-				public static readonly StrandParameters defaults = new StrandParameters()
-				{
-					normalizedStrandLength = 1.0f,
-					normalizedStrandDiameter = 1.0f,
-					normalizedCurlRadius = 1.0f,
-					normalizedCurlSlope = 1.0f,
-				};
-			}
-
-			public int strandCount;
-			public NativeArray<Vector2> rootUV;
-			public NativeArray<Vector3> rootPosition;
-			public NativeArray<Vector3> rootDirection;
-			public NativeArray<StrandParameters> rootParameters;// R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope
-
-			public GeneratedRoots(int strandCount, Allocator allocator = Allocator.Temp)
-			{
-				this.strandCount = strandCount;
-				rootUV = new NativeArray<Vector2>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
-				rootPosition = new NativeArray<Vector3>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
-				rootDirection = new NativeArray<Vector3>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
-				rootParameters = new NativeArray<StrandParameters>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
-			}
-
-			public unsafe void GetUnsafePtrs(out Vector3* rootPositionPtr, out Vector3* rootDirectionPtr, out Vector2* rootUVPtr, out StrandParameters* rootParametersPtr)
-			{
-				rootUVPtr = (Vector2*)rootUV.GetUnsafePtr();
-				rootPositionPtr = (Vector3*)rootPosition.GetUnsafePtr();
-				rootDirectionPtr = (Vector3*)rootDirection.GetUnsafePtr();
-				rootParametersPtr = (StrandParameters*)rootParameters.GetUnsafePtr();
-			}
-
-			public void Dispose()
-			{
-				rootUV.Dispose();
-				rootPosition.Dispose();
-				rootDirection.Dispose();
-				rootParameters.Dispose();
-			}
-		}
-
-		public struct GeneratedStrands : IDisposable
-		{
-			public int strandCount;
-			public int strandParticleCount;
-			public NativeArray<Vector3> particlePosition;
-
-			public GeneratedStrands(int strandCount, int strandParticleCount, Allocator allocator = Allocator.Temp)
-			{
-				this.strandCount = strandCount;
-				this.strandParticleCount = strandParticleCount;
-				particlePosition = new NativeArray<Vector3>(strandCount * strandParticleCount, allocator, NativeArrayOptions.UninitializedMemory);
-			}
-
-			public unsafe void GetUnsafePtrs(out Vector3* particlePositionPtr)
-			{
-				particlePositionPtr = (Vector3*)particlePosition.GetUnsafePtr();
-			}
-
-			public void Dispose()
-			{
-				particlePosition.Dispose();
-			}
-		}
-
-		public interface IRootGenerator
-		{
-			bool GenerateRoots(in GeneratedRoots roots);
-		}
-
-		static unsafe bool GenerateRoots(in GeneratedRoots roots, in HairAsset.SettingsProcedural settings)
+		static unsafe bool GenerateRoots(in HairAssetProvider.GeneratedRoots roots, in HairAsset.SettingsProcedural settings)
 		{
 			switch (settings.placement)
 			{
@@ -599,7 +520,7 @@ namespace Unity.DemoTeam.Hair
 					return GenerateRootsPrimitive(roots, settings);
 
 				case HairAsset.SettingsProcedural.PlacementType.Custom:
-					return (settings.placementGenerator as IRootGenerator)?.GenerateRoots(roots) ?? false;
+					return (settings.placementCustom)?.GenerateRoots(roots) ?? false;
 
 				case HairAsset.SettingsProcedural.PlacementType.Mesh:
 					return GenerateRootsMesh(roots, settings);
@@ -609,7 +530,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		static unsafe bool GenerateRootsPrimitive(in GeneratedRoots generatedRoots, in HairAsset.SettingsProcedural settings)
+		static unsafe bool GenerateRootsPrimitive(in HairAssetProvider.GeneratedRoots generatedRoots, in HairAsset.SettingsProcedural settings)
 		{
 			generatedRoots.GetUnsafePtrs(out var rootPos, out var rootDir, out var rootUV0, out var rootVar);
 
@@ -688,27 +609,27 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != settings.strandCount; i++)
 			{
-				rootVar[i] = GeneratedRoots.StrandParameters.defaults;
+				rootVar[i] = HairAssetProvider.GeneratedRoots.StrandParameters.defaults;
 			}
 
 			return true;// success
 		}
 
-		static unsafe bool GenerateRootsMesh(in GeneratedRoots generatedRoots, in HairAsset.SettingsProcedural settings)
+		static unsafe bool GenerateRootsMesh(in HairAssetProvider.GeneratedRoots generatedRoots, in HairAsset.SettingsProcedural settings)
 		{
 			generatedRoots.GetUnsafePtrs(out var rootPos, out var rootDir, out var rootUV0, out var rootVar);
 
 			using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.placementMesh))
-			using (var meshSampler = new TriMeshSampler(meshData[0], 0, Allocator.Temp, (uint)settings.placementMeshInclude))
+			using (var meshSampler = new TriMeshSampler(meshData[0], 0, Allocator.Temp, (uint)settings.placementMeshGroups))
 			{
 				bool IsTextureReadable(Texture2D texture)
 				{
 					return (texture != null && texture.isReadable);
 				}
 
-				if (IsTextureReadable(settings.placementDensity))
+				if (IsTextureReadable(settings.mappedDensity))
 				{
-					var density = settings.placementDensity;
+					var density = settings.mappedDensity;
 					var densityThreshold = new Unity.Mathematics.Random(257);
 
 					for (int i = 0; i != settings.strandCount; i++)
@@ -740,12 +661,12 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// apply painted direction
-				if (IsTextureReadable(settings.paintedDirection))
+				if (IsTextureReadable(settings.mappedDirection))
 				{
 					for (int i = 0; i != settings.strandCount; i++)
 					{
 						// assume dxt5nm
-						Vector4 packed = settings.paintedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
+						Vector4 packed = settings.mappedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
 						{
 							packed.x *= packed.w;
 						}
@@ -767,20 +688,20 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// apply painted parameters
-				if (IsTextureReadable(settings.paintedParameters))
+				if (IsTextureReadable(settings.mappedParameters))
 				{
 					var rootVarSampled = (Vector4*)rootVar;
 
 					for (int i = 0; i != settings.strandCount; i++)
 					{
-						rootVarSampled[i] = (Vector4)settings.paintedParameters.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
+						rootVarSampled[i] = (Vector4)settings.mappedParameters.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
 					}
 				}
 				else
 				{
 					for (int i = 0; i != settings.strandCount; i++)
 					{
-						rootVar[i] = GeneratedRoots.StrandParameters.defaults;
+						rootVar[i] = HairAssetProvider.GeneratedRoots.StrandParameters.defaults;
 					}
 				}
 			}
@@ -788,7 +709,7 @@ namespace Unity.DemoTeam.Hair
 			return true;// success
 		}
 
-		static unsafe bool GenerateStrands(in GeneratedStrands strands, in GeneratedRoots roots, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
+		static unsafe bool GenerateStrands(in HairAssetProvider.GeneratedStrands strands, in HairAssetProvider.GeneratedRoots roots, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
 		{
 			roots.GetUnsafePtrs(out var rootPos, out var rootDir, out var rootUV0, out var rootVar);
 
