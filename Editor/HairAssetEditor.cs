@@ -125,6 +125,11 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndVertical();
 		}
 
+		static string LabelName(string variableName)
+		{
+			return ObjectNames.NicifyVariableName(variableName);
+		}
+
 		static StructValidation ValidationGUIAlembic(object userData)
 		{
 #if HAS_PACKAGE_UNITY_ALEMBIC
@@ -150,7 +155,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (texture != null && texture.isReadable == false)
 				{
-					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' map will be ignored since the assigned texture asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
+					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' will be ignored since the assigned texture asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
 				}
 			}
 
@@ -160,20 +165,20 @@ namespace Unity.DemoTeam.Hair
 				var mesh = hairAsset.settingsProcedural.placementMesh;
 				if (mesh == null)
 				{
-					EditorGUILayout.HelpBox("Configuration error: 'Placement Mesh' is not assigned.", MessageType.Error);
+					EditorGUILayout.HelpBox(string.Format("Configuration error: '{0}' is not assigned.", LabelName(nameof(hairAsset.settingsProcedural.placementMesh))), MessageType.Error);
 				}
 
-				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedDensity, "Placement Density");
-				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedDirection, "Painted Direction");
-				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedParameters, "Painted Parameters");
+				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedDensity, LabelName(nameof(hairAsset.settingsProcedural.mappedDensity)));
+				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedDirection, LabelName(nameof(hairAsset.settingsProcedural.mappedDirection)));
+				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedParameters, LabelName(nameof(hairAsset.settingsProcedural.mappedParameters)));
 			}
 
 			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom)
 			{
-				var rootGenerator = hairAsset.settingsProcedural.placementCustom;
-				if (rootGenerator == null)
+				var hairAssetProvider = hairAsset.settingsProcedural.placementCustom;
+				if (hairAssetProvider == null)
 				{
-					EditorGUILayout.HelpBox("Configuration error: 'Placement Generator' is not assigned.", MessageType.Error);
+					EditorGUILayout.HelpBox(string.Format("Configuration error: '{0}' is not assigned.", LabelName(nameof(hairAsset.settingsProcedural.placementCustom))), MessageType.Error);
 				}
 			}
 
