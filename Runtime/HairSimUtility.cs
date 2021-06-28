@@ -116,7 +116,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				cbufferStaging[0] = cbufferData;
 #if UNITY_2021_1_OR_NEWER
-				cmd.SetBufferData(cbuffer, dataStaging);
+				cmd.SetBufferData(cbuffer, cbufferStaging);
 #else
 				cmd.SetComputeBufferData(cbuffer, cbufferStaging);
 #endif
