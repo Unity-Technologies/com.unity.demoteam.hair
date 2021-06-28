@@ -234,13 +234,11 @@ namespace Unity.DemoTeam.Hair
 
 				using (new EditorGUI.IndentLevelScope())
 				{
-					EditorGUILayout.Space(-EditorGUIUtility.standardVerticalSpacing);
-					EditorGUILayout.BeginHorizontal();
-					EditorGUILayout.PrefixLabel("Steps Status");
-					EditorGUILayout.BeginVertical();
-					EditorGUILayout.Space(EditorGUIUtility.standardVerticalSpacing);
-
 					var rect = GUILayoutUtility.GetRect(0.0f, EditorGUIUtility.singleLineHeight, GUILayout.ExpandWidth(true));
+					{
+						rect = EditorGUI.PrefixLabel(rect, new GUIContent("Steps Status"));
+					}
+
 					if (rect.Contains(Event.current.mousePosition) && Event.current.type == EventType.MouseDown)
 					{
 						s_indicator = !s_indicator;
@@ -284,9 +282,11 @@ namespace Unity.DemoTeam.Hair
 					{
 						EditorGUI.HelpBox(rect, "Click to toggle indicator.", MessageType.None);
 					}
+				}
 
-					EditorGUILayout.EndVertical();
-					EditorGUILayout.EndHorizontal();
+				if (GUILayout.Button("Reset simulation"))
+				{
+					hairInstance.ResetSimulationState();
 				}
 			}
 

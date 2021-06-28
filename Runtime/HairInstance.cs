@@ -420,7 +420,8 @@ namespace Unity.DemoTeam.Hair
 			if (stepCount > 0)
 			{
 				// fire event
-				onSimulationStateChanged(cmd);
+				if (onSimulationStateChanged != null)
+					onSimulationStateChanged(cmd);
 			}
 		}
 
@@ -473,7 +474,8 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// fire event
-			onRenderingStateChanged(cmd);
+			if (onRenderingStateChanged != null)
+				onRenderingStateChanged(cmd);
 		}
 
 		void UpdateRendererStateBuiltin(ref StrandGroupInstance strandGroupInstance, in HairSim.SolverData solverData, in HairAsset.StrandGroup strandGroup)
@@ -772,7 +774,8 @@ namespace Unity.DemoTeam.Hair
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 
 			// fire event
-			onSimulationStateChangedStep(cmd);
+			if (onSimulationStateChangedStep != null)
+				onSimulationStateChangedStep(cmd);
 		}
 
 		public void DispatchDraw(CommandBuffer cmd)
@@ -921,6 +924,11 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			HairSim.ReleaseVolumeData(ref volumeData);
+		}
+
+		public void ResetSimulationState()
+		{
+			ReleaseRuntimeData();
 		}
 	}
 
