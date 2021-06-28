@@ -196,12 +196,12 @@ namespace Unity.DemoTeam.Hair
 		[NonSerialized] public float stepsLastFrameSmooth;
 		[NonSerialized] public int stepsLastFrameSkipped;
 
-		[NonSerialized] public string cachedName;
+		public event Action<CommandBuffer> onSimulationStateChangedStep;
+		public event Action<CommandBuffer> onSimulationStateChanged;
+		public event Action<CommandBuffer> onRenderingStateChanged;
 
 		void OnEnable()
 		{
-			cachedName = this.name;
-
 			UpdateStrandGroupInstances();
 			UpdateStrandGroupHideFlags();
 
@@ -416,7 +416,12 @@ namespace Unity.DemoTeam.Hair
 
 		void UpdateSimulationState(CommandBuffer cmd)
 		{
-			DispatchStepAccumulated(cmd, Time.deltaTime);
+			var stepCount = DispatchStepAccumulated(cmd, Time.deltaTime);
+			if (stepCount > 0)
+			{
+				// fire event
+				onSimulationStateChanged(cmd);
+			}
 		}
 
 		void UpdateRenderingState(CommandBuffer cmd)
@@ -466,6 +471,9 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 			}
+
+			// fire event
+			onRenderingStateChanged(cmd);
 		}
 
 		void UpdateRendererStateBuiltin(ref StrandGroupInstance strandGroupInstance, in HairSim.SolverData solverData, in HairAsset.StrandGroup strandGroup)
@@ -492,7 +500,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						if (subdivisionCount == 0)
 						{
-							HairInstanceBuilder.CreateInstanceIfNull(ref meshInstanceLines, strandGroup.meshAssetLines, HideFlags.HideAndDontSave);
+							HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroup.meshAssetLines, HideFlags.HideAndDontSave);
 						}
 						else
 						{
@@ -508,7 +516,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						if (subdivisionCount == 0)
 						{
-							HairInstanceBuilder.CreateInstanceIfNull(ref meshInstanceStrips, strandGroup.meshAssetStrips, HideFlags.HideAndDontSave);
+							HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, strandGroup.meshAssetStrips, HideFlags.HideAndDontSave);
 						}
 						else
 						{
@@ -762,6 +770,9 @@ namespace Unity.DemoTeam.Hair
 			// step volume data
 			HairSim.PushVolumeParams(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
 			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
+
+			// fire event
+			onSimulationStateChangedStep(cmd);
 		}
 
 		public void DispatchDraw(CommandBuffer cmd)
@@ -1189,7 +1200,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		public static Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
 			var meshRoots = new Mesh();
 			{
@@ -1200,13 +1211,13 @@ namespace Unity.DemoTeam.Hair
 			return meshRoots;
 		}
 
-		public static unsafe void CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		public static void CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
 			if (meshRoots == null)
 				meshRoots = CreateMeshRoots(hideFlags, strandCount, rootPosition, rootDirection);
 		}
 
-		public static unsafe Mesh CreateMeshLines(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateMeshLines(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var meshLines = new Mesh();
 			{
@@ -1217,13 +1228,13 @@ namespace Unity.DemoTeam.Hair
 			return meshLines;
 		}
 
-		public static unsafe void CreateMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static void CreateMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshLines == null)
 				meshLines = CreateMeshLines(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 		}
 
-		public static unsafe Mesh CreateMeshStrips(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateMeshStrips(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var meshStrips = new Mesh();
 			{
@@ -1234,14 +1245,30 @@ namespace Unity.DemoTeam.Hair
 			return meshStrips;
 		}
 
-		public static unsafe void CreateMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static void CreateMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshStrips == null)
 				meshStrips = CreateMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 		}
 
-		//---------
-		// utility
+		public static Mesh CreateMeshInstance(Mesh original, HideFlags hideFlags)
+		{
+			var instance = Mesh.Instantiate(original);
+			{
+				instance.name = original.name + "(Instance)";
+				instance.hideFlags = hideFlags;
+			}
+			return instance;
+		}
+
+		public static void CreateMeshInstanceIfNull(ref Mesh instance, Mesh original, HideFlags hideFlags)
+		{
+			if (instance == null)
+				instance = CreateMeshInstance(original, hideFlags);
+		}
+
+		//------------
+		// containers
 
 		public static GameObject CreateContainer(string name, GameObject parentContainer, HideFlags hideFlags)
 		{
@@ -1266,22 +1293,6 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (component == null)
 				component = CreateComponent<T>(container, hideFlags);
-		}
-
-		public static T CreateInstance<T>(T original, HideFlags hideFlags) where T : UnityEngine.Object
-		{
-			var instance = UnityEngine.Object.Instantiate(original);
-			{
-				instance.name = original.name + "(Instance)";
-				instance.hideFlags = hideFlags;
-			}
-			return instance;
-		}
-
-		public static void CreateInstanceIfNull<T>(ref T instance, T original, HideFlags hideFlags) where T : UnityEngine.Object
-		{
-			if (instance == null)
-				instance = CreateInstance(original, hideFlags);
 		}
 	}
 }
