@@ -90,11 +90,6 @@ namespace Unity.DemoTeam.Hair
 			this.submeshMask = submeshMask;
 		}
 
-		public bool HasAttribute(Attribute attribute)
-		{
-			return vertexAttributes.HasFlag(attribute);
-		}
-
 		public void Dispose()
 		{
 			if (vertexPosition.IsCreated)
@@ -105,6 +100,11 @@ namespace Unity.DemoTeam.Hair
 
 			if (vertexUV0.IsCreated)
 				vertexUV0.Dispose();
+		}
+
+		public bool HasAttribute(Attribute attribute)
+		{
+			return vertexAttributes.HasFlag(attribute);
 		}
 	}
 }
