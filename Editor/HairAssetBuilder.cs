@@ -323,9 +323,24 @@ namespace Unity.DemoTeam.Hair
 					ref var p0 = ref curveVertexDataPosition[i * curveVertexCount];
 					ref var p1 = ref curveVertexDataPosition[i * curveVertexCount + 1];
 
-					strandGroup.rootUV[i] = Vector2.zero;//TODO alembic root UV's
+					strandGroup.rootUV[i] = settings.rootUVConstant;
 					strandGroup.rootPosition[i] = p0;
 					strandGroup.rootDirection[i] = Vector3.Normalize(p1 - p0);
+				}
+
+				if (settings.rootUV == HairAsset.SettingsAlembic.RootUV.ResolveFromMesh)
+				{
+					if (settings.rootUVMesh != null && settings.rootUVMesh.isReadable)
+					{
+						using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.rootUVMesh))
+						using (var meshQueries = new TriMeshQueries(meshData[0], Allocator.Temp))
+						{
+							for (int i = 0; i != curveCount; i++)
+							{
+								strandGroup.rootUV[i] = meshQueries.FindClosestTriangleUV(strandGroup.rootPosition[i]);
+							}
+						}
+					}
 				}
 
 				switch (memoryLayout)

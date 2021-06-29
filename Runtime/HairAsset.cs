@@ -44,10 +44,27 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsAlembic
 		{
+			public enum RootUV
+			{
+				NoResolve,
+				ResolveFromMesh,
+				//ResolveFromAttribute,
+			}
+
 #if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
 			[Tooltip("Alembic asset containing at least one set of curves")]
 			public AlembicStreamPlayer alembicAsset;
 #endif
+
+			[LineHeader("UV Resolve")]
+
+			public RootUV rootUV;
+			[VisibleIf(nameof(rootUV), RootUV.NoResolve)]
+			public Vector2 rootUVConstant;
+			[VisibleIf(nameof(rootUV), RootUV.ResolveFromMesh)]
+			public Mesh rootUVMesh;
+			//[VisibleIf(nameof(rootUV), RootUV.ResolveFromAttribute)]
+			//public string rootUVAttribute;
 
 			[LineHeader("Processing")]
 
@@ -60,6 +77,10 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
 			{
+				rootUV = RootUV.NoResolve,
+				rootUVConstant = Vector2.zero,
+				rootUVMesh = null,
+
 				resampleCurves = true,
 				resampleParticleCount = 16,
 				resampleQuality = 1,
