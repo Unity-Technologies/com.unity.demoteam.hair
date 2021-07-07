@@ -42,7 +42,6 @@ HAIRSIM_SOLVERDATA<float3> _StagingPosition;		// xyz: position
 HAIRSIM_SOLVERDATA<float3> _StagingPositionPrev;	// ...
 #endif
 
-
 //-------------
 // volume data
 

@@ -179,6 +179,20 @@
         {
             "m_OutputSlot": {
                 "m_Node": {
+                    "m_Id": "1f91cf420025464eaead59f9d50b1e80"
+                },
+                "m_SlotId": 17
+            },
+            "m_InputSlot": {
+                "m_Node": {
+                    "m_Id": "05907e129e0b4526858a9d2d669f647a"
+                },
+                "m_SlotId": 10
+            }
+        },
+        {
+            "m_OutputSlot": {
+                "m_Node": {
                     "m_Id": "79df9a72eec84e95a1a5d1a8cc439db4"
                 },
                 "m_SlotId": 0
@@ -319,6 +333,9 @@
             "m_Id": "de2852bb66784c618a8fad459141fbcd"
         },
         {
+            "m_Id": "962a0d7d301d4cad8c4f7e74f6dde02c"
+        },
+        {
             "m_Id": "0e5622b598df4585b9e4277e3c5dc115"
         },
         {
@@ -384,6 +401,29 @@
     "m_SlotType": 0,
     "m_Hidden": false,
     "m_ShaderOutputName": "staticTangent",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
+    "m_ObjectId": "1547f3bbc4004d3b833333dc5cff6992",
+    "m_Id": 17,
+    "m_DisplayName": "motionOS",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "motionOS",
     "m_StageCapability": 3,
     "m_Value": {
         "x": 0.0,
@@ -503,6 +543,9 @@
         },
         {
             "m_Id": "4963c9469232450581857b5d2717352b"
+        },
+        {
+            "m_Id": "1547f3bbc4004d3b833333dc5cff6992"
         },
         {
             "m_Id": "8b275a63fc60431d92917ab2733afbf4"
@@ -850,7 +893,7 @@
     "m_Type": "UnityEditor.ShaderGraph.StickyNoteData",
     "m_ObjectId": "8331e992bf384bccbcc056026365ccb9",
     "m_Title": "Static preview",
-    "m_Content": "UV2.xyz = (pos << 16) | dir",
+    "m_Content": "",
     "m_TextSize": 0,
     "m_Theme": 0,
     "m_Position": {
@@ -970,6 +1013,29 @@
     "m_DefaultValue": {
         "x": 0.0,
         "y": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
+    "m_ObjectId": "962a0d7d301d4cad8c4f7e74f6dde02c",
+    "m_Id": 10,
+    "m_DisplayName": "motionOS",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "motionOS",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
     },
     "m_Labels": []
 }

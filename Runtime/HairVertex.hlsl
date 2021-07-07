@@ -70,6 +70,7 @@ float3 LoadPositionPrev(uint i)
 struct HairVertex
 {
 	float3 positionOS;
+	float3 motionOS;
 	float3 normalOS;
 	float3 tangentOS;
 	float3 bitangentOS;
@@ -104,9 +105,10 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 		: LoadPosition(i_next) - p;
 
 	float3 positionWS = GetCameraRelativePositionWS(p);
-	//TODO motion vector
-	//float3 motionWS = LoadPosition(i) -  LoadPositionPrev(i)
-	
+	float3 positionOS = mul(UNITY_MATRIX_I_M, float4(positionWS, 1.0)).xyz;
+	float3 positionOSPrev = mul(unity_MatrixPreviousMI, float4(LoadPositionPrev(i), 1.0)).xyz;
+	float3 motionOS = positionOS - positionOSPrev;
+
 	float3 bitangentWS = normalize(r0 + r1);
 	float3 tangentWS = normalize(cross(bitangentWS, GetWorldSpaceNormalizeViewDir(positionWS)));
 	float3 normalWS = cross(tangentWS, bitangentWS);
@@ -118,6 +120,7 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 #else
 		v.positionOS = TransformWorldToObject(positionWS);
 #endif
+		v.motionOS = motionOS;
 		v.normalOS = TransformWorldToObjectNormal(normalWS);
 		v.tangentOS = TransformWorldToObjectNormal(tangentWS);
 		v.bitangentOS = TransformWorldToObjectNormal(bitangentWS);
@@ -137,6 +140,7 @@ HairVertex GetHairVertex_Static(in float3 positionOS, in float3 normalOS, in flo
 	HairVertex v;
 	{
 		v.positionOS = positionOS;
+		v.motionOS = float3(0.0, 0.0, 0.0);
 		v.normalOS = normalOS;
 		v.tangentOS = tangentOS;
 		v.bitangentOS = normalize(cross(normalOS, tangentOS));
@@ -156,6 +160,7 @@ void HairVertex_float(
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS,
 	out float3 out_positionOS,
+	out float3 out_motionOS,
 	out float3 out_normalOS,
 	out float3 out_tangentOS,
 	out float3 out_bitangentOS,
@@ -172,6 +177,7 @@ void HairVertex_float(
 #endif
 	{
 		out_positionOS = v.positionOS;
+		out_motionOS = v.motionOS;
 		out_normalOS = v.normalOS;
 		out_tangentOS = v.tangentOS;
 		out_bitangentOS = v.bitangentOS;
