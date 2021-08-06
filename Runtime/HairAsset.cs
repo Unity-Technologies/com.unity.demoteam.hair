@@ -24,6 +24,12 @@ namespace Unity.DemoTeam.Hair
 			Sequential,
 		}
 
+		public enum LODClusters
+		{
+			Generated,
+			UVMapped,
+		}
+
 		[Serializable]
 		public struct SettingsBasic
 		{
@@ -33,11 +39,21 @@ namespace Unity.DemoTeam.Hair
 			public MemoryLayout memoryLayout;
 			[Tooltip("Material applied to the generated strand groups")]
 			public Material material;
+			[ToggleGroup, Tooltip("Build LOD clusters for the generated strands (to optionally reduce cost of rendering and simulation)")]
+			public bool kLODClusters;
+			[ToggleGroupItem, Tooltip("Choose how to build base level clusters")]
+			public LODClusters kLODClustersProvider;
+			[ToggleGroupItem(withLabel = true), Tooltip("Enable subdivision of base level clusters (to generate upper LODs)")]
+			public bool kLODClustersPyramid;
 
 			public static readonly SettingsBasic defaults = new SettingsBasic()
 			{
 				type = Type.Procedural,
 				memoryLayout = MemoryLayout.Interleaved,
+				material = null,
+				kLODClusters = false,
+				kLODClustersProvider = LODClusters.Generated,
+				kLODClustersPyramid = false,
 			};
 		}
 
@@ -46,7 +62,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public enum RootUV
 			{
-				NoResolve,
+				Uniform,
 				ResolveFromMesh,
 				//ResolveFromAttribute,
 			}
@@ -59,7 +75,7 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("UV Resolve")]
 
 			public RootUV rootUV;
-			[VisibleIf(nameof(rootUV), RootUV.NoResolve)]
+			[VisibleIf(nameof(rootUV), RootUV.Uniform)]
 			public Vector2 rootUVConstant;
 			[VisibleIf(nameof(rootUV), RootUV.ResolveFromMesh)]
 			public Mesh rootUVMesh;
@@ -77,7 +93,7 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
 			{
-				rootUV = RootUV.NoResolve,
+				rootUV = RootUV.Uniform,
 				rootUVConstant = Vector2.zero,
 				rootUVMesh = null,
 
@@ -131,7 +147,7 @@ namespace Unity.DemoTeam.Hair
 			[VisibleIf(nameof(placement), PlacementType.Primitive), Tooltip("Place strands using builtin primitive generator")]
 			public PrimitiveType placementPrimitive;
 			[VisibleIf(nameof(placement), PlacementType.Custom), Tooltip("Place strands using specified custom generator"), FormerlySerializedAs("placementGenerator")]
-			public HairAssetProvider placementCustom;
+			public HairAssetProvider placementProvider;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on specified triangle mesh")]
 			public Mesh placementMesh;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Included submesh indices"), FormerlySerializedAs("placementMeshInclude")]
@@ -181,7 +197,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				placement = PlacementType.Primitive,
 				placementPrimitive = PrimitiveType.Curtain,
-				placementCustom = null,
+				placementProvider = null,
 				placementMesh = null,
 				placementMeshGroups = (SubmeshMask)(-1),
 				mappedDensity = null,
@@ -207,6 +223,93 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
+		// TOPIC: Clumping/LOD
+		//
+		//		.--- simulated ---.  .------- interpolated --------.
+		//		g  g  g  g  g  g  g  f  f  f  f  f  f  f  f  f  f  f
+		//		----->-----> ordering ----->----->----->----->----->
+		//
+		// Per-LOD data
+		//		_LODGuideCount -> num. guides
+		//		_LODGuideIndex[strandIndex_f] -> strandIndex_g
+		//
+		// Enable LOD
+		//		LOD 0 = all strands / guides from texture / guides from generator (from all strands)
+		//		LOD 1 = guides from texture / guides from generator (from LOD 0)
+		//		LOD 2 = guides from texture / guides from generator (from LOD 1)
+		//		LOD x = guides from generator(LOD x-1)
+		//
+		// LOD From Texture
+		//		Simulated Guide Index Map
+		//		[Info: Asset must be set up to resolve root UVs]
+		//
+		// LOD From Generator
+		//		Guide Root Separation
+
+		[Serializable]
+		public struct SettingsLODGenerated
+		{
+			public enum ClusterSelection
+			{
+				RandomPointsOnMesh,
+				RandomPointsInVolume,
+			}
+
+			[LineHeader("Base LOD")]
+
+			[Range(0.0f, 1.0f)]
+			public float baseLOD;
+			public ClusterSelection baseLODClusterSelection;
+			[VisibleIf(nameof(baseLODClusterSelection), ClusterSelection.RandomPointsOnMesh)]
+			public Mesh baseLODClusterSelectionMesh;
+			public int baseLODClusterIterations;
+
+			public static readonly SettingsLODGenerated defaults = new SettingsLODGenerated()
+			{
+				baseLOD = 0.1f,
+				baseLODClusterSelection = ClusterSelection.RandomPointsInVolume,
+				baseLODClusterSelectionMesh = null,
+				baseLODClusterIterations = 1,
+			};
+		}
+
+		[Serializable]
+		public struct SettingsLODUVMapped
+		{
+			[LineHeader("Base LOD")]
+
+			[NonReorderable]
+			public Texture2D[] baseLODClusterMaps;
+
+			public static readonly SettingsLODUVMapped defaults = new SettingsLODUVMapped()
+			{
+				baseLODClusterMaps = null,
+			};
+		}
+
+		[Serializable]
+		public struct SettingsLODPyramid
+		{
+			public enum HighLOD
+			{
+				AllStrands,
+				FractionOfStrands,
+			}
+
+			[LineHeader("High LOD Pyramid")]
+
+			[Range(0.0f, 1.0f)]
+			public float highLOD;
+			[Range(0, 10)]
+			public int highLODIntermediateLevels;
+
+			public static readonly SettingsLODPyramid defaults = new SettingsLODPyramid()
+			{
+				highLOD = 1.0f,
+				highLODIntermediateLevels = 0,
+			};
+		}
+
 		[Serializable]
 		public struct StrandGroup
 		{
@@ -226,6 +329,11 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
+			public int lodCount;
+			[NonReorderable] public int[] lodGuideCount;// len: lodCount
+			[HideInInspector] public int[] lodGuideIndex;// len: lodCount * strandCount
+			[HideInInspector] public float[] lodThreshold;
+
 			[HideInInspector] public Mesh meshAssetRoots;
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetStrips;
@@ -236,6 +344,9 @@ namespace Unity.DemoTeam.Hair
 		public SettingsBasic settingsBasic = SettingsBasic.defaults;
 		public SettingsAlembic settingsAlembic = SettingsAlembic.defaults;
 		public SettingsProcedural settingsProcedural = SettingsProcedural.defaults;
+		public SettingsLODGenerated settingsLODGenerated = SettingsLODGenerated.defaults;
+		public SettingsLODUVMapped settingsLODUVMapped = SettingsLODUVMapped.defaults;
+		public SettingsLODPyramid settingsLODPyramid = SettingsLODPyramid.defaults;
 
 		public StrandGroup[] strandGroups;
 		public bool strandGroupsAutoBuild;

@@ -20,8 +20,15 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _settingsBasic;
 		SerializedProperty _settingsBasic_type;
 		SerializedProperty _settingsBasic_material;
+		SerializedProperty _settingsBasic_kLODClusters;
+		SerializedProperty _settingsBasic_kLODClustersProvider;
+		SerializedProperty _settingsBasic_kLODClustersPyramid;
 		SerializedProperty _settingsAlembic;
 		SerializedProperty _settingsProcedural;
+		SerializedProperty _settingsProcedural_placement;
+		SerializedProperty _settingsLODGenerated;
+		SerializedProperty _settingsLODUVMapped;
+		SerializedProperty _settingsLODPyramid;
 
 		SerializedProperty _strandGroups;
 		SerializedProperty _strandGroupsAutoBuild;
@@ -61,9 +68,16 @@ namespace Unity.DemoTeam.Hair
 
 			_settingsBasic = serializedObject.FindProperty("settingsBasic");
 			_settingsBasic_type = _settingsBasic.FindPropertyRelative("type");
+			_settingsBasic_kLODClusters = _settingsBasic.FindPropertyRelative("kLODClusters");
+			_settingsBasic_kLODClustersProvider = _settingsBasic.FindPropertyRelative("kLODClustersProvider");
+			_settingsBasic_kLODClustersPyramid = _settingsBasic.FindPropertyRelative("kLODClustersPyramid");
 			_settingsBasic_material = _settingsBasic.FindPropertyRelative("material");
 			_settingsAlembic = serializedObject.FindProperty("settingsAlembic");
 			_settingsProcedural = serializedObject.FindProperty("settingsProcedural");
+			_settingsProcedural_placement = _settingsProcedural.FindPropertyRelative("placement");
+			_settingsLODGenerated = serializedObject.FindProperty("settingsLODGenerated");
+			_settingsLODUVMapped = serializedObject.FindProperty("settingsLODUVMapped");
+			_settingsLODPyramid = serializedObject.FindProperty("settingsLODPyramid");
 
 			_strandGroups = serializedObject.FindProperty("strandGroups");
 			_strandGroupsAutoBuild = serializedObject.FindProperty("strandGroupsAutoBuild");
@@ -175,10 +189,10 @@ namespace Unity.DemoTeam.Hair
 
 			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom)
 			{
-				var hairAssetProvider = hairAsset.settingsProcedural.placementCustom;
+				var hairAssetProvider = hairAsset.settingsProcedural.placementProvider;
 				if (hairAssetProvider == null)
 				{
-					EditorGUILayout.HelpBox(string.Format("Configuration error: '{0}' is not assigned.", LabelName(nameof(hairAsset.settingsProcedural.placementCustom))), MessageType.Error);
+					EditorGUILayout.HelpBox(string.Format("Configuration error: '{0}' is not assigned.", LabelName(nameof(hairAsset.settingsProcedural.placementProvider))), MessageType.Error);
 				}
 			}
 
@@ -209,12 +223,12 @@ namespace Unity.DemoTeam.Hair
 					case HairAsset.Type.Procedural:
 						StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
 						{
-							if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom &&
-								hairAsset.settingsProcedural.placementCustom is HairAssetProvider)
+							var placementType = (HairAsset.SettingsProcedural.PlacementType)_settingsProcedural_placement.enumValueIndex;
+							if (placementType == HairAsset.SettingsProcedural.PlacementType.Custom && hairAsset.settingsProcedural.placementProvider is HairAssetProvider)
 							{
-								Editor.CreateCachedEditor(hairAsset.settingsProcedural.placementCustom, editorType: null, ref rootGeneratorEditor);
+								Editor.CreateCachedEditor(hairAsset.settingsProcedural.placementProvider, editorType: null, ref rootGeneratorEditor);
 								EditorGUILayout.Space();
-								EditorGUILayout.LabelField("Settings Placement Custom", EditorStyles.miniBoldLabel);
+								EditorGUILayout.LabelField("Settings Procedural Placement", EditorStyles.miniBoldLabel);
 								using (new EditorGUI.IndentLevelScope())
 								{
 									rootGeneratorEditor.DrawDefaultInspector();
@@ -222,6 +236,33 @@ namespace Unity.DemoTeam.Hair
 							}
 						}
 						break;
+				}
+
+				if (_settingsBasic_kLODClusters.boolValue)
+				{
+					EditorGUILayout.Space();
+
+					var clustersProvider = (HairAsset.LODClusters)_settingsBasic_kLODClustersProvider.enumValueIndex;
+					var clustersPyramid = _settingsBasic_kLODClustersPyramid.boolValue;
+
+					switch (clustersProvider)
+					{
+						case HairAsset.LODClusters.Generated:
+							StructPropertyFieldsWithHeader(_settingsLODGenerated, "Settings Clusters Generated");
+							break;
+
+						case HairAsset.LODClusters.UVMapped:
+							StructPropertyFieldsWithHeader(_settingsLODUVMapped, "Settings Clusters UV Mapped");
+							break;
+					}
+
+					if (clustersPyramid)
+					{
+						using (new EditorGUI.IndentLevelScope())
+						{
+							StructPropertyFields(_settingsLODPyramid);
+						}
+					}
 				}
 			}
 
@@ -345,8 +386,10 @@ namespace Unity.DemoTeam.Hair
 
 								HairSim.BindSolverData(previewMaterial, previewData[i]);
 
-								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_LIVE", true);
-								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_LIVE_STRIPS", false);
+								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_LINES", true);
+								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_STRIPS", false);
+								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_SOLVER", true);
+								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_STAGING", false);
 
 								previewRenderer.BeginPreview(rect, GUIStyle.none);
 								previewRenderer.DrawMesh(meshLines, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
@@ -407,7 +450,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					ref var strandGroup = ref strandGroups[i];
 
-					HairSim.PrepareSolverData(ref previewData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
+					HairSim.PrepareSolverData(ref previewData[i], strandGroup.strandCount, strandGroup.strandParticleCount, strandGroup.lodCount);
 					{
 						previewData[i].memoryLayout = strandGroup.particleMemoryLayout;
 						previewData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;

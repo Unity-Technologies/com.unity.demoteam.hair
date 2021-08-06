@@ -1,7 +1,7 @@
 #ifndef __HAIRVERTEX_HLSL__
 #define __HAIRVERTEX_HLSL__
 
-#pragma editor_sync_compilation
+//#pragma editor_sync_compilation
 
 #include "HairSimData.hlsl"
 #include "HairSimDebugDrawUtility.hlsl"

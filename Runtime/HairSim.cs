@@ -75,6 +75,9 @@ namespace Unity.DemoTeam.Hair
 			public static int _ParticleVelocity;
 			public static int _ParticleVelocityPrev;
 
+			public static int _LODGuideCount;
+			public static int _LODGuideIndex;
+
 			public static int _StagingPosition;
 			public static int _StagingPositionPrev;
 
@@ -400,6 +403,7 @@ namespace Unity.DemoTeam.Hair
 			public bool drawStrandRoots;
 			public bool drawStrandParticles;
 			public bool drawStrandVelocities;
+			public bool drawStrandClusters;
 
 			[LineHeader("Volume Cells")]
 
@@ -498,7 +502,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static bool PrepareSolverData(ref SolverData solverData, int strandCount, int strandParticleCount)
+		public static bool PrepareSolverData(ref SolverData solverData, int strandCount, int strandParticleCount, int lodCount)
 		{
 			unsafe
 			{
@@ -506,6 +510,7 @@ namespace Unity.DemoTeam.Hair
 
 				int particleCount = strandCount * strandParticleCount;
 
+				int particleStrideIndex = sizeof(uint);
 				int particleStrideScalar = sizeof(float);
 				int particleStrideVector2 = sizeof(Vector2);
 				int particleStrideVector4 = sizeof(Vector4);
@@ -528,6 +533,9 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStrideVector4);
+
+				changed |= CreateBuffer(ref solverData.lodGuideCount, "LODGuideCount", Mathf.Max(1, lodCount), particleStrideIndex);
+				changed |= CreateBuffer(ref solverData.lodGuideIndex, "LODGuideIndex", Mathf.Max(1, lodCount) * strandCount, particleStrideIndex);
 
 				return changed;
 			}
@@ -617,6 +625,12 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverData.particleVelocity);
 			ReleaseBuffer(ref solverData.particleVelocityPrev);
 
+			ReleaseBuffer(ref solverData.lodGuideCount);
+			ReleaseBuffer(ref solverData.lodGuideIndex);
+
+			if (solverData.lodThreshold.IsCreated)
+				solverData.lodThreshold.Dispose();
+
 			ReleaseBuffer(ref solverData.stagingPosition);
 			ReleaseBuffer(ref solverData.stagingPositionPrev);
 
@@ -678,6 +692,9 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			target.BindComputeBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			target.BindComputeBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+
+			target.BindComputeBuffer(UniformIDs._LODGuideCount, solverData.lodGuideCount);
+			target.BindComputeBuffer(UniformIDs._LODGuideIndex, solverData.lodGuideIndex);
 
 			target.BindComputeBuffer(UniformIDs._StagingPosition, solverData.stagingPosition);
 			target.BindComputeBuffer(UniformIDs._StagingPositionPrev, solverData.stagingPositionPrev);
@@ -798,6 +815,58 @@ namespace Unity.DemoTeam.Hair
 
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.cbufferStorage, cbuffer);
+		}
+
+		//public struct ReverseFloatComparer : System.Collections.Generic.IComparer<float>
+		//{
+		//	public int Compare(float x, float y) => y.CompareTo(x);
+		//}
+
+		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, float lodValue, bool lodBlending)
+		{
+			ref var cbuffer = ref solverData.cbuffer;
+
+			//Debug.Log("seeking lodValue " + lodValue);
+			//for (int i = 0; i != solverData.lodCount; i++)
+			//{
+			//	Debug.Log("lodThreshold[" + i + "] = " + solverData.lodThreshold[i]);
+			//}
+
+			// derive constants
+			var lodIndexHi = solverData.lodThreshold.BinarySearch(lodValue);
+			var lodIndexLo = lodIndexHi;
+			var lodBlendFrac = 0.0f;
+
+			if (lodIndexHi < 0)
+			{
+				lodIndexHi = ~lodIndexHi;
+				lodIndexLo = Mathf.Max(0, lodIndexHi - 1);
+
+				//Debug.Log("lodIndexLo " + lodIndexLo + ", lodIndexHi " + lodIndexHi);
+
+				var lodValueLo = solverData.lodThreshold[lodIndexLo];
+				var lodValueHi = solverData.lodThreshold[lodIndexHi];
+
+				lodBlendFrac = (lodValueLo != lodValueHi) ? Mathf.Clamp01((lodValue - lodValueLo) / (lodValueHi - lodValueLo)) : 0.0f;
+
+				//Debug.Log("lodIndexLo " + lodIndexLo + ", lodIndexHi " + lodIndexHi + ", lodBlendFrac " + lodBlendFrac);
+			}
+
+			if (lodBlending)
+			{
+				cbuffer._LODIndexLo = (uint)lodIndexLo;
+				cbuffer._LODIndexHi = (uint)lodIndexHi;
+				cbuffer._LODBlendFrac = lodBlendFrac;
+			}
+			else
+			{
+				cbuffer._LODIndexLo = (lodBlendFrac > 0.5f) ? (uint)lodIndexHi : (uint)lodIndexLo;
+				cbuffer._LODIndexHi = cbuffer._LODIndexLo;
+				cbuffer._LODBlendFrac = 0.0f;
+			}
+
+			// update cbuffer
+			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
 		}
 
 		public static void PushSolverRoots(CommandBuffer cmd, in SolverData solverData, Mesh rootMesh)
@@ -1303,13 +1372,23 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		const int DEBUG_PASS_STRAND_POSITION = 0;
+		const int DEBUG_PASS_STRAND_VELOCITY = 1;
+		const int DEBUG_PASS_STRAND_CLUSTERS = 7;
+		const int DEBUG_PASS_CELL_DENSITY = 2;
+		const int DEBUG_PASS_CELL_GRADIENT = 3;
+		const int DEBUG_PASS_VOLUME_SLICE = 4;
+		const int DEBUG_PASS_VOLUME_SLICE_BELOW = 5;
+		const int DEBUG_PASS_VOLUME_ISOSURFACE = 6;
+
 		public static void DrawSolverData(CommandBuffer cmd, in SolverData solverData, in DebugSettings debugSettings)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.DrawSolverData))
 			{
 				if (!debugSettings.drawStrandRoots &&
 					!debugSettings.drawStrandParticles &&
-					!debugSettings.drawStrandVelocities)
+					!debugSettings.drawStrandVelocities &&
+					!debugSettings.drawStrandClusters)
 					return;
 
 				BindSolverData(cmd, solverData);
@@ -1317,19 +1396,25 @@ namespace Unity.DemoTeam.Hair
 				// strand roots
 				if (debugSettings.drawStrandRoots)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Lines, 2, (int)solverData.cbuffer._StrandCount);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_POSITION, MeshTopology.Lines, vertexCount: 2, (int)solverData.cbuffer._StrandCount);
 				}
 
 				// strand particles
 				if (debugSettings.drawStrandParticles)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 0, MeshTopology.Points, (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_POSITION, MeshTopology.Points, vertexCount: (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
 				}
 
 				// strand velocities
 				if (debugSettings.drawStrandVelocities)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 1, MeshTopology.Lines, (int)solverData.cbuffer._StrandParticleCount * 4, (int)solverData.cbuffer._StrandCount);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_VELOCITY, MeshTopology.Lines, vertexCount: 4 * (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
+				}
+
+				// strand clusters
+				if (debugSettings.drawStrandClusters)
+				{
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_CLUSTERS, MeshTopology.Lines, vertexCount: 2, (int)solverData.cbuffer._StrandCount);
 				}
 			}
 		}
@@ -1351,13 +1436,13 @@ namespace Unity.DemoTeam.Hair
 				// cell density
 				if (debugSettings.drawCellDensity)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 2, MeshTopology.Points, GetVolumeCellCount(volumeData), 1);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_CELL_DENSITY, MeshTopology.Points, GetVolumeCellCount(volumeData), 1);
 				}
 
 				// cell gradient
 				if (debugSettings.drawCellGradient)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 3, MeshTopology.Lines, 2 * GetVolumeCellCount(volumeData), 1);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_CELL_GRADIENT, MeshTopology.Lines, 2 * GetVolumeCellCount(volumeData), 1);
 				}
 
 				// volume slices
@@ -1371,9 +1456,9 @@ namespace Unity.DemoTeam.Hair
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceXOffset);
 
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_VOLUME_SLICE, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_VOLUME_SLICE_BELOW, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 					}
 					if (debugSettings.drawSliceY)
 					{
@@ -1381,9 +1466,9 @@ namespace Unity.DemoTeam.Hair
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceYOffset);
 
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_VOLUME_SLICE, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_VOLUME_SLICE_BELOW, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 					}
 					if (debugSettings.drawSliceZ)
 					{
@@ -1391,9 +1476,9 @@ namespace Unity.DemoTeam.Hair
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOffset, debugSettings.drawSliceZOffset);
 
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.8f);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 4, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_VOLUME_SLICE, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 						s_debugDrawMPB.SetFloat(UniformIDs._DebugSliceOpacity, 0.2f);
-						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, 5, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_VOLUME_SLICE_BELOW, MeshTopology.Quads, 4, 1, s_debugDrawMPB);
 					}
 				}
 
@@ -1408,7 +1493,7 @@ namespace Unity.DemoTeam.Hair
 					s_debugDrawMPB.SetFloat(UniformIDs._DebugIsosurfaceDensity, debugSettings.drawIsosurfaceDensity);
 					s_debugDrawMPB.SetInt(UniformIDs._DebugIsosurfaceSubsteps, debugSettings.drawIsosurfaceSubsteps);
 
-					cmd.DrawMesh(s_debugDrawCube, Matrix4x4.TRS(worldCenter, Quaternion.identity, 2.0f * worldExtent), s_debugDrawMat, 0, 6, s_debugDrawMPB);
+					cmd.DrawMesh(s_debugDrawCube, Matrix4x4.TRS(worldCenter, Quaternion.identity, 2.0f * worldExtent), s_debugDrawMat, 0, DEBUG_PASS_VOLUME_ISOSURFACE, s_debugDrawMPB);
 				}
 			}
 		}

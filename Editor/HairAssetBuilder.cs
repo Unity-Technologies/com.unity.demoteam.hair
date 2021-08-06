@@ -72,11 +72,11 @@ namespace Unity.DemoTeam.Hair
 			switch (hairAsset.settingsBasic.type)
 			{
 				case HairAsset.Type.Alembic:
-					BuildHairAsset(hairAsset, hairAsset.settingsAlembic, hairAsset.settingsBasic.memoryLayout);
+					BuildHairAssetAlembic(hairAsset);
 					break;
 
 				case HairAsset.Type.Procedural:
-					BuildHairAsset(hairAsset, hairAsset.settingsProcedural, hairAsset.settingsBasic.memoryLayout);
+					BuildHairAssetProcedural(hairAsset);
 					break;
 			}
 
@@ -142,17 +142,17 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
-		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsAlembic settings, HairAsset.MemoryLayout memoryLayout)
+		public static void BuildHairAssetAlembic(HairAsset hairAsset)
 		{
 #if HAS_PACKAGE_UNITY_ALEMBIC
 			// check stream present
-			var alembic = settings.alembicAsset;
+			var alembic = hairAsset.settingsAlembic.alembicAsset;
 			if (alembic == null)
 				return;
 
 			// instantiate to load the data
-			var alembicInstantiated = EditorUtility.IsPersistent(settings.alembicAsset);
-			if (alembicInstantiated)
+			var alembicInstantiate = EditorUtility.IsPersistent(hairAsset.settingsAlembic.alembicAsset);
+			if (alembicInstantiate)
 			{
 				alembic = GameObject.Instantiate(alembic);
 				alembic.gameObject.hideFlags |= HideFlags.DontSave;
@@ -168,12 +168,12 @@ namespace Unity.DemoTeam.Hair
 				// build strand groups
 				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 				{
-					BuildHairAssetStrandGroup(ref hairAsset.strandGroups[i], settings, curveSets[i], memoryLayout);
+					BuildStrandGroupAlembic(ref hairAsset.strandGroups[i], hairAsset, curveSets[i]);
 				}
 			}
 
 			// destroy container
-			if (alembicInstantiated)
+			if (alembicInstantiate)
 			{
 				GameObject.DestroyImmediate(alembic.gameObject);
 			}
@@ -182,27 +182,23 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
-		public static void BuildHairAsset(HairAsset hairAsset, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
+		public static void BuildHairAssetProcedural(HairAsset hairAsset)
 		{
-			// check placement target present
-			var placementMesh = settings.placementMesh;
-			if (placementMesh == null && settings.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
-				return;
-
 			// prep strand groups
 			hairAsset.strandGroups = new HairAsset.StrandGroup[1];
 
 			// build strand groups
 			for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 			{
-				BuildHairAssetStrandGroup(ref hairAsset.strandGroups[i], settings, memoryLayout);
+				BuildStrandGroupProcedural(ref hairAsset.strandGroups[i], hairAsset);
 			}
 		}
 
 #if HAS_PACKAGE_UNITY_ALEMBIC
-		public static void BuildHairAssetStrandGroup(ref HairAsset.StrandGroup strandGroup, in HairAsset.SettingsAlembic settings, AlembicCurves curveSet, HairAsset.MemoryLayout memoryLayout)
+		public static void BuildStrandGroupAlembic(ref HairAsset.StrandGroup strandGroup, in HairAsset hairAsset, AlembicCurves curveSet)
 		{
 			//TODO require/recommend resampling or WARN if not all pairs are equidistant?
+			var settings = hairAsset.settingsAlembic;
 
 			// get curve data
 			var curveVertexDataPosition = curveSet.Positions;
@@ -307,7 +303,7 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.strandParticleCount = curveVertexCount;
 
 			// set memory layout
-			strandGroup.particleMemoryLayout = memoryLayout;
+			strandGroup.particleMemoryLayout = hairAsset.settingsBasic.memoryLayout;
 
 			// prep strand buffers
 			strandGroup.rootUV = new Vector2[curveCount];
@@ -343,7 +339,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				switch (memoryLayout)
+				switch (strandGroup.particleMemoryLayout)
 				{
 					case HairAsset.MemoryLayout.Sequential:
 						{
@@ -374,12 +370,14 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// calc derivative fields, create mesh assets
-			FinalizeStrandGroup(ref strandGroup);
+			FinalizeStrandGroup(ref strandGroup, hairAsset);
 		}
 #endif
 
-		public static void BuildHairAssetStrandGroup(ref HairAsset.StrandGroup strandGroup, in HairAsset.SettingsProcedural settings, HairAsset.MemoryLayout memoryLayout)
+		public static void BuildStrandGroupProcedural(ref HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
+			var settings = hairAsset.settingsProcedural;
+
 			// get target counts
 			var generatedStrandCount = settings.strandCount;
 			var generatedStrandParticleCount = settings.strandParticleCount;
@@ -391,7 +389,7 @@ namespace Unity.DemoTeam.Hair
 				// build temporaries
 				if (GenerateRoots(generatedRoots, settings))
 				{
-					GenerateStrands(generatedStrands, generatedRoots, settings, memoryLayout);
+					GenerateStrands(generatedStrands, generatedRoots, settings, hairAsset.settingsBasic.memoryLayout);
 				}
 				else
 				{
@@ -404,7 +402,7 @@ namespace Unity.DemoTeam.Hair
 				strandGroup.strandParticleCount = generatedStrandParticleCount;
 
 				// set memory layout
-				strandGroup.particleMemoryLayout = memoryLayout;
+				strandGroup.particleMemoryLayout = hairAsset.settingsBasic.memoryLayout;
 
 				// prep strand buffers
 				strandGroup.rootUV = new Vector2[generatedStrandCount];
@@ -424,14 +422,13 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// calc derivative fields, create mesh assets
-			FinalizeStrandGroup(ref strandGroup);
+			FinalizeStrandGroup(ref strandGroup, hairAsset);
 		}
 
-		static void FinalizeStrandGroup(ref HairAsset.StrandGroup strandGroup)
+		static void FinalizeStrandGroup(ref HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
-			// get strand counts
-			ref var strandCount = ref strandGroup.strandCount;
-			ref var strandParticleCount = ref strandGroup.strandParticleCount;
+			var strandCount = strandGroup.strandCount;
+			var strandParticleCount = strandGroup.strandParticleCount;
 
 			// finalize strand properties
 			using (var strandLengths = new NativeArray<float>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
@@ -496,6 +493,9 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			// build lod clusters
+			BuildLODClusters(ref strandGroup, hairAsset);
+
 			// build mesh assets
 			unsafe
 			{
@@ -527,6 +527,276 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+
+		static void BuildLODClusters(ref HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
+		{
+			if (hairAsset.settingsBasic.kLODClusters)
+			{
+				switch (hairAsset.settingsBasic.kLODClustersProvider)
+				{
+					case HairAsset.LODClusters.Generated:
+						Debug.LogWarning("not implemented");
+						break;//TODO
+
+					case HairAsset.LODClusters.UVMapped:
+						BuildLODClustersUVMapped(ref strandGroup, hairAsset);
+						break;
+				}
+			}
+		}
+
+		static unsafe void BuildLODClustersUVMapped(ref HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
+		{
+			var strandCount = strandGroup.strandCount;
+			var strandParticleCount = strandGroup.strandParticleCount;
+
+			// allocate clusters
+			var clusterSet = new ClusterSet(0, strandCount, Allocator.Temp);
+			var clusterSetDepth = 0;
+
+			// allocate lod guide index
+			var lodGuideCount = new NativeList<int>(Allocator.Temp);
+			var lodGuideIndex = new NativeList<int>(Allocator.Temp);
+			//TODO sensible initial capacity
+
+			//-------------- UVMapped/Generated BASE LOD BEGIN -------------
+
+			// count valid cluster maps
+			var clusterMaps = hairAsset.settingsLODUVMapped.baseLODClusterMaps;
+			var clusterMapsReadable = 0;
+			{
+				if (clusterMaps != null)
+				{
+					foreach (var clusterMap in clusterMaps)
+					{
+						if (clusterMap != null && clusterMap.isReadable)
+							clusterMapsReadable++;
+					}
+				}
+
+				if (clusterMapsReadable == 0)
+				{
+					Debug.LogWarning("no readable cluster maps");
+				}
+			}
+
+			// build clusters from cluster maps
+#if true
+			using (var clusterLookup = new UnsafeHashMap<uint, int>(strandCount, Allocator.Temp))
+#else
+			using (var clusterLookup = new UnsafeHashMap<Color, int>(strandCount, Allocator.Temp))
+#endif
+			using (var strandCluster = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var strandGuide = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			{
+				var strandClusterPtr = (int*)strandCluster.GetUnsafePtr();
+				var strandGuidePtr = (int*)strandCluster.GetUnsafePtr();
+
+				foreach (var clusterMap in clusterMaps)
+				{
+					if (clusterMap == null || clusterMap.isReadable == false)
+					{
+						continue;
+					}
+
+					// find clusters
+					var cluster = -1;
+					var clusterCount = 0;
+
+					clusterLookup.Clear();
+
+#if true
+					using (var connectedClusters = new ConnectedComponentsImage(clusterMap, Allocator.Temp))
+					{
+						Debug.Log("found " + connectedClusters.clusterCount + " connected clusters in " + clusterMap.name);
+
+						for (int i = 0; i != strandCount; i++)
+						{
+							var x = Mathf.RoundToInt(strandGroup.rootUV[i].x * (clusterMap.width - 1));
+							var y = Mathf.RoundToInt(strandGroup.rootUV[i].y * (clusterMap.height - 1));
+							var id = connectedClusters.GetComponentID(x, y);
+
+							if (clusterLookup.TryGetValue(id, out cluster) == false)
+							{
+								cluster = clusterCount++;
+								clusterLookup.Add(id, cluster);
+							}
+
+							strandClusterPtr[i] = cluster;
+						}
+					}
+#else
+					for (int i = 0; i != strandCount; i++)
+					{
+						var x = Mathf.RoundToInt(strandGroup.rootUV[i].x * (clusterMap.width - 1));
+						var y = Mathf.RoundToInt(strandGroup.rootUV[i].y * (clusterMap.height - 1));
+						var c = clusterMap.GetPixel(x, y, 0);
+						{
+							c.a = 0.0f;
+						}
+
+						if (clusterLookup.TryGetValue(c, out cluster) == false)
+						{
+							cluster = clusterCount++;
+							clusterLookup.Add(c, cluster);
+						}
+
+						strandClusterPtr[i] = cluster;
+					}
+
+#endif
+
+					// build clusters
+					var nextClusterSet = new ClusterSet(clusterCount, strandCount, Allocator.Temp);
+					{
+						nextClusterSet.strandCluster.CopyFrom(strandCluster);
+						nextClusterSet.SelectGuidesFrom(strandGroup, clusterSetDepth++);
+						nextClusterSet.ImportGuidesFrom(clusterSet);
+						//TODO handle (reject?) injection of lower granularity
+						// e.g. if 3 guides in lower level points to 1 cluster in current
+					}
+
+					clusterSet.Dispose();
+					clusterSet = nextClusterSet;
+
+					// export strand->guide mapping to lod guide index
+					for (int i = 0; i != strandCount; i++)
+					{
+						strandGuidePtr[i] = clusterSet.clusterGuidePtr[clusterSet.strandClusterPtr[i]];
+					}
+
+					lodGuideCount.Add(clusterSet.clusterCount);
+					lodGuideIndex.AddRange(strandGuidePtr, strandCount);
+				}
+			}
+
+			//-------------- UVMapped/Generated BASE LOD END -------------
+
+			// build clusters from subdivision
+			//TODO
+
+			// build clusters from all strands
+			if (lodGuideCount.Length == 0)
+			{
+				lodGuideCount.Add(strandCount);
+				lodGuideIndex.Resize(strandCount, NativeArrayOptions.UninitializedMemory);
+
+				var lodGuideIndexPtr = (int*)lodGuideIndex.GetUnsafePtr();
+				{
+					for (int i = 0; i != strandCount; i++)
+					{
+						lodGuideIndexPtr[i] = i;
+					}
+				}
+			}
+
+			// write lod guide index
+			strandGroup.lodCount = lodGuideCount.Length;
+#if true
+			strandGroup.lodGuideCount = lodGuideCount.ToArray();
+			strandGroup.lodGuideIndex = lodGuideIndex.ToArray();
+#else
+			{
+				strandGroup.lodGuideCount = new int[lodGuideCount.Length];
+				strandGroup.lodGuideIndex = new int[lodGuideIndex.Length];
+
+				// write highest granularity to LOD 0, next-to-highest granularity to LOD 1, etc.
+				fixed (int* lodGuideCountDstBase = strandGroup.lodGuideCount)
+				fixed (int* lodGuideIndexDstBase = strandGroup.lodGuideIndex)
+				{
+					int* lodGuideCountCopyDst = lodGuideCountDstBase;
+					int* lodGuideIndexCopyDst = lodGuideIndexDstBase;
+
+					int* lodGuideCountCopySrc = (int*)lodGuideCount.GetUnsafePtr() + (strandGroup.lodCount);
+					int* lodGuideIndexCopySrc = (int*)lodGuideIndex.GetUnsafePtr() + (strandGroup.lodCount * strandCount);
+
+					for (int i = 0; i != strandGroup.lodCount; i++)
+					{
+						lodGuideCountCopySrc -= 1;
+						lodGuideIndexCopySrc -= strandCount;
+
+						UnsafeUtility.MemCpy(lodGuideCountCopyDst, lodGuideCountCopySrc, sizeof(int));
+						UnsafeUtility.MemCpy(lodGuideIndexCopyDst, lodGuideIndexCopySrc, sizeof(int) * strandCount);
+
+						lodGuideCountCopyDst += 1;
+						lodGuideIndexCopyDst += strandCount;
+					}
+				}
+			}
+#endif
+
+			// write lod thresholds
+			strandGroup.lodThreshold = new float[strandGroup.lodCount];
+			{
+#if true
+				var maxLOD = strandGroup.lodCount - 1;
+				var maxLODGuideCount = strandGroup.lodGuideCount[maxLOD];
+
+				strandGroup.lodThreshold[maxLOD] = 1.0f;
+
+				for (int i = 0; i != maxLOD; i++)
+				{
+					strandGroup.lodThreshold[i] = strandGroup.lodGuideCount[i] / (float)maxLODGuideCount;
+				}
+#else
+				strandGroup.lodThreshold[0] = 1.0f;
+
+				for (int i = 1; i != strandGroup.lodCount; i++)
+				{
+					strandGroup.lodThreshold[i] = strandGroup.lodGuideCount[i] / (float)strandGroup.lodGuideCount[0];
+				}
+#endif
+			}
+
+			// apply remapping
+			using (var remapping = new ClusterRemapping(clusterSet, Allocator.Temp))
+			{
+				// shuffle strands
+				remapping.ApplyShuffle(strandGroup.rootUV, 0, 1, strandCount);
+				remapping.ApplyShuffle(strandGroup.rootScale, 0, 1, strandCount);
+				remapping.ApplyShuffle(strandGroup.rootPosition, 0, 1, strandCount);
+				remapping.ApplyShuffle(strandGroup.rootDirection, 0, 1, strandCount);
+
+				switch (strandGroup.particleMemoryLayout)
+				{
+					case HairAsset.MemoryLayout.Sequential:
+						for (int i = 0; i != strandParticleCount; i++)
+						{
+							remapping.ApplyShuffle(strandGroup.particlePosition,
+								attrOffset: i,
+								attrStride: strandParticleCount,
+								attrCount: strandCount);
+						}
+						break;
+
+					case HairAsset.MemoryLayout.Interleaved:
+						for (int i = 0; i != strandParticleCount; i++)
+						{
+							remapping.ApplyShuffle(strandGroup.particlePosition,
+								attrOffset: i * strandCount,
+								attrStride: 1,
+								attrCount: strandCount);
+						}
+						break;
+				}
+
+				for (int i = 0; i != strandGroup.lodCount; i++)
+				{
+					remapping.ApplyShuffle(strandGroup.lodGuideIndex, i * strandCount, 1, strandCount);
+				}
+
+				// remap indices
+				remapping.ApplyRemapping(strandGroup.lodGuideIndex);
+			}
+
+			// dispose lod guide index
+			lodGuideCount.Dispose();
+			lodGuideIndex.Dispose();
+
+			// dispose clusters
+			clusterSet.Dispose();
+		}
+
 		static unsafe bool GenerateRoots(in HairAssetProvider.GeneratedRoots roots, in HairAsset.SettingsProcedural settings)
 		{
 			switch (settings.placement)
@@ -535,7 +805,7 @@ namespace Unity.DemoTeam.Hair
 					return GenerateRootsPrimitive(roots, settings);
 
 				case HairAsset.SettingsProcedural.PlacementType.Custom:
-					return (settings.placementCustom)?.GenerateRoots(roots) ?? false;
+					return (settings.placementProvider)?.GenerateRoots(roots) ?? false;
 
 				case HairAsset.SettingsProcedural.PlacementType.Mesh:
 					return GenerateRootsMesh(roots, settings);
@@ -632,6 +902,10 @@ namespace Unity.DemoTeam.Hair
 
 		static unsafe bool GenerateRootsMesh(in HairAssetProvider.GeneratedRoots generatedRoots, in HairAsset.SettingsProcedural settings)
 		{
+			var placementMesh = settings.placementMesh;
+			if (placementMesh == null)
+				return false;
+
 			generatedRoots.GetUnsafePtrs(out var rootPos, out var rootDir, out var rootUV0, out var rootVar);
 
 			using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.placementMesh))
@@ -898,6 +1172,404 @@ namespace Unity.DemoTeam.Hair
 				{
 					srcIndex++;
 				}
+			}
+		}
+
+		unsafe struct ClusterSet : IDisposable
+		{
+			public int clusterCount;
+			public NativeArray<int> clusterDepth;
+			public NativeArray<int> clusterGuide;
+			public NativeArray<int> strandCluster;
+			public int strandCount;
+
+			public int* clusterDepthPtr;
+			public int* clusterGuidePtr;
+			public int* strandClusterPtr;
+
+			public ClusterSet(int clusterCount, int strandCount, Allocator allocator)
+			{
+				this.clusterCount = clusterCount;
+				this.clusterDepth = new NativeArray<int>(clusterCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.clusterGuide = new NativeArray<int>(clusterCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.strandCluster = new NativeArray<int>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.strandCount = strandCount;
+
+				this.clusterDepthPtr = (int*)clusterDepth.GetUnsafePtr();
+				this.clusterGuidePtr = (int*)clusterGuide.GetUnsafePtr();
+				this.strandClusterPtr = (int*)strandCluster.GetUnsafePtr();
+			}
+
+			public void Dispose()
+			{
+				clusterDepth.Dispose();
+				clusterGuide.Dispose();
+				strandCluster.Dispose();
+			}
+
+			public void SelectGuidesFrom(HairAsset.StrandGroup strandGroup, int selectionDepth)
+			{
+				using (var clusterCenter = new NativeArray<Vector3>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				using (var clusterWeight = new NativeArray<float>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				using (var clusterScore = new NativeArray<float>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				{
+					var clusterCenterPtr = (Vector3*)clusterCenter.GetUnsafePtr();
+					var clusterWeightPtr = (float*)clusterWeight.GetUnsafePtr();
+					var clusterScorePtr = (float*)clusterScore.GetUnsafePtr();
+					var clusterGuidePtr = (int*)clusterGuide.GetUnsafePtr();
+
+					// calc weighted centers
+					for (int i = 0; i != clusterCount; i++)
+					{
+						clusterCenterPtr[i] = Vector3.zero;
+						clusterWeightPtr[i] = 0.0f;
+					}
+
+					for (int i = 0; i != strandCount; i++)
+					{
+						var cluster = strandClusterPtr[i];
+						{
+							clusterCenterPtr[cluster] += strandGroup.rootPosition[i];
+							clusterWeightPtr[cluster] += strandGroup.rootScale[i];
+						}
+					}
+
+					for (int i = 0; i != clusterCount; i++)
+					{
+						clusterCenterPtr[i] /= clusterWeightPtr[i];
+					}
+
+					// select one guide per cluster based on distance to weighted centers
+					for (int i = 0; i != clusterCount; i++)
+					{
+						clusterScorePtr[i] = float.PositiveInfinity;
+						clusterDepthPtr[i] = selectionDepth;
+						clusterGuidePtr[i] = -1;
+					}
+
+					for (int i = 0; i != strandCount; i++)
+					{
+						var cluster = strandClusterPtr[i];
+						{
+							var strandLength = strandGroup.maxParticleInterval * strandGroup.rootScale[i];
+							var strandOffset = Vector3.Distance(clusterCenterPtr[cluster], strandGroup.rootPosition[i]);
+
+							//TODO better scoring
+							var strandScore = strandOffset;// / strandLength;// smaller score is better
+							if (strandScore < clusterScorePtr[cluster])
+							{
+								clusterGuidePtr[cluster] = i;
+								clusterScorePtr[cluster] = strandScore;
+							}
+						}
+					}
+				}
+			}
+
+			public void ImportGuidesFrom(in ClusterSet existingClusters)
+			{
+				using (var visitedMask = new NativeArray<bool>(clusterCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				{
+					var visitedMaskPtr = (bool*)visitedMask.GetUnsafePtr();
+
+					for (int i = 0; i != existingClusters.clusterCount; i++)
+					{
+						var transferGuide = existingClusters.clusterGuidePtr[i];
+						var transferCluster = strandClusterPtr[transferGuide];
+
+						if (visitedMaskPtr[transferCluster])
+						{
+							//TODO sensible error message
+							Debug.LogError("TODO: sensible error message");
+						}
+						else
+						{
+							// copy depth so we can sort clusters by depth first and guide second
+							clusterDepthPtr[transferCluster] = existingClusters.clusterDepthPtr[transferCluster];
+
+							// copy guide so existing guides remain as depth increases
+							clusterGuidePtr[transferCluster] = transferGuide;
+
+							// mark as visited
+							visitedMaskPtr[transferCluster] = true;
+						}
+					}
+				}
+			}
+		}
+
+		unsafe struct ClusterRemapping : IDisposable
+		{
+			struct SortableCluster : IComparable<SortableCluster>
+			{
+				public int depth;
+				public int guide;
+
+				public int CompareTo(SortableCluster other)
+				{
+					if (depth != other.depth)
+						return depth.CompareTo(other.depth);
+					else
+						return guide.CompareTo(other.guide);
+				}
+			}
+
+			public NativeArray<int> strandRemapSrc;// maps final strand index -> old strand index
+			public NativeArray<int> strandRemapDst;// maps old strand index -> final strand index
+
+			public int* strandRemapSrcPtr;
+			public int* strandRemapDstPtr;
+
+			public ClusterRemapping(in ClusterSet clusters, Allocator allocator)
+			{
+				strandRemapSrc = new NativeArray<int>(clusters.strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				strandRemapDst = new NativeArray<int>(clusters.strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+
+				strandRemapSrcPtr = (int*)strandRemapSrc.GetUnsafePtr();
+				strandRemapDstPtr = (int*)strandRemapDst.GetUnsafePtr();
+
+				// sort clusters by depth first and guide second
+				using (var sortedClusters = new NativeArray<SortableCluster>(clusters.clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				{
+					var sortedClustersPtr = (SortableCluster*)sortedClusters.GetUnsafePtr();
+
+					for (int i = 0; i != clusters.clusterCount; i++)
+					{
+						sortedClustersPtr[i].depth = clusters.clusterDepthPtr[i];
+						sortedClustersPtr[i].guide = clusters.clusterGuidePtr[i];
+					}
+
+					sortedClusters.Sort();
+
+					// write guides from sorted clusters
+					for (int i = 0; i != clusters.clusterCount; i++)
+					{
+						strandRemapSrcPtr[i] = sortedClustersPtr[i].guide;
+						strandRemapDstPtr[sortedClustersPtr[i].guide] = i;
+					}
+
+					// write non-guide strands
+					for (int i = 0, j = clusters.clusterCount; i != clusters.strandCount; i++)
+					{
+						var guide = clusters.clusterGuidePtr[clusters.strandClusterPtr[i]];
+						if (guide != i)
+						{
+							strandRemapSrcPtr[j] = i;
+							strandRemapDstPtr[i] = j++;
+						}
+					}
+
+					//TODO sort non-guide strands by guide first and index second
+				}
+			}
+
+			public void Dispose()
+			{
+				strandRemapSrc.Dispose();
+				strandRemapDst.Dispose();
+			}
+
+			public void ApplyRemapping(int* indexPtr, int indexCount)
+			{
+				for (int i = 0; i != indexCount; i++)
+				{
+					indexPtr[i] = strandRemapDstPtr[indexPtr[i]];
+				}
+			}
+
+			public void ApplyRemapping(in NativeArray<int> indexBuffer)
+			{
+				ApplyRemapping((int*)indexBuffer.GetUnsafePtr(), indexBuffer.Length);
+			}
+
+			public void ApplyRemapping(int[] indexBuffer)
+			{
+				fixed (int* indexPtr = indexBuffer)
+				{
+					ApplyRemapping(indexPtr, indexBuffer.Length);
+				}
+			}
+
+			public void ApplyShuffleUntyped(byte* attrPtr, int attrSize, int attrStride, int attrCount)
+			{
+				using (var buffer = new NativeArray<byte>(attrCount * attrSize, Allocator.Temp))
+				{
+					var bufferPtr = (byte*)buffer.GetUnsafePtr();
+
+					// shuffle into temporary buffer
+					for (int i = 0; i != attrCount; i++)
+					{
+						var copyDstPtr = bufferPtr + attrSize * i;
+						var copySrcPtr = attrPtr + attrStride * strandRemapSrcPtr[i];
+
+						UnsafeUtility.MemCpy(copyDstPtr, copySrcPtr, attrSize);
+					}
+
+					//for (int i = 0; i < 5; i++)
+					//{
+					//	Debug.Log("attrPtr[" + i + " -> " + 2 * strandRemapSrcPtr[i] + "] = " + ((float*)attrPtr)[2 * strandRemapSrcPtr[i]]);
+					//	Debug.Log("bufferPtr[" + i + "] = " + ((float*)bufferPtr)[i * 2]);
+					//}
+
+					// copy back the shuffled data
+					UnsafeUtility.MemCpyStride(
+						attrPtr,        // dst
+						attrStride,     // dst stride
+						bufferPtr,      // src
+						attrSize,       // src stride
+						attrSize,       // size
+						attrCount);     // count
+
+					// equiv.
+					//for (int i = 0; i != attrCount; i++)
+					//{
+					//	var attrDstPtr = attrPtr + attrStride * i;
+					//	var attrSrcPtr = bufferPtr + attrSize * i;
+					//	UnsafeUtility.MemCpy(attrDstPtr, attrSrcPtr, attrSize);
+					//}
+				}
+			}
+
+			public void ApplyShuffle<T>(NativeArray<T> attrBuffer, int attrOffset, int attrStride, int attrCount) where T : struct
+			{
+				var attrPtr = (byte*)attrBuffer.GetUnsafePtr();
+				var attrSize = UnsafeUtility.SizeOf<T>();
+
+				ApplyShuffleUntyped(attrPtr + attrOffset * attrSize, attrSize, attrStride * attrSize, attrCount);
+			}
+
+			public void ApplyShuffle<T>(T[] attrBuffer, int attrOffset, int attrStride, int attrCount) where T : struct
+			{
+				var attrPtr = (byte*)UnsafeUtility.PinGCArrayAndGetDataAddress(attrBuffer, out ulong gcHandle);
+				var attrSize = UnsafeUtility.SizeOf<T>();
+
+				//Debug.Log("applyShuffle<" + typeof(T).Name + ">");
+				//Debug.Log(" - attrSize " + attrSize);
+				//Debug.Log(" - attrStride " + (attrStride * attrSize));
+				//Debug.Log(" - attrCount " + attrCount);
+
+				ApplyShuffleUntyped(attrPtr + attrOffset * attrSize, attrSize, attrStride * attrSize, attrCount);
+
+				UnsafeUtility.ReleaseGCObject(gcHandle);
+			}
+		}
+
+		public unsafe struct ConnectedComponentsImage : IDisposable
+		{
+			public int idDimX;
+			public int idDimY;
+
+			public NativeArray<uint> idBuffer;
+			public uint* idBufferPtr;
+
+			public uint clusterCount;
+
+			public ConnectedComponentsImage(Texture2D texture, Allocator allocator)
+			{
+				idDimX = texture.width;
+				idDimY = texture.height;
+
+				idBuffer = new NativeArray<uint>(idDimX * idDimY, allocator, NativeArrayOptions.ClearMemory);
+				idBufferPtr = (uint*)idBuffer.GetUnsafePtr();
+
+				clusterCount = 0;
+
+				var texelData = texture.GetRawTextureData<byte>();
+				var texelDataPtr = (byte*)texelData.GetUnsafePtr();
+
+				var texelCount = idDimX * idDimY;
+				var texelSize = texelData.Length / texelCount;
+
+				var texelBG = new NativeArray<byte>(texelSize, Allocator.Temp, NativeArrayOptions.ClearMemory);
+				var texelBGPtr = (byte*)texelBG.GetUnsafePtr();
+
+				// identify matching neighbouring texels
+				var texelAdjacency = new LinkedIndexListArray(texelCount, 16 * texelCount, Allocator.Temp);
+				{
+					void CompareAndConnect(ref LinkedIndexListArray adjacency, byte* valueBasePtr, byte* valueSkipPtr, int valueSize, int indexA, int indexB)
+					{
+						if (UnsafeUtility.MemCmp(valueSkipPtr, valueBasePtr + valueSize * indexA, valueSize) == 0 ||
+							UnsafeUtility.MemCmp(valueSkipPtr, valueBasePtr + valueSize * indexB, valueSize) == 0)
+							return;
+
+						if (UnsafeUtility.MemCmp(valueBasePtr + valueSize * indexA, valueBasePtr + valueSize * indexB, valueSize) == 0)
+						{
+							adjacency.Append(indexA, indexB);
+							adjacency.Append(indexB, indexA);
+						}
+					};
+
+					// a b c
+					// d e <-- 'e' is sweep index at (x, y)
+					for (int y = 0; y != idDimY; y++)
+					{
+						int ym = (y - 1 + idDimY) % idDimY;
+						int yp = (y + 1) % idDimY;
+
+						for (int x = 0; x != idDimX; x++)
+						{
+							int xm = (x - 1 + idDimX) % idDimX;
+							int xp = (x + 1) % idDimX;
+
+							int i_a = idDimX * ym + xm;
+							int i_b = idDimX * ym + x;
+							int i_c = idDimX * ym + xp;
+							int i_d = idDimX * y + xm;
+							int i_e = idDimX * y + x;
+
+							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelBGPtr, texelSize, i_e, i_a);
+							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelBGPtr, texelSize, i_e, i_b);
+							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelBGPtr, texelSize, i_e, i_c);
+							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelBGPtr, texelSize, i_e, i_d);
+						}
+					}
+				}
+
+				// identify connected clusters
+				using (var texelVisitor = new UnsafeBFS(texelCount, Allocator.Temp))
+				{
+					uint texelClusterID = 0;
+
+					for (int i = 0; i != texelCount; i++)
+					{
+						if (texelVisitor.visitedPtr[i])
+						{
+							continue;// skip texels that we've already visited
+						}
+
+						texelClusterID++;
+						texelVisitor.Insert(i);
+
+						while (texelVisitor.MoveNext(out int visitedIndex, out int visitedDepth))
+						{
+							idBufferPtr[visitedIndex] = texelClusterID;
+
+							foreach (var adjacentIndex in texelAdjacency[visitedIndex])
+							{
+								texelVisitor.Insert(adjacentIndex);
+							}
+						}
+					}
+
+					clusterCount = texelClusterID;
+				}
+
+				// done
+				texelAdjacency.Dispose();
+				texelBG.Dispose();
+			}
+
+			public uint GetComponentID(int x, int y)
+			{
+				if (x < 0 || y < 0 || x > idDimX - 1 || y > idDimY - 1)
+					Debug.Log("out of bounds ("+x+", "+y+")");
+
+				return idBufferPtr[x + y * idDimX];
+			}
+
+			public void Dispose()
+			{
+				idBuffer.Dispose();
 			}
 		}
 	}

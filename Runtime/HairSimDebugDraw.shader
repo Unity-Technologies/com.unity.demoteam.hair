@@ -76,14 +76,14 @@
 		{
 			if (!(vertexID & 1))
 			{
-				worldPos -= 4.0 * _DT * _ParticleVelocityPrev[i].xyz;
+				worldPos -= _DT * _ParticleVelocityPrev[i].xyz;
 			}
 		}
 		else
 		{
 			if (vertexID & 1)
 			{
-				worldPos += 4.0 * _DT * _ParticleVelocity[i].xyz;
+				worldPos += _DT * _ParticleVelocity[i].xyz;
 			}
 		}
 
@@ -92,6 +92,54 @@
 		output.color = float4(0.0, vertexID & 1, vertexID & 2, 1.0);
 		return output;
 
+	}
+
+	DebugVaryings DebugVert_StrandParticleClusters(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+	{
+#if LAYOUT_INTERLEAVED
+		const uint strandParticleBegin = instanceID;
+		const uint strandParticleStride = _StrandCount;
+#else
+		const uint strandParticleBegin = instanceID * _StrandParticleCount;
+		const uint strandParticleStride = 1;
+#endif
+
+		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 1);
+		float3 worldPos;
+		float3 color;
+
+		if (vertexID & 1)
+		{
+			uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + instanceID];
+			uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + instanceID];
+
+#if LAYOUT_INTERLEAVED
+			const uint strandParticleBeginLo = strandIndexLo;
+			const uint strandParticleBeginHi = strandIndexHi;
+#else
+			const uint strandParticleBeginLo = strandIndexLo * _StrandParticleCount;
+			const uint strandParticleBeginHi = strandIndexHi * _StrandParticleCount;
+#endif
+
+			float3 worldPosLo = _ParticlePosition[strandParticleBeginLo + strandParticleStride * (vertexID >> 1)].xyz;
+			float3 worldPosHi = _ParticlePosition[strandParticleBeginHi + strandParticleStride * (vertexID >> 1)].xyz;
+
+			float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODIndexLo]);
+			float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODIndexHi]);
+
+			worldPos = lerp(worldPosLo, worldPosHi, _LODBlendFrac);
+			color = lerp(colorLo, colorHi, _LODBlendFrac);
+		}
+		else
+		{
+			worldPos = _ParticlePosition[i].xyz;
+			color = ColorCycle(instanceID, _StrandCount);
+		}
+
+		DebugVaryings output;
+		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
+		output.color = float4(color, 1.0);
+		return output;
 	}
 
 	/*
@@ -334,7 +382,7 @@
 		ZTest LEqual
 		ZWrite On
 
-		Pass// 0 == STRAND PARTICLE
+		Pass// 0 == STRAND PARTICLE POSITION
 		{
 			HLSLPROGRAM
 
@@ -411,6 +459,16 @@
 
 			#pragma vertex DebugVert_VolumeIsosurface
 			#pragma fragment DebugFrag_VolumeIsosurface
+
+			ENDHLSL
+		}
+
+		Pass// 7 == STRAND PARTICLE CLUSTERS
+		{
+			HLSLPROGRAM
+
+			#pragma vertex DebugVert_StrandParticleClusters
+			#pragma fragment DebugFrag
 
 			ENDHLSL
 		}

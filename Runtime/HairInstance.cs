@@ -51,6 +51,11 @@ namespace Unity.DemoTeam.Hair
 				UniformWorldMax,
 			}
 
+			public enum LODSelection
+			{
+				Fixed,
+			}
+
 			public enum StagingPrecision
 			{
 				Full,
@@ -83,12 +88,19 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 100.0f), Tooltip("Strand margin (in millimeters)")]
 			public float strandMargin;//TODO per-group
 
+			[LineHeader("LOD")]
+
+			public LODSelection kLODSearch;
+			[Range(0.0f, 1.0f)]
+			public float kLODSearchValue;
+			public bool kLODBlending;
+
 			[LineHeader("Geometry")]
 
 			[ToggleGroup]
 			public bool staging;
 			[ToggleGroupItem(withLabel = true), Range(0, 10)]
-			public uint stagingSubdivisions;
+			public uint stagingSubdivision;
 			[EditableIf(nameof(staging), true)]
 			public StagingPrecision stagingPrecision;
 
@@ -132,8 +144,12 @@ namespace Unity.DemoTeam.Hair
 				strandDiameter = 1.0f,
 				strandMargin = 0.0f,
 
+				kLODSearch = LODSelection.Fixed,
+				kLODSearchValue = 1.0f,
+				kLODBlending = false,
+
 				staging = false,
-				stagingSubdivisions = 0,
+				stagingSubdivision = 0,
 				stagingPrecision = StagingPrecision.Half,
 
 				strandMaterial = false,
@@ -283,6 +299,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (InitializeRuntimeData(cmd))
 				{
+					UpdateSimulationLOD(cmd);
 					UpdateSimulationState(cmd);
 					UpdateRenderingState(cmd);
 					Graphics.ExecuteCommandBuffer(cmd);
@@ -414,6 +431,20 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
+		void UpdateSimulationLOD(CommandBuffer cmd)
+		{
+			if (strandGroupInstances == null)
+				return;
+
+			var lodValue = settingsStrands.kLODSearchValue;
+			var lodBlending = settingsStrands.kLODBlending;
+
+			for (int i = 0; i != solverData.Length; i++)
+			{
+				HairSim.PushSolverLOD(cmd, ref solverData[i], lodValue, lodBlending);
+			}
+		}
+
 		void UpdateSimulationState(CommandBuffer cmd)
 		{
 			var stepCount = DispatchStepAccumulated(cmd, Time.deltaTime);
@@ -435,7 +466,7 @@ namespace Unity.DemoTeam.Hair
 				if (settingsStrands.staging)
 				{
 					var stagingCompression = (settingsStrands.stagingPrecision == SettingsStrands.StagingPrecision.Half);
-					var stagingSubdivisions = settingsStrands.stagingSubdivisions;
+					var stagingSubdivisions = settingsStrands.stagingSubdivision;
 
 					if (HairSim.PrepareSolverStaging(ref solverData[i], stagingCompression, stagingSubdivisions))
 					{
@@ -750,11 +781,11 @@ namespace Unity.DemoTeam.Hair
 				var strandRotation = GetRootRotation(strandGroupInstances[i]);
 
 				HairSim.PushSolverParams(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, dt);
-				HairSim.PushSolverRoots(cmd, solverData[i], rootMesh);// TODO handle substeps within frame
+				HairSim.PushSolverRoots(cmd, solverData[i], rootMesh);// TODO handle substeps within frame (interpolate roots)
 			}
 
 			// update volume boundaries
-			HairSim.PushVolumeBoundaries(cmd, ref volumeData, volumeSettings, simulationBounds);// TODO handle substeps within frame
+			HairSim.PushVolumeBoundaries(cmd, ref volumeData, volumeSettings, simulationBounds);// TODO handle substeps within frame (interpolate colliders)
 
 			// pre-step volume if resolution changed
 			if (HairSim.PrepareVolumeData(ref volumeData, volumeSettings))
@@ -825,13 +856,15 @@ namespace Unity.DemoTeam.Hair
 			{
 				ref var strandGroup = ref strandGroups[i];
 
-				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount);
+				HairSim.PrepareSolverData(ref solverData[i], strandGroup.strandCount, strandGroup.strandParticleCount, strandGroup.lodCount);
 				{
 					solverData[i].memoryLayout = strandGroup.particleMemoryLayout;
 					solverData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 					solverData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
 					solverData[i].cbuffer._StrandMaxParticleInterval = strandGroup.maxParticleInterval;
 					solverData[i].cbuffer._StrandMaxParticleWeight = strandGroup.maxParticleInterval / volumeData.allGroupsMaxParticleInterval;
+					solverData[i].lodCount = (uint)strandGroup.lodCount;
+					solverData[i].lodThreshold = new NativeArray<float>(strandGroup.lodThreshold, Allocator.Persistent);
 				}
 
 				int strandGroupParticleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
@@ -852,13 +885,15 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					if (strandGroup.rootUV != null)//TODO remove condition, version the data
 					solverData[i].rootUV.SetData(strandGroup.rootUV);
 					solverData[i].rootScale.SetData(strandGroup.rootScale);
 					solverData[i].rootPosition.SetData(alignedRootPosition);
 					solverData[i].rootDirection.SetData(alignedRootDirection);
 
 					solverData[i].particlePosition.SetData(alignedParticlePosition);
+
+					solverData[i].lodGuideCount.SetData(strandGroup.lodGuideCount);
+					solverData[i].lodGuideIndex.SetData(strandGroup.lodGuideIndex);
 
 					// NOTE: the rest of these buffers are initialized in KInitParticles
 					//solverData[i].particlePositionPrev.SetData(tmpParticlePosition);

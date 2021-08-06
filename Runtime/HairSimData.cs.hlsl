@@ -18,6 +18,9 @@ CBUFFER_START(SolverCBuffer)
     float _StrandMaxParticleWeight;
     float _StrandScale;
     float _StrandDiameter;
+    uint _LODIndexLo;
+    uint _LODIndexHi;
+    float _LODBlendFrac;
     uint _StagingVertexCount;
     uint _StagingSubdivisions;
     float _DT;

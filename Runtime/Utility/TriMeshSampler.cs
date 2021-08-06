@@ -81,7 +81,7 @@ namespace Unity.DemoTeam.Hair
 				var searchValue = triangleAreaSum * rand.NextFloat();
 				var searchIndex = triangleAreaAccu.BinarySearch(searchValue);
 
-				if (searchIndex > 0)
+				if (searchIndex >= 0)
 					return searchIndex;
 				else
 					return ~searchIndex;

@@ -30,6 +30,12 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particleVelocity;		// xyz: velocity, w: splatting weight
 			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: splatting weight
 
+			public ComputeBuffer lodGuideCount;			// n: lod index -> num. guides
+			public ComputeBuffer lodGuideIndex;			// i: lod index * strandCount + strand index -> guide index
+
+			public uint lodCount;
+			public NativeArray<float> lodThreshold;
+
 			public ComputeBuffer stagingPosition;
 			public ComputeBuffer stagingPositionPrev;
 
@@ -61,8 +67,8 @@ namespace Unity.DemoTeam.Hair
 			public Matrix4x4 _LocalToWorldInvT;			// ...
 			public Vector4 _WorldRotation;				// primary skinning bone rotation
 
-			public Vector4 _StagingOriginExtent;				// xyz: origin, w: scale
-			public Vector4 _StagingOriginExtentPrev;			// ...
+			public Vector4 _StagingOriginExtent;		// xyz: origin, w: scale
+			public Vector4 _StagingOriginExtentPrev;	// ...
 
 			public uint _StrandCount;					// group strand count
 			public uint _StrandParticleCount;			// group strand particle count
@@ -71,6 +77,10 @@ namespace Unity.DemoTeam.Hair
 			public float _StrandMaxParticleWeight;		// group max particle weight (relative to all groups within volume)
 			public float _StrandScale;					// group scale
 			public float _StrandDiameter;//TODO fold under maximum + group scale scheme
+
+			public uint _LODIndexLo;					// lod index (lower detail in blend)
+			public uint _LODIndexHi;					// lod index (higher detail in blend)
+			public float _LODBlendFrac;					// lod blend fraction (lo -> hi)
 
 			public uint _StagingVertexCount;			// staging strand vertex count
 			public uint _StagingSubdivisions;			// staging subdivisions (per segment)

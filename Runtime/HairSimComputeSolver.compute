@@ -16,18 +16,22 @@
 // 0 == particles grouped by strand, i.e. root, root+1, root, root+1
 // 1 == particles grouped by index, i.e. root, root, root+1, root+1
 
+#pragma multi_compile __ STAGING_COMPRESSION
+// 0 == staging data full precision
+// 1 == staging data compressed
+
 #pragma multi_compile __ APPLY_VOLUME_IMPULSE
 // 0 == mute volume impulse, by default the case for secondary substeps (unless application is forced)
 // 1 == apply volume impulses, always the case for first substep
 
-#pragma multi_compile __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
+//#pragma multi_compile __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
 #pragma multi_compile __ ENABLE_DISTANCE
 #pragma multi_compile __ ENABLE_DISTANCE_LRA
 #pragma multi_compile __ ENABLE_DISTANCE_FTL
-#pragma multi_compile __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
+//#pragma multi_compile __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
 #pragma multi_compile __ ENABLE_POSE_LOCAL_BEND_TWIST
 #pragma multi_compile __ ENABLE_POSE_GLOBAL_POSITION
-#pragma multi_compile __ ENABLE_POSE_GLOBAL_ROTATION
+//#pragma multi_compile __ ENABLE_POSE_GLOBAL_ROTATION
 
 #ifndef ENABLE_BOUNDARY
 #define ENABLE_BOUNDARY 0
@@ -62,10 +66,6 @@
 #ifndef ENABLE_POSE_GLOBAL_ROTATION
 #define ENABLE_POSE_GLOBAL_ROTATION 0
 #endif
-
-#pragma multi_compile __ STAGING_COMPRESSION
-// 0 == staging data full precision
-// 1 == staging data compressed
 
 #ifndef STAGING_COMPRESSION
 #define STAGING_COMPRESSION 0
