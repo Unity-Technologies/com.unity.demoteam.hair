@@ -3,7 +3,7 @@
 
 using System;
 using UnityEngine;
-using UnityEngine.Rendering;
+using UnityEngine.Profiling;
 using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -595,9 +595,7 @@ namespace Unity.DemoTeam.Hair
 				foreach (var clusterMap in clusterMaps)
 				{
 					if (clusterMap == null || clusterMap.isReadable == false)
-					{
 						continue;
-					}
 
 					// find clusters
 					var cluster = -1;
@@ -606,20 +604,20 @@ namespace Unity.DemoTeam.Hair
 					clusterLookup.Clear();
 
 #if true
-					using (var connectedClusters = new ConnectedComponentsImage(clusterMap, Allocator.Temp))
+					using (var clusterMapLabels = new ConnectedComponentLabels(clusterMap, Allocator.Temp))
 					{
-						Debug.Log("found " + connectedClusters.clusterCount + " connected clusters in " + clusterMap.name);
+						Debug.Log("found " + clusterMapLabels.labelCount + " connected components in " + clusterMap.name);
 
 						for (int i = 0; i != strandCount; i++)
 						{
 							var x = Mathf.RoundToInt(strandGroup.rootUV[i].x * (clusterMap.width - 1));
 							var y = Mathf.RoundToInt(strandGroup.rootUV[i].y * (clusterMap.height - 1));
-							var id = connectedClusters.GetComponentID(x, y);
 
-							if (clusterLookup.TryGetValue(id, out cluster) == false)
+							var clusterLabel = clusterMapLabels.GetPixelLabel(x, y);
+							if (clusterLookup.TryGetValue(clusterLabel, out cluster) == false)
 							{
 								cluster = clusterCount++;
-								clusterLookup.Add(id, cluster);
+								clusterLookup.Add(clusterLabel, cluster);
 							}
 
 							strandClusterPtr[i] = cluster;
@@ -1454,45 +1452,51 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public unsafe struct ConnectedComponentsImage : IDisposable
+		public unsafe struct ConnectedComponentLabels : IDisposable
 		{
-			public int idDimX;
-			public int idDimY;
+			public int dimX;
+			public int dimY;
 
-			public NativeArray<uint> idBuffer;
-			public uint* idBufferPtr;
+			public NativeArray<uint> labelImage;
+			public uint* labelImagePtr;
+			public uint labelCount;
 
-			public uint clusterCount;
-
-			public ConnectedComponentsImage(Texture2D texture, Allocator allocator)
+			public ConnectedComponentLabels(Texture2D texture, Allocator allocator)
 			{
-				idDimX = texture.width;
-				idDimY = texture.height;
+				dimX = texture.width;
+				dimY = texture.height;
 
-				idBuffer = new NativeArray<uint>(idDimX * idDimY, allocator, NativeArrayOptions.ClearMemory);
-				idBufferPtr = (uint*)idBuffer.GetUnsafePtr();
-
-				clusterCount = 0;
+				labelImage = new NativeArray<uint>(dimX * dimY, allocator, NativeArrayOptions.UninitializedMemory);
+				labelImagePtr = (uint*)labelImage.GetUnsafePtr();
+				labelCount = 0;
 
 				var texelData = texture.GetRawTextureData<byte>();
 				var texelDataPtr = (byte*)texelData.GetUnsafePtr();
 
-				var texelCount = idDimX * idDimY;
+				var texelCount = dimX * dimY;
 				var texelSize = texelData.Length / texelCount;
 
 				var texelBG = new NativeArray<byte>(texelSize, Allocator.Temp, NativeArrayOptions.ClearMemory);
 				var texelBGPtr = (byte*)texelBG.GetUnsafePtr();
 
-				// identify matching neighbouring texels
-				var texelAdjacency = new LinkedIndexListArray(texelCount, 16 * texelCount, Allocator.Temp);
+				// discover adjacency of matching texels
+				Profiler.BeginSample("discover adjacency");
+				var texelAdjacency = new UnsafeAdjacency(texelCount, 16 * texelCount, Allocator.Temp);
 				{
-					void CompareAndConnect(ref LinkedIndexListArray adjacency, byte* valueBasePtr, byte* valueSkipPtr, int valueSize, int indexA, int indexB)
+					bool CompareEquals(byte* ptrA, byte* ptrB, int count)
 					{
-						if (UnsafeUtility.MemCmp(valueSkipPtr, valueBasePtr + valueSize * indexA, valueSize) == 0 ||
-							UnsafeUtility.MemCmp(valueSkipPtr, valueBasePtr + valueSize * indexB, valueSize) == 0)
-							return;
+						for (int i = 0; i != count; i++)
+						{
+							if (ptrA[i] != ptrB[i])
+								return false;
+						}
 
-						if (UnsafeUtility.MemCmp(valueBasePtr + valueSize * indexA, valueBasePtr + valueSize * indexB, valueSize) == 0)
+						return true;
+					};
+
+					void CompareAndConnect(ref UnsafeAdjacency adjacency, byte* valueBasePtr, int valueSize, int indexA, int indexB)
+					{
+						if (CompareEquals(valueBasePtr + valueSize * indexA, valueBasePtr + valueSize * indexB, valueSize))
 						{
 							adjacency.Append(indexA, indexB);
 							adjacency.Append(indexB, indexA);
@@ -1501,75 +1505,104 @@ namespace Unity.DemoTeam.Hair
 
 					// a b c
 					// d e <-- 'e' is sweep index at (x, y)
-					for (int y = 0; y != idDimY; y++)
+					for (int y = 0; y != dimY; y++)
 					{
-						int ym = (y - 1 + idDimY) % idDimY;
-						int yp = (y + 1) % idDimY;
+						int ym = (y - 1 + dimY) % dimY;
+						int yp = (y + 1) % dimY;
 
-						for (int x = 0; x != idDimX; x++)
+						for (int x = 0; x != dimX; x++)
 						{
-							int xm = (x - 1 + idDimX) % idDimX;
-							int xp = (x + 1) % idDimX;
+							int xm = (x - 1 + dimX) % dimX;
+							int xp = (x + 1) % dimX;
 
-							int i_a = idDimX * ym + xm;
-							int i_b = idDimX * ym + x;
-							int i_c = idDimX * ym + xp;
-							int i_d = idDimX * y + xm;
-							int i_e = idDimX * y + x;
+							int i_a = dimX * ym + xm;
+							int i_b = dimX * ym + x;
+							int i_c = dimX * ym + xp;
+							int i_d = dimX * y + xm;
+							int i_e = dimX * y + x;
 
-							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelBGPtr, texelSize, i_e, i_a);
-							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelBGPtr, texelSize, i_e, i_b);
-							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelBGPtr, texelSize, i_e, i_c);
-							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelBGPtr, texelSize, i_e, i_d);
+							// skip background texels
+							if (CompareEquals(texelBGPtr, texelDataPtr + texelSize * i_e, texelSize))
+								continue;
+
+							// 8-way connected clusters
+							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelSize, i_e, i_a);
+							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelSize, i_e, i_b);
+							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelSize, i_e, i_c);
+							CompareAndConnect(ref texelAdjacency, texelDataPtr, texelSize, i_e, i_d);
 						}
 					}
 				}
+				Profiler.EndSample();
 
-				// identify connected clusters
+				// discover connected clusters
+				Profiler.BeginSample("discover clusters");
 				using (var texelVisitor = new UnsafeBFS(texelCount, Allocator.Temp))
 				{
-					uint texelClusterID = 0;
-
 					for (int i = 0; i != texelCount; i++)
 					{
+						// skip texel if already visited
 						if (texelVisitor.visitedPtr[i])
+							continue;
+
+						// begin new cluster
+						labelCount++;
+
+						// visit texels
+						if (texelAdjacency.listsPtr[i].size > 0)
 						{
-							continue;// skip texels that we've already visited
-						}
+							texelVisitor.Insert(i);
 
-						texelClusterID++;
-						texelVisitor.Insert(i);
-
-						while (texelVisitor.MoveNext(out int visitedIndex, out int visitedDepth))
-						{
-							idBufferPtr[visitedIndex] = texelClusterID;
-
-							foreach (var adjacentIndex in texelAdjacency[visitedIndex])
+							while (texelVisitor.MoveNext(out int visitedIndex, out int visitedDepth))
 							{
-								texelVisitor.Insert(adjacentIndex);
+								foreach (var adjacentIndex in texelAdjacency[visitedIndex])
+								{
+									texelVisitor.Insert(adjacentIndex);
+								}
+
+								labelImagePtr[visitedIndex] = labelCount;
 							}
 						}
-					}
+						else
+						{
+							texelVisitor.Ignore(i);
 
-					clusterCount = texelClusterID;
+							labelImagePtr[i] = labelCount;
+						}
+					}
 				}
+				Profiler.EndSample();
 
 				// done
 				texelAdjacency.Dispose();
 				texelBG.Dispose();
 			}
 
-			public uint GetComponentID(int x, int y)
+			public uint GetLabelCount()
 			{
-				if (x < 0 || y < 0 || x > idDimX - 1 || y > idDimY - 1)
-					Debug.Log("out of bounds ("+x+", "+y+")");
+				return labelCount;
+			}
 
-				return idBufferPtr[x + y * idDimX];
+			public uint GetPixelLabel(int x, int y)
+			{
+				int Wrap(int a, int n)
+				{
+					int r = a % n;
+					if (r < 0)
+						return r + n;
+					else
+						return r;
+				}
+
+				x = Wrap(x, dimX);
+				y = Wrap(y, dimY);
+
+				return labelImagePtr[x + y * dimX];
 			}
 
 			public void Dispose()
 			{
-				idBuffer.Dispose();
+				labelImage.Dispose();
 			}
 		}
 	}

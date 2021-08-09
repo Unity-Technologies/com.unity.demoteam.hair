@@ -6,8 +6,8 @@ namespace Unity.DemoTeam.Hair
 {
 	public unsafe struct UnsafeDFS : IDisposable
 	{
-		public int nodeIndex;
-		public int nodeDepth;
+		public int currentNodeIndex;
+		public int currentNodeDepth;
 
 		public NativeArray<ulong> pending;// pending[i] == (nodeDepth << 32) | nodeIndex
 		public ulong* pendingPtr;
@@ -18,8 +18,8 @@ namespace Unity.DemoTeam.Hair
 
 		public UnsafeDFS(int nodeCount, Allocator allocator)
 		{
-			nodeIndex = -1;
-			nodeDepth = -1;
+			currentNodeIndex = -1;
+			currentNodeDepth = -1;
 
 			pending = new NativeArray<ulong>(nodeCount, allocator, NativeArrayOptions.UninitializedMemory);
 			pendingPtr = (ulong*)pending.GetUnsafePtr();
@@ -35,10 +35,10 @@ namespace Unity.DemoTeam.Hair
 			visited.Dispose();
 		}
 
-		public void Reset()
+		public void Clear()
 		{
-			nodeIndex = -1;
-			nodeDepth = -1;
+			currentNodeIndex = -1;
+			currentNodeDepth = -1;
 
 			pendingHead = 0;
 
@@ -56,9 +56,9 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			ulong packedIndex = (ulong)nodeIndex;
-			ulong packedDepth = (ulong)(nodeDepth + 1) << 32;
+			ulong packedDepth = (ulong)(currentNodeDepth + 1) << 32;
 
-			pendingPtr[++pendingHead] = packedDepth | packedIndex;
+			pendingPtr[pendingHead++] = packedDepth | packedIndex;
 			visitedPtr[nodeIndex] = true;
 		}
 
@@ -67,14 +67,14 @@ namespace Unity.DemoTeam.Hair
 			if (pendingHead > 0)
 			{
 				ulong packed = pendingPtr[--pendingHead];
-				this.nodeIndex = nodeIndex = (int)(packed & 0xffffffffuL);
-				this.nodeDepth = nodeDepth = (int)(packed >> 32);
+				nodeIndex = currentNodeIndex = (int)(packed & 0xffffffffuL);
+				nodeDepth = currentNodeDepth = (int)(packed >> 32);
 				return true;
 			}
 			else
 			{
-				this.nodeIndex = nodeIndex = -1;
-				this.nodeDepth = nodeDepth = -1;
+				nodeIndex = currentNodeIndex = -1;
+				nodeDepth = currentNodeDepth = -1;
 				return false;
 			}
 		}

@@ -6,7 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Unity.DemoTeam.Hair
 {
-	public unsafe struct LinkedIndexListArray : IDisposable
+	public unsafe struct UnsafeAdjacency : IDisposable
 	{
 		public struct LinkedIndexList
 		{
@@ -24,19 +24,19 @@ namespace Unity.DemoTeam.Hair
 		public NativeArray<LinkedIndexList> lists;
 		public LinkedIndexList* listsPtr;
 
-		public NativeList<LinkedIndexItem> items;
+		public UnsafeList<LinkedIndexItem> items;
 		public LinkedIndexItem* itemsPtr;
 
 		public int listCount;
 		public int itemCount;
 
-		public LinkedIndexListArray(int listCapacity, int itemCapacity, Allocator allocator)
+		public UnsafeAdjacency(int listCapacity, int itemCapacity, Allocator allocator)
 		{
 			lists = new NativeArray<LinkedIndexList>(listCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 			listsPtr = (LinkedIndexList*)lists.GetUnsafePtr();
 
-			items = new NativeList<LinkedIndexItem>(itemCapacity, allocator);
-			itemsPtr = (LinkedIndexItem*)items.GetUnsafePtr();
+			items = new UnsafeList<LinkedIndexItem>(itemCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+			itemsPtr = (LinkedIndexItem*)items.Ptr;
 
 			listCount = lists.Length;
 			itemCount = 0;
@@ -64,10 +64,10 @@ namespace Unity.DemoTeam.Hair
 
 		public void Append(int listIndex, int value)
 		{
-			if (itemCount == items.Length)
+			if (itemCount == items.Capacity)
 			{
 				items.Resize(itemCount * 2, NativeArrayOptions.UninitializedMemory);
-				itemsPtr = (LinkedIndexItem*)items.GetUnsafePtr();
+				itemsPtr = (LinkedIndexItem*)items.Ptr;
 			}
 
 			int headIndex = listsPtr[listIndex].head;
@@ -207,7 +207,7 @@ namespace Unity.DemoTeam.Hair
 				else
 				{
 					itemIndex = itemsPtr[itemIndex].next;
-					return (itemIndex != headIndex);// stop once we've reached head again
+					return (itemIndex != headIndex);// stop if we've come full circle
 				}
 			}
 

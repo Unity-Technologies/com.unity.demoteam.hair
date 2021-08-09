@@ -103,7 +103,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		static void SortWithinNode(Leaf* leafPtr, int leafCount, UnsafeBVH.Node* nodePtr)
+		static void SortWithinNode(Leaf* leafPtr, int leafCount, Node* nodePtr)
 		{
 			var size = abs(nodePtr->data.max - nodePtr->data.min);
 			if (size.x >= size.y && size.x >= size.z)
@@ -114,7 +114,7 @@ namespace Unity.DemoTeam.Hair
 				NativeSortExtension.Sort(leafPtr, leafCount, leafComparerZ);
 		}
 
-		static void SplitWithinNode(Leaf* leafPtr, int leafCount, UnsafeBVH.Node* nodePtr, out int leafCountL, out int leafCountR)
+		static void SplitWithinNode(Leaf* leafPtr, int leafCount, Node* nodePtr, out int leafCountL, out int leafCountR)
 		{
 			SortWithinNode(leafPtr, leafCount, nodePtr);
 
@@ -124,7 +124,7 @@ namespace Unity.DemoTeam.Hair
 			//TODO sah?
 		}
 
-		static UnsafeBVH.Node* BuildNode(ref UnsafeBVH.Node* nodeWritePtr, Leaf* leafPtr, int leafCount)
+		static Node* BuildNode(ref Node* nodeWritePtr, Leaf* leafPtr, int leafCount)
 		{
 			var nodePtr = nodeWritePtr++;
 
@@ -180,7 +180,7 @@ namespace Unity.DemoTeam.Hair
 			return bestIndex;
 		}
 
-		static void FindClosestLeaf<T>(in T context, UnsafeBVH.Node* nodePtr, in float3 p, float* bestDistPtr, uint* bestIndexPtr) where T : IUnsafeBVHContext
+		static void FindClosestLeaf<T>(in T context, Node* nodePtr, in float3 p, float* bestDistPtr, uint* bestIndexPtr) where T : IUnsafeBVHContext
 		{
 			if (nodePtr->Contains(p))
 			{
