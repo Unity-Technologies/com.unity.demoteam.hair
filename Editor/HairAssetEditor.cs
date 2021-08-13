@@ -22,7 +22,7 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _settingsBasic_material;
 		SerializedProperty _settingsBasic_kLODClusters;
 		SerializedProperty _settingsBasic_kLODClustersProvider;
-		SerializedProperty _settingsBasic_kLODClustersPyramid;
+		SerializedProperty _settingsBasic_kLODClustersHighLOD;
 		SerializedProperty _settingsAlembic;
 		SerializedProperty _settingsProcedural;
 		SerializedProperty _settingsProcedural_placement;
@@ -66,21 +66,21 @@ namespace Unity.DemoTeam.Hair
 				previewRenderer.lights[i].enabled = false;
 			}
 
-			_settingsBasic = serializedObject.FindProperty("settingsBasic");
-			_settingsBasic_type = _settingsBasic.FindPropertyRelative("type");
-			_settingsBasic_kLODClusters = _settingsBasic.FindPropertyRelative("kLODClusters");
-			_settingsBasic_kLODClustersProvider = _settingsBasic.FindPropertyRelative("kLODClustersProvider");
-			_settingsBasic_kLODClustersPyramid = _settingsBasic.FindPropertyRelative("kLODClustersPyramid");
-			_settingsBasic_material = _settingsBasic.FindPropertyRelative("material");
-			_settingsAlembic = serializedObject.FindProperty("settingsAlembic");
-			_settingsProcedural = serializedObject.FindProperty("settingsProcedural");
-			_settingsProcedural_placement = _settingsProcedural.FindPropertyRelative("placement");
-			_settingsLODGenerated = serializedObject.FindProperty("settingsLODGenerated");
-			_settingsLODUVMapped = serializedObject.FindProperty("settingsLODUVMapped");
-			_settingsLODPyramid = serializedObject.FindProperty("settingsLODPyramid");
+			_settingsBasic = serializedObject.FindProperty(nameof(HairAsset.settingsBasic));
+			_settingsBasic_type = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.type));
+			_settingsBasic_kLODClusters = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClusters));
+			_settingsBasic_kLODClustersProvider = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClustersProvider));
+			_settingsBasic_kLODClustersHighLOD = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClustersHighLOD));
+			_settingsBasic_material = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.material));
+			_settingsAlembic = serializedObject.FindProperty(nameof(HairAsset.settingsAlembic));
+			_settingsProcedural = serializedObject.FindProperty(nameof(HairAsset.settingsProcedural));
+			_settingsProcedural_placement = _settingsProcedural.FindPropertyRelative(nameof(HairAsset.settingsProcedural.placement));
+			_settingsLODGenerated = serializedObject.FindProperty(nameof(HairAsset.settingsLODGenerated));
+			_settingsLODUVMapped = serializedObject.FindProperty(nameof(HairAsset.settingsLODUVMapped));
+			_settingsLODPyramid = serializedObject.FindProperty(nameof(HairAsset.settingsLODPyramid));
 
-			_strandGroups = serializedObject.FindProperty("strandGroups");
-			_strandGroupsAutoBuild = serializedObject.FindProperty("strandGroupsAutoBuild");
+			_strandGroups = serializedObject.FindProperty(nameof(HairAsset.strandGroups));
+			_strandGroupsAutoBuild = serializedObject.FindProperty(nameof(HairAsset.strandGroupsAutoBuild));
 		}
 
 		void OnDisable()
@@ -243,7 +243,7 @@ namespace Unity.DemoTeam.Hair
 					EditorGUILayout.Space();
 
 					var clustersProvider = (HairAsset.LODClusters)_settingsBasic_kLODClustersProvider.enumValueIndex;
-					var clustersPyramid = _settingsBasic_kLODClustersPyramid.boolValue;
+					var clustersSubdivided = _settingsBasic_kLODClustersHighLOD.boolValue;
 
 					switch (clustersProvider)
 					{
@@ -256,7 +256,7 @@ namespace Unity.DemoTeam.Hair
 							break;
 					}
 
-					if (clustersPyramid)
+					if (clustersSubdivided)
 					{
 						using (new EditorGUI.IndentLevelScope())
 						{

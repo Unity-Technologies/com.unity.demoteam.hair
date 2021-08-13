@@ -44,7 +44,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem, Tooltip("Choose how to build base level clusters")]
 			public LODClusters kLODClustersProvider;
 			[ToggleGroupItem(withLabel = true), Tooltip("Enable subdivision of base level clusters (to generate upper LODs)")]
-			public bool kLODClustersPyramid;
+			public bool kLODClustersHighLOD;
 
 			public static readonly SettingsBasic defaults = new SettingsBasic()
 			{
@@ -53,7 +53,7 @@ namespace Unity.DemoTeam.Hair
 				material = null,
 				kLODClusters = false,
 				kLODClustersProvider = LODClusters.Generated,
-				kLODClustersPyramid = false,
+				kLODClustersHighLOD = false,
 			};
 		}
 
@@ -223,29 +223,6 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
-		// TOPIC: Clumping/LOD
-		//
-		//		.--- simulated ---.  .------- interpolated --------.
-		//		g  g  g  g  g  g  g  f  f  f  f  f  f  f  f  f  f  f
-		//		----->-----> ordering ----->----->----->----->----->
-		//
-		// Per-LOD data
-		//		_LODGuideCount -> num. guides
-		//		_LODGuideIndex[strandIndex_f] -> strandIndex_g
-		//
-		// Enable LOD
-		//		LOD 0 = all strands / guides from texture / guides from generator (from all strands)
-		//		LOD 1 = guides from texture / guides from generator (from LOD 0)
-		//		LOD 2 = guides from texture / guides from generator (from LOD 1)
-		//		LOD x = guides from generator(LOD x-1)
-		//
-		// LOD From Texture
-		//		Simulated Guide Index Map
-		//		[Info: Asset must be set up to resolve root UVs]
-		//
-		// LOD From Generator
-		//		Guide Root Separation
-
 		[Serializable]
 		public struct SettingsLODGenerated
 		{
@@ -257,8 +234,8 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Base LOD")]
 
-			[Range(0.0f, 1.0f)]
-			public float baseLOD;
+			[Range(0.0f, 1.0f), Tooltip("Number of generated clusters as fraction of all strands")]
+			public float baseLODClusterQuantity;
 			public ClusterSelection baseLODClusterSelection;
 			[VisibleIf(nameof(baseLODClusterSelection), ClusterSelection.RandomPointsOnMesh)]
 			public Mesh baseLODClusterSelectionMesh;
@@ -266,7 +243,7 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SettingsLODGenerated defaults = new SettingsLODGenerated()
 			{
-				baseLOD = 0.1f,
+				baseLODClusterQuantity = 0.1f,
 				baseLODClusterSelection = ClusterSelection.RandomPointsInVolume,
 				baseLODClusterSelectionMesh = null,
 				baseLODClusterIterations = 1,
@@ -276,36 +253,38 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsLODUVMapped
 		{
+			public enum ClusterMapFormat
+			{
+				OneClusterPerColor,
+				OneClusterPerColorCluster,
+			}
+
 			[LineHeader("Base LOD")]
 
+			public ClusterMapFormat baseLODClusterMapFormat;
 			[NonReorderable]
-			public Texture2D[] baseLODClusterMaps;
+			public Texture2D[] baseLODClusterMapChain;
 
 			public static readonly SettingsLODUVMapped defaults = new SettingsLODUVMapped()
 			{
-				baseLODClusterMaps = null,
+				baseLODClusterMapFormat = ClusterMapFormat.OneClusterPerColor,
+				baseLODClusterMapChain = null,
 			};
 		}
 
 		[Serializable]
 		public struct SettingsLODPyramid
 		{
-			public enum HighLOD
-			{
-				AllStrands,
-				FractionOfStrands,
-			}
-
-			[LineHeader("High LOD Pyramid")]
+			[LineHeader("High LOD")]
 
 			[Range(0.0f, 1.0f)]
-			public float highLOD;
+			public float highLODClusterQuantity;
 			[Range(0, 10)]
 			public int highLODIntermediateLevels;
 
 			public static readonly SettingsLODPyramid defaults = new SettingsLODPyramid()
 			{
-				highLOD = 1.0f,
+				highLODClusterQuantity = 1.0f,
 				highLODIntermediateLevels = 0,
 			};
 		}

@@ -25,15 +25,15 @@ namespace Unity.DemoTeam.Hair
 
 		void OnEnable()
 		{
-			_hairAsset = serializedObject.FindProperty("hairAsset");
-			_hairAssetQuickEdit = serializedObject.FindProperty("hairAssetQuickEdit");
+			_hairAsset = serializedObject.FindProperty(nameof(HairInstance.hairAsset));
+			_hairAssetQuickEdit = serializedObject.FindProperty(nameof(HairInstance.hairAssetQuickEdit));
 
-			_settingsRoots = serializedObject.FindProperty("settingsRoots");
-			_settingsStrands = serializedObject.FindProperty("settingsStrands");
+			_settingsRoots = serializedObject.FindProperty(nameof(HairInstance.settingsRoots));
+			_settingsStrands = serializedObject.FindProperty(nameof(HairInstance.settingsStrands));
 
-			_settingsSolver = serializedObject.FindProperty("solverSettings");
-			_settingsVolume = serializedObject.FindProperty("volumeSettings");
-			_settingsDebug = serializedObject.FindProperty("debugSettings");
+			_settingsSolver = serializedObject.FindProperty(nameof(HairInstance.solverSettings));
+			_settingsVolume = serializedObject.FindProperty(nameof(HairInstance.volumeSettings));
+			_settingsDebug = serializedObject.FindProperty(nameof(HairInstance.debugSettings));
 		}
 
 		void OnDisable()
