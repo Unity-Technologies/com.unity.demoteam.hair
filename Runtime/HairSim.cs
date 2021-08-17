@@ -35,6 +35,7 @@ namespace Unity.DemoTeam.Hair
 		static class MarkersGPU
 		{
 			public static ProfilingSampler Solver;
+			public static ProfilingSampler Solver_Interpolate;
 			public static ProfilingSampler Solver_Staging;
 			public static ProfilingSampler Volume;
 			public static ProfilingSampler Volume_0_Clear;
@@ -124,6 +125,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KSolveConstraints_Jacobi_32;
 			public static int KSolveConstraints_Jacobi_64;
 			public static int KSolveConstraints_Jacobi_128;
+			public static int KInterpolate;
 			public static int KStaging;
 			public static int KStagingSubdivision;
 		}
@@ -541,14 +543,14 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static bool PrepareSolverStaging(ref SolverData solverData, bool stagingCompression, uint stagingSubdivisions)
+		public static bool PrepareSolverStaging(ref SolverData solverData, bool stagingCompression, uint stagingSubdivision)
 		{
 			unsafe
 			{
 				bool changed = false;
 
 				var segmentCount = solverData.cbuffer._StrandParticleCount - 1;
-				var segmentCountStaging = segmentCount * (1 + stagingSubdivisions);
+				var segmentCountStaging = segmentCount * (1 + stagingSubdivision);
 
 				var vertexCount = (int)(solverData.cbuffer._StrandCount * (segmentCountStaging + 1));
 				var vertexStridePosition = stagingCompression ? sizeof(Vector2) : sizeof(Vector3);
@@ -557,7 +559,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverData.stagingPositionPrev, "StagingPosition_1", vertexCount, vertexStridePosition);
 
 				changed |= (solverData.cbuffer._StagingVertexCount == 0);
-				changed |= (solverData.cbuffer._StagingSubdivisions != stagingSubdivisions);
+				changed |= (solverData.cbuffer._StagingSubdivision != stagingSubdivision);
 
 				return changed;
 			}
@@ -627,6 +629,9 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref solverData.lodGuideCount);
 			ReleaseBuffer(ref solverData.lodGuideIndex);
+
+			if (solverData.lodGuideCountCPU.IsCreated)
+				solverData.lodGuideCountCPU.Dispose();
 
 			if (solverData.lodThreshold.IsCreated)
 				solverData.lodThreshold.Dispose();
@@ -817,20 +822,9 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, solverData.cbufferStorage, cbuffer);
 		}
 
-		//public struct ReverseFloatComparer : System.Collections.Generic.IComparer<float>
-		//{
-		//	public int Compare(float x, float y) => y.CompareTo(x);
-		//}
-
 		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, float lodValue, bool lodBlending)
 		{
 			ref var cbuffer = ref solverData.cbuffer;
-
-			//Debug.Log("seeking lodValue " + lodValue);
-			//for (int i = 0; i != solverData.lodCount; i++)
-			//{
-			//	Debug.Log("lodThreshold[" + i + "] = " + solverData.lodThreshold[i]);
-			//}
 
 			// derive constants
 			var lodIndexHi = solverData.lodThreshold.BinarySearch(lodValue);
@@ -842,28 +836,27 @@ namespace Unity.DemoTeam.Hair
 				lodIndexHi = ~lodIndexHi;
 				lodIndexLo = Mathf.Max(0, lodIndexHi - 1);
 
-				//Debug.Log("lodIndexLo " + lodIndexLo + ", lodIndexHi " + lodIndexHi);
-
 				var lodValueLo = solverData.lodThreshold[lodIndexLo];
 				var lodValueHi = solverData.lodThreshold[lodIndexHi];
-
-				lodBlendFrac = (lodValueLo != lodValueHi) ? Mathf.Clamp01((lodValue - lodValueLo) / (lodValueHi - lodValueLo)) : 0.0f;
-
-				//Debug.Log("lodIndexLo " + lodIndexLo + ", lodIndexHi " + lodIndexHi + ", lodBlendFrac " + lodBlendFrac);
+				{
+					lodBlendFrac = (lodValueLo != lodValueHi) ? Mathf.Clamp01((lodValue - lodValueLo) / (lodValueHi - lodValueLo)) : 0.0f;
+				}
 			}
 
 			if (lodBlending)
 			{
 				cbuffer._LODIndexLo = (uint)lodIndexLo;
 				cbuffer._LODIndexHi = (uint)lodIndexHi;
-				cbuffer._LODBlendFrac = lodBlendFrac;
+				cbuffer._LODBlendFraction = lodBlendFrac;
 			}
 			else
 			{
-				cbuffer._LODIndexLo = (lodBlendFrac > 0.5f) ? (uint)lodIndexHi : (uint)lodIndexLo;
+				cbuffer._LODIndexLo = (uint)((lodBlendFrac > 0.5f) ? lodIndexHi : lodIndexLo);
 				cbuffer._LODIndexHi = cbuffer._LODIndexLo;
-				cbuffer._LODBlendFrac = 0.0f;
+				cbuffer._LODBlendFraction = 0.0f;
 			}
+
+			cbuffer._SolverStrandCount = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexHi];
 
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
@@ -896,7 +889,7 @@ namespace Unity.DemoTeam.Hair
 			var segmentCountStaging = segmentCount * (1 + stagingSubdivisions);
 
 			cbuffer._StagingVertexCount = segmentCountStaging + 1;
-			cbuffer._StagingSubdivisions = stagingSubdivisions;
+			cbuffer._StagingSubdivision = stagingSubdivisions;
 
 			// derive keywords
 			keywords.STAGING_COMPRESSION = stagingCompression;
@@ -909,7 +902,7 @@ namespace Unity.DemoTeam.Hair
 			int numY = 1;
 			int numZ = 1;
 
-			int kernelStaging = (cbuffer._StagingSubdivisions == 0)
+			int kernelStaging = (cbuffer._StagingSubdivision == 0)
 				? SolverKernels.KStaging
 				: SolverKernels.KStagingSubdivision;
 
@@ -1140,7 +1133,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void StepSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in VolumeData volumeData)
 		{
-			int numX = (int)solverData.cbuffer._StrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._StrandCount % PARTICLE_GROUP_SIZE);
+			int numX = (int)solverData.cbuffer._SolverStrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._SolverStrandCount % PARTICLE_GROUP_SIZE);
 			int numY = 1;
 			int numZ = 1;
 
@@ -1175,7 +1168,7 @@ namespace Unity.DemoTeam.Hair
 							kernelSolveConstraints = SolverKernels.KSolveConstraints_Jacobi_128;
 							break;
 					}
-					numX = (int)solverData.cbuffer._StrandCount;
+					numX = (int)solverData.cbuffer._SolverStrandCount;
 					break;
 			}
 
@@ -1196,6 +1189,20 @@ namespace Unity.DemoTeam.Hair
 
 					// volume impulse is only applied for first substep
 					solverData.keywords.APPLY_VOLUME_IMPULSE = false;
+				}
+			}
+
+			var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
+			if (interpolateStrandCount > 0)
+			{
+				using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
+				{
+					numX = (int)interpolateStrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)interpolateStrandCount % PARTICLE_GROUP_SIZE);
+					numY = 1;
+					numZ = 1;
+
+					BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolate, solverData);
+					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, numX, numY, numZ);
 				}
 			}
 		}

@@ -284,10 +284,10 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				if (GUILayout.Button("Reset simulation"))
-				{
-					hairInstance.ResetSimulationState();
-				}
+				//if (GUILayout.Button("Reset simulation"))
+				//{
+				//	hairInstance.ResetSimulationState();
+				//}
 			}
 
 			if (EditorGUI.EndChangeCheck())

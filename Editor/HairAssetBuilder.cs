@@ -620,45 +620,49 @@ namespace Unity.DemoTeam.Hair
 #endif
 			}
 
-			// build remapping tables from final set of cluster
-			using (var remapping = new ClusterRemapping(lodChain.clusterSet, Allocator.Temp))
+			// build remapping tables from final cluster set
+			var remappingRequired = (lodChain.lodCount > 1 || lodChain.clusterSet.clusterCount < strandCount);
+			if (remappingRequired)
 			{
-				// apply to strands
-				remapping.ApplyShuffle(strandGroup.rootUV, 0, 1, strandCount);
-				remapping.ApplyShuffle(strandGroup.rootScale, 0, 1, strandCount);
-				remapping.ApplyShuffle(strandGroup.rootPosition, 0, 1, strandCount);
-				remapping.ApplyShuffle(strandGroup.rootDirection, 0, 1, strandCount);
-
-				switch (strandGroup.particleMemoryLayout)
+				using (var remapping = new ClusterRemapping(lodChain.clusterSet, Allocator.Temp))
 				{
-					case HairAsset.MemoryLayout.Sequential:
-						for (int i = 0; i != strandParticleCount; i++)
-						{
-							remapping.ApplyShuffle(strandGroup.particlePosition,
-								attrOffset: i,
-								attrStride: strandParticleCount,
-								attrCount: strandCount);
-						}
-						break;
+					// apply to strands
+					remapping.ApplyShuffle(strandGroup.rootUV, 0, 1, strandCount);
+					remapping.ApplyShuffle(strandGroup.rootScale, 0, 1, strandCount);
+					remapping.ApplyShuffle(strandGroup.rootPosition, 0, 1, strandCount);
+					remapping.ApplyShuffle(strandGroup.rootDirection, 0, 1, strandCount);
 
-					case HairAsset.MemoryLayout.Interleaved:
-						for (int i = 0; i != strandParticleCount; i++)
-						{
-							remapping.ApplyShuffle(strandGroup.particlePosition,
-								attrOffset: i * strandCount,
-								attrStride: 1,
-								attrCount: strandCount);
-						}
-						break;
+					switch (strandGroup.particleMemoryLayout)
+					{
+						case HairAsset.MemoryLayout.Sequential:
+							for (int i = 0; i != strandParticleCount; i++)
+							{
+								remapping.ApplyShuffle(strandGroup.particlePosition,
+									attrOffset: i,
+									attrStride: strandParticleCount,
+									attrCount: strandCount);
+							}
+							break;
+
+						case HairAsset.MemoryLayout.Interleaved:
+							for (int i = 0; i != strandParticleCount; i++)
+							{
+								remapping.ApplyShuffle(strandGroup.particlePosition,
+									attrOffset: i * strandCount,
+									attrStride: 1,
+									attrCount: strandCount);
+							}
+							break;
+					}
+
+					for (int i = 0; i != strandGroup.lodCount; i++)
+					{
+						remapping.ApplyShuffle(strandGroup.lodGuideIndex, i * strandCount, 1, strandCount);
+					}
+
+					// apply to indices (since strands have now moved)
+					remapping.ApplyRemapping(strandGroup.lodGuideIndex);
 				}
-
-				for (int i = 0; i != strandGroup.lodCount; i++)
-				{
-					remapping.ApplyShuffle(strandGroup.lodGuideIndex, i * strandCount, 1, strandCount);
-				}
-
-				// apply to indices (since strands have now moved)
-				remapping.ApplyRemapping(strandGroup.lodGuideIndex);
 			}
 
 			// dispose lod chain builder
@@ -732,14 +736,12 @@ namespace Unity.DemoTeam.Hair
 							}
 							break;
 
-						case HairAsset.SettingsLODUVMapped.ClusterMapFormat.OneClusterPerColorCluster:
+						case HairAsset.SettingsLODUVMapped.ClusterMapFormat.OneClusterPerVisualCluster:
 							{
 								clusterLookupLabel.Clear();
 
 								using (var clusterMapLabels = new Texture2DLabels(clusterMap, clusterMap.wrapMode, Allocator.Temp))
 								{
-									//Debug.Log("found " + clusterMapLabels.labelCount + " connected components in " + clusterMap.name);
-
 									for (int i = 0; i != strandCount; i++)
 									{
 										var x = Mathf.RoundToInt(strandGroup.rootUV[i].x * (clusterMap.width - 1));
@@ -768,7 +770,7 @@ namespace Unity.DemoTeam.Hair
 					// append to chain
 					if (lodChain.TryAppend(clusterSet) == false)
 					{
-						Debug.LogWarningFormat("Skipped '{0}' when building LOD chain.", clusterMap.name, clusterMap);
+						Debug.LogWarningFormat("Skipped '{0}' while building LOD chain.", clusterMap.name, clusterMap);
 					}
 				}
 			}
@@ -1365,7 +1367,7 @@ namespace Unity.DemoTeam.Hair
 							var strandOffset = Vector3.Distance(clusterCenterPtr[cluster], strandGroup.rootPosition[i]);
 
 							//TODO better scoring
-							var strandScore = strandOffset;// / strandLength;// smaller score is better
+							var strandScore = strandOffset / strandLength;// smaller score is better
 							if (strandScore < clusterScorePtr[cluster])
 							{
 								clusterGuidePtr[cluster] = i;
@@ -1444,7 +1446,7 @@ namespace Unity.DemoTeam.Hair
 
 					sortedClusters.Sort();
 
-					// write guides from sorted clusters
+					// write remapping table for guides from sorted clusters
 					for (int i = 0; i != clusters.clusterCount; i++)
 					{
 						var guide = (int)(sortedClustersPtr[i] & 0xffffffffuL);
@@ -1453,19 +1455,42 @@ namespace Unity.DemoTeam.Hair
 							strandRemapDstPtr[guide] = i;
 						}
 					}
+				}
 
-					// write non-guide strands
-					for (int i = 0, j = clusters.clusterCount; i != clusters.strandCount; i++)
+				var remainingCount = clusters.strandCount - clusters.clusterCount;
+				if (remainingCount > 0)
+				{
+					// sort remaining (non-guide) strands by remapped guide first and index second
+					using (var sortedRemaining = new NativeArray<ulong>(remainingCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 					{
-						var guide = clusters.clusterGuidePtr[clusters.strandClusterPtr[i]];
-						if (guide != i)
+						var sortedRemainingPtr = (ulong*)sortedRemaining.GetUnsafePtr();
+
+						for (int i = 0, j = 0; i != clusters.strandCount; i++)
 						{
-							strandRemapSrcPtr[j] = i;
-							strandRemapDstPtr[i] = j++;
+							var guide = clusters.clusterGuidePtr[clusters.strandClusterPtr[i]];
+							if (guide != i)
+							{
+								var sortGuide = (ulong)strandRemapDstPtr[guide] << 32;
+								var sortIndex = (ulong)i;
+								{
+									sortedRemainingPtr[j++] = sortGuide | sortIndex;
+								}
+							}
+						}
+
+						//TODO maybe make it configurable whether/how to sort this data?
+						sortedRemaining.Sort();
+
+						// write remapping table for remaining (non-guide) strands
+						for (int i = 0, j = clusters.clusterCount; i != remainingCount; i++, j++)
+						{
+							var index = (int)(sortedRemainingPtr[i] & 0xffffffffuL);
+							{
+								strandRemapSrcPtr[j] = index;
+								strandRemapDstPtr[index] = j;
+							}
 						}
 					}
-
-					//TODO sort non-guide strands by guide first and index second
 				}
 			}
 
@@ -1520,7 +1545,7 @@ namespace Unity.DemoTeam.Hair
 						attrSize,       // size
 						attrCount);     // count
 
-					// equiv.
+					// copy back equiv.
 					//for (int i = 0; i != attrCount; i++)
 					//{
 					//	var attrDstPtr = attrPtr + attrStride * i;
@@ -1542,11 +1567,6 @@ namespace Unity.DemoTeam.Hair
 			{
 				var attrPtr = (byte*)UnsafeUtility.PinGCArrayAndGetDataAddress(attrBuffer, out ulong gcHandle);
 				var attrSize = UnsafeUtility.SizeOf<T>();
-
-				//Debug.Log("applyShuffle<" + typeof(T).Name + ">");
-				//Debug.Log(" - attrSize " + attrSize);
-				//Debug.Log(" - attrStride " + (attrStride * attrSize));
-				//Debug.Log(" - attrCount " + attrCount);
 
 				ApplyShuffleUntyped(attrPtr + attrOffset * attrSize, attrSize, attrStride * attrSize, attrCount);
 

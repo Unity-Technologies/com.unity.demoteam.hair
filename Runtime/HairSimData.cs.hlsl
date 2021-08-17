@@ -14,15 +14,16 @@ CBUFFER_START(SolverCBuffer)
     float4 _StagingOriginExtentPrev;
     uint _StrandCount;
     uint _StrandParticleCount;
+    uint _SolverStrandCount;
     float _StrandMaxParticleInterval;
     float _StrandMaxParticleWeight;
     float _StrandScale;
     float _StrandDiameter;
     uint _LODIndexLo;
     uint _LODIndexHi;
-    float _LODBlendFrac;
+    float _LODBlendFraction;
     uint _StagingVertexCount;
-    uint _StagingSubdivisions;
+    uint _StagingSubdivision;
     float _DT;
     uint _Iterations;
     float _Stiffness;

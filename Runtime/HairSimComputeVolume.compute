@@ -36,26 +36,8 @@
 #define VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES 0
 #endif
 
-//---------
-// include
-
-#define HAIRSIM_WRITEABLE_VOLUMEDATA 1
-
-#include "HairSimData.hlsl"
-#include "HairSimComputeConfig.hlsl"
-#include "HairSimComputeVolumeUtility.hlsl"
-#include "HairSimComputeSolverQuaternion.hlsl"
-
-//--------
-// macros
-
-#define PARTICLE_NUM_X 64
-#define PARTICLE_NUM_Y 1
-#define PARTICLE_NUM_Z 1
-
-#define VOLUME_NUM_X 8
-#define VOLUME_NUM_Y 8
-#define VOLUME_NUM_Z 1
+//------------------
+// features derived
 
 #if VOLUME_SUPPORT_CONTRACTION
 	#define VOLUME_REST_AT_ZERO					0
@@ -85,6 +67,27 @@
 	#define VOLUME_GHOST_PRESSURE_GRAD			0
 	#define VOLUME_VOF							0
 #endif
+
+//---------
+// include
+
+#define HAIRSIM_WRITEABLE_VOLUMEDATA 1
+
+#include "HairSimData.hlsl"
+#include "HairSimComputeConfig.hlsl"
+#include "HairSimComputeVolumeUtility.hlsl"
+#include "HairSimComputeSolverQuaternion.hlsl"
+
+//--------
+// macros
+
+#define PARTICLE_NUM_X 64
+#define PARTICLE_NUM_Y 1
+#define PARTICLE_NUM_Z 1
+
+#define VOLUME_NUM_X 8
+#define VOLUME_NUM_Y 8
+#define VOLUME_NUM_Z 1
 
 #define CHECK_STRAND_INDEX(x)	\
 	if (x >= _StrandCount) return;

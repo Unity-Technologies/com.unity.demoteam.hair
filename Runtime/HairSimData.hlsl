@@ -15,7 +15,7 @@
 #endif
 
 StructuredBuffer<float2> _RootUV;					// xy: strand root uv
-StructuredBuffer<float> _RootScale;					// x: relative strand length [0..1] (to group maximum)
+StructuredBuffer<float> _RootScale;					// x: relative strand length [0..1] (to maximum within group)
 StructuredBuffer<float4> _RootPosition;				// xyz: strand root position, w: -
 StructuredBuffer<float4> _RootDirection;			// xyz: strand root direction, w: -
 StructuredBuffer<float4> _RootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
@@ -32,13 +32,13 @@ HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;		// xyz: velocity, w: splatting we
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;	// xyz: velocity, w: splatting weight
 
 HAIRSIM_SOLVERDATA<uint> _LODGuideCount;			// n: lod index -> num. guides
-HAIRSIM_SOLVERDATA<uint> _LODGuideIndex;			// i: lod index * strandCount + strand index -> guide index
+HAIRSIM_SOLVERDATA<uint> _LODGuideIndex;			// i: lod index * strandCount + strand index -> guide strand index
 
 //----------------
 // solver staging
 
 #if STAGING_COMPRESSION
-HAIRSIM_SOLVERDATA<uint2> _StagingPosition;			// xy: position encoded
+HAIRSIM_SOLVERDATA<uint2> _StagingPosition;			// xy: encoded position
 HAIRSIM_SOLVERDATA<uint2> _StagingPositionPrev;		// ...
 #else
 HAIRSIM_SOLVERDATA<float3> _StagingPosition;		// xyz: position

@@ -105,35 +105,31 @@
 #endif
 
 		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 1);
-		float3 worldPos;
-		float3 color;
+
+		uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + instanceID];
+		uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + instanceID];
+
+#if LAYOUT_INTERLEAVED
+		const uint strandParticleBeginLo = strandIndexLo;
+		const uint strandParticleBeginHi = strandIndexHi;
+#else
+		const uint strandParticleBeginLo = strandIndexLo * _StrandParticleCount;
+		const uint strandParticleBeginHi = strandIndexHi * _StrandParticleCount;
+#endif
+
+		float3 worldPosLo = _ParticlePosition[strandParticleBeginLo + strandParticleStride * (vertexID >> 1)].xyz;
+		float3 worldPosHi = _ParticlePosition[strandParticleBeginHi + strandParticleStride * (vertexID >> 1)].xyz;
+
+		float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODIndexLo]);
+		float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODIndexHi]);
+
+		float3 worldPos = lerp(worldPosLo, worldPosHi, _LODBlendFraction);
+		float3 color = lerp(colorLo, colorHi, _LODBlendFraction);
 
 		if (vertexID & 1)
 		{
-			uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + instanceID];
-			uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + instanceID];
-
-#if LAYOUT_INTERLEAVED
-			const uint strandParticleBeginLo = strandIndexLo;
-			const uint strandParticleBeginHi = strandIndexHi;
-#else
-			const uint strandParticleBeginLo = strandIndexLo * _StrandParticleCount;
-			const uint strandParticleBeginHi = strandIndexHi * _StrandParticleCount;
-#endif
-
-			float3 worldPosLo = _ParticlePosition[strandParticleBeginLo + strandParticleStride * (vertexID >> 1)].xyz;
-			float3 worldPosHi = _ParticlePosition[strandParticleBeginHi + strandParticleStride * (vertexID >> 1)].xyz;
-
-			float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODIndexLo]);
-			float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODIndexHi]);
-
-			worldPos = lerp(worldPosLo, worldPosHi, _LODBlendFrac);
-			color = lerp(colorLo, colorHi, _LODBlendFrac);
-		}
-		else
-		{
 			worldPos = _ParticlePosition[i].xyz;
-			color = ColorCycle(instanceID, _StrandCount);
+			//color = ColorCycle(instanceID, _StrandCount);
 		}
 
 		DebugVaryings output;

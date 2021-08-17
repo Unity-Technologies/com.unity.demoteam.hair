@@ -14,7 +14,7 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer cbufferStorage;		// constant buffer storage
 
 			public ComputeBuffer rootUV;				// xy: strand root uv
-			public ComputeBuffer rootScale;				// x: relative strand length [0..1] (to group maximum)
+			public ComputeBuffer rootScale;				// x: relative strand length [0..1] (to maximum in group)
 			public ComputeBuffer rootPosition;			// xyz: strand root position, w: -
 			public ComputeBuffer rootDirection;			// xyz: strand root direction, w: -
 			public ComputeBuffer rootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
@@ -31,13 +31,13 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: splatting weight
 
 			public ComputeBuffer lodGuideCount;			// n: lod index -> num. guides
-			public ComputeBuffer lodGuideIndex;			// i: lod index * strandCount + strand index -> guide index
+			public ComputeBuffer lodGuideIndex;			// i: lod index * strandCount + strand index -> guide strand index
 
-			public uint lodCount;
-			public NativeArray<float> lodThreshold;
+			public NativeArray<int> lodGuideCountCPU;	// n: lod index -> num. guides
+			public NativeArray<float> lodThreshold;		// n: lod index -> relative guide count [0..1] (to maximum lod in group)
 
-			public ComputeBuffer stagingPosition;
-			public ComputeBuffer stagingPositionPrev;
+			public ComputeBuffer stagingPosition;		// xy: encoded position | xyz: position
+			public ComputeBuffer stagingPositionPrev;	// ...
 
 			public HairAsset.MemoryLayout memoryLayout;
 		}
@@ -65,13 +65,14 @@ namespace Unity.DemoTeam.Hair
 		{
 			public Matrix4x4 _LocalToWorld;				// root mesh vertex transform
 			public Matrix4x4 _LocalToWorldInvT;			// ...
-			public Vector4 _WorldRotation;				// primary skinning bone rotation
+			public Vector4 _WorldRotation;				// quat(xyz,w): primary skinning bone rotation
 
 			public Vector4 _StagingOriginExtent;		// xyz: origin, w: scale
 			public Vector4 _StagingOriginExtentPrev;	// ...
 
 			public uint _StrandCount;					// group strand count
 			public uint _StrandParticleCount;			// group strand particle count
+			public uint _SolverStrandCount;
 
 			public float _StrandMaxParticleInterval;	// group max particle interval
 			public float _StrandMaxParticleWeight;		// group max particle weight (relative to all groups within volume)
@@ -80,10 +81,10 @@ namespace Unity.DemoTeam.Hair
 
 			public uint _LODIndexLo;					// lod index (lower detail in blend)
 			public uint _LODIndexHi;					// lod index (higher detail in blend)
-			public float _LODBlendFrac;					// lod blend fraction (lo -> hi)
+			public float _LODBlendFraction;				// lod blend fraction (lo -> hi)
 
 			public uint _StagingVertexCount;			// staging strand vertex count
-			public uint _StagingSubdivisions;			// staging subdivisions (per segment)
+			public uint _StagingSubdivision;			// staging strand segment subdivision count
 
 			public float _DT;
 			public uint _Iterations;

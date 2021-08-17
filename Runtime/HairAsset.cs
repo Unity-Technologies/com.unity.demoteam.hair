@@ -234,18 +234,18 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Base LOD")]
 
-			[Range(0.0f, 1.0f), Tooltip("Number of generated clusters as fraction of all strands")]
+			[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands")]
 			public float baseLODClusterQuantity;
-			public ClusterSelection baseLODClusterSelection;
-			[VisibleIf(nameof(baseLODClusterSelection), ClusterSelection.RandomPointsOnMesh)]
-			public Mesh baseLODClusterSelectionMesh;
+			public ClusterSelection baseLODClusterInitialization;
+			[VisibleIf(nameof(baseLODClusterInitialization), ClusterSelection.RandomPointsOnMesh)]
+			public Mesh baseLODClusterInitializationMesh;
 			public int baseLODClusterIterations;
 
 			public static readonly SettingsLODGenerated defaults = new SettingsLODGenerated()
 			{
 				baseLODClusterQuantity = 0.1f,
-				baseLODClusterSelection = ClusterSelection.RandomPointsInVolume,
-				baseLODClusterSelectionMesh = null,
+				baseLODClusterInitialization = ClusterSelection.RandomPointsInVolume,
+				baseLODClusterInitializationMesh = null,
 				baseLODClusterIterations = 1,
 			};
 		}
@@ -256,7 +256,7 @@ namespace Unity.DemoTeam.Hair
 			public enum ClusterMapFormat
 			{
 				OneClusterPerColor,
-				OneClusterPerColorCluster,
+				OneClusterPerVisualCluster,
 			}
 
 			[LineHeader("Base LOD")]
