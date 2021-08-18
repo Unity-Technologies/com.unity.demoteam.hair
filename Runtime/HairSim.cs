@@ -126,6 +126,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KSolveConstraints_Jacobi_64;
 			public static int KSolveConstraints_Jacobi_128;
 			public static int KInterpolate;
+			public static int KInterpolateNearest;
 			public static int KStaging;
 			public static int KStagingSubdivision;
 		}
@@ -1196,14 +1197,18 @@ namespace Unity.DemoTeam.Hair
 			var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
 			if (interpolateStrandCount > 0)
 			{
+				int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
+					? SolverKernels.KInterpolate
+					: SolverKernels.KInterpolateNearest;
+
 				using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
 				{
 					numX = (int)interpolateStrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)interpolateStrandCount % PARTICLE_GROUP_SIZE);
 					numY = 1;
 					numZ = 1;
 
-					BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolate, solverData);
-					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, numX, numY, numZ);
+					BindSolverData(cmd, s_solverCS, kernelInterpolate, solverData);
+					cmd.DispatchCompute(s_solverCS, kernelInterpolate, numX, numY, numZ);
 				}
 			}
 		}

@@ -7,6 +7,7 @@
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
 #pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
 #pragma kernel KInterpolate								THREAD_GROUP_SIZE=64	F_INTERPOLATE
+#pragma kernel KInterpolateNearest						THREAD_GROUP_SIZE=64	F_INTERPOLATE
 #pragma kernel KStaging									THREAD_GROUP_SIZE=64	F_STAGING
 #pragma kernel KStagingSubdivision						THREAD_GROUP_SIZE=64	F_STAGING
 
@@ -1415,6 +1416,7 @@ void KInterpolate(
 	float3 rootPosition = _RootPosition[strandParticleBegin].xyz;
 
 	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
+	_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin, rootPosition);
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride, iHi = strandParticleBeginHi + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
 	{
@@ -1461,6 +1463,7 @@ void KInterpolateNearest(
 	float3 rootPosition = _RootPosition[strandParticleBegin].xyz;
 
 	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
+	_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin, rootPosition);
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride)
 	{
