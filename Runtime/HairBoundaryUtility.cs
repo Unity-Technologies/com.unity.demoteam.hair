@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Collections;
 using Unity.Mathematics;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -17,6 +18,7 @@ namespace Unity.DemoTeam.Hair
 
 		static HashSet<int> s_gatherMask = new HashSet<int>();
 		static List<HairBoundary.RuntimeData> s_gatherList = new List<HairBoundary.RuntimeData>();
+		static List<HairBoundary.RuntimeData> s_gatherListCopy = new List<HairBoundary.RuntimeData>();
 
 		public static void FilterBoundary(HairBoundary boundary, HashSet<int> mask, List<HairBoundary.RuntimeData> list, ref HairBoundary.RuntimeData item)
 		{
@@ -93,20 +95,48 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// sort the data
-			if (volumeSort)
+			unsafe
 			{
-				for (int i = 0; i != s_gatherList.Count; i++)
+				using (var sortedIndices = new NativeArray<ulong>(s_gatherList.Count, Allocator.Temp))
 				{
-					float sortKey = SdBoundary(volumeBounds.center, s_gatherList[i]);//TODO sort boundaries by sdfn
-					//....
+					var sortedIndicesPtr = (ulong*)sortedIndices.GetUnsafePtr();
+
+					var volumeOrigin = volumeBounds.center;
+					var volumeExtent = volumeBounds.extents.Abs().CMax();
+
+					for (int i = 0; i != s_gatherList.Count; i++)
+					{
+						var volumeSortValue = 0u;
+						if (volumeSort)
+						{
+							var sdClippedDoubleExtent = Mathf.Clamp(SdBoundary(volumeOrigin, s_gatherList[i]) / volumeExtent, -2.0f, 2.0f);
+							var udClippedDoubleExtent = Mathf.Clamp01(sdClippedDoubleExtent * 0.25f + 0.5f);
+							{
+								volumeSortValue = (uint)udClippedDoubleExtent * UInt16.MaxValue;
+							}
+						}
+
+						var sortDistance = ((ulong)volumeSortValue) << 48;
+						var sortHandle = ((ulong)s_gatherList[i].xform.handle) << 16;
+						var sortIndex = ((ulong)i) & 0xffffuL;
+						{
+							sortedIndicesPtr[i] = sortDistance | sortHandle | sortIndex;
+						}
+					}
+
+					sortedIndices.Sort();
+
+					s_gatherListCopy.Clear();
+					s_gatherListCopy.AddRange(s_gatherList);
+
+					for (int i = 0; i != s_gatherList.Count; i++)
+					{
+						var index = (int)(sortedIndicesPtr[i] & 0xffffuL);
+						{
+							s_gatherList[i] = s_gatherListCopy[index];
+						}
+					}
 				}
-			}
-			else
-			{
-				s_gatherList.Sort((a, b) =>
-				{
-					return a.xform.handle.CompareTo(b.xform.handle);
-				});
 			}
 
 			// done

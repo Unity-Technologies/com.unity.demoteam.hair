@@ -259,9 +259,17 @@ namespace Unity.DemoTeam.Hair
 				OneClusterPerVisualCluster,
 			}
 
+			//public enum ClusterMapColor
+			//{
+			//	ColorEncodesCluster,
+			//	ColorEncodesGuideIndex,
+			//}
+
 			[LineHeader("Base LOD")]
 
 			public ClusterMapFormat baseLODClusterMapFormat;
+			//[VisibleIf(nameof(baseLODClusterMapFormat), ClusterMapFormat.OneClusterPerColor)]
+			//public ClusterMapColor baseLODClusterMapColor;
 			[NonReorderable]
 			public Texture2D[] baseLODClusterMapChain;
 

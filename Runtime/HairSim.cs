@@ -969,6 +969,7 @@ namespace Unity.DemoTeam.Hair
 					var ptrMatrixW2PrevW = (Matrix4x4*)bufMatrixW2PrevW.GetUnsafePtr();
 
 					// gather boundaries
+					//TODO expose or always enable the volumeSort option which sorts active boundaries by distance
 					var boundaryList = HairBoundaryUtility.Gather(volumeSettings.boundariesPriority, volumeSort: false, volumeSettings.boundariesCollect, volumeBounds, Quaternion.identity, volumeSettings.boundariesCollectMode == VolumeSettings.CollectMode.IncludeColliders);
 					var boundaryCount = 0;
 					var boundarySDFIndex = -1;

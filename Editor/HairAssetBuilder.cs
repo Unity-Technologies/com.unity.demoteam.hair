@@ -1,5 +1,6 @@
 ﻿//#define VISIBLE_SUBASSETS
 #define CLEAR_ALL_SUBASSETS
+
 #define LOD_INDEX_INCREASING
 
 using System;
@@ -240,7 +241,7 @@ namespace Unity.DemoTeam.Hair
 					// skip group if it has obviously degenerate curves
 					if (curveVertexCountMin < 2)
 					{
-						Debug.LogWarningFormat("Hair Importer: skipping strand group due to degenerate curves with less than two vertices.");
+						Debug.LogWarningFormat("Skipping strand group due to degenerate curves with less than two vertices.");
 
 						curveCount = 0;
 						curveVertexCount = 0;
@@ -257,7 +258,7 @@ namespace Unity.DemoTeam.Hair
 					var resamplingRequired = !settings.resampleCurves && (curveVertexCountMin != curveVertexCountMax);
 					if (resamplingRequired)
 					{
-						Debug.LogWarningFormat("Hair Importer: resampling strand group (to maximum vertex count within group) due to curves with varying vertex count.");
+						Debug.LogWarningFormat("Resampling strand group (to maximum vertex count within group) due to curves with varying vertex count.");
 
 						resampling = true;
 						resamplingCount = curveVertexCountMax;
@@ -665,7 +666,7 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			// dispose lod chain builder
+			// dispose lod chain
 			lodChain.Dispose();
 		}
 

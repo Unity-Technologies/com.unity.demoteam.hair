@@ -23,6 +23,16 @@ namespace Unity.DemoTeam.Hair
 		{
 			return Mathf.Max(Mathf.Max(value.x, value.y), value.z);
 		}
+
+		public static Vector3 Rcp(this Vector3 value)
+		{
+			return new Vector3
+			{
+				x = 1.0f / value.x,
+				y = 1.0f / value.y,
+				z = 1.0f / value.z,
+			};
+		}
 	}
 
 	public static class BoundsExtensions
