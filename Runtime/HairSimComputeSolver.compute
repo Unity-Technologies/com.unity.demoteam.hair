@@ -29,10 +29,10 @@
 //#pragma multi_compile __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
 #pragma multi_compile __ ENABLE_DISTANCE
 #pragma multi_compile __ ENABLE_DISTANCE_LRA
-#pragma multi_compile __ ENABLE_DISTANCE_FTL
+//#pragma multi_compile __ ENABLE_DISTANCE_FTL
 //#pragma multi_compile __ ENABLE_CURVATURE_EQ ENABLE_CURVATURE_GEQ ENABLE_CURVATURE_LEQ
 #pragma multi_compile __ ENABLE_POSE_LOCAL_BEND_TWIST
-#pragma multi_compile __ ENABLE_POSE_GLOBAL_POSITION
+//#pragma multi_compile __ ENABLE_POSE_GLOBAL_POSITION
 //#pragma multi_compile __ ENABLE_POSE_GLOBAL_ROTATION
 
 //------------------
@@ -1395,7 +1395,7 @@ void KInterpolate(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x + _SolverStrandCount);
+	DECLARE_STRAND(worldIdx.x + _SolverStrandCountFinal);
 
 	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
 	uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
@@ -1447,7 +1447,7 @@ void KInterpolateNearest(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x + _SolverStrandCount);
+	DECLARE_STRAND(worldIdx.x + _SolverStrandCountFinal);
 
 	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
 

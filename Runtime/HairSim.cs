@@ -858,6 +858,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			cbuffer._SolverStrandCount = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexHi];
+			cbuffer._SolverStrandCountFinal = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexLo];
 
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
@@ -1194,7 +1195,7 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
+			var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCountFinal;
 			if (interpolateStrandCount > 0)
 			{
 				int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
