@@ -2,7 +2,6 @@
     "name": "Unity.DemoTeam.Hair.Runtime",
     "rootNamespace": "",
     "references": [
-        "GUID:f430d943acec4664388d12e0bbff46de",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:22f31b74491fb45d5b598e0b935deb31",

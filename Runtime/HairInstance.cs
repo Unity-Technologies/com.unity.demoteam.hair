@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.DemoTeam.Attributes;
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 using Unity.DemoTeam.DigitalHuman;

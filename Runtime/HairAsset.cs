@@ -1,7 +1,6 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.Serialization;
-using Unity.DemoTeam.Attributes;
 
 #if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
 using UnityEngine.Formats.Alembic.Importer;

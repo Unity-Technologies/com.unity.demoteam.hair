@@ -7,7 +7,6 @@ using UnityEngine.Experimental.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
-using Unity.DemoTeam.Attributes;
 
 namespace Unity.DemoTeam.Hair
 {

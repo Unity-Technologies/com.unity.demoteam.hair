@@ -16,12 +16,11 @@ Strand based hair simulation and rendering.
 
 ## Usage
 
-Declare the package and its dependencies as git dependencies in `Packages/manifest.json`:
+Declare the package as a git dependency in `Packages/manifest.json`:
 
 ```
 "dependencies": {
     "com.unity.demoteam.hair": "https://github.com/Unity-Technologies/com.unity.demoteam.hair.git",
-    "com.unity.demoteam.attributes": "https://github.com/Unity-Technologies/com.unity.demoteam.attributes.git",
     ...
 }
 ```

@@ -1,13 +1,10 @@
-using System;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
 #if UNITY_EDITOR
 using UnityEditor;
-using UnityEditorInternal;
 #endif
 
-namespace Unity.DemoTeam.Attributes
+namespace Unity.DemoTeam.Hair
 {
 	public class RenderingLayerMaskAttribute : PropertyAttribute { }
 

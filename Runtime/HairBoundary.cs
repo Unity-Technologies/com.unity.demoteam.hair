@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using Unity.DemoTeam.Attributes;
 
 namespace Unity.DemoTeam.Hair
 {

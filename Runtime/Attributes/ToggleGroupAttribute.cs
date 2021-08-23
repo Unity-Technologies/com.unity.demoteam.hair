@@ -6,7 +6,7 @@ using UnityEditor;
 using UnityEditorInternal;
 #endif
 
-namespace Unity.DemoTeam.Attributes
+namespace Unity.DemoTeam.Hair
 {
 	public class ToggleGroupItemAttribute : PropertyAttribute
 	{

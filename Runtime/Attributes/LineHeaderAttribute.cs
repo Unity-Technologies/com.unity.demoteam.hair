@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-namespace Unity.DemoTeam.Attributes
+namespace Unity.DemoTeam.Hair
 {
 	public class LineHeaderAttribute : PropertyAttribute
 	{
