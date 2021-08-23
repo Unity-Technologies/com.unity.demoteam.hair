@@ -527,6 +527,9 @@ namespace Unity.DemoTeam.Hair
 					strandGroup.strandParticleCount,
 					strandGroup.bounds);
 			}
+
+			// append version
+			strandGroup.version = HairAsset.StrandGroup.VERSION;
 		}
 
 		static void BuildLODClusters(ref HairAsset.StrandGroup strandGroup, HairAsset hairAsset)

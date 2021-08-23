@@ -10,7 +10,7 @@ using UnityEngine.Formats.Alembic.Importer;
 namespace Unity.DemoTeam.Hair
 {
 	[CreateAssetMenu(menuName = "Hair/Hair Asset", order = 350), PreferBinarySerialization]
-	public class HairAsset : ScriptableObject
+	public class HairAsset : ScriptableObject, ISerializationCallbackReceiver
 	{
 		public enum Type
 		{
@@ -259,7 +259,7 @@ namespace Unity.DemoTeam.Hair
 				OneClusterPerVisualCluster,
 			}
 
-			//public enum ClusterMapColor
+			//public enum ClusterMapEncoding
 			//{
 			//	ColorEncodesCluster,
 			//	ColorEncodesGuideIndex,
@@ -269,7 +269,7 @@ namespace Unity.DemoTeam.Hair
 
 			public ClusterMapFormat baseLODClusterMapFormat;
 			//[VisibleIf(nameof(baseLODClusterMapFormat), ClusterMapFormat.OneClusterPerColor)]
-			//public ClusterMapColor baseLODClusterMapColor;
+			//public ClusterMapEncoding baseLODClusterMapEncoding;
 			[NonReorderable]
 			public Texture2D[] baseLODClusterMapChain;
 
@@ -324,6 +324,9 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Mesh meshAssetRoots;
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetStrips;
+
+			public int version;
+			public const int VERSION = 1;
 		}
 
 		public Material defaultMaterial;
@@ -339,6 +342,45 @@ namespace Unity.DemoTeam.Hair
 		public bool strandGroupsAutoBuild;
 
 		public string checksum;
+
+		public void OnBeforeSerialize() { }
+		public void OnAfterDeserialize()
+		{
+			if (strandGroups == null)
+				return;
+
+			bool PerformVersionBump(ref StrandGroup strandGroup)
+			{
+				switch (strandGroup.version)
+				{
+					// 0->1: add LOD data
+					case 0:
+						{
+							strandGroup.lodCount = 1;
+							strandGroup.lodGuideCount = new int[1] { strandGroup.strandCount };
+							strandGroup.lodGuideIndex = new int[strandGroup.strandCount];
+							strandGroup.lodThreshold = new float[1] { 1.0f };
+
+							for (int i = 0; i != strandGroup.strandCount; i++)
+							{
+								strandGroup.lodGuideIndex[i] = i;
+							}
+
+							strandGroup.version = 1;
+						}
+						return true;
+
+					// done
+					default:
+						return false;
+				}
+			}
+
+			for (int i = 0; i != strandGroups.Length; i++)
+			{
+				while (PerformVersionBump(ref strandGroups[i])) { };
+			}
+		}
 	}
 
 	public static class HairAssetUtility
