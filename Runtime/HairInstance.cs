@@ -904,6 +904,7 @@ namespace Unity.DemoTeam.Hair
 				var strandScale = GetStrandScale();
 				var strandRotation = GetRootRotation(strandGroupInstances[i]);
 
+				HairSim.PushSolverLOD(cmd, ref solverData[i], strandGroup.lodCount - 1);//TODO will need to move this around to generate rest density per LOD, to support target density initial pose in particles
 				HairSim.PushSolverParams(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, 1.0f);
 				HairSim.PushSolverRoots(cmd, solverData[i], rootMesh);
 				{

@@ -21,8 +21,23 @@
     "versionDefines": [
         {
             "name": "com.unity.formats.alembic",
-            "expression": "2.2.0-pre.4",
+            "expression": "2.2.0",
             "define": "HAS_PACKAGE_UNITY_ALEMBIC"
+        },
+        {
+            "name": "com.unity.render-pipelines.high-definition",
+            "expression": "10.2.2",
+            "define": "HAS_PACKAGE_UNITY_HDRP"
+        },
+        {
+            "name": "com.unity.render-pipelines.universal",
+            "expression": "10.2.2",
+            "define": "HAS_PACKAGE_UNITY_URP"
+        },
+        {
+            "name": "com.unity.visualeffectgraph",
+            "expression": "10.2.2",
+            "define": "HAS_PACKAGE_UNITY_VFXGRAPH"
         },
         {
             "name": "com.unity.demoteam.digital-human",

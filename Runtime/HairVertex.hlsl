@@ -3,9 +3,6 @@
 
 //#pragma editor_sync_compilation
 
-#include "HairSimData.hlsl"
-#include "HairSimDebugDrawUtility.hlsl"
-
 /*
 #pragma multi_compile __ LAYOUT_INTERLEAVED
 // 0 == particles grouped by strand, i.e. root, root+1, root, root+1
@@ -15,6 +12,13 @@
 // 0 == staging data full precision
 // 1 == staging data compressed
 */
+
+#include "HairSimData.hlsl"
+#include "HairSimDebugDrawUtility.hlsl"
+
+#ifndef UNITY_SHADER_VARIABLES_INCLUDED
+float4x4 unity_MatrixPreviousMI;
+#endif
 
 #ifndef HAIR_VERTEX_ID_LINES
 #define HAIR_VERTEX_ID_LINES 0

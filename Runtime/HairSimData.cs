@@ -4,7 +4,7 @@ using Unity.Collections;
 
 namespace Unity.DemoTeam.Hair
 {
-	public partial class HairSim
+	public static partial class HairSim
 	{
 		public struct SolverData
 		{

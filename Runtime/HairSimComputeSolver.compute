@@ -93,7 +93,7 @@
 
 #if SECOND_ORDER_UPDATE
 #define SECOND_ORDER_POSITION 1
-#define SECOND_ORDER_VELOCITY 1
+#define SECOND_ORDER_VELOCITY 0
 #else
 #define SECOND_ORDER_POSITION 0
 #define SECOND_ORDER_VELOCITY 0
@@ -118,11 +118,6 @@
 	if (x >= _StrandCount) return;
 #define CHECK_STRAND_SOLVER(x)	\
 	if (x >= _SolverStrandCount) return;
-
-#define CHECK_PARTICLE(x)			\
-	if (x >= _StrandCount * _StrandParticleCount) return;
-#define CHECK_PARTICLE_SOLVER(x)	\
-	if (x >= _SolverStrandCount * _StrandParticleCount) return;
 
 #if LAYOUT_INTERLEAVED
   #define DECLARE_STRAND_UNCHECKED(x)				\

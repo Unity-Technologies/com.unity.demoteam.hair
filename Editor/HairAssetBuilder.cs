@@ -168,9 +168,16 @@ namespace Unity.DemoTeam.Hair
 				hairAsset.strandGroups = new HairAsset.StrandGroup[curveSets.Length];
 
 				// build strand groups
-				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
+				for (int i = 0, curveSetIndex = 0; i != hairAsset.strandGroups.Length; i++)
 				{
-					BuildStrandGroupAlembic(ref hairAsset.strandGroups[i], hairAsset, curveSets[i]);
+					if (curveSetIndex < curveSets.Length)
+					{
+						BuildStrandGroupAlembic(ref hairAsset.strandGroups[i], hairAsset, curveSets, ref curveSetIndex);
+					}
+					else
+					{
+						break;
+					}
 				}
 			}
 
@@ -197,129 +204,236 @@ namespace Unity.DemoTeam.Hair
 		}
 
 #if HAS_PACKAGE_UNITY_ALEMBIC
-		public static void BuildStrandGroupAlembic(ref HairAsset.StrandGroup strandGroup, in HairAsset hairAsset, AlembicCurves curveSet)
+		static unsafe NativeArray<int> IntervalLengthsFromOffsetsAndTotalLength(int* intervalOffsetPtr, int intervalCount, int totalLength, Allocator allocator)
 		{
-			//TODO require/recommend resampling or WARN if not all pairs are equidistant?
-			var settings = hairAsset.settingsAlembic;
-
-			// get curve data
-			var curveVertexDataPosition = curveSet.Positions;
-			var curveVertexOffsets = curveSet.CurveOffsets;
-
-			var curveCount = curveVertexOffsets.Length;
-			var curveVertexCount = -1;
-
-			// validate curve data, conditionally apply resampling
-			using (var curveVertexCountBuffer = new NativeArray<int>(curveCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			var intervalLength = new NativeArray<int>(intervalCount, allocator, NativeArrayOptions.UninitializedMemory);
+			var intervalLengthPtr = (int*)intervalLength.GetUnsafePtr();
 			{
-				var curveVertexCountMin = -1;
-				var curveVertexCountMax = -1;
-
-				unsafe
+				for (int i = 1; i != intervalCount; i++)
 				{
-					int* curveVertexCountPtr = (int*)curveVertexCountBuffer.GetUnsafePtr();
+					intervalLengthPtr[i - 1] = intervalOffsetPtr[i] - intervalOffsetPtr[i - 1];
+				}
 
-					// check min-max vertex count
-					if (curveCount > 0)
+				intervalLengthPtr[intervalCount - 1] = totalLength - intervalOffsetPtr[intervalCount - 1];
+			}
+
+			return intervalLength;
+		}
+
+		static unsafe NativeArray<int> IntervalLengthsFromOffsetsAndTotalLength(int[] intervalOffset, int totalLength, Allocator allocator)
+		{
+			fixed (int* intervalOffsetPtr = intervalOffset)
+			{
+				return IntervalLengthsFromOffsetsAndTotalLength(intervalOffsetPtr, intervalOffset.Length, totalLength, allocator);
+			}
+		}
+
+		struct AlembicCurvesInfo
+		{
+			public int curveCount;
+			public int[] curveVertexOffset;
+			public int curveVertexCountMin;
+			public int curveVertexCountMax;
+			public Vector3[] vertexDataPosition;
+			public Vector2[] vertexDataTexCoord;
+		}
+
+		static unsafe AlembicCurvesInfo PrepareAlembicCurvesInfo(AlembicCurves curveSet)
+		{
+			var curveCount = curveSet.CurveOffsets.Length;
+
+			// prepare struct
+			var info = new AlembicCurvesInfo
+			{
+				curveCount = curveSet.CurveOffsets.Length,
+				curveVertexOffset = curveSet.CurveOffsets,
+				curveVertexCountMin = 0,
+				curveVertexCountMax = 0,
+				vertexDataPosition = curveSet.Positions,
+				vertexDataTexCoord = curveSet.UVs,
+			};
+
+			// find min-max vertex count
+			if (info.curveCount > 0)
+			{
+				using (var curveVertexCount = IntervalLengthsFromOffsetsAndTotalLength(info.curveVertexOffset, info.vertexDataPosition.Length, Allocator.Temp))
+				{
+					var curveVertexCountPtr = (int*)curveVertexCount.GetUnsafePtr();
+
+					info.curveVertexCountMin = curveVertexCountPtr[0];
+					info.curveVertexCountMax = curveVertexCountPtr[0];
+
+					for (int i = 1; i != info.curveCount; i++)
 					{
-						for (int i = 1; i != curveCount; i++)
-						{
-							curveVertexCountPtr[i - 1] = curveVertexOffsets[i] - curveVertexOffsets[i - 1];
-						}
-
-						curveVertexCountPtr[curveCount - 1] = curveVertexDataPosition.Length - curveVertexOffsets[curveCount - 1];
-						curveVertexCountMin = curveVertexCountPtr[0];
-						curveVertexCountMax = curveVertexCountPtr[0];
-
-						for (int i = 1; i != curveCount; i++)
-						{
-							Mathf.Min(curveVertexCountMin, curveVertexCountPtr[i]);
-							Mathf.Max(curveVertexCountMax, curveVertexCountPtr[i]);
-						}
-					}
-
-					// skip group if it has obviously degenerate curves
-					if (curveVertexCountMin < 2)
-					{
-						Debug.LogWarningFormat("Skipping strand group due to degenerate curves with less than two vertices.");
-
-						curveCount = 0;
-						curveVertexCount = 0;
-						curveVertexCountMin = 0;
-						curveVertexCountMax = 0;
-					}
-
-					// resample curves if selected
-					var resampling = settings.resampleCurves;
-					var resamplingCount = settings.resampleParticleCount;
-					var resamplingQuality = settings.resampleQuality;
-
-					// resample always if there are curves with varying vertex count
-					var resamplingRequired = !settings.resampleCurves && (curveVertexCountMin != curveVertexCountMax);
-					if (resamplingRequired)
-					{
-						Debug.LogWarningFormat("Resampling strand group (to maximum vertex count within group) due to curves with varying vertex count.");
-
-						resampling = true;
-						resamplingCount = curveVertexCountMax;
-						resamplingQuality = 1;
-					}
-
-					// apply resampling if selected or required
-					if (resampling)
-					{
-						var curveVertexPositionsResampled = new Vector3[curveCount * resamplingCount];
-
-						unsafe
-						{
-							fixed (Vector3* srcBasePtr = curveVertexDataPosition)
-							fixed (Vector3* dstBasePtr = curveVertexPositionsResampled)
-							{
-								var dstOffset = 0;
-								var dstCount = resamplingCount;
-
-								for (int i = 0; i != curveCount; i++)
-								{
-									var srcOffset = curveVertexOffsets[i];
-									var srcCount = curveVertexCountPtr[i];
-
-									Resample(srcBasePtr + srcOffset, srcCount, dstBasePtr + dstOffset, dstCount, resamplingQuality);
-
-									dstOffset += dstCount;
-								}
-							}
-						}
-
-						curveVertexDataPosition = curveVertexPositionsResampled;
-						curveVertexCount = resamplingCount;
-					}
-					else
-					{
-						curveVertexCount = curveVertexCountMin;
+						Mathf.Min(info.curveVertexCountMin, curveVertexCountPtr[i]);
+						Mathf.Max(info.curveVertexCountMax, curveVertexCountPtr[i]);
 					}
 				}
 			}
 
-			// set strand counts
-			strandGroup.strandCount = curveCount;
-			strandGroup.strandParticleCount = curveVertexCount;
+			// done
+			return info;
+		}
+
+		public static unsafe void BuildStrandGroupAlembic(ref HairAsset.StrandGroup strandGroup, in HairAsset hairAsset, AlembicCurves[] curveSets, ref int curveSetIndex)
+		{
+			var settings = hairAsset.settingsAlembic;
+
+			// gather data from curve sets
+			var combinedCurveCount = 0;
+			var combinedCurveVertexCount = 0;
+			var combinedCurveVertexOffset = new UnsafeList<int>(0, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+			var combinedVertexDataPosition = new UnsafeList<Vector3>(0, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+			{
+				var combinedCurveVertexCountMin = 0;
+				var combinedCurveVertexCountMax = 0;
+
+				// validate primary curve set
+				var primaryInfo = PrepareAlembicCurvesInfo(curveSets[curveSetIndex++]);
+				if (primaryInfo.curveVertexCountMin >= 2)
+				{
+					// append data from primary curve set
+					combinedCurveCount = primaryInfo.curveCount;
+					combinedCurveVertexCountMin = primaryInfo.curveVertexCountMin;
+					combinedCurveVertexCountMax = primaryInfo.curveVertexCountMax;
+
+					fixed (int* primaryCurveVertexOffsetPtr = primaryInfo.curveVertexOffset)
+					fixed (Vector3* primaryVertexDataPositionPtr = primaryInfo.vertexDataPosition)
+					{
+						combinedCurveVertexOffset.AddRange(primaryCurveVertexOffsetPtr, primaryInfo.curveVertexOffset.Length);
+						combinedVertexDataPosition.AddRange(primaryVertexDataPositionPtr, primaryInfo.vertexDataPosition.Length);
+					}
+
+					// optionally append data from subsequent curve sets that have same maximum vertex count
+					var combineSets = (settings.alembicAssetGroups == HairAsset.SettingsAlembic.Groups.CombineMatchingSubsequent);
+					if (combineSets)
+					{
+						for (; curveSetIndex != curveSets.Length; curveSetIndex++)
+						{
+							// validate subsequent curve set
+							var secondaryInfo = PrepareAlembicCurvesInfo(curveSets[curveSetIndex]);
+							if (secondaryInfo.curveVertexCountMin >= 2 && secondaryInfo.curveVertexCountMax == combinedCurveVertexCountMax)
+							{
+								var prevCombinedCurveCount = combinedCurveCount;
+								var prevCombinedVertexCount = combinedVertexDataPosition.Length;
+
+								// append data from subsequent curve set
+								combinedCurveVertexCountMin = Mathf.Min(secondaryInfo.curveVertexCountMin, combinedCurveVertexCountMin);
+								combinedCurveVertexCountMax = Mathf.Max(secondaryInfo.curveVertexCountMax, combinedCurveVertexCountMax);
+
+								fixed (int* secondaryCurveVertexOffsetPtr = secondaryInfo.curveVertexOffset)
+								fixed (Vector3* secondaryVertexDataPositionPtr = secondaryInfo.vertexDataPosition)
+								{
+									combinedCurveVertexOffset.AddRange(secondaryCurveVertexOffsetPtr, secondaryInfo.curveVertexOffset.Length);
+									combinedVertexDataPosition.AddRange(secondaryVertexDataPositionPtr, secondaryInfo.vertexDataPosition.Length);
+								}
+
+								// update offsets in appended part of combined set
+								if (prevCombinedVertexCount > 0)
+								{
+									var appendedVertexOffsetPtr = combinedCurveVertexOffset.Ptr + prevCombinedCurveCount;
+
+									for (int j = 0; j != secondaryInfo.curveCount; j++)
+									{
+										appendedVertexOffsetPtr[j] += prevCombinedVertexCount;
+									}
+								}
+
+								// update number of curves in combined set
+								combinedCurveCount += secondaryInfo.curveCount;
+							}
+							else
+							{
+								// stop appending if degenerate or non-matching set was encountered
+								break;
+							}
+						}
+					}
+				}
+				else
+				{
+					Debug.LogWarningFormat("Skipping curve set (index {0}) due to degenerate curves with less than two vertices.", curveSetIndex);
+				}
+
+				// optionally resample the data
+				{
+					var resample = settings.resampleCurves;
+					var resampleIterations = settings.resampleQuality;
+					var resampleVertexCount = settings.resampleParticleCount;
+
+					// resampling required if there are curves with varying vertex count
+					var resampleRequired = !resample && (combinedCurveVertexCountMin != combinedCurveVertexCountMax);
+					if (resampleRequired)
+					{
+						Debug.LogWarningFormat("Resampling strand group (to maximum vertex count within group) due to curves with varying vertex count.");
+
+						resample = true;
+						resampleVertexCount = combinedCurveVertexCountMax;
+						resampleIterations = 1;
+					}
+
+					// resample the data if requested by user or required by varying vertex count
+					if (resample)
+					{
+						var resampledVertexDataPosition = new UnsafeList<Vector3>(combinedCurveCount * resampleVertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+						{
+							using (var srcVertexCount = IntervalLengthsFromOffsetsAndTotalLength(combinedCurveVertexOffset.Ptr, combinedCurveCount, combinedVertexDataPosition.Length, Allocator.Temp))
+							{
+								var srcVertexCountPtr = (int*)srcVertexCount.GetUnsafePtr();
+								var srcVertexOffsetPtr = combinedCurveVertexOffset.Ptr;
+
+								var dstVertexCount = resampleVertexCount;
+								var dstVertexOffset = 0;
+
+								var srcBasePtr = combinedVertexDataPosition.Ptr;
+								var dstBasePtr = resampledVertexDataPosition.Ptr;
+
+								for (int i = 0; i != combinedCurveCount; i++)
+								{
+									var srcCount = srcVertexCountPtr[i];
+									var srcOffset = srcVertexOffsetPtr[i];
+
+									Resample(srcBasePtr + srcOffset, srcCount, dstBasePtr + dstVertexOffset, dstVertexCount, resampleIterations);
+
+									dstVertexOffset += dstVertexCount;
+								}
+							}
+						}
+
+						combinedCurveVertexCountMin = resampleVertexCount;
+						combinedCurveVertexCountMax = resampleVertexCount;
+
+						combinedVertexDataPosition.Dispose();
+						combinedVertexDataPosition = resampledVertexDataPosition;
+					}
+				}
+
+				// uniform vertex count
+				combinedCurveVertexCount = combinedCurveVertexCountMin;
+			}
+
+			// set strand count
+			strandGroup.strandCount = combinedCurveCount;
+			strandGroup.strandParticleCount = combinedCurveVertexCount;
 
 			// set memory layout
 			strandGroup.particleMemoryLayout = hairAsset.settingsBasic.memoryLayout;
 
 			// prep strand buffers
-			strandGroup.rootUV = new Vector2[curveCount];
-			strandGroup.rootScale = new float[curveCount];// written in FinalizeStrandGroup(..)
-			strandGroup.rootPosition = new Vector3[curveCount];
-			strandGroup.rootDirection = new Vector3[curveCount];
-			strandGroup.particlePosition = new Vector3[curveCount * curveVertexCount];
+			strandGroup.rootUV = new Vector2[combinedCurveCount];
+			strandGroup.rootScale = new float[combinedCurveCount];// written in FinalizeStrandGroup(..)
+			strandGroup.rootPosition = new Vector3[combinedCurveCount];
+			strandGroup.rootDirection = new Vector3[combinedCurveCount];
+			strandGroup.particlePosition = new Vector3[combinedCurveCount * combinedCurveVertexCount];
 
 			// build strand buffers
 			{
-				for (int i = 0; i != curveCount; i++)
+				var combinedVertexDataPositionPtr = combinedVertexDataPosition.Ptr;
+
+				for (int i = 0; i != combinedCurveCount; i++)
 				{
-					ref var p0 = ref curveVertexDataPosition[i * curveVertexCount];
-					ref var p1 = ref curveVertexDataPosition[i * curveVertexCount + 1];
+					ref var p0 = ref combinedVertexDataPositionPtr[i * combinedCurveVertexCount];
+					ref var p1 = ref combinedVertexDataPositionPtr[i * combinedCurveVertexCount + 1];
 
 					strandGroup.rootUV[i] = settings.rootUVConstant;
 					strandGroup.rootPosition[i] = p0;
@@ -328,12 +442,12 @@ namespace Unity.DemoTeam.Hair
 
 				if (settings.rootUV == HairAsset.SettingsAlembic.RootUV.ResolveFromMesh)
 				{
-					if (settings.rootUVMesh != null && settings.rootUVMesh.isReadable)
+					if (settings.rootUVMesh != null)
 					{
 						using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.rootUVMesh))
 						using (var meshQueries = new TriMeshQueries(meshData[0], Allocator.Temp))
 						{
-							for (int i = 0; i != curveCount; i++)
+							for (int i = 0; i != combinedCurveCount; i++)
 							{
 								strandGroup.rootUV[i] = meshQueries.FindClosestTriangleUV(strandGroup.rootPosition[i]);
 							}
@@ -345,31 +459,41 @@ namespace Unity.DemoTeam.Hair
 				{
 					case HairAsset.MemoryLayout.Sequential:
 						{
-							curveVertexDataPosition.CopyTo(strandGroup.particlePosition, 0);
+							fixed (Vector3* dstPtr = strandGroup.particlePosition)
+							{
+								var srcBasePtr = combinedVertexDataPosition.Ptr;
+								var srcLength = combinedVertexDataPosition.Length * sizeof(Vector3);
+
+								UnsafeUtility.MemCpy(dstPtr, srcBasePtr, srcLength);
+							}
 						}
 						break;
 
 					case HairAsset.MemoryLayout.Interleaved:
 						unsafe
 						{
+							var srcBasePtr = combinedVertexDataPosition.Ptr;
 							var srcStride = sizeof(Vector3);
 							var dstStride = sizeof(Vector3) * strandGroup.strandCount;
 
-							fixed (Vector3* srcBasePtr = curveVertexDataPosition)
 							fixed (Vector3* dstBasePtr = strandGroup.particlePosition)
 							{
-								for (int i = 0; i != curveCount; i++)
+								for (int i = 0; i != combinedCurveCount; i++)
 								{
-									var srcPtr = srcBasePtr + i * curveVertexCount;
+									var srcPtr = srcBasePtr + i * combinedCurveVertexCount;
 									var dstPtr = dstBasePtr + i;
 
-									UnsafeUtility.MemCpyStride(dstPtr, dstStride, srcPtr, srcStride, srcStride, curveVertexCount);
+									UnsafeUtility.MemCpyStride(dstPtr, dstStride, srcPtr, srcStride, srcStride, combinedCurveVertexCount);
 								}
 							}
 						}
 						break;
 				}
 			}
+
+			// dispose data from curve sets
+			combinedCurveVertexOffset.Dispose();
+			combinedVertexDataPosition.Dispose();
 
 			// calc derivative fields, create mesh assets
 			FinalizeStrandGroup(ref strandGroup, hairAsset);
@@ -430,7 +554,12 @@ namespace Unity.DemoTeam.Hair
 		static void FinalizeStrandGroup(ref HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
 			var strandCount = strandGroup.strandCount;
+			if (strandCount == 0)
+				return;
+
 			var strandParticleCount = strandGroup.strandParticleCount;
+			if (strandParticleCount == 0)
+				return;
 
 			// finalize strand properties
 			using (var strandLengths = new NativeArray<float>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))

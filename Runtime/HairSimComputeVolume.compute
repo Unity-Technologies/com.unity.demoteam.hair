@@ -89,11 +89,10 @@
 #define VOLUME_NUM_Y 8
 #define VOLUME_NUM_Z 1
 
-#define CHECK_STRAND_INDEX(x)	\
-	if (x >= _StrandCount) return;
-
-#define CHECK_PARTICLE_INDEX(x)	\
+#define CHECK_PARTICLE(x)			\
 	if (x >= _StrandCount * _StrandParticleCount) return;
+#define CHECK_PARTICLE_SOLVER(x)	\
+	if (x >= _SolverStrandCount * _StrandParticleCount) return;
 
 //---------
 // utility
@@ -219,7 +218,12 @@ void KVolumeSplat(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x);
+	//TODO
+	uint row = worldIdx.x / _SolverStrandCount;
+	uint col = worldIdx.x % _SolverStrandCount;
+	worldIdx.x = row * _StrandCount + col;//TODO
+
+	CHECK_PARTICLE_SOLVER(worldIdx.x);
 
 	//TODO remap and pack according to max velocity within volume?
 	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
@@ -260,7 +264,7 @@ void KVolumeSplatDensity(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x);
+	CHECK_PARTICLE_SOLVER(worldIdx.x);
 
 	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];
@@ -282,7 +286,7 @@ void KVolumeSplatVelocityX(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x);
+	CHECK_PARTICLE_SOLVER(worldIdx.x);
 	
 	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];
@@ -305,7 +309,7 @@ void KVolumeSplatVelocityY(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x);
+	CHECK_PARTICLE_SOLVER(worldIdx.x);
 
 	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];
@@ -328,7 +332,7 @@ void KVolumeSplatVelocityZ(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	CHECK_PARTICLE_INDEX(worldIdx.x);
+	CHECK_PARTICLE_SOLVER(worldIdx.x);
 
 	const float3 p = _ParticlePosition[worldIdx.x].xyz;
 	const float4 v = _ParticleVelocity[worldIdx.x];

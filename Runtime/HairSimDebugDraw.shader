@@ -13,7 +13,7 @@
 	// 1 == non uniform target density
 
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-	#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
+	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
 	#include "HairSimData.hlsl"
@@ -35,6 +35,11 @@
 		float4 color : TEXCOORD0;
 	};
 
+	float4 WorldToClip(float3 worldPos)
+	{
+		return TransformWorldToHClip(worldPos);
+	}
+
 	DebugVaryings DebugVert_StrandParticle(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
 	#if LAYOUT_INTERLEAVED
@@ -54,7 +59,7 @@
 		float3 worldPos = _ParticlePosition[i].xyz;
 
 		DebugVaryings output;
-		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
+		output.positionCS = WorldToClip(worldPos);
 		output.color = float4(ColorCycle(instanceID, _StrandCount), 1.0);
 		return output;
 	}
@@ -88,7 +93,7 @@
 		}
 
 		DebugVaryings output;
-		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
+		output.positionCS = WorldToClip(worldPos);
 		output.color = float4(0.0, vertexID & 1, vertexID & 2, 1.0);
 		return output;
 
@@ -133,7 +138,7 @@
 		}
 
 		DebugVaryings output;
-		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
+		output.positionCS = WorldToClip(worldPos);
 		output.color = float4(color, 1.0);
 		return output;
 	}
@@ -160,7 +165,7 @@
 		float2 ndc1 = clipPos1.xy / clipPos1.w;
 
 		DebugVaryings output;
-		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos1));
+		output.positionCS = WorldToClip(worldPos1);
 		output.color = float4(0.5 * (ndc1 - ndc0), 0, 0);
 		return output;
 	}
@@ -173,7 +178,7 @@
 		float3 worldPos = (volumeDensity == 0.0) ? 1e+7 : VolumeIndexToWorld(volumeIdx);
 
 		DebugVaryings output;
-		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
+		output.positionCS = WorldToClip(worldPos);
 		output.color = float4(ColorDensity(volumeDensity), 1.0);
 		return output;
 	}
@@ -190,7 +195,7 @@
 		}
 
 		DebugVaryings output;
-		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
+		output.positionCS = WorldToClip(worldPos);
 		output.color = float4(ColorGradient(volumeGradient), 1.0);
 		return output;
 	}
@@ -204,7 +209,7 @@
 		uvw = uvwWorld;
 
 		DebugVaryings output;
-		output.positionCS = TransformWorldToHClip(GetCameraRelativePositionWS(worldPos));
+		output.positionCS = WorldToClip(worldPos);
 		output.color = float4(uvw, 1);
 		return output;
 	}
@@ -325,12 +330,11 @@
 
 	DebugVaryings DebugVert_VolumeIsosurface(float3 position : POSITION)
 	{
-		float3 positionRWS = TransformObjectToWorld(position);
-		float3 positionWS = GetAbsolutePositionWS(positionRWS);
+		float3 worldPos = TransformObjectToWorld(position);
 
 		DebugVaryings output;
-		output.positionCS = TransformWorldToHClip(positionRWS);
-		output.color = float4(positionWS, 1);
+		output.positionCS = WorldToClip(worldPos);
+		output.color = float4(worldPos, 1);
 		return output;
 	}
 

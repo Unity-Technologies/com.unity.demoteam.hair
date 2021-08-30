@@ -15,11 +15,11 @@ namespace Unity.DemoTeam.Hair
 		public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => -EditorGUIUtility.standardVerticalSpacing;
 		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
-			var pipelineAsset = GraphicsSettings.renderPipelineAsset;
-			if (pipelineAsset == null)
+			var currentPipelineAsset = GraphicsSettings.currentRenderPipeline;
+			if (currentPipelineAsset == null)
 				return;
 
-			var layerMaskNames = pipelineAsset.renderingLayerMaskNames;
+			var layerMaskNames = currentPipelineAsset.renderingLayerMaskNames;
 			if (layerMaskNames == null)
 				return;
 

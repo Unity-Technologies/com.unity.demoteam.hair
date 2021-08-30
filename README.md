@@ -1,12 +1,11 @@
 # Package: com.unity.demoteam.hair
 
-Strand based hair simulation and rendering.
+Strand based hair authoring, simulation and rendering.
 
 
 ## Requirements
 
 - Unity 2020.2.0f1 +
-- HDRP 10.2.2 +
 
 
 ## Features

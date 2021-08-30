@@ -144,6 +144,22 @@ namespace Unity.DemoTeam.Hair
 			return ObjectNames.NicifyVariableName(variableName);
 		}
 
+		static void WarnIfNotAssigned(Object asset, string label)
+		{
+			if (asset == null)
+			{
+				EditorGUILayout.HelpBox(string.Format("Configuration error: '{0}' is required and not assigned.", label), MessageType.Error, wide: true);
+			}
+		}
+
+		static void WarnIfNotReadable(Texture2D texture, string label)
+		{
+			if (texture != null && texture.isReadable == false)
+			{
+				EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' will be ignored since the assigned texture asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
+			}
+		}
+
 		static StructValidation ValidationGUIAlembic(object userData)
 		{
 #if HAS_PACKAGE_UNITY_ALEMBIC
@@ -155,6 +171,11 @@ namespace Unity.DemoTeam.Hair
 				{
 					EditorGUILayout.HelpBox("Configuration warning: Unable to locate curves in the assigned alembic asset.", MessageType.Warning, wide: true);
 				}
+
+				if (hairAsset.settingsAlembic.rootUV == HairAsset.SettingsAlembic.RootUV.ResolveFromMesh)
+				{
+					WarnIfNotAssigned(hairAsset.settingsAlembic.rootUVMesh, LabelName(nameof(hairAsset.settingsAlembic.rootUVMesh)));
+				}
 			}
 			return StructValidation.Pass;
 #else
@@ -165,34 +186,56 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUIProcedural(object userData)
 		{
-			void WarnIfMissingReadable(Texture2D texture, string label)
-			{
-				if (texture != null && texture.isReadable == false)
-				{
-					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' will be ignored since the assigned texture asset is not marked 'Read/Write'.", label), MessageType.Warning, wide: true);
-				}
-			}
-
 			var hairAsset = userData as HairAsset;
 			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
 			{
-				var mesh = hairAsset.settingsProcedural.placementMesh;
-				if (mesh == null)
-				{
-					EditorGUILayout.HelpBox(string.Format("Configuration error: '{0}' is not assigned.", LabelName(nameof(hairAsset.settingsProcedural.placementMesh))), MessageType.Error);
-				}
-
-				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedDensity, LabelName(nameof(hairAsset.settingsProcedural.mappedDensity)));
-				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedDirection, LabelName(nameof(hairAsset.settingsProcedural.mappedDirection)));
-				WarnIfMissingReadable(hairAsset.settingsProcedural.mappedParameters, LabelName(nameof(hairAsset.settingsProcedural.mappedParameters)));
+				WarnIfNotAssigned(hairAsset.settingsProcedural.placementMesh, LabelName(nameof(hairAsset.settingsProcedural.placementMesh)));
+				WarnIfNotReadable(hairAsset.settingsProcedural.mappedDensity, LabelName(nameof(hairAsset.settingsProcedural.mappedDensity)));
+				WarnIfNotReadable(hairAsset.settingsProcedural.mappedDirection, LabelName(nameof(hairAsset.settingsProcedural.mappedDirection)));
+				WarnIfNotReadable(hairAsset.settingsProcedural.mappedParameters, LabelName(nameof(hairAsset.settingsProcedural.mappedParameters)));
 			}
 
 			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom)
 			{
-				var hairAssetProvider = hairAsset.settingsProcedural.placementProvider;
-				if (hairAssetProvider == null)
+				WarnIfNotAssigned(hairAsset.settingsProcedural.placementProvider, LabelName(nameof(hairAsset.settingsProcedural.placementProvider)));
+			}
+
+			return StructValidation.Pass;
+		}
+
+		static StructValidation ValidationGUILODClusters(object userData)
+		{
+			var hairAsset = userData as HairAsset;
+			if (hairAsset.settingsBasic.kLODClusters)
+			{
+				switch (hairAsset.settingsBasic.kLODClustersProvider)
 				{
-					EditorGUILayout.HelpBox(string.Format("Configuration error: '{0}' is not assigned.", LabelName(nameof(hairAsset.settingsProcedural.placementProvider))), MessageType.Error);
+					case HairAsset.LODClusters.Generated:
+						{
+							EditorGUILayout.HelpBox("Configuration warning: Not yet implemented.", MessageType.Warning, wide: true);
+							return StructValidation.Inaccessible;
+						}
+
+					case HairAsset.LODClusters.UVMapped:
+						{
+							var clusterMaps = hairAsset.settingsLODUVMapped.baseLODClusterMapChain;
+							if (clusterMaps != null)
+							{
+								for (int i = 0; i != clusterMaps.Length; i++)
+								{
+									WarnIfNotReadable(clusterMaps[i], string.Format("{0}[{1}]", LabelName(nameof(hairAsset.settingsLODUVMapped.baseLODClusterMapChain)), i));
+								}
+							}
+						}
+						break;
+				}
+
+				if (hairAsset.settingsBasic.kLODClustersHighLOD)
+				{
+					if (hairAsset.settingsLODPyramid.highLODIntermediateLevels > 0)
+					{
+						EditorGUILayout.HelpBox("Configuration warning: Not yet implemented.", MessageType.Warning, wide: true);
+					}
 				}
 			}
 
@@ -248,11 +291,11 @@ namespace Unity.DemoTeam.Hair
 					switch (clustersProvider)
 					{
 						case HairAsset.LODClusters.Generated:
-							StructPropertyFieldsWithHeader(_settingsLODGenerated, "Settings Clusters Generated");
+							StructPropertyFieldsWithHeader(_settingsLODGenerated, "Settings Clusters Generated", ValidationGUILODClusters, hairAsset);
 							break;
 
 						case HairAsset.LODClusters.UVMapped:
-							StructPropertyFieldsWithHeader(_settingsLODUVMapped, "Settings Clusters UV Mapped");
+							StructPropertyFieldsWithHeader(_settingsLODUVMapped, "Settings Clusters UV Mapped", ValidationGUILODClusters, hairAsset);
 							break;
 					}
 

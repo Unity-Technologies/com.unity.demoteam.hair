@@ -59,6 +59,12 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsAlembic
 		{
+			public enum Groups
+			{
+				CombineMatchingSubsequent,
+				Preserve,
+			}
+
 			public enum RootUV
 			{
 				Uniform,
@@ -66,10 +72,14 @@ namespace Unity.DemoTeam.Hair
 				//ResolveFromAttribute,
 			}
 
+			[LineHeader("Curves")]
+
 #if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
 			[Tooltip("Alembic asset containing at least one set of curves")]
 			public AlembicStreamPlayer alembicAsset;
 #endif
+			[Tooltip("Whether to combine or preserve successive sets of curves with same vertex count")]
+			public Groups alembicAssetGroups;
 
 			[LineHeader("UV Resolve")]
 
@@ -85,13 +95,17 @@ namespace Unity.DemoTeam.Hair
 
 			[Tooltip("Resample curves to ensure a specific number of equidistant particles along each strand")]
 			public bool resampleCurves;
-			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of particles along each strand")]
+
+			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of equidistant particles along each strand")]
 			public int resampleParticleCount;
 			[Range(1, 5), Tooltip("Number of resampling iterations")]
 			public int resampleQuality;
 
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
 			{
+				alembicAsset = null,
+				alembicAssetGroups = Groups.CombineMatchingSubsequent,
+
 				rootUV = RootUV.Uniform,
 				rootUVConstant = Vector2.zero,
 				rootUVMesh = null,
@@ -235,9 +249,13 @@ namespace Unity.DemoTeam.Hair
 
 			[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands")]
 			public float baseLODClusterQuantity;
+			[Tooltip("Cluster initialization method")]
 			public ClusterSelection baseLODClusterInitialization;
-			[VisibleIf(nameof(baseLODClusterInitialization), ClusterSelection.RandomPointsOnMesh)]
+			[VisibleIf(nameof(baseLODClusterInitialization), ClusterSelection.RandomPointsOnMesh), Tooltip("Cluster initialization mesh")]
 			public Mesh baseLODClusterInitializationMesh;
+			[Tooltip("Cluster initialization seed")]
+			public uint baseLODClusterInitializationSeed;
+			[Tooltip("Number of k-means iterations to apply to initial set of clusters")]
 			public int baseLODClusterIterations;
 
 			public static readonly SettingsLODGenerated defaults = new SettingsLODGenerated()
@@ -245,6 +263,7 @@ namespace Unity.DemoTeam.Hair
 				baseLODClusterQuantity = 0.1f,
 				baseLODClusterInitialization = ClusterSelection.RandomPointsInVolume,
 				baseLODClusterInitializationMesh = null,
+				baseLODClusterInitializationSeed = 7,
 				baseLODClusterIterations = 1,
 			};
 		}
@@ -258,18 +277,13 @@ namespace Unity.DemoTeam.Hair
 				OneClusterPerVisualCluster,
 			}
 
-			//public enum ClusterMapEncoding
-			//{
-			//	ColorEncodesCluster,
-			//	ColorEncodesGuideIndex,
-			//}
-
 			[LineHeader("Base LOD")]
 
+			[Tooltip("Cluster map format (controls how specified cluster maps are interpreted)")]
 			public ClusterMapFormat baseLODClusterMapFormat;
 			//[VisibleIf(nameof(baseLODClusterMapFormat), ClusterMapFormat.OneClusterPerColor)]
 			//public ClusterMapEncoding baseLODClusterMapEncoding;
-			[NonReorderable]
+			[NonReorderable, Tooltip("Cluster map chain (higher indices must provide increasing levels of detail)")]
 			public Texture2D[] baseLODClusterMapChain;
 
 			public static readonly SettingsLODUVMapped defaults = new SettingsLODUVMapped()
@@ -284,9 +298,9 @@ namespace Unity.DemoTeam.Hair
 		{
 			[LineHeader("High LOD")]
 
-			[Range(0.0f, 1.0f)]
+			[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands counting from highest base LOD")]
 			public float highLODClusterQuantity;
-			[Range(0, 10)]
+			[Range(0, 10), Tooltip("Number of intermediate levels that will be generated between highest base LOD and high LOD")]
 			public int highLODIntermediateLevels;
 
 			public static readonly SettingsLODPyramid defaults = new SettingsLODPyramid()
@@ -318,6 +332,8 @@ namespace Unity.DemoTeam.Hair
 			public int lodCount;
 			[NonReorderable] public int[] lodGuideCount;// len: lodCount
 			[HideInInspector] public int[] lodGuideIndex;// len: lodCount * strandCount
+
+			[HideInInspector] public float[] lodGuideWidth;
 			[HideInInspector] public float[] lodThreshold;
 
 			[HideInInspector] public Mesh meshAssetRoots;
