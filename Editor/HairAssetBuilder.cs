@@ -2,6 +2,7 @@
 #define CLEAR_ALL_SUBASSETS
 
 #define LOD_INDEX_INCREASING
+//#define USE_DERIVED_CACHE
 
 using System;
 using UnityEngine;
@@ -443,8 +444,20 @@ namespace Unity.DemoTeam.Hair
 					case HairAsset.SettingsAlembic.RootUV.ResolveFromMesh:
 						if (settings.rootUVMesh != null)
 						{
+#if USE_DERIVED_CACHE
+							var meshQueries = DerivedCache.GetOrCreate(settings.rootUVMesh,
+								meshArg =>
+								{
+									using (var meshData = Mesh.AcquireReadOnlyMeshData(meshArg))
+									{
+										return new TriMeshQueries(meshData[0], Allocator.Persistent);
+									}
+								}
+							);
+#else
 							using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.rootUVMesh))
 							using (var meshQueries = new TriMeshQueries(meshData[0], Allocator.Temp))
+#endif
 							{
 								for (int i = 0; i != combinedCurveCount; i++)
 								{
@@ -885,7 +898,16 @@ namespace Unity.DemoTeam.Hair
 							{
 								clusterLookupLabel.Clear();
 
+#if USE_DERIVED_CACHE
+								var clusterMapLabels = DerivedCache.GetOrCreate(clusterMap,
+									clusterMapArg =>
+									{
+										return new Texture2DLabels(clusterMapArg, clusterMapArg.wrapMode, Allocator.Persistent);
+									}
+								);
+#else
 								using (var clusterMapLabels = new Texture2DLabels(clusterMap, clusterMap.wrapMode, Allocator.Temp))
+#endif
 								{
 									for (int i = 0; i != strandCount; i++)
 									{
