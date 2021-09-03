@@ -104,7 +104,9 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
 			{
+#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
 				alembicAsset = null,
+#endif
 				alembicAssetGroups = Groups.Combine,
 
 				rootUV = RootUV.Uniform,
