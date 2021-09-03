@@ -109,9 +109,8 @@ namespace Unity.DemoTeam.Hair
 					var p1 = triangleBVHContext.vertexPositionPtr[j1];
 					var p2 = triangleBVHContext.vertexPositionPtr[j2];
 
-					var n = cross(p1 - p0, p2 - p0);
-					var q = p - n * dot(p - p0, n);
-					var u = saturate(TriMeshQueriesUtility.MakeBarycentric(q, p0, p1, p2));
+					var q = TriMeshQueriesUtility.ProjectOntoTriangle(p, p0, p1, p2);
+					var u = TriMeshQueriesUtility.MakeBarycentric(q, p0, p1, p2);
 
 					var u0 = triangleBVHContext.vertexUV0Ptr[j0];
 					var u1 = triangleBVHContext.vertexUV0Ptr[j1];
@@ -191,6 +190,87 @@ namespace Unity.DemoTeam.Hair
 				// 1 face
 				return dot(nor, p1) * dot(nor, p1) / dot2(nor);
 			}
+		}
+
+		public static float3 ProjectOntoLine(in float3 p, in float3 p0, in float3 p1)
+		{
+			var n = normalize(p1 - p0);
+			var q = p0 + n * dot(p - p0, n);
+
+			return q;
+		}
+
+		public static float3 ProjectOntoPlane(in float3 p, in float3 p0, in float3 n0)
+		{
+			return p - n0 * dot(p - p0, n0);
+		}
+
+		public static float3 ProjectOntoPlane(in float3 p, in float3 p0, in float3 p1, in float3 p2)
+		{
+			var v01 = p1 - p0;
+			var v12 = p2 - p1;
+			var v20 = p0 - p2;
+
+			var n = normalize(cross(v20, v01));// ccw towards viewer
+			var q = p - n * dot(p - p0, n);
+
+			return q;
+		}
+
+		public static float3 ProjectOntoTriangle(in float3 p, in float3 p0, in float3 p1, in float3 p2)
+		{
+			var v01 = p1 - p0;
+			var v12 = p2 - p1;
+			var v20 = p0 - p2;
+
+			var n = normalize(cross(v20, v01));// ccw towards viewer
+			var q = p - n * dot(p - p0, n);
+
+			var v0q = q - p0;
+			var v1q = q - p1;
+			var v2q = q - p2;
+
+			var n01 = cross(v01, n);
+			var n12 = cross(v12, n);
+			var n20 = cross(v20, n);
+
+			var d01 = dot(v0q, n01);
+			var d12 = dot(v1q, n12);
+			var d20 = dot(v2q, n20);
+
+			var mask_face_positive =
+				(d01 > 0.0f ? 0b001 : 0b000) |
+				(d12 > 0.0f ? 0b010 : 0b000) |
+				(d20 > 0.0f ? 0b100 : 0b000);
+
+			if (mask_face_positive != 0)
+			{
+				var t01 = dot(v0q, v01) / lengthsq(v01);
+				var t12 = dot(v1q, v12) / lengthsq(v12);
+				var t20 = dot(v2q, v20) / lengthsq(v20);
+
+				var mask_face_ortho =
+					((t01 > 0.0f && t01 < 1.0f) ? 0b001 : 0b000) |
+					((t12 > 0.0f && t12 < 1.0f) ? 0b010 : 0b000) |
+					((t20 > 0.0f && t20 < 1.0f) ? 0b100 : 0b000);
+
+				var mask_face_isect =
+					((t01 >= 1.0f && t12 <= 0.0f) ? 0b011 : 0b000) |
+					((t12 >= 1.0f && t20 <= 0.0f) ? 0b110 : 0b000) |
+					((t20 >= 1.0f && t01 <= 0.0f) ? 0b101 : 0b000);
+
+				switch ((mask_face_positive & mask_face_ortho) | mask_face_isect)
+				{
+					case 0b001: q = ProjectOntoLine(q, p0, p1); break;
+					case 0b010: q = ProjectOntoLine(q, p1, p2); break;
+					case 0b100: q = ProjectOntoLine(q, p2, p0); break;
+					case 0b011: q = p1; break;
+					case 0b110: q = p2; break;
+					case 0b101: q = p0; break;
+				}
+			}
+
+			return q;
 		}
 	}
 }

@@ -36,7 +36,7 @@ namespace Unity.DemoTeam.Hair
 			public Type type;
 			[Tooltip("Memory layout for the generated strands")]
 			public MemoryLayout memoryLayout;
-			[Tooltip("Material applied to the generated strand groups")]
+			[Tooltip("Material to assign to the generated groups")]
 			public Material material;
 			[ToggleGroup, Tooltip("Build LOD clusters for the generated strands (to optionally reduce cost of rendering and simulation)")]
 			public bool kLODClusters;
@@ -61,7 +61,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public enum Groups
 			{
-				CombineMatchingSubsequent,
+				Combine,
 				Preserve,
 			}
 
@@ -69,7 +69,8 @@ namespace Unity.DemoTeam.Hair
 			{
 				Uniform,
 				ResolveFromMesh,
-				//ResolveFromAttribute,
+				//ResolveFromCurveUV,
+				//ResolveFromCurveAttribute,
 			}
 
 			[LineHeader("Curves")]
@@ -78,7 +79,7 @@ namespace Unity.DemoTeam.Hair
 			[Tooltip("Alembic asset containing at least one set of curves")]
 			public AlembicStreamPlayer alembicAsset;
 #endif
-			[Tooltip("Whether to combine or preserve successive sets of curves with same vertex count")]
+			[Tooltip("Whether to combine or preserve subsequent sets of curves with same vertex count")]
 			public Groups alembicAssetGroups;
 
 			[LineHeader("UV Resolve")]
@@ -88,7 +89,7 @@ namespace Unity.DemoTeam.Hair
 			public Vector2 rootUVConstant;
 			[VisibleIf(nameof(rootUV), RootUV.ResolveFromMesh)]
 			public Mesh rootUVMesh;
-			//[VisibleIf(nameof(rootUV), RootUV.ResolveFromAttribute)]
+			//[VisibleIf(nameof(rootUV), RootUV.ResolveFromCurveAttribute)]
 			//public string rootUVAttribute;
 
 			[LineHeader("Processing")]
@@ -104,7 +105,7 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
 			{
 				alembicAsset = null,
-				alembicAssetGroups = Groups.CombineMatchingSubsequent,
+				alembicAssetGroups = Groups.Combine,
 
 				rootUV = RootUV.Uniform,
 				rootUVConstant = Vector2.zero,
@@ -137,14 +138,14 @@ namespace Unity.DemoTeam.Hair
 			[Flags]
 			public enum SubmeshMask
 			{
-				SubmeshIndex0 = 0x1 << 0,
-				SubmeshIndex1 = 0x1 << 1,
-				SubmeshIndex2 = 0x1 << 2,
-				SubmeshIndex3 = 0x1 << 3,
-				SubmeshIndex4 = 0x1 << 4,
-				SubmeshIndex5 = 0x1 << 5,
-				SubmeshIndex6 = 0x1 << 6,
-				SubmeshIndex7 = 0x1 << 7,
+				Submesh0 = 1 << 0,
+				Submesh1 = 1 << 1,
+				Submesh2 = 1 << 2,
+				Submesh3 = 1 << 3,
+				Submesh4 = 1 << 4,
+				Submesh5 = 1 << 5,
+				Submesh6 = 1 << 6,
+				Submesh7 = 1 << 7,
 			}
 
 			public enum CurlSamplingStrategy
@@ -155,7 +156,7 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Roots")]
 
-			[Tooltip("Placement method")]
+			[Tooltip("Root placement method")]
 			public PlacementType placement;
 			[VisibleIf(nameof(placement), PlacementType.Primitive), Tooltip("Place strands using builtin primitive generator")]
 			public PrimitiveType placementPrimitive;
@@ -171,6 +172,7 @@ namespace Unity.DemoTeam.Hair
 			public Texture2D mappedDirection;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Obtain normalized strand parameters from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)"), FormerlySerializedAs("paintedParameters")]
 			public Texture2D mappedParameters;
+
 			//[ToggleGroup, Tooltip("Randomization seed")]
 			//public bool seed;
 			//[ToggleGroupItem, Min(1)]
@@ -330,18 +332,17 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
 			public int lodCount;
-			[NonReorderable] public int[] lodGuideCount;// len: lodCount
-			[HideInInspector] public int[] lodGuideIndex;// len: lodCount * strandCount
-
-			[HideInInspector] public float[] lodGuideWidth;
-			[HideInInspector] public float[] lodThreshold;
+			[NonReorderable] public int[] lodGuideCount;	// n: lod index -> num. guides
+			[HideInInspector] public int[] lodGuideIndex;	// i: lod index * strand count + strand index -> guide index
+			[HideInInspector] public float[] lodGuideCarry;	// f: lod index * strand count + strand index -> guide carry
+			[HideInInspector] public float[] lodThreshold;	// f: lod index -> relative guide count [0..1] (to maximum lod in group)
 
 			[HideInInspector] public Mesh meshAssetRoots;
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetStrips;
 
 			public int version;
-			public const int VERSION = 1;
+			public const int VERSION = 2;
 		}
 
 		public Material defaultMaterial;
@@ -382,6 +383,20 @@ namespace Unity.DemoTeam.Hair
 							}
 
 							strandGroup.version = 1;
+						}
+						return true;
+
+					// 1->2: add LOD guide carry
+					case 1:
+						{
+							strandGroup.lodGuideCarry = new float[strandGroup.lodGuideIndex.Length];
+
+							for (int i = 0; i != strandGroup.lodGuideCarry.Length; i++)
+							{
+								strandGroup.lodGuideCarry[i] = 1.0f;
+							}
+
+							strandGroup.version = 2;
 						}
 						return true;
 

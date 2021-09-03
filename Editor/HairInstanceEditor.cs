@@ -47,7 +47,7 @@ namespace Unity.DemoTeam.Hair
 		public bool HasFrameBounds()
 		{
 			var hairInstance = target as HairInstance;
-			if (hairInstance == null)
+			if (hairInstance == null || hairInstance.strandGroupInstances == null)
 				return false;
 			else
 				return true;

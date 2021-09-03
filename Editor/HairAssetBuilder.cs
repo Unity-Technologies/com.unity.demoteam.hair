@@ -240,8 +240,6 @@ namespace Unity.DemoTeam.Hair
 
 		static unsafe AlembicCurvesInfo PrepareAlembicCurvesInfo(AlembicCurves curveSet)
 		{
-			var curveCount = curveSet.CurveOffsets.Length;
-
 			// prepare struct
 			var info = new AlembicCurvesInfo
 			{
@@ -305,7 +303,7 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					// optionally append data from subsequent curve sets that have same maximum vertex count
-					var combineSets = (settings.alembicAssetGroups == HairAsset.SettingsAlembic.Groups.CombineMatchingSubsequent);
+					var combineSets = (settings.alembicAssetGroups == HairAsset.SettingsAlembic.Groups.Combine);
 					if (combineSets)
 					{
 						for (; curveSetIndex != curveSets.Length; curveSetIndex++)
@@ -440,19 +438,21 @@ namespace Unity.DemoTeam.Hair
 					strandGroup.rootDirection[i] = Vector3.Normalize(p1 - p0);
 				}
 
-				if (settings.rootUV == HairAsset.SettingsAlembic.RootUV.ResolveFromMesh)
+				switch (settings.rootUV)
 				{
-					if (settings.rootUVMesh != null)
-					{
-						using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.rootUVMesh))
-						using (var meshQueries = new TriMeshQueries(meshData[0], Allocator.Temp))
+					case HairAsset.SettingsAlembic.RootUV.ResolveFromMesh:
+						if (settings.rootUVMesh != null)
 						{
-							for (int i = 0; i != combinedCurveCount; i++)
+							using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.rootUVMesh))
+							using (var meshQueries = new TriMeshQueries(meshData[0], Allocator.Temp))
 							{
-								strandGroup.rootUV[i] = meshQueries.FindClosestTriangleUV(strandGroup.rootPosition[i]);
+								for (int i = 0; i != combinedCurveCount; i++)
+								{
+									strandGroup.rootUV[i] = meshQueries.FindClosestTriangleUV(strandGroup.rootPosition[i]);
+								}
 							}
 						}
-					}
+						break;
 				}
 
 				switch (strandGroup.particleMemoryLayout)
@@ -700,30 +700,41 @@ namespace Unity.DemoTeam.Hair
 #if LOD_INDEX_INCREASING
 			strandGroup.lodGuideCount = lodChain.lodGuideCount.ToArray();
 			strandGroup.lodGuideIndex = lodChain.lodGuideIndex.ToArray();
+			strandGroup.lodGuideCarry = lodChain.lodGuideCarry.ToArray();
 #else
-			strandGroup.lodGuideCount = new int[lodGuideCount.Length];
-			strandGroup.lodGuideIndex = new int[lodGuideIndex.Length];
+			strandGroup.lodGuideCount = new int[lodChain.lodGuideCount.Length];
+			strandGroup.lodGuideIndex = new int[lodChain.lodGuideIndex.Length];
+			strandGroup.lodGuideCarry = new float[lodChain.lodGuideCarry.Length];
 
-			// write highest granularity to LOD 0, next-to-highest granularity to LOD 1, etc.
-			fixed (int* lodGuideCountDstBase = strandGroup.lodGuideCount)
-			fixed (int* lodGuideIndexDstBase = strandGroup.lodGuideIndex)
+			unsafe
 			{
-				int* lodGuideCountCopyDst = lodGuideCountDstBase;
-				int* lodGuideIndexCopyDst = lodGuideIndexDstBase;
-
-				int* lodGuideCountCopySrc = (int*)lodGuideCount.GetUnsafePtr() + (strandGroup.lodCount);
-				int* lodGuideIndexCopySrc = (int*)lodGuideIndex.GetUnsafePtr() + (strandGroup.lodCount * strandCount);
-
-				for (int i = 0; i != strandGroup.lodCount; i++)
+				// write highest granularity to LOD 0, next-to-highest granularity to LOD 1, etc.
+				fixed (int* lodGuideCountDstBase = strandGroup.lodGuideCount)
+				fixed (int* lodGuideIndexDstBase = strandGroup.lodGuideIndex)
+				fixed (float* lodGuideCarryDstBase = strandGroup.lodGuideCarry)
 				{
-					lodGuideCountCopySrc -= 1;
-					lodGuideIndexCopySrc -= strandCount;
+					var lodGuideCountCopyDst = lodGuideCountDstBase;
+					var lodGuideIndexCopyDst = lodGuideIndexDstBase;
+					var lodGuideCarryCopyDst = lodGuideCarryDstBase;
 
-					UnsafeUtility.MemCpy(lodGuideCountCopyDst, lodGuideCountCopySrc, sizeof(int));
-					UnsafeUtility.MemCpy(lodGuideIndexCopyDst, lodGuideIndexCopySrc, sizeof(int) * strandCount);
+					var lodGuideCountCopySrc = (int*)lodChain.lodGuideCount.GetUnsafePtr() + (strandGroup.lodCount);
+					var lodGuideIndexCopySrc = (int*)lodChain.lodGuideIndex.GetUnsafePtr() + (strandGroup.lodCount * strandCount);
+					var lodGuideCarryCopySrc = (float*)lodChain.lodGuideCarry.GetUnsafePtr() + (strandGroup.lodCount * strandCount);
 
-					lodGuideCountCopyDst += 1;
-					lodGuideIndexCopyDst += strandCount;
+					for (int i = 0; i != strandGroup.lodCount; i++)
+					{
+						lodGuideCountCopySrc -= 1;
+						lodGuideIndexCopySrc -= strandCount;
+						lodGuideCarryCopySrc -= strandCount;
+
+						UnsafeUtility.MemCpy(lodGuideCountCopyDst, lodGuideCountCopySrc, sizeof(int));
+						UnsafeUtility.MemCpy(lodGuideIndexCopyDst, lodGuideIndexCopySrc, sizeof(int) * strandCount);
+						UnsafeUtility.MemCpy(lodGuideCarryCopyDst, lodGuideCarryCopySrc, sizeof(float) * strandCount);
+
+						lodGuideCountCopyDst += 1;
+						lodGuideIndexCopyDst += strandCount;
+						lodGuideCarryCopyDst += strandCount;
+					}
 				}
 			}
 #endif
@@ -791,6 +802,7 @@ namespace Unity.DemoTeam.Hair
 					for (int i = 0; i != strandGroup.lodCount; i++)
 					{
 						remapping.ApplyShuffle(strandGroup.lodGuideIndex, i * strandCount, 1, strandCount);
+						remapping.ApplyShuffle(strandGroup.lodGuideCarry, i * strandCount, 1, strandCount);
 					}
 
 					// apply to indices (since strands have now moved)
@@ -959,6 +971,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				clusterSet.clusterDepthPtr[i] = lodChain.lodCount;
 				clusterSet.clusterGuidePtr[i] = i;
+				clusterSet.clusterCarryPtr[i] = 1.0f;
 				clusterSet.strandClusterPtr[i] = i;
 			}
 
@@ -1351,10 +1364,13 @@ namespace Unity.DemoTeam.Hair
 			public int lodCount;
 			public NativeList<int> lodGuideCount;
 			public NativeList<int> lodGuideIndex;
+			public NativeList<float> lodGuideCarry;
 
 			public int strandCount;
 			public NativeArray<int> strandGuide;
+			public NativeArray<float> strandCarry;
 			public int* strandGuidePtr;
+			public float* strandCarryPtr;
 
 			public LODChain(int lodCapacity, int strandCount, Allocator allocator)
 			{
@@ -1363,10 +1379,13 @@ namespace Unity.DemoTeam.Hair
 				this.lodCount = 0;
 				this.lodGuideCount = new NativeList<int>(lodCapacity, allocator);
 				this.lodGuideIndex = new NativeList<int>(lodCapacity * strandCount, allocator);
+				this.lodGuideCarry = new NativeList<float>(lodCapacity * strandCount, allocator);
 
 				this.strandCount = strandCount;
 				this.strandGuide = new NativeArray<int>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
 				this.strandGuidePtr = (int*)strandGuide.GetUnsafePtr();
+				this.strandCarry = new NativeArray<float>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.strandCarryPtr = (float*)strandCarry.GetUnsafePtr();
 			}
 
 			public void Dispose()
@@ -1374,7 +1393,9 @@ namespace Unity.DemoTeam.Hair
 				clusterSet.Dispose();
 				lodGuideCount.Dispose();
 				lodGuideIndex.Dispose();
+				lodGuideCarry.Dispose();
 				strandGuide.Dispose();
+				strandCarry.Dispose();
 			}
 
 			public bool TryAppend(ClusterSet nextClusters)
@@ -1391,12 +1412,17 @@ namespace Unity.DemoTeam.Hair
 						// update lod guide index
 						for (int i = 0; i != strandCount; i++)
 						{
-							strandGuidePtr[i] = clusterSet.clusterGuidePtr[clusterSet.strandClusterPtr[i]];
+							int cluster = clusterSet.strandClusterPtr[i];
+							{
+								strandGuidePtr[i] = clusterSet.clusterGuidePtr[cluster];
+								strandCarryPtr[i] = clusterSet.clusterCarryPtr[cluster];
+							}
 						}
 
 						lodCount++;
 						lodGuideCount.Add(clusterSet.clusterCount);
 						lodGuideIndex.AddRange(strandGuidePtr, strandCount);
+						lodGuideCarry.AddRange(strandCarryPtr, strandCount);
 
 						// succcess
 						return true;
@@ -1421,12 +1447,14 @@ namespace Unity.DemoTeam.Hair
 			public int clusterCount;
 			public NativeArray<int> clusterDepth;
 			public NativeArray<int> clusterGuide;
+			public NativeArray<float> clusterCarry;
 
 			public int strandCount;
 			public NativeArray<int> strandCluster;
 
 			public int* clusterDepthPtr;
 			public int* clusterGuidePtr;
+			public float* clusterCarryPtr;
 			public int* strandClusterPtr;
 
 			public ClusterSet(int clusterCount, int strandCount, Allocator allocator)
@@ -1434,12 +1462,14 @@ namespace Unity.DemoTeam.Hair
 				this.clusterCount = clusterCount;
 				this.clusterDepth = new NativeArray<int>(clusterCount, allocator, NativeArrayOptions.UninitializedMemory);
 				this.clusterGuide = new NativeArray<int>(clusterCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.clusterCarry = new NativeArray<float>(clusterCount, allocator, NativeArrayOptions.UninitializedMemory);
 
 				this.strandCount = strandCount;
 				this.strandCluster = new NativeArray<int>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
 
 				this.clusterDepthPtr = (int*)clusterDepth.GetUnsafePtr();
 				this.clusterGuidePtr = (int*)clusterGuide.GetUnsafePtr();
+				this.clusterCarryPtr = (float*)clusterCarry.GetUnsafePtr();
 				this.strandClusterPtr = (int*)strandCluster.GetUnsafePtr();
 			}
 
@@ -1447,6 +1477,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				clusterDepth.Dispose();
 				clusterGuide.Dispose();
+				clusterCarry.Dispose();
 				strandCluster.Dispose();
 			}
 
@@ -1461,7 +1492,6 @@ namespace Unity.DemoTeam.Hair
 					var clusterCenterPtr = (Vector3*)clusterCenter.GetUnsafePtr();
 					var clusterWeightPtr = (float*)clusterWeight.GetUnsafePtr();
 					var clusterScorePtr = (float*)clusterScore.GetUnsafePtr();
-					var clusterGuidePtr = (int*)clusterGuide.GetUnsafePtr();
 
 					// find weighted cluster centers
 					for (int i = 0; i != clusterCount; i++)
@@ -1507,6 +1537,12 @@ namespace Unity.DemoTeam.Hair
 								clusterScorePtr[cluster] = strandScore;
 							}
 						}
+					}
+
+					// find cluster carry (weight of all strands in cluster relative to weight of guide)
+					for (int i = 0; i != clusterCount; i++)
+					{
+						clusterCarryPtr[i] = clusterWeightPtr[i] / strandGroup.rootScale[clusterGuidePtr[i]];
 					}
 				}
 			}

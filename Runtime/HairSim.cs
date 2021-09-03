@@ -77,6 +77,7 @@ namespace Unity.DemoTeam.Hair
 
 			public static int _LODGuideCount;
 			public static int _LODGuideIndex;
+			public static int _LODGuideCarry;
 
 			public static int _StagingPosition;
 			public static int _StagingPositionPrev;
@@ -538,6 +539,7 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref solverData.lodGuideCount, "LODGuideCount", Mathf.Max(1, lodCount), particleStrideIndex);
 				changed |= CreateBuffer(ref solverData.lodGuideIndex, "LODGuideIndex", Mathf.Max(1, lodCount) * strandCount, particleStrideIndex);
+				changed |= CreateBuffer(ref solverData.lodGuideCarry, "LODGuideCarry", Mathf.Max(1, lodCount) * strandCount, particleStrideScalar);
 
 				return changed;
 			}
@@ -629,6 +631,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref solverData.lodGuideCount);
 			ReleaseBuffer(ref solverData.lodGuideIndex);
+			ReleaseBuffer(ref solverData.lodGuideCarry);
 
 			if (solverData.lodGuideCountCPU.IsCreated)
 				solverData.lodGuideCountCPU.Dispose();
@@ -700,6 +703,7 @@ namespace Unity.DemoTeam.Hair
 
 			target.BindComputeBuffer(UniformIDs._LODGuideCount, solverData.lodGuideCount);
 			target.BindComputeBuffer(UniformIDs._LODGuideIndex, solverData.lodGuideIndex);
+			target.BindComputeBuffer(UniformIDs._LODGuideCarry, solverData.lodGuideCarry);
 
 			target.BindComputeBuffer(UniformIDs._StagingPosition, solverData.stagingPosition);
 			target.BindComputeBuffer(UniformIDs._StagingPositionPrev, solverData.stagingPositionPrev);

@@ -60,7 +60,8 @@ float SdCube(float3 p, const float4x4 invM)
 	// see: "distance functions" by Inigo Quilez
 	// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
 
-	const float3 q = abs(p) - float3(0.5, 0.5, 0.5);
+	const float3 b = float3(0.5, 0.5, 0.5);
+	const float3 q = abs(p) - b;
 
 	return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }

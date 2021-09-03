@@ -8,6 +8,8 @@ namespace Unity.DemoTeam.Hair
 {
 	public unsafe struct Texture2DLabels : IDisposable
 	{
+		public delegate uint GetLabelDelegate(int x, int y);
+
 		public int dimX;
 		public int dimY;
 
@@ -15,6 +17,7 @@ namespace Unity.DemoTeam.Hair
 		public uint* texelLabelPtr;
 
 		public uint labelCount;
+		public bool labelWrap;
 
 		public Texture2DLabels(Texture2D texture, TextureWrapMode wrapMode, Allocator allocator)
 		{
@@ -25,6 +28,7 @@ namespace Unity.DemoTeam.Hair
 			texelLabelPtr = (uint*)texelLabel.GetUnsafePtr();
 
 			labelCount = 0;
+			labelWrap = (wrapMode == TextureWrapMode.Repeat);
 
 			var texelData = texture.GetRawTextureData<byte>();
 			var texelDataPtr = (byte*)texelData.GetUnsafePtr();
@@ -178,17 +182,30 @@ namespace Unity.DemoTeam.Hair
 
 		public uint GetLabel(int x, int y)
 		{
-			int Wrap(int a, int n)
+			if (labelWrap)
 			{
-				int r = a % n;
-				if (r < 0)
-					return r + n;
-				else
-					return r;
-			}
+				int Wrap(int a, int n)
+				{
+					int r = a % n;
+					if (r < 0)
+						return r + n;
+					else
+						return r;
+				}
 
-			x = Wrap(x, dimX);
-			y = Wrap(y, dimY);
+				x = Wrap(x, dimX);
+				y = Wrap(y, dimY);
+			}
+			else
+			{
+				int Clamp(int a, int n)
+				{
+					return (a < 0) ? 0 : ((a > n - 1) ? (n - 1) : a);
+				}
+
+				x = Clamp(x, dimX);
+				y = Clamp(y, dimY);
+			}
 
 			return texelLabelPtr[x + y * dimX];
 		}

@@ -893,6 +893,7 @@ namespace Unity.DemoTeam.Hair
 
 					solverData[i].lodGuideCount.SetData(strandGroup.lodGuideCount);
 					solverData[i].lodGuideIndex.SetData(strandGroup.lodGuideIndex);
+					solverData[i].lodGuideCarry.SetData(strandGroup.lodGuideCarry);
 
 					// NOTE: the remaining buffers are initialized in KInitialize and KInitializePostVolume
 				}

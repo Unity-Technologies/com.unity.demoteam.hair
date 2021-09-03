@@ -170,6 +170,18 @@ namespace Unity.DemoTeam.Hair
 
 	public static unsafe class UnsafeBVHQueries
 	{
+		public static float DistanceNodePoint(Node* nodePtr, in float3 p)
+		{
+			// see: "distance functions" by Inigo Quilez
+			// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+
+			var b = 0.5f * (nodePtr->data.max - nodePtr->data.min);
+			var c = 0.5f * (nodePtr->data.max + nodePtr->data.min);
+			var q = abs(p - c) - b;
+
+			return length(max(q, 0.0f)) + min(max(q.x, max(q.y, q.z)), 0.0f);
+		}
+
 		public static uint FindClosestLeaf<T>(in T context, in UnsafeBVH bvh, in float3 p) where T : IUnsafeBVHContext
 		{
 			var bestDist = float.PositiveInfinity;
@@ -182,7 +194,7 @@ namespace Unity.DemoTeam.Hair
 
 		static void FindClosestLeaf<T>(in T context, Node* nodePtr, in float3 p, float* bestDistPtr, uint* bestIndexPtr) where T : IUnsafeBVHContext
 		{
-			if (nodePtr->Contains(p))
+			if (DistanceNodePoint(nodePtr, p) < *bestDistPtr)
 			{
 				// examine leaf
 				var leafIndex = nodePtr->data.index;

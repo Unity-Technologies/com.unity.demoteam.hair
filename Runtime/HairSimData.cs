@@ -31,10 +31,11 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: splatting weight
 
 			public ComputeBuffer lodGuideCount;			// n: lod index -> num. guides
-			public ComputeBuffer lodGuideIndex;			// i: lod index * strandCount + strand index -> guide strand index
+			public ComputeBuffer lodGuideIndex;			// i: lod index * strand count + strand index -> guide index
+			public ComputeBuffer lodGuideCarry;			// f: lod index * strand count + strand index -> guide carry
 
 			public NativeArray<int> lodGuideCountCPU;	// n: lod index -> num. guides
-			public NativeArray<float> lodThreshold;		// n: lod index -> relative guide count [0..1] (to maximum lod in group)
+			public NativeArray<float> lodThreshold;		// f: lod index -> relative guide count [0..1] (to maximum lod in group)
 
 			public ComputeBuffer stagingPosition;		// xy: encoded position | xyz: position
 			public ComputeBuffer stagingPositionPrev;	// ...
