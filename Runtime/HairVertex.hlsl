@@ -85,6 +85,15 @@ struct HairVertex
 	float3 debugColor;
 };
 
+float3 GetHairNormalTS(in float2 vertexUV)
+{
+	float3 normalTS;
+	normalTS.x = 2.0 * saturate(vertexUV.x) - 1.0;
+	normalTS.y = 0.0;
+	normalTS.z = sqrt(max(1e-5, 1.0 - normalTS.x * normalTS.x));
+	return normalTS;
+}
+
 HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 {
 #if HAIR_VERTEX_ID_STRIPS
@@ -131,9 +140,7 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 		v.rootUV = _RootUV[strandIndex];
 		v.strandUV = vertexUV;
 		v.strandIndex = strandIndex;
-		v.strandNormalTS.x = saturate(2.0 * vertexUV.x - 1.0);
-		v.strandNormalTS.y = 0.0;
-		v.strandNormalTS.z = sqrt(max(1e-5, 1.0 - v.strandNormalTS.x * v.strandNormalTS.x));
+		v.strandNormalTS = GetHairNormalTS(vertexUV);
 		v.debugColor = ColorCycle(strandIndex, _StrandCount);
 	}
 	return v;
@@ -157,6 +164,20 @@ HairVertex GetHairVertex_Static(in float3 positionOS, in float3 normalOS, in flo
 	return v;
 }
 
+HairVertex GetHairVertex(
+	in uint in_vertexID,
+	in float2 in_vertexUV,
+	in float3 in_staticPositionOS,
+	in float3 in_staticNormalOS,
+	in float3 in_staticTangentOS)
+{
+#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS)
+	return GetHairVertex_Live(in_vertexID, in_vertexUV);
+#else
+	return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
+#endif
+}
+
 void HairVertex_float(
 	in uint in_vertexID,
 	in float2 in_vertexUV,
@@ -174,11 +195,7 @@ void HairVertex_float(
 	out float3 out_strandNormalTS,
 	out float3 out_debugColor)
 {
-#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS)
-	HairVertex v = GetHairVertex_Live(in_vertexID, in_vertexUV);
-#else
-	HairVertex v = GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
-#endif
+	HairVertex v = GetHairVertex(in_vertexID, in_vertexUV, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 	{
 		out_positionOS = v.positionOS;
 		out_motionOS = v.motionOS;
