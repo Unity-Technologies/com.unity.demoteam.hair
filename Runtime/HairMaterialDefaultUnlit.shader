@@ -68,8 +68,8 @@ Shader "Hidden/Hair/HairMaterialDefaultUnlit"
 		{
 			HLSLPROGRAM
 
-			#pragma vertex StrandVert_Color
-			#pragma fragment StrandFrag_Color
+			#pragma vertex StrandVert
+			#pragma fragment StrandFrag
 
 			ENDHLSL
 		}

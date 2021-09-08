@@ -133,6 +133,20 @@
         {
             "m_OutputSlot": {
                 "m_Node": {
+                    "m_Id": "44f5e51a52784b51a33d7135c556dd57"
+                },
+                "m_SlotId": 9
+            },
+            "m_InputSlot": {
+                "m_Node": {
+                    "m_Id": "51009a9937724d72b9250896569a7909"
+                },
+                "m_SlotId": 9
+            }
+        },
+        {
+            "m_OutputSlot": {
+                "m_Node": {
                     "m_Id": "7406c6ca8ce74d7785a672de49f82e50"
                 },
                 "m_SlotId": 0
@@ -290,6 +304,9 @@
     },
     "m_Slots": [
         {
+            "m_Id": "5b9dd4e620cc4093ad9ddf2fb9660e34"
+        },
+        {
             "m_Id": "3e9db22ad6284aff9ebe776b16f90e35"
         },
         {
@@ -311,10 +328,10 @@
             "m_Id": "3a12afeae53c4e97bf58d7213b9f62f1"
         },
         {
-            "m_Id": "c126fe2487a34d7f8cfc58b828a8390d"
+            "m_Id": "58f08324773345a391d07145d238b986"
         },
         {
-            "m_Id": "5b9dd4e620cc4093ad9ddf2fb9660e34"
+            "m_Id": "c126fe2487a34d7f8cfc58b828a8390d"
         }
     ],
     "synonyms": [],
@@ -416,6 +433,9 @@
             "m_Id": "258a4ea550694367a9d0b66746120f9c"
         },
         {
+            "m_Id": "b0eb91db0d8d43b08bb8446edd982cba"
+        },
+        {
             "m_Id": "80c63f71e91d4ed1bda87d655a1784cf"
         }
     ],
@@ -426,6 +446,18 @@
         "m_SerializableColors": []
     },
     "IsFirstSlotValid": true
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Texture3DMaterialSlot",
+    "m_ObjectId": "58f08324773345a391d07145d238b986",
+    "m_Id": 9,
+    "m_DisplayName": "volumeDirection",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "volumeDirection",
+    "m_StageCapability": 3
 }
 
 {
@@ -601,6 +633,22 @@
     "m_Hidden": false,
     "m_ShaderOutputName": "volumeDensity",
     "m_StageCapability": 3
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Texture3DInputMaterialSlot",
+    "m_ObjectId": "b0eb91db0d8d43b08bb8446edd982cba",
+    "m_Id": 9,
+    "m_DisplayName": "volumeDirection",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "volumeDirection",
+    "m_StageCapability": 3,
+    "m_Texture": {
+        "m_SerializedTexture": "{\"texture\":{\"instanceID\":0}}",
+        "m_Guid": ""
+    }
 }
 
 {

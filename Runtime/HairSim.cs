@@ -44,6 +44,7 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Volume_1_Splat_Rasterization;
 			public static ProfilingSampler Volume_1_Splat_RasterizationNoGS;
 			public static ProfilingSampler Volume_2_Resolve;
+			public static ProfilingSampler Volume_2_ResolveDirection;
 			public static ProfilingSampler Volume_2_ResolveFromRasterization;
 			public static ProfilingSampler Volume_3_Divergence;
 			public static ProfilingSampler Volume_4_PressureEOS;
@@ -90,10 +91,14 @@ namespace Unity.DemoTeam.Hair
 			public static int _AccuVelocityX;
 			public static int _AccuVelocityY;
 			public static int _AccuVelocityZ;
+			public static int _AccuDirectionX;
+			public static int _AccuDirectionY;
+			public static int _AccuDirectionZ;
 
 			public static int _VolumeDensity;
 			public static int _VolumeDensity0;
 			public static int _VolumeVelocity;
+			public static int _VolumeDirection;
 			public static int _VolumeDivergence;
 
 			public static int _VolumePressure;
@@ -140,6 +145,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KVolumeSplatVelocityY;
 			public static int KVolumeSplatVelocityZ;
 			public static int KVolumeResolve;
+			public static int KVolumeResolveDirection;
 			public static int KVolumeResolveFromRasterization;
 			public static int KVolumeDivergence;
 			public static int KVolumePressureEOS;
@@ -337,6 +343,9 @@ namespace Unity.DemoTeam.Hair
 
 			[UnityEngine.Serialization.FormerlySerializedAs("volumeSplatMethod")]
 			public SplatMethod splatMethod;
+			public bool splatClusters;
+			public bool splatDirection;
+
 			[ToggleGroup]
 			public bool splatDebug;
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 9.0f)]
@@ -377,6 +386,8 @@ namespace Unity.DemoTeam.Hair
 			public static readonly VolumeSettings defaults = new VolumeSettings()
 			{
 				splatMethod = SplatMethod.Compute,
+				splatClusters = true,
+				splatDirection = true,
 				splatDebug = false,
 				splatDebugWidth = 1.0f,
 
@@ -587,10 +598,14 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateVolume(ref volumeData.accuVelocityX, "AccuVelocityX", cellCount, cellFormatAccu);
 				changed |= CreateVolume(ref volumeData.accuVelocityY, "AccuVelocityY", cellCount, cellFormatAccu);
 				changed |= CreateVolume(ref volumeData.accuVelocityZ, "AccuVelocityZ", cellCount, cellFormatAccu);
+				changed |= CreateVolume(ref volumeData.accuDirectionX, "AccuDirectionX", cellCount, cellFormatAccu);
+				changed |= CreateVolume(ref volumeData.accuDirectionY, "AccuDirectionY", cellCount, cellFormatAccu);
+				changed |= CreateVolume(ref volumeData.accuDirectionZ, "AccuDirectionZ", cellCount, cellFormatAccu);
 
 				changed |= CreateVolume(ref volumeData.volumeDensity, "VolumeDensity", cellCount, cellFormatScalar);
 				changed |= CreateVolume(ref volumeData.volumeDensity0, "VolumeDensity0", cellCount, cellFormatScalar);
 				changed |= CreateVolume(ref volumeData.volumeVelocity, "VolumeVelocity", cellCount, cellFormatVector);
+				changed |= CreateVolume(ref volumeData.volumeDirection, "VolumeDirection", cellCount, cellFormatVector);
 
 				changed |= CreateVolume(ref volumeData.volumeDivergence, "VolumeDivergence", cellCount, cellFormatScalar);
 				changed |= CreateVolume(ref volumeData.volumePressure, "VolumePressure_0", cellCount, cellFormatScalar);
@@ -654,10 +669,14 @@ namespace Unity.DemoTeam.Hair
 			ReleaseVolume(ref volumeData.accuVelocityX);
 			ReleaseVolume(ref volumeData.accuVelocityY);
 			ReleaseVolume(ref volumeData.accuVelocityZ);
+			ReleaseVolume(ref volumeData.accuDirectionX);
+			ReleaseVolume(ref volumeData.accuDirectionY);
+			ReleaseVolume(ref volumeData.accuDirectionZ);
 
 			ReleaseVolume(ref volumeData.volumeDensity);
 			ReleaseVolume(ref volumeData.volumeDensity0);
 			ReleaseVolume(ref volumeData.volumeVelocity);
+			ReleaseVolume(ref volumeData.volumeDirection);
 
 			ReleaseVolume(ref volumeData.volumeDivergence);
 			ReleaseVolume(ref volumeData.volumePressure);
@@ -736,10 +755,14 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeTexture(UniformIDs._AccuVelocityX, volumeData.accuVelocityX);
 			target.BindComputeTexture(UniformIDs._AccuVelocityY, volumeData.accuVelocityY);
 			target.BindComputeTexture(UniformIDs._AccuVelocityZ, volumeData.accuVelocityZ);
+			target.BindComputeTexture(UniformIDs._AccuDirectionX, volumeData.accuDirectionX);
+			target.BindComputeTexture(UniformIDs._AccuDirectionY, volumeData.accuDirectionY);
+			target.BindComputeTexture(UniformIDs._AccuDirectionZ, volumeData.accuDirectionZ);
 
 			target.BindComputeTexture(UniformIDs._VolumeDensity, volumeData.volumeDensity);
 			target.BindComputeTexture(UniformIDs._VolumeDensity0, volumeData.volumeDensity0);
 			target.BindComputeTexture(UniformIDs._VolumeVelocity, volumeData.volumeVelocity);
+			target.BindComputeTexture(UniformIDs._VolumeDirection, volumeData.volumeDirection);
 			target.BindComputeTexture(UniformIDs._VolumeDivergence, volumeData.volumeDivergence);
 
 			target.BindComputeTexture(UniformIDs._VolumePressure, volumeData.volumePressure);
@@ -753,6 +776,8 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(UniformIDs._BoundaryMatrixW2PrevW, volumeData.boundaryMatrixW2PrevW);
 
 			target.BindKeyword("VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
+			target.BindKeyword("VOLUME_SPLAT_CLUSTERS", volumeData.keywords.VOLUME_SPLAT_CLUSTERS);
+			target.BindKeyword("VOLUME_SPLAT_DIRECTION", volumeData.keywords.VOLUME_SPLAT_DIRECTION);
 			target.BindKeyword("VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
 			target.BindKeyword("VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 		}
@@ -959,6 +984,8 @@ namespace Unity.DemoTeam.Hair
 
 			// derive keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
+			keywords.VOLUME_SPLAT_CLUSTERS = (volumeSettings.splatClusters);
+			keywords.VOLUME_SPLAT_DIRECTION = (volumeSettings.splatDirection);
 			keywords.VOLUME_TARGET_INITIAL_POSE = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPose);
 			keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPoseInParticles);
 
@@ -1267,9 +1294,10 @@ namespace Unity.DemoTeam.Hair
 
 		private static void StepVolumeData_Insert(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData solverData)
 		{
-			int particleCount = (int)solverData.cbuffer._SolverStrandCount * (int)solverData.cbuffer._StrandParticleCount;
+			int insertedStrandCount = volumeData.keywords.VOLUME_SPLAT_CLUSTERS ? (int)solverData.cbuffer._SolverStrandCount : (int)solverData.cbuffer._StrandCount;
+			int insertedParticleCount = insertedStrandCount * (int)solverData.cbuffer._StrandParticleCount;
 
-			int numX = particleCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, particleCount % PARTICLE_GROUP_SIZE);
+			int numX = insertedParticleCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, insertedParticleCount % PARTICLE_GROUP_SIZE);
 			int numY = 1;
 			int numZ = 1;
 
@@ -1319,7 +1347,7 @@ namespace Unity.DemoTeam.Hair
 								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
 								BindVolumeData(cmd, volumeData);
 								BindSolverData(cmd, solverData);
-								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, particleCount, 1);
+								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, insertedParticleCount, 1);
 							}
 						}
 						break;
@@ -1331,7 +1359,7 @@ namespace Unity.DemoTeam.Hair
 								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
 								BindVolumeData(cmd, volumeData);
 								BindSolverData(cmd, solverData);
-								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, particleCount * 8, 1);
+								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, insertedParticleCount * 8, 1);
 							}
 						}
 						break;
@@ -1355,6 +1383,15 @@ namespace Unity.DemoTeam.Hair
 						{
 							BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeResolve, volumeData);
 							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolve, numX, numY, numZ);
+						}
+
+						if (volumeData.keywords.VOLUME_SPLAT_DIRECTION)
+						{
+							using (new ProfilingScope(cmd, MarkersGPU.Volume_2_ResolveDirection))
+							{
+								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeResolveDirection, volumeData);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolveDirection, numX, numY, numZ);
+							}
 						}
 					}
 					break;

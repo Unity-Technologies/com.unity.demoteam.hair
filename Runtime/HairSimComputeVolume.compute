@@ -5,6 +5,7 @@
 #pragma kernel KVolumeSplatVelocityY
 #pragma kernel KVolumeSplatVelocityZ
 #pragma kernel KVolumeResolve
+#pragma kernel KVolumeResolveDirection
 #pragma kernel KVolumeResolveFromRasterization
 #pragma kernel KVolumeDivergence
 #pragma kernel KVolumePressureEOS
@@ -18,6 +19,9 @@
 // 0 == particles grouped by strand, i.e. root, root+1, root, root+1
 // 1 == particles grouped by index, i.e. root, root, root+1, root+1
 
+#pragma multi_compile __ VOLUME_SPLAT_CLUSTERS
+#pragma multi_compile __ VOLUME_SPLAT_DIRECTION
+
 #pragma multi_compile __ VOLUME_SUPPORT_CONTRACTION
 // 0 == pressure is always positive
 // 1 == negative pressure causes contraction
@@ -28,6 +32,12 @@
 
 #ifndef VOLUME_SUPPORT_CONTRACTION
 #define VOLUME_SUPPORT_CONTRACTION 0
+#endif
+#ifndef VOLUME_SPLAT_CLUSTERS
+#define VOLUME_SPLAT_CLUSTERS 0
+#endif
+#ifndef VOLUME_SPLAT_DIRECTION
+#define VOLUME_SPLAT_DIRECTION 0
 #endif
 #ifndef VOLUME_TARGET_INITIAL_POSE
 #define VOLUME_TARGET_INITIAL_POSE 0
@@ -93,6 +103,28 @@
 	if (x >= _StrandCount * _StrandParticleCount) return;
 #define CHECK_PARTICLE_SOLVER(x)	\
 	if (x >= _SolverStrandCount * _StrandParticleCount) return;
+
+#if LAYOUT_INTERLEAVED
+  #define DECLARE_STRAND_UNCHECKED(x)				\
+	const uint strandIndex = x;						\
+	const uint strandParticleBegin = strandIndex;	\
+	const uint strandParticleStride = _StrandCount;	\
+	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
+#else
+  #define DECLARE_STRAND_UNCHECKED(x)										\
+	const uint strandIndex = x;												\
+	const uint strandParticleBegin = strandIndex * _StrandParticleCount;	\
+	const uint strandParticleStride = 1;									\
+	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
+#endif
+
+#define DECLARE_STRAND(x)	\
+	CHECK_STRAND(x);		\
+	DECLARE_STRAND_UNCHECKED(x);
+
+#define DECLARE_STRAND_SOLVER(x)	\
+	CHECK_STRAND_SOLVER(x);			\
+	DECLARE_STRAND_UNCHECKED(x);
 
 //---------
 // utility
@@ -202,10 +234,18 @@ void KVolumeClear(
 	_AccuVelocityX[worldIdx] = 0;
 	_AccuVelocityY[worldIdx] = 0;
 	_AccuVelocityZ[worldIdx] = 0;
+
+#if VOLUME_SPLAT_DIRECTION
+	_AccuDirectionX[worldIdx] = 0;
+	_AccuDirectionY[worldIdx] = 0;
+	_AccuDirectionZ[worldIdx] = 0;
+#endif
 }
 
 //---------------
 // kernels splat
+
+//TODO update the split kernels
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
 void KVolumeSplat(
@@ -218,30 +258,40 @@ void KVolumeSplat(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	//TODO
+	CHECK_PARTICLE_SOLVER(worldIdx.x);
+
+#if VOLUME_SPLAT_CLUSTERS
 	uint row = worldIdx.x / _SolverStrandCount;
 	uint col = worldIdx.x % _SolverStrandCount;
-	worldIdx.x = row * _StrandCount + col;//TODO
+	worldIdx.x = row * _StrandCount + col;
+#endif
 
-	CHECK_PARTICLE_SOLVER(worldIdx.x);
+	const float3 p = _ParticlePosition[worldIdx.x].xyz;
+#if VOLUME_SPLAT_CLUSTERS
+	const float4 v = _ParticleVelocity[worldIdx.x] * float4(1.0, 1.0, 1.0, _LODGuideCarry[(_LODIndexHi * _StrandCount) + GetStrandIndex(worldIdx.x)]);
+#else
+	const float4 v = _ParticleVelocity[worldIdx.x];
+#endif
+
+	// splat density
+	InterlockedAddParticleContribution(p, (v.w), _AccuWeight);
+	
+	// splat target density
+	{
+#if VOLUME_TARGET_INITIAL_POSE
+		const float3 p0 = _RootPosition[GetStrandIndex(worldIdx.x)].xyz;
+		const float3 r0 = QMul(_WorldRotation, _InitialParticleOffset[worldIdx.x].xyz * _StrandScale);
+		InterlockedAddParticleContribution(p0 + r0, (v.w), _AccuWeight0);
+#elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
+		InterlockedMaxParticleContribution(p, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
+#endif
+	}
 
 	//TODO remap and pack according to max velocity within volume?
 	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
 	//float3 velocityStep = clamp(_ParticleVelocity[worldIdx.x].xyz * _DT, -velocityStepLimit, velocityStepLimit);
 
-	const float3 p = _ParticlePosition[worldIdx.x].xyz;
-	const float4 v = _ParticleVelocity[worldIdx.x];
-
-	InterlockedAddParticleContribution(p, (v.w), _AccuWeight);
-	
-#if VOLUME_TARGET_INITIAL_POSE
-	const float3 p0 = _RootPosition[GetStrandIndex(worldIdx.x)].xyz;
-	const float3 r0 = QMul(_WorldRotation, _InitialParticleOffset[worldIdx.x].xyz * _StrandScale);
-	InterlockedAddParticleContribution(p0 + r0, (v.w), _AccuWeight0);
-#elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
-	InterlockedMaxParticleContribution(p, (v.w * _ParticlePosition[worldIdx.x].w), _AccuWeight0);
-#endif
-
+	// splat velocity
 #if VOLUME_STAGGERED_GRID
 	InterlockedAddParticleContributionPackW(p, (v.w * v.x), _AccuVelocityX, float3(0.0, 0.5, 0.5));
 	InterlockedAddParticleContributionPackW(p, (v.w * v.y), _AccuVelocityY, float3(0.5, 0.0, 0.5));
@@ -250,6 +300,27 @@ void KVolumeSplat(
 	InterlockedAddParticleContribution(p, (v.w * v.x), _AccuVelocityX);
 	InterlockedAddParticleContribution(p, (v.w * v.y), _AccuVelocityY);
 	InterlockedAddParticleContribution(p, (v.w * v.z), _AccuVelocityZ);
+#endif
+
+	// splat direction
+#if VOLUME_SPLAT_DIRECTION
+	{
+		DECLARE_STRAND_UNCHECKED(GetStrandIndex(worldIdx.x));
+
+		float3 n = (worldIdx.x == strandParticleBegin)
+			? _RootDirection[strandIndex].xyz
+			: normalize(p - _ParticlePosition[worldIdx.x - strandParticleStride].xyz);
+
+#if VOLUME_STAGGERED_GRID
+		InterlockedAddParticleContributionPackW(p, (v.w * n.x), _AccuDirectionX, float3(0.0, 0.5, 0.5));
+		InterlockedAddParticleContributionPackW(p, (v.w * n.y), _AccuDirectionY, float3(0.5, 0.0, 0.5));
+		InterlockedAddParticleContributionPackW(p, (v.w * n.z), _AccuDirectionZ, float3(0.5, 0.5, 0.0));
+#else
+		InterlockedAddParticleContribution(p, (v.w * n.x), _AccuDirectionX);
+		InterlockedAddParticleContribution(p, (v.w * n.y), _AccuDirectionY);
+		InterlockedAddParticleContribution(p, (v.w * n.z), _AccuDirectionZ);
+#endif
+	}
 #endif
 }
 
@@ -390,6 +461,40 @@ void KVolumeResolve(
 			_AccuVelocityX[worldIdx],
 			_AccuVelocityY[worldIdx],
 			_AccuVelocityZ[worldIdx]) / (float)max(1, accu_n)
+#endif
+		),
+		accu_w);
+}
+
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
+void KVolumeResolveDirection(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	const int accu_n = _AccuWeight[worldIdx];
+	const float accu_w = accu_n / (float)(1 << SPLAT_FRACTIONAL_BITS);
+
+	_VolumeDirection[worldIdx] = float4(
+		(float3(
+#if VOLUME_STAGGERED_GRID
+			_AccuDirectionX[worldIdx] >> WEIGHT_BITS,
+			_AccuDirectionY[worldIdx] >> WEIGHT_BITS,
+			_AccuDirectionZ[worldIdx] >> WEIGHT_BITS) /
+			float3(
+				max(1, _AccuDirectionX[worldIdx] & WEIGHT_MASK),
+				max(1, _AccuDirectionY[worldIdx] & WEIGHT_MASK),
+				max(1, _AccuDirectionZ[worldIdx] & WEIGHT_MASK)
+			)
+#else
+			_AccuDirectionX[worldIdx],
+			_AccuDirectionY[worldIdx],
+			_AccuDirectionZ[worldIdx]) / (float)max(1, accu_n)
 #endif
 		),
 		accu_w);
