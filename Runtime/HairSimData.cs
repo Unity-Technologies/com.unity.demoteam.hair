@@ -125,16 +125,12 @@ namespace Unity.DemoTeam.Hair
 			public RenderTexture accuVelocityX;			// x: fp accumulated x-velocity
 			public RenderTexture accuVelocityY;			// x: ... ... ... .. y-velocity
 			public RenderTexture accuVelocityZ;			// x: .. ... ... ... z-velocity
-			public RenderTexture accuDirectionX;		// x: fp accumulated x-direction
-			public RenderTexture accuDirectionY;		// x: ... ... ... .. y-direction
-			public RenderTexture accuDirectionZ;		// x: .. ... ... ... z-direction
 
 			public RenderTexture volumeDensity;			// x: density (as fraction occupied)
 			public RenderTexture volumeDensity0;		// x: density target
 			public RenderTexture volumeVelocity;		// xyz: velocity, w: accumulated weight
-			public RenderTexture volumeDirection;		// xyz: direction, w: accumulated weight
-			public RenderTexture volumeDivergence;		// x: velocity divergence + source term
 
+			public RenderTexture volumeDivergence;		// x: velocity divergence + source term
 			public RenderTexture volumePressure;		// x: pressure
 			public RenderTexture volumePressureNext;	// x: pressure (output of iteration)
 			public RenderTexture volumePressureGrad;	// xyz: pressure gradient, w: -
@@ -161,7 +157,6 @@ namespace Unity.DemoTeam.Hair
 		{
 			public bool VOLUME_SUPPORT_CONTRACTION;
 			public bool VOLUME_SPLAT_CLUSTERS;
-			public bool VOLUME_SPLAT_DIRECTION;
 			public bool VOLUME_TARGET_INITIAL_POSE;
 			public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
 		}

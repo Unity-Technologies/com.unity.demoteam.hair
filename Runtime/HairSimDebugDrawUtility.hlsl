@@ -6,7 +6,7 @@
 
 float3 ColorCycle(uint index, uint count)
 {
-    float t = frac(float(index) / float(count - 1));
+    float t = frac(index / (float)count);
 
 	// source: https://www.shadertoy.com/view/4ttfRn
 	float3 c = 3.0 * float3(abs(t - 0.5), t.xx) - float3(1.5, 1.0, 2.0);
@@ -15,7 +15,7 @@ float3 ColorCycle(uint index, uint count)
 
 float3 ColorRamp(uint index, uint count)
 {
-    float t = 1.0 - frac(float(index) / float(count - 1));
+    float t = 1.0 - frac(index / (float)count);
 
 	// source: https://www.shadertoy.com/view/4ttfRn
 	float3 c = 2.0 * t - float3(0.0, 1.0, 2.0);

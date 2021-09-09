@@ -11,10 +11,11 @@ Shader "Hidden/Hair/HairMaterialDefaultLit"
 
 		#pragma surface StrandSurf Lambert addshadow fullforwardshadows vertex:StrandVert
 
-#if SHADER_API_D3D11
 		#ifdef SHADER_API_XBOXONE
 		#undef SHADER_API_XBOXONE
 		#endif
+
+#if SHADER_API_D3D11
 		#ifndef UNITY_COMMON_INCLUDED
 		#define UNITY_COMMON_INCLUDED
 		#endif

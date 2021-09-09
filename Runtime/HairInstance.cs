@@ -597,7 +597,6 @@ namespace Unity.DemoTeam.Hair
 
 				materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
 				materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
-				materialInstance.SetTexture("_UntypedVolumeDirection", volumeData.volumeDirection);
 
 				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinLines);
 				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinStrips);

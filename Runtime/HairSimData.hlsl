@@ -60,17 +60,13 @@ HAIRSIM_VOLUMEDATA<int> _AccuWeight0;				// x: fp accumulated target weight
 HAIRSIM_VOLUMEDATA<int> _AccuVelocityX;				// x: fp accumulated x-velocity
 HAIRSIM_VOLUMEDATA<int> _AccuVelocityY;				// x: ... ... ... .. y-velocity
 HAIRSIM_VOLUMEDATA<int> _AccuVelocityZ;				// x: .. ... ... ... z-velocity
-HAIRSIM_VOLUMEDATA<int> _AccuDirectionX;			// x: fp accumulated x-direction
-HAIRSIM_VOLUMEDATA<int> _AccuDirectionY;			// x: ... ... ... .. y-direction
-HAIRSIM_VOLUMEDATA<int> _AccuDirectionZ;			// x: .. ... ... ... z-direction
 //TODO this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 
 HAIRSIM_VOLUMEDATA<float> _VolumeDensity;			// x: density (as fraction occupied)
 HAIRSIM_VOLUMEDATA<float> _VolumeDensity0;			// x: density target
 HAIRSIM_VOLUMEDATA<float4> _VolumeVelocity;			// xyz: velocity, w: accumulated weight
-HAIRSIM_VOLUMEDATA<float4> _VolumeDirection;		// xyz: direction, w: accumulated weight
-HAIRSIM_VOLUMEDATA<float> _VolumeDivergence;		// x: velocity divergence + source term
 
+HAIRSIM_VOLUMEDATA<float> _VolumeDivergence;		// x: velocity divergence + source term
 HAIRSIM_VOLUMEDATA<float> _VolumePressure;			// x: pressure
 HAIRSIM_VOLUMEDATA<float> _VolumePressureNext;		// x: pressure (output of iteration)
 HAIRSIM_VOLUMEDATA<float3> _VolumePressureGrad;		// xyz: pressure gradient, w: -

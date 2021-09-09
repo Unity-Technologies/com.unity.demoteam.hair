@@ -148,32 +148,26 @@ float3 ApplyVolumeImpulse(float3 x0, float3 v0)
 {
 	float3 impulse = 0.0;
 
-	#if APPLY_VOLUME_IMPULSE
+#if APPLY_VOLUME_IMPULSE
 	{
 		float3 uvw = VolumeWorldToUVW(x0);
 
-		// volume pressure
+		// add cell pressure
 		{
-			float3 pressureGrad = VolumeSampleVector(_VolumePressureGrad, uvw);
-			{
-				impulse += _CellPressure * -pressureGrad;
-			}
+			impulse += _CellPressure * -VolumeSampleVector(_VolumePressureGrad, uvw);
 		}
 
-		// volume velocity
+		// add cell velocity
 		{
-			#if SPLAT_TRILINEAR
+#if SPLAT_TRILINEAR
 			SamplerState ss = _Volume_trilinear_clamp;
-			#else
+#else
 			SamplerState ss = _Volume_point_clamp;
-			#endif
-			float3 v = VolumeSampleVector(_VolumeVelocity, uvw, ss);
-			{
-				impulse += _CellVelocity * (v - v0);
-			}
+#endif
+			impulse += _CellVelocity * (VolumeSampleVector(_VolumeVelocity, uvw, ss) - v0);
 		}
 	}
-	#endif
+#endif
 
 	return impulse;
 }
@@ -1408,7 +1402,7 @@ void KInterpolate(
 
 	float3 rootPositionLo = _ParticlePosition[strandParticleBeginLo].xyz;
 	float3 rootPositionHi = _ParticlePosition[strandParticleBeginHi].xyz;
-	float3 rootPosition = _RootPosition[strandParticleBegin].xyz;
+	float3 rootPosition = _ParticlePosition[strandParticleBegin].xyz;
 
 	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
 	_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin, rootPosition);
@@ -1455,7 +1449,7 @@ void KInterpolateNearest(
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 
 	float3 rootPositionLo = _ParticlePosition[strandParticleBeginLo].xyz;
-	float3 rootPosition = _RootPosition[strandParticleBegin].xyz;
+	float3 rootPosition = _ParticlePosition[strandParticleBegin].xyz;
 
 	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
 	_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin, rootPosition);
