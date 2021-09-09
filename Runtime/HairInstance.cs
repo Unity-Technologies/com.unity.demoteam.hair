@@ -117,6 +117,7 @@ namespace Unity.DemoTeam.Hair
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
 			public int strandLayers;
+			public MotionVectorGenerationMode motionVectors;
 
 			[LineHeader("Simulation")]
 
@@ -156,6 +157,7 @@ namespace Unity.DemoTeam.Hair
 				strandRenderer = StrandRenderer.BuiltinLines,
 				strandShadows = ShadowCastingMode.On,
 				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
+				motionVectors = MotionVectorGenerationMode.Camera,
 
 				simulation = true,
 				simulationRate = SimulationRate.Fixed60Hz,
@@ -590,7 +592,7 @@ namespace Unity.DemoTeam.Hair
 				meshRenderer.sharedMaterial = materialInstance;
 				meshRenderer.shadowCastingMode = settingsStrands.strandShadows;
 				meshRenderer.renderingLayerMask = (uint)settingsStrands.strandLayers;
-				meshRenderer.motionVectorGenerationMode = MotionVectorGenerationMode.Camera;
+				meshRenderer.motionVectorGenerationMode = settingsStrands.motionVectors;
 
 				HairSim.BindSolverData(materialInstance, solverData);
 				HairSim.BindVolumeData(materialInstance, volumeData);
