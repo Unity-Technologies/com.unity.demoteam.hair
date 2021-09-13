@@ -13,13 +13,6 @@
 // 1 == staging data compressed
 */
 
-#include "HairSimData.hlsl"
-#include "HairSimDebugDrawUtility.hlsl"
-
-#ifndef UNITY_SHADER_VARIABLES_INCLUDED
-float4x4 unity_MatrixPreviousMI;
-#endif
-
 #ifndef HAIR_VERTEX_ID_LINES
 #define HAIR_VERTEX_ID_LINES 0
 #endif
@@ -31,6 +24,20 @@ float4x4 unity_MatrixPreviousMI;
 #endif
 #ifndef HAIR_VERTEX_SRC_STAGING
 #define HAIR_VERTEX_SRC_STAGING 0
+#endif
+
+#include "HairSimData.hlsl"
+#include "HairSimDebugDrawUtility.hlsl"
+
+#ifndef UNITY_SHADER_VARIABLES_INCLUDED
+float4x4 unity_MatrixPreviousMI;
+#endif
+
+#ifndef UNITY_PREV_MATRIX_M
+#define UNITY_PREV_MATRIX_M unity_MatrixPreviousM
+#endif
+#ifndef UNITY_PREV_MATRIX_I_M
+#define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
 #endif
 
 #if HAIR_VERTEX_SRC_STAGING
@@ -85,10 +92,10 @@ struct HairVertex
 	float3 debugColor;
 };
 
-float3 GetHairNormalTS(in float2 vertexUV)
+float3 GetHairNormalTS(in float2 uv)
 {
 	float3 normalTS;
-	normalTS.x = 2.0 * saturate(vertexUV.x) - 1.0;
+	normalTS.x = 2.0 * saturate(uv.x) - 1.0;
 	normalTS.y = 0.0;
 	normalTS.z = sqrt(max(1e-5, 1.0 - normalTS.x * normalTS.x));
 	return normalTS;
@@ -119,7 +126,7 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 
 	float3 positionWS = GetCameraRelativePositionWS(p);
 	float3 positionOS = mul(UNITY_MATRIX_I_M, float4(positionWS, 1.0)).xyz;
-	float3 positionOSPrev = mul(unity_MatrixPreviousMI, float4(LoadPositionPrev(i), 1.0)).xyz;
+	float3 positionOSPrev = mul(UNITY_PREV_MATRIX_I_M, float4(LoadPositionPrev(i), 1.0)).xyz;
 	float3 motionOS = positionOS - positionOSPrev;
 
 	float3 bitangentWS = normalize(r0 + r1);

@@ -105,9 +105,9 @@ namespace Unity.DemoTeam.Hair
 			var hairInstance = userData as HairInstance;
 			{
 				var material = hairInstance.GetStrandMaterial();
-				if (material != null && !material.HasProperty("HAIRMATERIALTAG"))
+				if (material == null)
 				{
-					EditorGUILayout.HelpBox("Configuration warning: Active material does not define property 'HAIRMATERIALTAG'.", MessageType.Warning, wide: true);
+					EditorGUILayout.HelpBox("Configuration warning: No active material.", MessageType.Warning, wide: true);
 				}
 			}
 

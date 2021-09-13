@@ -3,6 +3,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+
 #if HAS_PACKAGE_UNITY_HDRP 
 using UnityEngine.Rendering.HighDefinition;
 #endif

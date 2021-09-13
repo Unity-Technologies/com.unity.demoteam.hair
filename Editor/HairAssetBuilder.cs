@@ -6,7 +6,6 @@
 
 using System;
 using UnityEngine;
-using UnityEngine.Profiling;
 using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;

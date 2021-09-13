@@ -18,3 +18,7 @@ MonoBehaviour:
   computeVolumeRaster: {fileID: 4800000, guid: 7e9119a1fe374fd45b70c831f4cc3131, type: 3}
   debugDraw: {fileID: 4800000, guid: f84628556e79514499da79fa2a82f427, type: 3}
   debugDrawCube: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  defaultBuiltin: {fileID: 4800000, guid: 00130ba255f6d9246b65ea8e49cd73c7, type: 3}
+  defaultCustom: {fileID: 4800000, guid: aa19c1d1ecbc28f43be51dc33a2ffa95, type: 3}
+  defaultHDRP: {fileID: -6465566751694194690, guid: e28e8d02189f3d549a2682c06f7ab03d, type: 3}
+  defaultURP: {fileID: -6465566751694194690, guid: e28e8d02189f3d549a2682c06f7ab03d, type: 3}

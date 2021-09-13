@@ -1,21 +1,17 @@
-Shader "Hidden/Hair/HairMaterialDefaultLit"
+Shader "Hidden/Hair/HairMaterialDefaultLitBuiltin"
 {
 	SubShader
 	{
-		Tags { "RenderType" = "Opaque" }
+		Tags { "RenderType" = "Opaque" "DisableBatching" = "True" "Queue" = "Geometry" }
+		ZTest LEqual
+		ZWrite On
 
 		CGPROGRAM
 
 		#pragma target 5.0
-		#pragma exclude_renderers xboxone
 
-		#pragma surface StrandSurf Lambert addshadow fullforwardshadows vertex:StrandVert
+		#pragma surface StrandSurf Lambert vertex:StrandVert addshadow fullforwardshadows
 
-		#ifdef SHADER_API_XBOXONE
-		#undef SHADER_API_XBOXONE
-		#endif
-
-#if SHADER_API_D3D11
 		#ifndef UNITY_COMMON_INCLUDED
 		#define UNITY_COMMON_INCLUDED
 		#endif
@@ -49,40 +45,57 @@ Shader "Hidden/Hair/HairMaterialDefaultLit"
 		// 0 == staging data full precision
 		// 1 == staging data compressed
 
+#ifdef SHADER_API_D3D11
 		#include "HairVertex.hlsl"
 #endif
 
 		struct Input
 		{
+			float3 strandTangentWS;
 			float3 strandColor;
 			float2 strandUV;
 		};
 
 		void StrandVert(inout appdata_full v, out Input o)
 		{
-#if SHADER_API_D3D11
-			HairVertex vhair = GetHairVertex((uint)v.texcoord.x, (float2)v.texcoord1.xy, v.vertex.xyz, v.normal.xyz, v.tangent.xyz);
+#ifdef SHADER_API_D3D11
+			HairVertex hair = GetHairVertex((uint)v.texcoord.x, v.texcoord1.xy, v.vertex.xyz, v.normal.xyz, v.tangent.xyz);
 			{
-				v.vertex = float4(vhair.positionOS, 1.0);
-				v.normal = float4(vhair.normalOS, 0.0);
-				v.tangent = float4(vhair.tangentOS, 0.0);
+				v.vertex = float4(hair.positionOS, 1.0);
+				v.normal = float4(hair.normalOS, 1.0);
+				v.tangent = float4(hair.tangentOS, 1.0);
 
 				UNITY_INITIALIZE_OUTPUT(Input, o);
-				o.strandColor = vhair.debugColor;
-				o.strandUV = vhair.strandUV;
+				o.strandTangentWS = TransformObjectToWorldNormal(hair.tangentOS);
+				o.strandColor = hair.debugColor;
+				o.strandUV = hair.strandUV;
 			}
+#else
+			o.strandTangentWS = TransformObjectToWorldNormal(v.tangent.xyz);
+			o.strandColor = float3(1.0, 1.0, 1.0);
+			o.strandUV = float2(0.5, 0.5);
 #endif
 		}
 
 		void StrandSurf(Input IN, inout SurfaceOutput o)
 		{
-#if SHADER_API_D3D11
-			o.Albedo = IN.strandColor;
-			o.Normal = GetHairNormalTS(IN.strandUV) * float3(-1, 1, 1);
+#ifdef SHADER_API_D3D11
+			float3 normalTS = GetHairNormalTS(IN.strandUV);
+#else
+			float3 normalTS = float3(0.0, 0.0, 1.0);
 #endif
+
+			o.Albedo = IN.strandColor;
+			o.Normal = TransformTangentToWorld(normalTS,
+				float3x3(
+					normalize(IN.strandTangentWS),
+					normalize(cross(IN.strandTangentWS, o.Normal)),
+					o.Normal)
+			);
 		}
 
 		ENDCG
 	}
+
 	Fallback "Hidden/Hair/HairMaterialDefaultUnlit"
 }

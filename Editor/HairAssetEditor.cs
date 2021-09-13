@@ -19,7 +19,6 @@ namespace Unity.DemoTeam.Hair
 
 		SerializedProperty _settingsBasic;
 		SerializedProperty _settingsBasic_type;
-		SerializedProperty _settingsBasic_material;
 		SerializedProperty _settingsBasic_kLODClusters;
 		SerializedProperty _settingsBasic_kLODClustersProvider;
 		SerializedProperty _settingsBasic_kLODClustersHighLOD;
@@ -44,8 +43,7 @@ namespace Unity.DemoTeam.Hair
 
 		void OnEnable()
 		{
-			previewMaterial = new Material((target as HairAsset).defaultMaterial);//TODO change this to a RP agnostic default
-			previewMaterial.hideFlags = HideFlags.HideAndDontSave;
+			previewMaterial = new Material(HairMaterialUtility.GetCurrentPipelineDefault());
 			previewAngle = Vector2.zero;
 			previewZoom = 0.0f;
 
@@ -71,7 +69,6 @@ namespace Unity.DemoTeam.Hair
 			_settingsBasic_kLODClusters = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClusters));
 			_settingsBasic_kLODClustersProvider = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClustersProvider));
 			_settingsBasic_kLODClustersHighLOD = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClustersHighLOD));
-			_settingsBasic_material = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.material));
 			_settingsAlembic = serializedObject.FindProperty(nameof(HairAsset.settingsAlembic));
 			_settingsProcedural = serializedObject.FindProperty(nameof(HairAsset.settingsProcedural));
 			_settingsProcedural_placement = _settingsProcedural.FindPropertyRelative(nameof(HairAsset.settingsProcedural.placement));
@@ -252,9 +249,6 @@ namespace Unity.DemoTeam.Hair
 			{
 				StructPropertyFieldsWithHeader(_settingsBasic);
 
-				if (_settingsBasic_material.objectReferenceValue == null)
-					_settingsBasic_material.objectReferenceValue = hairAsset.defaultMaterial;
-
 				EditorGUILayout.Space();
 
 				switch ((HairAsset.Type)_settingsBasic_type.enumValueIndex)
@@ -415,10 +409,7 @@ namespace Unity.DemoTeam.Hair
 									cameraTransform.position = meshCenter - cameraDistance * cameraTransform.forward;
 								}
 
-								var sourceMaterial = _settingsBasic_material.objectReferenceValue as Material;
-								if (sourceMaterial == null)
-									sourceMaterial = hairAsset.defaultMaterial;
-
+								var sourceMaterial = HairMaterialUtility.GetCurrentPipelineDefault();
 								if (sourceMaterial != null)
 								{
 									if (previewMaterial.shader != sourceMaterial.shader)

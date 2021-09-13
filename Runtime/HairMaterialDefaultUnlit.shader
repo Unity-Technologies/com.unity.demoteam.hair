@@ -39,30 +39,34 @@ Shader "Hidden/Hair/HairMaterialDefaultUnlit"
 	struct StrandVaryings
 	{
 		float4 positionCS : SV_Position;
-		float3 color : COLOR;
+		float3 strandColor : COLOR;
+		float2 strandUV : TEXCOORD0;
 	};
 
-	StrandVaryings StrandVert(StrandAttribs IN, uint in_vertexID : SV_VertexID)
+	StrandVaryings StrandVert(StrandAttribs IN)
 	{
-		HairVertex v = GetHairVertex((uint)IN.vertexID, IN.vertexUV, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
+		HairVertex hair = GetHairVertex((uint)IN.vertexID, IN.vertexUV, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
 		{
 			StrandVaryings OUT;
-			OUT.positionCS = TransformObjectToHClip(v.positionOS);
-			OUT.color = ColorCycle(v.strandIndex, _StrandCount);
+			OUT.positionCS = TransformObjectToHClip(hair.positionOS);
+			OUT.strandColor = ColorCycle(hair.strandIndex, _StrandCount);
+			OUT.strandUV = hair.strandUV;
 			return OUT;
 		}
 	}
 
 	float4 StrandFrag(StrandVaryings IN) : SV_Target
 	{
-		return float4(IN.color, 1.0);
+		return float4(IN.strandColor, 1.0);
 	}
 
 	ENDHLSL
 
 	SubShader
 	{
-		Tags { "RenderType" = "Opaque" }
+		Tags { "RenderType" = "Opaque" "DisableBatching" = "True" "Queue" = "Transparent" }
+		ZTest LEqual
+		ZWrite On
 
 		Pass
 		{

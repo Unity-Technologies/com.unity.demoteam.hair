@@ -712,8 +712,12 @@ namespace Unity.DemoTeam.Hair
 			if (mat == null && settingsStrands.strandMaterial)
 				mat = settingsStrands.strandMaterialValue;
 
-			if (mat == null && hairAsset != null)
-				mat = hairAsset.settingsBasic.material;
+			//TODO handle this as part of ui cleanup
+			//if (mat == null && hairAsset != null)
+			//	mat = hairAsset.settingsBasic.material;
+
+			if (mat == null)
+				mat = HairMaterialUtility.GetCurrentPipelineDefault();
 
 			return mat;
 		}
