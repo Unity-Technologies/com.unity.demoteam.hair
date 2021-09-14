@@ -1,8 +1,6 @@
 #ifndef __HAIRVERTEX_HLSL__
 #define __HAIRVERTEX_HLSL__
 
-//#pragma editor_sync_compilation
-
 /*
 #pragma multi_compile __ LAYOUT_INTERLEAVED
 // 0 == particles grouped by strand, i.e. root, root+1, root, root+1
@@ -33,9 +31,6 @@
 float4x4 unity_MatrixPreviousMI;
 #endif
 
-#ifndef UNITY_PREV_MATRIX_M
-#define UNITY_PREV_MATRIX_M unity_MatrixPreviousM
-#endif
 #ifndef UNITY_PREV_MATRIX_I_M
 #define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
 #endif
@@ -92,7 +87,7 @@ struct HairVertex
 	float3 debugColor;
 };
 
-float3 GetHairNormalTS(in float2 uv)
+float3 GetHairNormalTangentSpace(in float2 uv)
 {
 	float3 normalTS;
 	normalTS.x = 2.0 * saturate(uv.x) - 1.0;
@@ -147,7 +142,7 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 		v.rootUV = _RootUV[strandIndex];
 		v.strandUV = vertexUV;
 		v.strandIndex = strandIndex;
-		v.strandNormalTS = GetHairNormalTS(vertexUV);
+		v.strandNormalTS = GetHairNormalTangentSpace(vertexUV);
 		v.debugColor = ColorCycle(strandIndex, _StrandCount);
 	}
 	return v;

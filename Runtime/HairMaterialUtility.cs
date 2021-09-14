@@ -1,4 +1,7 @@
 using System;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -75,6 +78,20 @@ namespace Unity.DemoTeam.Hair
 		public static Material GetCurrentPipelineDefault()
 		{
 			return GetPipelineDefaultMaterial(RenderPipelineManager.currentPipeline);
+		}
+
+		public static bool AnyPassPendingCompilation(Material material)
+		{
+#if UNITY_EDITOR
+			for (int i = 0, n = material.shader.passCount; i != n; i++)
+			{
+				if (ShaderUtil.IsPassCompiled(material, i) == false)
+				{
+					return true;
+				}
+			}
+#endif
+			return false;
 		}
 	}
 }

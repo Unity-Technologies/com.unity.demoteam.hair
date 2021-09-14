@@ -1402,7 +1402,7 @@ void KInterpolate(
 
 	float3 rootPositionLo = _ParticlePosition[strandParticleBeginLo].xyz;
 	float3 rootPositionHi = _ParticlePosition[strandParticleBeginHi].xyz;
-	float3 rootPosition = _ParticlePosition[strandParticleBegin].xyz;
+	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
 	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
 	_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin, rootPosition);
@@ -1449,7 +1449,7 @@ void KInterpolateNearest(
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 
 	float3 rootPositionLo = _ParticlePosition[strandParticleBeginLo].xyz;
-	float3 rootPosition = _ParticlePosition[strandParticleBegin].xyz;
+	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
 	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
 	_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin, rootPosition);

@@ -1,4 +1,4 @@
-Shader "Hidden/Hair/HairMaterialDefaultUnlit"
+Shader "Hair/Default/HairMaterialDefaultUnlit"
 {
 	HLSLINCLUDE
 
@@ -27,39 +27,6 @@ Shader "Hidden/Hair/HairMaterialDefaultUnlit"
 
 	#include "HairVertex.hlsl"
 
-	struct StrandAttribs
-	{
-		float vertexID : TEXCOORD0;
-		float2 vertexUV : TEXCOORD1;
-		float3 staticPositionOS : POSITION;
-		float3 staticNormalOS : NORMAL;
-		float3 staticTangentOS : TANGENT;
-	};
-
-	struct StrandVaryings
-	{
-		float4 positionCS : SV_Position;
-		float3 strandColor : COLOR;
-		float2 strandUV : TEXCOORD0;
-	};
-
-	StrandVaryings StrandVert(StrandAttribs IN)
-	{
-		HairVertex hair = GetHairVertex((uint)IN.vertexID, IN.vertexUV, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
-		{
-			StrandVaryings OUT;
-			OUT.positionCS = TransformObjectToHClip(hair.positionOS);
-			OUT.strandColor = ColorCycle(hair.strandIndex, _StrandCount);
-			OUT.strandUV = hair.strandUV;
-			return OUT;
-		}
-	}
-
-	float4 StrandFrag(StrandVaryings IN) : SV_Target
-	{
-		return float4(IN.strandColor, 1.0);
-	}
-
 	ENDHLSL
 
 	SubShader
@@ -74,6 +41,39 @@ Shader "Hidden/Hair/HairMaterialDefaultUnlit"
 
 			#pragma vertex StrandVert
 			#pragma fragment StrandFrag
+
+			struct StrandAttribs
+			{
+				float vertexID : TEXCOORD0;
+				float2 vertexUV : TEXCOORD1;
+				float3 staticPositionOS : POSITION;
+				float3 staticNormalOS : NORMAL;
+				float3 staticTangentOS : TANGENT;
+			};
+
+			struct StrandVaryings
+			{
+				float4 positionCS : SV_Position;
+				float3 strandColor : COLOR;
+				float2 strandUV : TEXCOORD0;
+			};
+
+			StrandVaryings StrandVert(StrandAttribs IN)
+			{
+				HairVertex hair = GetHairVertex((uint)IN.vertexID, IN.vertexUV, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
+				{
+					StrandVaryings OUT;
+					OUT.positionCS = TransformObjectToHClip(hair.positionOS);
+					OUT.strandColor = ColorCycle(hair.strandIndex, _StrandCount);
+					OUT.strandUV = hair.strandUV;
+					return OUT;
+				}
+			}
+
+			float4 StrandFrag(StrandVaryings IN) : SV_Target
+			{
+				return float4(IN.strandColor, 1.0);
+			}
 
 			ENDHLSL
 		}

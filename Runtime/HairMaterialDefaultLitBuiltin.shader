@@ -1,5 +1,57 @@
-Shader "Hidden/Hair/HairMaterialDefaultLitBuiltin"
+Shader "Hair/Default/HairMaterialDefaultLitBuiltin"
 {
+	CGINCLUDE
+
+	#pragma target 5.0
+
+	#ifndef UNITY_COMMON_INCLUDED
+	#define UNITY_COMMON_INCLUDED
+	#endif
+
+	#ifndef UNITY_MATRIX_I_M
+	#define UNITY_MATRIX_I_M unity_WorldToObject
+	#endif
+	#ifndef UNITY_PREV_MATRIX_M
+	#define UNITY_PREV_MATRIX_M unity_MatrixPreviousM
+	#endif
+	#ifndef UNITY_PREV_MATRIX_I_M
+	#define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
+	#endif
+
+	#define real float
+	#define real3 float3
+	#define real3x3 float3x3
+	#define SafeNormalize(v) (normalize(v))
+	float4x4 unity_MatrixPreviousM;
+	float4x4 unity_MatrixPreviousMI;
+
+	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderConfig.cs.hlsl"
+	#ifdef SHADEROPTIONS_CAMERA_RELATIVE_RENDERING
+	#undef SHADEROPTIONS_CAMERA_RELATIVE_RENDERING
+	#define SHADEROPTIONS_CAMERA_RELATIVE_RENDERING (0)
+	#endif
+
+	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
+	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariablesFunctions.hlsl"
+
+	#pragma multi_compile __ HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
+	#pragma multi_compile __ HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
+
+	#pragma multi_compile __ LAYOUT_INTERLEAVED
+	// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
+	// 1 == particles grouped by index, i.e. root, root, root+1, root+1
+
+	#pragma multi_compile __ STAGING_COMPRESSION
+	// 0 == staging data full precision
+	// 1 == staging data compressed
+
+#ifdef SHADER_API_D3D11
+	#include "HairVertex.hlsl"
+#endif
+
+	ENDCG
+
 	SubShader
 	{
 		Tags { "RenderType" = "Opaque" "DisableBatching" = "True" "Queue" = "Geometry" }
@@ -8,46 +60,7 @@ Shader "Hidden/Hair/HairMaterialDefaultLitBuiltin"
 
 		CGPROGRAM
 
-		#pragma target 5.0
-
 		#pragma surface StrandSurf Lambert vertex:StrandVert addshadow fullforwardshadows
-
-		#ifndef UNITY_COMMON_INCLUDED
-		#define UNITY_COMMON_INCLUDED
-		#endif
-		#ifndef UNITY_MATRIX_I_M
-		#define UNITY_MATRIX_I_M unity_WorldToObject
-		#endif
-		#define real float
-		#define real3 float3
-		#define real3x3 float3x3
-		#define SafeNormalize(v) (normalize(v))
-		float4x4 unity_MatrixPreviousMI;
-
-		#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderConfig.cs.hlsl"
-		#ifdef SHADEROPTIONS_CAMERA_RELATIVE_RENDERING
-		#undef SHADEROPTIONS_CAMERA_RELATIVE_RENDERING
-		#define SHADEROPTIONS_CAMERA_RELATIVE_RENDERING (0)
-		#endif
-
-		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-		#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
-		#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariablesFunctions.hlsl"
-
-		#pragma multi_compile __ HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
-		#pragma multi_compile __ HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
-
-		#pragma multi_compile __ LAYOUT_INTERLEAVED
-		// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
-		// 1 == particles grouped by index, i.e. root, root, root+1, root+1
-
-		#pragma multi_compile __ STAGING_COMPRESSION
-		// 0 == staging data full precision
-		// 1 == staging data compressed
-
-#ifdef SHADER_API_D3D11
-		#include "HairVertex.hlsl"
-#endif
 
 		struct Input
 		{
@@ -80,7 +93,7 @@ Shader "Hidden/Hair/HairMaterialDefaultLitBuiltin"
 		void StrandSurf(Input IN, inout SurfaceOutput o)
 		{
 #ifdef SHADER_API_D3D11
-			float3 normalTS = GetHairNormalTS(IN.strandUV);
+			float3 normalTS = GetHairNormalTangentSpace(IN.strandUV);
 #else
 			float3 normalTS = float3(0.0, 0.0, 1.0);
 #endif
@@ -97,5 +110,5 @@ Shader "Hidden/Hair/HairMaterialDefaultLitBuiltin"
 		ENDCG
 	}
 
-	Fallback "Hidden/Hair/HairMaterialDefaultUnlit"
+	Fallback "Hair/Default/HairMaterialDefaultUnlit"
 }
