@@ -119,7 +119,11 @@ namespace Unity.DemoTeam.Hair
 
 		public static Hash128 Compute(Texture2D texture)
 		{
+#if UNITY_EDITOR
 			return texture.imageContentsHash;
+#else
+			return new Hash128((uint)texture.GetInstanceID(), 0, 0, 0);
+#endif
 		}
 	}
 }

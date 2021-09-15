@@ -119,26 +119,31 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 		? r0
 		: LoadPosition(i_next) - p;
 
-	float3 positionWS = GetCameraRelativePositionWS(p);
-	float3 positionOS = mul(UNITY_MATRIX_I_M, float4(positionWS, 1.0)).xyz;
-	float3 positionOSPrev = mul(UNITY_PREV_MATRIX_I_M, float4(LoadPositionPrev(i), 1.0)).xyz;
-	float3 motionOS = positionOS - positionOSPrev;
+	float3 curvePositionRWS = GetCameraRelativePositionWS(p);
+	float3 curvePositionRWSPrev = GetCameraRelativePositionWS(LoadPositionPrev(i));
 
-	float3 bitangentWS = normalize(r0 + r1);
-	float3 tangentWS = normalize(cross(bitangentWS, GetWorldSpaceNormalizeViewDir(positionWS)));
-	float3 normalWS = cross(tangentWS, bitangentWS);
+	float3 vertexBitangentWS = r0 + r1;
+	float3 vertexTangentWS = normalize(cross(vertexBitangentWS, GetWorldSpaceNormalizeViewDir(curvePositionRWS)));
+	float3 vertexNormalWS = cross(vertexTangentWS, vertexBitangentWS);
+
+#if HAIR_VERTEX_ID_STRIPS
+	float3 vertexOffsetWS = vertexTangentWS * (_StrandDiameter * _StrandScale * (vertexUV.x - 0.5));
+#else
+	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
+#endif
+
+	float3 vertexPositionWS = curvePositionRWS + vertexOffsetWS;
+	float3 vertexPositionWSPrev = curvePositionRWSPrev + vertexOffsetWS;
+	float3 vertexPositionOS = mul(UNITY_MATRIX_I_M, float4(vertexPositionWS, 1.0)).xyz;
+	float3 vertexPositionOSPrev = mul(UNITY_PREV_MATRIX_I_M, float4(vertexPositionWSPrev, 1.0)).xyz;
 
 	HairVertex v;
 	{
-#if HAIR_VERTEX_ID_STRIPS
-		v.positionOS = TransformWorldToObject(positionWS + tangentWS * (_StrandDiameter * _StrandScale * (vertexUV.x - 0.5)));
-#else
-		v.positionOS = TransformWorldToObject(positionWS);
-#endif
-		v.motionOS = motionOS;
-		v.normalOS = TransformWorldToObjectNormal(normalWS);
-		v.tangentOS = TransformWorldToObjectNormal(tangentWS);
-		v.bitangentOS = TransformWorldToObjectNormal(bitangentWS);
+		v.positionOS = vertexPositionOS;
+		v.motionOS = vertexPositionOS - vertexPositionOSPrev;
+		v.normalOS = TransformWorldToObjectNormal(vertexNormalWS);
+		v.tangentOS = TransformWorldToObjectNormal(vertexTangentWS);
+		v.bitangentOS = TransformWorldToObjectNormal(vertexBitangentWS);
 		v.rootUV = _RootUV[strandIndex];
 		v.strandUV = vertexUV;
 		v.strandIndex = strandIndex;
