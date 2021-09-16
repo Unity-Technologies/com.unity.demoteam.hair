@@ -148,7 +148,7 @@ namespace Unity.DemoTeam.Hair
 				kLODSearchValue = 1.0f,
 				kLODBlending = false,
 
-				staging = false,
+				staging = true,
 				stagingSubdivision = 0,
 				stagingPrecision = StagingPrecision.Half,
 
@@ -160,14 +160,14 @@ namespace Unity.DemoTeam.Hair
 				motionVectors = MotionVectorGenerationMode.Camera,
 
 				simulation = true,
-				simulationRate = SimulationRate.Fixed60Hz,
+				simulationRate = SimulationRate.Fixed30Hz,
 				simulationInEditor = true,
 
 				simulationTimeStep = 1.0f / 100.0f,
 				stepsMin = false,
 				stepsMinValue = 1,
 				stepsMax = true,
-				stepsMaxValue = 2,
+				stepsMaxValue = 1,
 			};
 		}
 
@@ -599,6 +599,7 @@ namespace Unity.DemoTeam.Hair
 
 				materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
 				materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
+				materialInstance.SetTexture("_UntypedVolumeStrandCountProbe", volumeData.volumeStrandCountProbe);
 
 				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinLines);
 				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsStrands.strandRenderer == SettingsStrands.StrandRenderer.BuiltinStrips);

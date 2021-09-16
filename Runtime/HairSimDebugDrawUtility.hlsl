@@ -66,4 +66,9 @@ float3 ColorVelocity(float3 v)
 	return saturate(abs(float3(v.x, 0.0, -v.z)));
 }
 
+float3 ColorProbe(float3 s)
+{
+	return s;
+}
+
 #endif//__HAIRSIMDEBUGDRAWUTILITY_HLSL__

@@ -10,6 +10,7 @@
 #pragma kernel KVolumePressureEOS
 #pragma kernel KVolumePressureSolve
 #pragma kernel KVolumePressureGradient
+#pragma kernel KVolumeStrandCountProbe
 
 //----------
 // features
@@ -84,6 +85,7 @@
 #include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
 #include "HairSimComputeSolverQuaternion.hlsl"
+#include "HairSimComputeStrandCountProbe.hlsl"
 
 //--------
 // macros
@@ -821,4 +823,39 @@ void KVolumePressureGradient(
 		p_zp - p_zm) / h;
 
 	_VolumePressureGrad[worldIdx] = diff;
+}
+
+//----------------------------
+// kernels strand count probe
+
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
+void KVolumeStrandCountProbe(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	const float rho = _VolumeDensity[worldIdx];
+
+	// early out in empty cells
+	if (rho == 0.0)
+	{
+		_VolumeStrandCountProbe[worldIdx] = 0.0;
+		return;
+	}
+
+	// store like this in case we ever want to compute more bands
+	float coefficients[4];
+
+	ProjectStrandCountSH(worldIdx, coefficients);
+
+	_VolumeStrandCountProbe[worldIdx] = float4(
+		coefficients[0],
+		coefficients[1],
+		coefficients[2],
+		coefficients[3]);
 }

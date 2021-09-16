@@ -135,6 +135,8 @@ namespace Unity.DemoTeam.Hair
 			public RenderTexture volumePressureNext;	// x: pressure (output of iteration)
 			public RenderTexture volumePressureGrad;	// xyz: pressure gradient, w: -
 
+			public RenderTexture volumeStrandCountProbe;
+
 			public float allGroupsMaxParticleInterval;
 			//public float allGroupsMaxStrandDiameter;
 			//public float allGroupsMaxStrandLength;
@@ -200,6 +202,10 @@ namespace Unity.DemoTeam.Hair
 
 			public float _BoundaryWorldEpsilon;
 			public float _BoundaryWorldMargin;
+
+			public uint _StrandCountPhi;
+			public uint _StrandCountTheta;
+			public uint _StrandCountSubstep;
 		}
 	}
 }

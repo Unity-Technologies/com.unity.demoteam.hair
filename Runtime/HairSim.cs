@@ -4,6 +4,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Serialization;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
@@ -49,6 +50,7 @@ namespace Unity.DemoTeam.Hair
 			public static ProfilingSampler Volume_4_PressureEOS;
 			public static ProfilingSampler Volume_5_PressureSolve;
 			public static ProfilingSampler Volume_6_PressureGradient;
+			public static ProfilingSampler Volume_7_StrandCountProbe;
 			public static ProfilingSampler DrawSolverData;
 			public static ProfilingSampler DrawVolumeData;
 		}
@@ -100,6 +102,8 @@ namespace Unity.DemoTeam.Hair
 			public static int _VolumePressureNext;
 			public static int _VolumePressureGrad;
 
+			public static int _VolumeStrandCountProbe;
+
 			public static int _BoundarySDF;
 			public static int _BoundaryShape;
 			public static int _BoundaryMatrix;
@@ -145,6 +149,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KVolumePressureEOS;
 			public static int KVolumePressureSolve;
 			public static int KVolumePressureGradient;
+			public static int KVolumeStrandCountProbe;
 		}
 
 		[Serializable]
@@ -258,7 +263,7 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
 				method = Method.GaussSeidel,
-				iterations = 5,
+				iterations = 3,
 				substeps = 1,
 				stiffness = 1.0f,
 				kSOR = 1.0f,
@@ -335,22 +340,23 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Volume")]
 
-			[UnityEngine.Serialization.FormerlySerializedAs("volumeSplatMethod")]
-			public SplatMethod splatMethod;
-			public bool splatClusters;
-
-			[ToggleGroup]
-			public bool splatDebug;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 9.0f)]
-			public float splatDebugWidth;
-
-			[UnityEngine.Serialization.FormerlySerializedAs("volumeGridResolution"), Range(8, 160)]
-			public int gridResolution;
 			public GridPrecision gridPrecision;
+			[FormerlySerializedAs("volumeGridResolution"), Range(8, 160)]
+			public int gridResolution;
 			[HideInInspector, Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
 			public bool gridStaggered;
 			[HideInInspector]
 			public bool gridSquare;
+
+			[FormerlySerializedAs("volumeSplatMethod")]
+			public SplatMethod splatMethod;
+			public bool splatClusters;
+
+			//TODO remove these
+			[ToggleGroup]
+			public bool splatDebug;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 9.0f)]
+			public float splatDebugWidth;
 
 			[LineHeader("Pressure")]
 
@@ -362,6 +368,17 @@ namespace Unity.DemoTeam.Hair
 			public TargetDensity targetDensity;
 			[Range(0.0f, 1.0f), Tooltip("Influence of target density vs. an always-present incompressibility term")]
 			public float targetDensityInfluence;
+
+			[LineHeader("Scattering")]
+
+			[ToggleGroup, FormerlySerializedAs("strandCountProbe")]
+			public bool probeStrandCount;
+			[ToggleGroupItem(withLabel = true), Range(1, 10), FormerlySerializedAs("cellSubsteps")]
+			public uint probeStrandCountCellSubsteps;
+			[Range(0, 20), FormerlySerializedAs("samplesTheta")]
+			public uint probeStepsTheta;
+			[Range(0, 20), FormerlySerializedAs("samplesPhi")]
+			public uint probeStepsPhi;
 
 			[LineHeader("Boundaries")]
 
@@ -392,6 +409,11 @@ namespace Unity.DemoTeam.Hair
 				pressureSolution = PressureSolution.DensityLessThan,
 				targetDensity = TargetDensity.Uniform,
 				targetDensityInfluence = 1.0f,
+
+				probeStrandCount = false,
+				probeStrandCountCellSubsteps = 1,
+				probeStepsTheta = 5,
+				probeStepsPhi = 10,
 
 				collisionMargin = 0.25f,
 				boundariesCollect = true,
@@ -436,7 +458,7 @@ namespace Unity.DemoTeam.Hair
 			public bool drawSliceZ;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Position of slice along Z")]
 			public float drawSliceZOffset;
-			[Range(0.0f, 5.0f), Tooltip("Scrubs between different layers")]
+			[Range(0.0f, 6.0f), Tooltip("Scrubs between different layers")]
 			public float drawSliceDivider;
 
 			public static readonly DebugSettings defaults = new DebugSettings()
@@ -600,6 +622,8 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateVolume(ref volumeData.volumePressureNext, "VolumePressure_1", cellCount, cellFormatScalar);
 				changed |= CreateVolume(ref volumeData.volumePressureGrad, "VolumePressureGrad", cellCount, cellFormatVector);
 
+				changed |= CreateVolume(ref volumeData.volumeStrandCountProbe, "VolumeStrandCountProbe", cellCount, cellFormatVector);
+
 				changed |= CreateVolume(ref volumeData.boundarySDF_undefined, "BoundarySDF_undefined", 1, RenderTextureFormat.RHalf);
 
 				changed |= CreateBuffer(ref volumeData.boundaryShape, "BoundaryShape", MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
@@ -666,6 +690,8 @@ namespace Unity.DemoTeam.Hair
 			ReleaseVolume(ref volumeData.volumePressure);
 			ReleaseVolume(ref volumeData.volumePressureNext);
 			ReleaseVolume(ref volumeData.volumePressureGrad);
+
+			ReleaseVolume(ref volumeData.volumeStrandCountProbe);
 
 			ReleaseVolume(ref volumeData.boundarySDF_undefined);
 
@@ -748,6 +774,8 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeTexture(UniformIDs._VolumePressure, volumeData.volumePressure);
 			target.BindComputeTexture(UniformIDs._VolumePressureNext, volumeData.volumePressureNext);
 			target.BindComputeTexture(UniformIDs._VolumePressureGrad, volumeData.volumePressureGrad);
+
+			target.BindComputeTexture(UniformIDs._VolumeStrandCountProbe, volumeData.volumeStrandCountProbe);
 
 			target.BindComputeTexture(UniformIDs._BoundarySDF, (volumeData.boundarySDF != null) ? volumeData.boundarySDF : volumeData.boundarySDF_undefined);
 			target.BindComputeBuffer(UniformIDs._BoundaryShape, volumeData.boundaryShape);
@@ -960,6 +988,10 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._ResolveUnitDebugWidth = volumeSettings.splatDebugWidth;
 
 			cbuffer._TargetDensityFactor = volumeSettings.targetDensityInfluence;
+
+			cbuffer._StrandCountPhi = volumeSettings.probeStepsPhi;
+			cbuffer._StrandCountTheta = volumeSettings.probeStepsTheta;
+			cbuffer._StrandCountSubstep = volumeSettings.probeStrandCountCellSubsteps;
 
 			// derive keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
@@ -1411,6 +1443,16 @@ namespace Unity.DemoTeam.Hair
 			{
 				BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumePressureGradient, volumeData);
 				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureGradient, numX, numY, numZ);
+			}
+
+			// strand count probe
+			if (volumeSettings.probeStrandCount)
+			{
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_7_StrandCountProbe))
+				{
+					BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeStrandCountProbe, volumeData);
+					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeStrandCountProbe, numX, numY, numZ);
+				}
 			}
 		}
 

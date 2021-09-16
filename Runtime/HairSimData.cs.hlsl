@@ -66,6 +66,9 @@ CBUFFER_START(VolumeCBuffer)
     uint _BoundaryCountCube;
     float _BoundaryWorldEpsilon;
     float _BoundaryWorldMargin;
+    uint _StrandCountPhi;
+    uint _StrandCountTheta;
+    uint _StrandCountSubstep;
 CBUFFER_END
 
 

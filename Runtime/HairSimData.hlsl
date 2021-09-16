@@ -71,6 +71,8 @@ HAIRSIM_VOLUMEDATA<float> _VolumePressure;			// x: pressure
 HAIRSIM_VOLUMEDATA<float> _VolumePressureNext;		// x: pressure (output of iteration)
 HAIRSIM_VOLUMEDATA<float3> _VolumePressureGrad;		// xyz: pressure gradient, w: -
 
+HAIRSIM_VOLUMEDATA<float4> _VolumeStrandCountProbe;
+
 SamplerState _Volume_point_clamp;
 SamplerState _Volume_trilinear_clamp;
 

@@ -368,6 +368,7 @@ namespace Unity.DemoTeam.Hair
 							case 3: return "divergence";
 							case 4: return "pressure";
 							case 5: return "grad(pressure)";
+							case 6: return "scattering";
 						}
 						return "unknown";
 					}

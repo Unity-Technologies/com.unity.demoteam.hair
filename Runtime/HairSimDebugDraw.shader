@@ -246,6 +246,7 @@
 		float volumeDivergence = VolumeSampleScalar(_VolumeDivergence, uvw);
 		float volumePressure = VolumeSampleScalar(_VolumePressure, uvw);
 		float3 volumePressureGrad = VolumeSampleVector(_VolumePressureGrad, uvw);
+		float3 volumeStrandCountProbe = VolumeSampleVector(_VolumeStrandCountProbe, uvw);
 
 #if 0
 		float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvw);
@@ -324,8 +325,10 @@
 			return float4(ColorDivergence(volumeDivergence), _DebugSliceOpacity);
 		else if (x < 5.0)
 			return float4(ColorPressure(volumePressure), _DebugSliceOpacity);
-		else
+		else if (x < 6.0)
 			return float4(ColorGradient(volumePressureGrad), _DebugSliceOpacity);
+		else
+			return float4(ColorProbe(volumeStrandCountProbe), _DebugSliceOpacity);
 	}
 
 	DebugVaryings DebugVert_VolumeIsosurface(float3 position : POSITION)
