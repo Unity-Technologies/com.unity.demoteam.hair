@@ -25,7 +25,9 @@ float EstimateStrandCount(float3 P, float3 L)
 
 	VolumeTraceState trace = VolumeTraceBegin(P, L, 0, numStepsWithinCell);
 
-	const float strandCountTerm = length(trace.uvwStep) * rcp(0.001);
+	const float stepLength = length(VolumeUVWToWorld(trace.uvwStep));
+	const float strandDiameter = 0.001 * 0.25;// 0.25mm
+	const float strandCountTerm = stepLength / strandDiameter;
 
 	float n = 0;
 
@@ -33,7 +35,7 @@ float EstimateStrandCount(float3 P, float3 L)
 	{
 		if (VolumeTraceStep(trace))
 		{
-			//TODO: Strand Count
+			//TODO: trilinear
 			uint3 idx = (trace.uvw * _VolumeCells) - 0.5;
 			float cellDensitySampled = _VolumeDensity.Load(idx);
 			n += cellDensitySampled * strandCountTerm;
