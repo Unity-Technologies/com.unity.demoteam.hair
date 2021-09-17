@@ -150,6 +150,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KVolumePressureSolve;
 			public static int KVolumePressureGradient;
 			public static int KVolumeStrandCountProbe;
+			public static int KVolumeStrandCountProbeDefault;
 		}
 
 		[Serializable]
@@ -1238,7 +1239,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				BindVolumeData(cmd, s_solverCS, kernelSolveConstraints, volumeData);
 
-				var stateApplyVolumeImpulse = solverData.keywords.APPLY_VOLUME_IMPULSE;
+				var keywordState = solverData.keywords;
 
 				for (int i = 0; i != Mathf.Max(1, solverSettings.substeps); i++)
 				{
@@ -1252,6 +1253,8 @@ namespace Unity.DemoTeam.Hair
 					// volume impulse is only applied for first substep
 					solverData.keywords.APPLY_VOLUME_IMPULSE = false;
 				}
+
+				solverData.keywords = keywordState;
 			}
 
 			var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCountFinal;
@@ -1452,6 +1455,14 @@ namespace Unity.DemoTeam.Hair
 				{
 					BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeStrandCountProbe, volumeData);
 					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeStrandCountProbe, numX, numY, numZ);
+				}
+			}
+			else
+			{
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_7_StrandCountProbe))
+				{
+					BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeStrandCountProbeDefault, volumeData);
+					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeStrandCountProbeDefault, numX, numY, numZ);
 				}
 			}
 		}
