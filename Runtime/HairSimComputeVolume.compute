@@ -10,8 +10,8 @@
 #pragma kernel KVolumePressureEOS
 #pragma kernel KVolumePressureSolve
 #pragma kernel KVolumePressureGradient
-#pragma kernel KVolumeStrandCountProbe
-#pragma kernel KVolumeStrandCountProbeDefault
+#pragma kernel KVolumeStrandCountProbe			F_PROBE
+#pragma kernel KVolumeStrandCountProbeDefault	F_PROBE
 
 //----------
 // features
@@ -80,13 +80,20 @@
 //---------
 // include
 
+#ifdef F_PROBE
+#define HAIRSIM_WRITEABLE_VOLUMEPROBE 1
+#else
 #define HAIRSIM_WRITEABLE_VOLUMEDATA 1
+#endif
 
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
 #include "HairSimComputeSolverQuaternion.hlsl"
+
+#ifdef F_PROBE
 #include "HairSimComputeStrandCountProbe.hlsl"
+#endif
 
 //--------
 // macros
@@ -215,6 +222,8 @@ void InterlockedMaxParticleContribution(float3 worldPos, float value, RWTexture3
 
 //---------------
 // kernels clear
+
+#if !F_PROBE
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeClear(
@@ -829,6 +838,8 @@ void KVolumePressureGradient(
 //----------------------------
 // kernels strand count probe
 
+#else// F_PROBE
+
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeStrandCountProbe(
 	uint3 groupIdx : SV_GroupID,
@@ -874,3 +885,5 @@ void KVolumeStrandCountProbeDefault(
 {
 	_VolumeStrandCountProbe[worldIdx] = 0.0;
 }
+
+#endif

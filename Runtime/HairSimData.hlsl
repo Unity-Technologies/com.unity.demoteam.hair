@@ -55,6 +55,12 @@ HAIRSIM_SOLVERDATA<float3> _StagingPositionPrev;	// ...
 #define HAIRSIM_VOLUMEDATA Texture3D
 #endif
 
+#if HAIRSIM_WRITEABLE_VOLUMEPROBE
+#define HAIRSIM_VOLUMEPROBE RWTexture3D
+#else
+#define HAIRSIM_VOLUMEPROBE Texture3D
+#endif
+
 HAIRSIM_VOLUMEDATA<int> _AccuWeight;				// x: fp accumulated weight
 HAIRSIM_VOLUMEDATA<int> _AccuWeight0;				// x: fp accumulated target weight
 HAIRSIM_VOLUMEDATA<int> _AccuVelocityX;				// x: fp accumulated x-velocity
@@ -71,7 +77,7 @@ HAIRSIM_VOLUMEDATA<float> _VolumePressure;			// x: pressure
 HAIRSIM_VOLUMEDATA<float> _VolumePressureNext;		// x: pressure (output of iteration)
 HAIRSIM_VOLUMEDATA<float3> _VolumePressureGrad;		// xyz: pressure gradient, w: -
 
-HAIRSIM_VOLUMEDATA<float4> _VolumeStrandCountProbe;
+HAIRSIM_VOLUMEPROBE<float4> _VolumeStrandCountProbe;
 
 SamplerState _Volume_point_clamp;
 SamplerState _Volume_trilinear_clamp;

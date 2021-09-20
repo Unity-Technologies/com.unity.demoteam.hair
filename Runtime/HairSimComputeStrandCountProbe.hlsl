@@ -25,24 +25,24 @@ float EstimateStrandCount(float3 P, float3 L)
 
 	VolumeTraceState trace = VolumeTraceBegin(P, L, 0, numStepsWithinCell);
 
-	const float stepLength = length(VolumeUVWToWorld(trace.uvwStep));
-	const float strandDiameter = 0.001 * 0.25;// 0.25mm
-	const float strandCountTerm = stepLength / strandDiameter;
-
-	float n = 0;
+	float rho_sum = 0;
 
 	for (int i = 0; i != numSteps; i++)
 	{
 		if (VolumeTraceStep(trace))
 		{
-			//TODO: trilinear
-			uint3 idx = (trace.uvw * _VolumeCells) - 0.5;
-			float cellDensitySampled = _VolumeDensity.Load(idx);
-			n += cellDensitySampled * strandCountTerm;
+			rho_sum += VolumeSampleScalar(_VolumeDensity, trace.uvw);
 		}
 	}
 
-	return n;
+	//TODO pass mean strand diameter
+	const float strandDiameter = 0.001;// 1mm
+	const float strandCrossSection = 0.25 * PI * strandDiameter * strandDiameter;
+
+	const float stepLength = length(VolumeWorldSize() * trace.uvwStep);
+	const float stepCrossSection = stepLength * stepLength;
+
+	return rho_sum * (stepCrossSection / strandCrossSection);
 }
 
 #define HALF_SQRT_INV_PI    0.5 * 0.56418958354775628694 

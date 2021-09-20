@@ -347,8 +347,6 @@ namespace Unity.DemoTeam.Hair
 			public const int VERSION = 2;
 		}
 
-		public Material defaultMaterial;
-
 		public SettingsBasic settingsBasic = SettingsBasic.defaults;
 		public SettingsAlembic settingsAlembic = SettingsAlembic.defaults;
 		public SettingsProcedural settingsProcedural = SettingsProcedural.defaults;
