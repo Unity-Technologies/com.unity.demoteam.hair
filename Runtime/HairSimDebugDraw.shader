@@ -20,6 +20,7 @@
 	#include "HairSimComputeConfig.hlsl"
 	#include "HairSimComputeSolverBoundaries.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
+	#include "HairSimComputeStrandCountProbe.hlsl"
 	#include "HairSimDebugDrawUtility.hlsl"
 	
 	uint _DebugSliceAxis;
@@ -226,6 +227,7 @@
 		float3 localPos = VolumeUVWToLocal(uvw);
 		float3 localPosFloor = round(localPos + 0.5);
 
+		float3 gridNormal = float3(_DebugSliceAxis == 0, _DebugSliceAxis == 1, _DebugSliceAxis == 2);
 		float3 gridAxis = float3(_DebugSliceAxis != 0, _DebugSliceAxis != 1, _DebugSliceAxis != 2);
 		float3 gridDist = gridAxis * abs(localPos - localPosFloor);
 		float3 gridWidth = gridAxis * fwidth(localPos);
@@ -246,7 +248,8 @@
 		float volumeDivergence = VolumeSampleScalar(_VolumeDivergence, uvw);
 		float volumePressure = VolumeSampleScalar(_VolumePressure, uvw);
 		float3 volumePressureGrad = VolumeSampleVector(_VolumePressureGrad, uvw);
-		float3 volumeStrandCountProbe = VolumeSampleVector(_VolumeStrandCountProbe, uvw);
+		float4 volumeStrandCountProbe = _VolumeStrandCountProbe.SampleLevel(_Volume_trilinear_clamp, uvw, 0);
+		float volumeStrandCountGridNormal = DecodeStrandCount(gridNormal, volumeStrandCountProbe);
 
 #if 0
 		float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvw);
@@ -328,7 +331,7 @@
 		else if (x < 6.0)
 			return float4(ColorGradient(volumePressureGrad), _DebugSliceOpacity);
 		else
-			return float4(ColorProbe(volumeStrandCountProbe), _DebugSliceOpacity);
+			return float4(ColorDensity(volumeStrandCountGridNormal / _StrandCount), _DebugSliceOpacity);
 	}
 
 	DebugVaryings DebugVert_VolumeIsosurface(float3 position : POSITION)

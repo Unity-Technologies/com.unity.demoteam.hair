@@ -860,16 +860,17 @@ void KVolumeStrandCountProbe(
 		return;
 	}
 
-	// store like this in case we ever want to compute more bands
+#if 1
+	_VolumeStrandCountProbe[worldIdx] = ProjectStrandCountSH_L0L1(VolumeIndexToWorld(worldIdx));
+#else
 	float coefficients[4];
-
 	ProjectStrandCountSH(worldIdx, coefficients);
-
 	_VolumeStrandCountProbe[worldIdx] = float4(
 		coefficients[0],
 		coefficients[1],
 		coefficients[2],
 		coefficients[3]);
+#endif
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
