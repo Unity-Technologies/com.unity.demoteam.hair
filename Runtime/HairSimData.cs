@@ -206,6 +206,7 @@ namespace Unity.DemoTeam.Hair
 			public uint _StrandCountPhi;
 			public uint _StrandCountTheta;
 			public uint _StrandCountSubstep;
+			public float _StrandCountDiameter;
 		}
 	}
 }

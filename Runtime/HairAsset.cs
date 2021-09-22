@@ -36,7 +36,7 @@ namespace Unity.DemoTeam.Hair
 			public Type type;
 			[Tooltip("Memory layout for the generated strands")]
 			public MemoryLayout memoryLayout;
-			[Tooltip("Material to assign to the generated groups"), HideInInspector]
+			[Tooltip("Material to assign to the generated groups")]
 			public Material material;//TODO handle this as part of ui cleanup
 			[ToggleGroup, Tooltip("Build LOD clusters for the generated strands (to optionally reduce cost of rendering and simulation)")]
 			public bool kLODClusters;

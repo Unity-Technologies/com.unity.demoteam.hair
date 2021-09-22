@@ -35,14 +35,10 @@ float EstimateStrandCount(float3 P, float3 L)
 		}
 	}
 
-	//TODO pass mean strand diameter
-	const float strandDiameter = 0.001;// 1mm
-	const float strandCrossSection = 0.25 * PI * strandDiameter * strandDiameter;
-
 	const float stepLength = length(VolumeWorldSize() * trace.uvwStep);
-	const float stepCrossSection = stepLength * stepLength;
+	const float stepVolume = stepLength * stepLength * stepLength;
 
-	return rho_sum * (stepCrossSection / strandCrossSection);
+	return rho_sum * (stepLength / _StrandCountDiameter);
 }
 
 #define HALF_SQRT_INV_PI    0.5 * 0.56418958354775628694 

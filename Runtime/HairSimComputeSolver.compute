@@ -434,25 +434,9 @@ void KInitializePostVolume(
 		float3 uvw = VolumeWorldToUVW(_ParticlePosition[i].xyz);
 		float accu_w = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, uvw, 0).w;
 
-		//TODO comment
+		// estimate pre-insertion value given trilinear sample and trilinear weights
 		{
-			TrilinearWeights tri = VolumeWorldToCellTrilinear(_ParticlePosition[i].xyz);
-
-			const float3 sqw0 = tri.w0 * tri.w0;
-			const float3 sqw1 = tri.w1 * tri.w1;
-
-			const float d = (
-				sqw0.x * sqw0.y * sqw0.z +
-				sqw1.x * sqw0.y * sqw0.z +
-				sqw0.x * sqw1.y * sqw0.z +
-				sqw1.x * sqw1.y * sqw0.z +
-				sqw0.x * sqw0.y * sqw1.z +
-				sqw1.x * sqw0.y * sqw1.z +
-				sqw0.x * sqw1.y * sqw1.z +
-				sqw1.x * sqw1.y * sqw1.z
-				);
-
-			accu_w = accu_w / d;
+			accu_w *= VolumeWorldToCellTrilinearInverseMultiplier(_ParticlePosition[i].xyz);
 		}
 
 		_ParticlePosition[i].w = accu_w;//TODO pack elsewhere?

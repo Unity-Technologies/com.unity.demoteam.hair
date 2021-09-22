@@ -69,6 +69,7 @@ CBUFFER_START(VolumeCBuffer)
     uint _StrandCountPhi;
     uint _StrandCountTheta;
     uint _StrandCountSubstep;
+    float _StrandCountDiameter;
 CBUFFER_END
 
 

@@ -993,6 +993,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._StrandCountPhi = volumeSettings.probeStepsPhi;
 			cbuffer._StrandCountTheta = volumeSettings.probeStepsTheta;
 			cbuffer._StrandCountSubstep = volumeSettings.probeStrandCountCellSubsteps;
+			cbuffer._StrandCountDiameter = strandDiameter / 1000.0f;
 
 			// derive keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);

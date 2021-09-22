@@ -213,6 +213,29 @@ TrilinearWeights VolumeWorldToCellTrilinear(float3 worldPos, float3 offset = 0.5
 	return tri;
 }
 
+float VolumeWorldToCellTrilinearInverseMultiplier(float3 worldPos, float3 offset = 0.5)
+{
+	//TODO comment/illustrate
+
+	TrilinearWeights tri = VolumeWorldToCellTrilinear(worldPos);
+
+	const float3 sqw0 = tri.w0 * tri.w0;
+	const float3 sqw1 = tri.w1 * tri.w1;
+
+	const float d = (
+		sqw0.x * sqw0.y * sqw0.z +
+		sqw1.x * sqw0.y * sqw0.z +
+		sqw0.x * sqw1.y * sqw0.z +
+		sqw1.x * sqw1.y * sqw0.z +
+		sqw0.x * sqw0.y * sqw1.z +
+		sqw1.x * sqw0.y * sqw1.z +
+		sqw0.x * sqw1.y * sqw1.z +
+		sqw1.x * sqw1.y * sqw1.z
+		);
+
+	return 1.0 / d;
+}
+
 float3 VolumeWorldCellStep(float3 worldDir)
 {
 #if VOLUME_SQUARE_CELLS
