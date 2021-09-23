@@ -372,10 +372,12 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Scattering")]
 
-			[ToggleGroup, FormerlySerializedAs("strandCountProbe")]
-			public bool probeStrandCount;
+			[ToggleGroup]
+			public bool strandCountProbe;
 			[ToggleGroupItem(withLabel = true), Range(1, 10), FormerlySerializedAs("cellSubsteps")]
-			public uint probeStrandCountCellSubsteps;
+			public uint strandCountProbeCellSubsteps;
+			[Range(0.0f, 2.0f)]
+			public float strandCountScale;
 			[Range(0, 20), FormerlySerializedAs("samplesTheta")]
 			public uint probeStepsTheta;
 			[Range(0, 20), FormerlySerializedAs("samplesPhi")]
@@ -411,8 +413,9 @@ namespace Unity.DemoTeam.Hair
 				targetDensity = TargetDensity.Uniform,
 				targetDensityInfluence = 1.0f,
 
-				probeStrandCount = false,
-				probeStrandCountCellSubsteps = 1,
+				strandCountProbe = false,
+				strandCountProbeCellSubsteps = 1,
+				strandCountScale = 1.0f,
 				probeStepsTheta = 5,
 				probeStepsPhi = 10,
 
@@ -992,8 +995,8 @@ namespace Unity.DemoTeam.Hair
 
 			cbuffer._StrandCountPhi = volumeSettings.probeStepsPhi;
 			cbuffer._StrandCountTheta = volumeSettings.probeStepsTheta;
-			cbuffer._StrandCountSubstep = volumeSettings.probeStrandCountCellSubsteps;
-			cbuffer._StrandCountDiameter = strandDiameter / 1000.0f;
+			cbuffer._StrandCountSubstep = volumeSettings.strandCountProbeCellSubsteps;
+			cbuffer._StrandCountDiameter = volumeSettings.strandCountScale * (strandDiameter / 1000.0f);
 
 			// derive keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
@@ -1450,7 +1453,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// strand count probe
-			if (volumeSettings.probeStrandCount)
+			if (volumeSettings.strandCountProbe)
 			{
 				using (new ProfilingScope(cmd, MarkersGPU.Volume_7_StrandCountProbe))
 				{
