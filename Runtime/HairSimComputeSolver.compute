@@ -76,16 +76,6 @@
 #define STAGING_COMPRESSION 0
 #endif
 
-#define ENABLE_CURVATURE (ENABLE_CURVATURE_EQ || ENABLE_CURVATURE_GEQ || ENABLE_CURVATURE_LEQ)
-
-#if ENABLE_CURVATURE_GEQ
-#define ApplyTriangleBendingConstraint ApplyTriangleBendingMinConstraint
-#define SolveTriangleBendingConstraint SolveTriangleBendingMinConstraint
-#elif ENABLE_CURVATURE_LEQ
-#define ApplyTriangleBendingConstraint ApplyTriangleBendingMaxConstraint
-#define SolveTriangleBendingConstraint SolveTriangleBendingMaxConstraint
-#endif
-
 //-----------------------
 // features experimental
 
@@ -113,6 +103,19 @@
 
 //--------
 // macros
+
+#define ENABLE_CURVATURE (ENABLE_CURVATURE_EQ || ENABLE_CURVATURE_GEQ || ENABLE_CURVATURE_LEQ)
+
+#if ENABLE_CURVATURE_GEQ
+#define ApplyTriangleBendingConstraintSel ApplyTriangleBendingMinConstraint
+#define SolveTriangleBendingConstraintSel SolveTriangleBendingMinConstraint
+#elif ENABLE_CURVATURE_LEQ
+#define ApplyTriangleBendingConstraintSel ApplyTriangleBendingMaxConstraint
+#define SolveTriangleBendingConstraintSel SolveTriangleBendingMaxConstraint
+#else
+#define ApplyTriangleBendingConstraintSel ApplyTriangleBendingConstraint
+#define SolveTriangleBendingConstraintSel SolveTriangleBendingConstraint
+#endif
 
 #define CHECK_STRAND(x)			\
 	if (x >= _StrandCount) return;
@@ -577,7 +580,7 @@ void KSolveConstraints_GaussSeidelReference(
 			//--- p0 <-- fixed (root)
 			//    |
 			//    r0 <-- fixed (root-1)
-			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 0.0, 0.0, 1.0, r0, p0, p1);
+			ApplyTriangleBendingConstraintSel(GetBendingRadius(strandIndex), stiffness, 0.0, 0.0, 1.0, r0, p0, p1);
 
 			//      p2 <-- solve
 			//     /
@@ -586,7 +589,7 @@ void KSolveConstraints_GaussSeidelReference(
 			//--- p0 <-- fixed (root)
 			//    |
 			//    ##
-			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
+			ApplyTriangleBendingConstraintSel(GetBendingRadius(strandIndex), stiffness, 0.0, 1.0, 1.0, p0, p1, p2);
 
 			for (uint i = strandParticleBegin + strandParticleStride * 3; i != strandParticleEnd; i += strandParticleStride)
 			{
@@ -601,7 +604,7 @@ void KSolveConstraints_GaussSeidelReference(
 				//    p0 <-- solve
 				//    |
 				//--- ##
-				ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, 1.0, 1.0, 1.0, p0, p1, p2);
+				ApplyTriangleBendingConstraintSel(GetBendingRadius(strandIndex), stiffness, 1.0, 1.0, 1.0, p0, p1, p2);
 
 				_ParticlePosition[i - strandParticleStride * 2].xyz = p0;
 			}
@@ -827,9 +830,9 @@ void PartialStrand_SolveNext(
 
 	if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(p.minus0);
 	if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(_BoundaryFriction, _ParticlePositionPrev[i].xyz, p.minus0);
-	if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), 1.0, w_minus1, w_minus0, p.minus1, p.minus0);
 	if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, rootPos, p.minus0);
-	if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, w_minus2, w_minus1, w_minus0, p.minus2, p.minus1, p.minus0);
+	if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), 1.0, w_minus1, w_minus0, p.minus1, p.minus0);
+	if (ENABLE_CURVATURE)			ApplyTriangleBendingConstraintSel(GetBendingRadius(strandIndex), stiffness, w_minus2, w_minus1, w_minus0, p.minus2, p.minus1, p.minus0);
 
 	if (ENABLE_POSE_LOCAL_BEND_TWIST)
 	{
@@ -1002,7 +1005,7 @@ void KSolveConstraints_GaussSeidel(
 
 			// root+1
 			{
-				const uint i = strandParticleBegin + strandParticleStride * 1;
+				const uint i = strandParticleBegin + strandParticleStride;
 				const uint k = 1;
 
 				PartialStrand_SolveNext(p, q, strandIndex, strandParticleStride, rootPos, i, k, stiffness, 0.0, 0.0, 1.0);
@@ -1243,17 +1246,17 @@ void KSolveConstraints_Jacobi(
 			{
 				float3 NOP;
 
-				SolveTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, gs_x[j - 2], gs_x[j - 1], gs_x[j], NOP, NOP, corr_x);
+				SolveTriangleBendingConstraintSel(GetBendingRadius(strandIndex), stiffness, gs_x[j - 2], gs_x[j - 1], gs_x[j], NOP, NOP, corr_x);
 
 				// [threads: ..end-1]
 				if (threadIdx < THREAD_GROUP_SIZE - 1)
 				{
-					SolveTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, gs_x[j - 1], gs_x[j], gs_x[j + 1], NOP, corr_x, NOP);
+					SolveTriangleBendingConstraintSel(GetBendingRadius(strandIndex), stiffness, gs_x[j - 1], gs_x[j], gs_x[j + 1], NOP, corr_x, NOP);
 
 					// [threads: ..end-2]
 					if (threadIdx < THREAD_GROUP_SIZE - 2)
 					{
-						SolveTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, gs_x[j], gs_x[j + 1], gs_x[j + 2], corr_x, NOP, NOP);
+						SolveTriangleBendingConstraintSel(GetBendingRadius(strandIndex), stiffness, gs_x[j], gs_x[j + 1], gs_x[j + 2], corr_x, NOP, NOP);
 					}
 				}
 			}

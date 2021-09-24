@@ -377,7 +377,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem(withLabel = true), Range(1, 10), FormerlySerializedAs("cellSubsteps")]
 			public uint strandCountProbeCellSubsteps;
 			[Range(0.0f, 2.0f)]
-			public float strandCountScale;
+			public float strandCountBias;
 			[Range(0, 20), FormerlySerializedAs("samplesTheta")]
 			public uint probeStepsTheta;
 			[Range(0, 20), FormerlySerializedAs("samplesPhi")]
@@ -415,7 +415,7 @@ namespace Unity.DemoTeam.Hair
 
 				strandCountProbe = false,
 				strandCountProbeCellSubsteps = 1,
-				strandCountScale = 1.0f,
+				strandCountBias = 1.0f,
 				probeStepsTheta = 5,
 				probeStepsPhi = 10,
 
@@ -996,7 +996,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._StrandCountPhi = volumeSettings.probeStepsPhi;
 			cbuffer._StrandCountTheta = volumeSettings.probeStepsTheta;
 			cbuffer._StrandCountSubstep = volumeSettings.strandCountProbeCellSubsteps;
-			cbuffer._StrandCountDiameter = volumeSettings.strandCountScale * (strandDiameter / 1000.0f);
+			cbuffer._StrandCountDiameter = (strandDiameter / 1000.0f) * (1.0f / Mathf.Max(1e-7f, volumeSettings.strandCountBias));
 
 			// derive keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);

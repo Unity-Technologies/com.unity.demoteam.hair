@@ -1,24 +1,23 @@
 #ifndef __HAIRSIMCOMPUTECONSTRAINTS_HLSL__
 #define __HAIRSIMCOMPUTECONSTRAINTS_HLSL__
 
-// Constraints between particles with infinite mass may exhibit division by zero.
-// Ideally, the application should not evaluate such constraints, as checking for
-// division by zero incurs an additional cost. For generic applications where the
-// mass of the particles is not known in advance, one can enable division by zero
-// checks by defining CONSTRAINTS_GUARD_DIVISION_BY_ZERO before including.
-//
-// E.g.:
-//   #define CONSTRAINTS_GUARD_DIVISION_BY_ZERO
-//   #include "HairSimComputeSolverConstraints.hlsl"
-
-#ifdef CONSTRAINTS_GUARD_DIVISION_BY_ZERO
-#define GUARD(x) if (x)
-#else
-#define GUARD(x)
-#endif
-
 #include "HairSimComputeSolverBoundaries.hlsl"
 #include "HairSimComputeSolverQuaternion.hlsl"
+
+//--------
+// macros
+
+#ifndef w_EPSILON
+#define w_EPSILON 1e-7
+#endif
+
+#ifndef rsqrt_safe// used where NaN would otherwise damage the data
+#define rsqrt_safe(x) max(0.0, rsqrt(x))
+#endif
+
+#ifndef rsqrt_unsafe// used where NaN is already handled by later operation
+#define rsqrt_unsafe(x) rsqrt(x)
+#endif
 
 //----------------------
 // constraint functions
@@ -28,16 +27,6 @@ void SolveCollisionConstraint(
 	const float3 p,
 	inout float3 d)
 {
-	//  - - -- -- ----+
-	//                |
-	//                |
-	//             d  |
-	//           .---.|
-	//          p----->
-	//                |
-	//                :
-	//                .
-
 	//         .
 	//           `.
 	//          d  \
@@ -48,13 +37,13 @@ void SolveCollisionConstraint(
 	//           .`
 	//         ´
 
-	float depth = BoundaryDistance(p);
-	if (depth < _BoundaryWorldMargin)
+	if (w > 0.0)
 	{
-		float3 normal = BoundaryNormal(p, depth);
-
-		GUARD(w > 0.0)
+		float depth = BoundaryDistance(p);
+		if (depth < _BoundaryWorldMargin)
 		{
+			float3 normal = BoundaryNormal(p, depth);
+
 			d += normal * (depth - _BoundaryWorldMargin);
 		}
 	}
@@ -84,40 +73,40 @@ void SolveCollisionFrictionConstraint(
 	//            '.|/
 	//              p
 
-	float depth = BoundaryDistance(p);
-	if (depth < _BoundaryWorldMargin)
+	if (w > 0.0)
 	{
-		uint index = BoundarySelect(p, depth);
-		float3 normal = BoundaryNormal(p, depth);
-
-		depth -= _BoundaryWorldMargin;
-
-		//const float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
-		const float4x4 M_prev = _BoundaryMatrixW2PrevW[index];
-
-		const float3 x_star = p + normal * depth;
-		const float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
-		const float3 x_delta_tan = x_delta - dot(x_delta, normal) * normal;
-
-		const float norm2_delta_tan = dot(x_delta_tan, x_delta_tan);
-
-		const float muS = friction;// for now just using the same constant here
-		const float muK = friction;// ...
-
-		GUARD(w > 0.0)
+		float depth = BoundaryDistance(p);
+		if (depth < _BoundaryWorldMargin)
 		{
+			uint index = BoundarySelect(p, depth);
+			float3 normal = BoundaryNormal(p, depth);
+
+			depth -= _BoundaryWorldMargin;
+
+			//const float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
+			const float4x4 M_prev = _BoundaryMatrixW2PrevW[index];
+
+			const float3 x_star = p + normal * depth;
+			const float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
+			const float3 x_delta_tan = x_delta - dot(x_delta, normal) * normal;
+
+			const float norm2_delta_tan = dot(x_delta_tan, x_delta_tan);
+
+			const float muS = friction;// for now just using the same constant here
+			const float muK = friction;// ...
+
 			d += normal * depth;
 
 			if (norm2_delta_tan < muS * muS * depth * depth)
 				d -= x_delta_tan;
 			else
-				d -= x_delta_tan * min(-muK * depth * rsqrt(norm2_delta_tan), 1);
+				d -= x_delta_tan * min(-muK * depth * rsqrt_unsafe(norm2_delta_tan), 1.0);
 		}
 	}
 }
 
 void SolveDistanceConstraint(
-	const float distance, const float stiffness,
+	const float distance0, const float stiffness,
 	const float w0, const float w1,
 	const float3 p0, const float3 p1,
 	inout float3 d0, inout float3 d1)
@@ -126,19 +115,17 @@ void SolveDistanceConstraint(
 	//    .----.                  .----.
 	// p0 ------><--------------><------ p1
 	//           \______________/
-	//               distance
+	//               distance0
 
 	float3 r = p1 - p0;
-	float rd_inv = rsqrt(dot(r, r));
+	float rd_inv = rsqrt_safe(dot(r, r));
 
-	float delta = 1.0 - (distance * rd_inv);
-	float W_inv = (delta * stiffness) / (w0 + w1);
+	float delta = 1.0 - (distance0 * rd_inv);
+	float W_inv = (delta * stiffness) / (w0 + w1 + w_EPSILON);
 
-	GUARD(W_inv > 0.0)
-	{
-		d0 += (w0 * W_inv) * r;
-		d1 -= (w1 * W_inv) * r;
-	}
+	d0 += (w0 * W_inv) * r;
+	d1 -= (w1 * W_inv) * r;
+
 }
 
 void SolveDistanceMinConstraint(
@@ -151,16 +138,13 @@ void SolveDistanceMinConstraint(
 	// ensures distance p0 - p1 >= distanceMin
 
 	float3 r = p1 - p0;
-	float rd_inv = rsqrt(dot(r, r));
+	float rd_inv = rsqrt_unsafe(dot(r, r));
 
 	float delta = 1.0 - max(1.0, distanceMin * rd_inv);// === if (rd < distanceMin) { delta = 1.0 - distanceMin / rd; }
-	float W_inv = (delta * stiffness) / (w0 + w1);
+	float W_inv = (delta * stiffness) / (w0 + w1 + w_EPSILON);
 
-	GUARD(W_inv > 0.0)
-	{
-		d0 += (w0 * W_inv) * r;
-		d1 -= (w1 * W_inv) * r;
-	}
+	d0 += (w0 * W_inv) * r;
+	d1 -= (w1 * W_inv) * r;
 }
 
 void SolveDistanceMaxConstraint(
@@ -173,16 +157,13 @@ void SolveDistanceMaxConstraint(
 	// ensures distance p0 - p1 <= distanceMax
 
 	float3 r = p1 - p0;
-	float rd_inv = rsqrt(dot(r, r));
+	float rd_inv = rsqrt_unsafe(dot(r, r));
 
 	float delta = 1.0 - min(1.0, distanceMax * rd_inv);// === if (rd > distanceMax) { delta = 1.0 - distanceMax / rd; }
-	float W_inv = (delta * stiffness) / (w0 + w1);
+	float W_inv = (delta * stiffness) / (w0 + w1 + w_EPSILON);
 
-	GUARD(W_inv > 0.0)
-	{
-		d0 += (w0 * W_inv) * r;
-		d1 -= (w1 * W_inv) * r;
-	}
+	d0 += (w0 * W_inv) * r;
+	d1 -= (w1 * W_inv) * r;
 }
 
 void SolveDistanceLRAConstraint(
@@ -200,7 +181,7 @@ void SolveDistanceLRAConstraint(
 	//       distanceMax
 
 	float3 r = p1 - p0;
-	float rd_inv = rsqrt(dot(r, r));
+	float rd_inv = rsqrt_unsafe(dot(r, r));
 
 	r *= 1.0 - min(1.0, distanceMax * rd_inv);
 
@@ -208,7 +189,7 @@ void SolveDistanceLRAConstraint(
 }
 
 void SolveDistanceFTLConstraint(
-	const float distance,
+	const float distance0,
 	const float3 p0, const float3 p1,
 	inout float3 d1)
 {
@@ -219,18 +200,18 @@ void SolveDistanceFTLConstraint(
 	//                     .----.
 	// p0 #--------------><------ p1
 	//    \______________/
-	//        distance
+	//        distance0
 
 	float3 r = p1 - p0;
-	float rd_inv = rsqrt(dot(r, r));
+	float rd_inv = rsqrt_safe(dot(r, r));
 
-	r *= 1.0 - (distance * rd_inv);
+	r *= 1.0 - (distance0 * rd_inv);
 
 	d1 -= r;
 }
 
 void SolveTriangleBendingConstraint(
-	const float radius, const float stiffness,
+	const float radius0, const float stiffness,
 	const float w0, const float w1, const float w2,
 	const float3 p0, const float3 p1, const float3 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
@@ -250,17 +231,14 @@ void SolveTriangleBendingConstraint(
 
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
-	float rd_inv = rsqrt(dot(r, r));
+	float rd_inv = rsqrt_safe(dot(r, r));
 
-	float delta = 1.0 - radius * rd_inv;
-	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2);
+	float delta = 1.0 - radius0 * rd_inv;
+	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2 + w_EPSILON);
 
-	GUARD(W_inv > 0.0)
-	{
-		d0 += (w0 * W_inv) * r;
-		d1 -= (w1 * W_inv * 2.0) * r;
-		d2 += (w2 * W_inv) * r;
-	}
+	d0 += (w0 * W_inv) * r;
+	d1 -= (w1 * W_inv * 2.0) * r;
+	d2 += (w2 * W_inv) * r;
 }
 
 void SolveTriangleBendingMinConstraint(
@@ -270,21 +248,18 @@ void SolveTriangleBendingMinConstraint(
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
 	// variation of SolveTriangleBendingConstraint(...),
-	// ensures triangle bending radius >= radiusMin
+	// ensures triangle bend radius >= radiusMin
 
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
-	float rd_inv = rsqrt(dot(r, r));
+	float rd_inv = rsqrt_unsafe(dot(r, r));
 
 	float delta = 1.0 - max(1.0, radiusMin * rd_inv);// === if (rd < radiusMin) { delta = 1.0 - radiusMin / rd; }
-	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2);
+	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2 + w_EPSILON);
 
-	GUARD(W_inv > 0.0)
-	{
-		d0 += (w0 * W_inv) * r;
-		d1 -= (w1 * W_inv * 2.0) * r;
-		d2 += (w2 * W_inv) * r;
-	}
+	d0 += (w0 * W_inv) * r;
+	d1 -= (w1 * W_inv * 2.0) * r;
+	d2 += (w2 * W_inv) * r;
 }
 
 void SolveTriangleBendingMaxConstraint(
@@ -294,21 +269,18 @@ void SolveTriangleBendingMaxConstraint(
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
 	// variation of SolveTriangleBendingConstraint(...),
-	// ensures triangle bending radius <= radiusMax
+	// ensures triangle bend radius <= radiusMax
 
 	float3 c = (p0 + p1 + p2) / 3.0;
 	float3 r = p1 - c;
-	float rd_inv = rsqrt(dot(r, r));
+	float rd_inv = rsqrt_unsafe(dot(r, r));
 
 	float delta = 1.0 - min(1.0, radiusMax * rd_inv);// === if (rd > radiusMax) { delta = 1.0 - radiusMax / rd; }
-	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2);
+	float W_inv = (2.0 * delta * stiffness) / (w0 + 2.0 * w1 + w2 + w_EPSILON);
 
-	GUARD(W_inv > 0.0)
-	{
-		d0 += (w0 * W_inv) * r;
-		d1 -= (w1 * W_inv * 2.0) * r;
-		d2 += (w2 * W_inv) * r;
-	}
+	d0 += (w0 * W_inv) * r;
+	d1 -= (w1 * W_inv * 2.0) * r;
+	d2 += (w2 * W_inv) * r;
 }
 
 void SolveEdgeVectorConstraint(
@@ -319,12 +291,10 @@ void SolveEdgeVectorConstraint(
 {
 	float3 r = (p0 + v0) - p1;
 
-	float W_inv = stiffness / (w0 + w1);
-	GUARD(W_inv > 0.0)
-	{
-		d0 -= (w0 * W_inv) * r;
-		d1 += (w1 * W_inv) * r;
-	}
+	float W_inv = stiffness / (w0 + w1 + w_EPSILON);
+
+	d0 -= (w0 * W_inv) * r;
+	d1 += (w1 * W_inv) * r;
 }
 
 void SolveDualEdgeVectorConstraint(
@@ -335,13 +305,11 @@ void SolveDualEdgeVectorConstraint(
 {
 	float3 r = (p0 - 2.0 * p1 + p2 + v0 - v1);
 
-	float W_inv = (1.0 * stiffness) / (w0 + 4.0 * w1 + w2);
-	GUARD(W_inv > 0.0)
-	{
-		d0 -= (w0 * W_inv) * r;
-		d1 += (w1 * W_inv * 2.0) * r;
-		d2 -= (w2 * W_inv) * r;
-	}
+	float W_inv = (1.0 * stiffness) / (w0 + 4.0 * w1 + w2 + w_EPSILON);
+
+	d0 -= (w0 * W_inv) * r;
+	d1 += (w1 * W_inv * 2.0) * r;
+	d2 -= (w2 * W_inv) * r;
 }
 
 void SolveMaterialFrameBendTwistConstraint(
@@ -361,13 +329,11 @@ void SolveMaterialFrameBendTwistConstraint(
 	float4 delta = (dot(delta_add, delta_add) < dot(delta_sub, delta_sub)) ? delta_add : delta_sub;
 
 	// apply eq. 40 to calc corrections
-	float W_inv = stiffness / (w0 + w1);
-	GUARD(W_inv > 0.0)
-	{
-		delta.w = 0.0;// zero scalar part
-		d0 += (w0 * W_inv) * QMul(q1, delta);
-		d1 -= (w1 * W_inv) * QMul(q0, delta);
-	}
+	float W_inv = stiffness / (w0 + w1 + w_EPSILON);
+
+	delta.w = 0.0;// zero scalar part
+	d0 += (w0 * W_inv) * QMul(q1, delta);
+	d1 -= (w1 * W_inv) * QMul(q0, delta);
 }
 
 void SolveMaterialFrameStretchShearConstraint(
@@ -385,13 +351,11 @@ void SolveMaterialFrameStretchShearConstraint(
 	float3 r = (p1 - p0) / distance0 - QMul(q, e3);
 
 	// apply eq. 37 to calc corrections
-	float W_inv = stiffness / (w0 + w1 + 4.0 * wq * distance0 * distance0);
-	GUARD(W_inv > 0.0)
-	{
-		d0 += (w0 * W_inv * distance0) * r;
-		d1 -= (w1 * W_inv * distance0) * r;
-		dq += (wq * W_inv * distance0 * distance0) * QMul(float4(r, 0), QMul(q, QConjugate(float4(0, 1, 0, 0))));
-	}
+	float W_inv = stiffness / (w0 + w1 + 4.0 * wq * distance0 * distance0 + w_EPSILON);
+
+	d0 += (w0 * W_inv * distance0) * r;
+	d1 -= (w1 * W_inv * distance0) * r;
+	dq += (wq * W_inv * distance0 * distance0) * QMul(float4(r, 0), QMul(q, QConjugate(float4(0, 1, 0, 0))));
 }
 
 //--------------------------------------------------
@@ -414,11 +378,11 @@ void SolveCollisionFrictionConstraint(
 }
 
 void SolveDistanceConstraint(
-	const float distance, const float stiffness,
+	const float distance0, const float stiffness,
 	const float4 p0, const float4 p1,
 	inout float3 d0, inout float3 d1)
 {
-	SolveDistanceConstraint(distance, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
+	SolveDistanceConstraint(distance0, stiffness, p0.w, p1.w, p0.xyz, p1.xyz, d0, d1);
 }
 
 void SolveDistanceMinConstraint(
@@ -438,11 +402,11 @@ void SolveDistanceMaxConstraint(
 }
 
 void SolveTriangleBendingConstraint(
-	const float radius, const float stiffness,
+	const float radius0, const float stiffness,
 	const float4 p0, const float4 p1, const float4 p2,
 	inout float3 d0, inout float3 d1, inout float3 d2)
 {
-	SolveTriangleBendingConstraint(radius, stiffness, p0.w, p1.w, p2.w, p0.xyz, p1.xyz, p2.xyz, d0, d1, d2);
+	SolveTriangleBendingConstraint(radius0, stiffness, p0.w, p1.w, p2.w, p0.xyz, p1.xyz, p2.xyz, d0, d1, d2);
 }
 
 void SolveTriangleBendingMinConstraint(
@@ -494,11 +458,11 @@ void ApplyCollisionFrictionConstraint(const float friction, const float3 x0, ino
 	p += d;
 }
 
-void ApplyDistanceConstraint(const float distance, const float stiffness, const float w0, const float w1, inout float3 p0, inout float3 p1)
+void ApplyDistanceConstraint(const float distance0, const float stiffness, const float w0, const float w1, inout float3 p0, inout float3 p1)
 {
 	float3 d0 = 0.0;
 	float3 d1 = 0.0;
-	SolveDistanceConstraint(distance, stiffness, w0, w1, p0, p1, d0, d1);
+	SolveDistanceConstraint(distance0, stiffness, w0, w1, p0, p1, d0, d1);
 	p0 += d0;
 	p1 += d1;
 }
@@ -528,23 +492,23 @@ void ApplyDistanceLRAConstraint(const float distanceMax, const float3 p0, inout 
 	p1 += d1;
 }
 
-void ApplyDistanceFTLConstraint(const float distance, const float3 p0, inout float3 p1, inout float3 d1)
+void ApplyDistanceFTLConstraint(const float distance0, const float3 p0, inout float3 p1, inout float3 d1)
 {
 	float3 d1_tmp = 0.0;
-	SolveDistanceFTLConstraint(distance, p0, p1, d1_tmp);
+	SolveDistanceFTLConstraint(distance0, p0, p1, d1_tmp);
 	p1 += d1_tmp;
 	d1 += d1_tmp;
 }
 
 void ApplyTriangleBendingConstraint(
-	const float radius, const float stiffness,
+	const float radius0, const float stiffness,
 	const float w0, const float w1, const float w2,
 	inout float3 p0, inout float3 p1, inout float3 p2)
 {
 	float3 d0 = 0.0;
 	float3 d1 = 0.0;
 	float3 d2 = 0.0;
-	SolveTriangleBendingConstraint(radius, stiffness, w0, w1, w2, p0, p1, p2, d0, d1, d2);
+	SolveTriangleBendingConstraint(radius0, stiffness, w0, w1, w2, p0, p1, p2, d0, d1, d2);
 	p0 += d0;
 	p1 += d1;
 	p2 += d2;
