@@ -145,7 +145,7 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 		v.tangentOS = TransformWorldToObjectNormal(vertexTangentWS);
 		v.bitangentOS = TransformWorldToObjectNormal(vertexBitangentWS);
 		v.rootUV = _RootUV[strandIndex];
-		v.strandUV = vertexUV;
+		v.strandUV = vertexUV * float2(1.0, _RootScale[strandIndex]);
 		v.strandIndex = strandIndex;
 		v.strandNormalTS = GetHairNormalTangentSpace(vertexUV);
 		v.debugColor = ColorCycle(strandIndex, _StrandCount);

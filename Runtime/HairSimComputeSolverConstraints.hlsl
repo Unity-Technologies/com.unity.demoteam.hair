@@ -125,7 +125,6 @@ void SolveDistanceConstraint(
 
 	d0 += (w0 * W_inv) * r;
 	d1 -= (w1 * W_inv) * r;
-
 }
 
 void SolveDistanceMinConstraint(
