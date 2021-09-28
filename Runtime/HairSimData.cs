@@ -67,6 +67,7 @@ namespace Unity.DemoTeam.Hair
 			public Matrix4x4 _LocalToWorld;				// root mesh vertex transform
 			public Matrix4x4 _LocalToWorldInvT;			// ...
 			public Vector4 _WorldRotation;				// quat(xyz,w): primary skinning bone rotation
+			public Vector4 _WorldGravity;				// xyz: gravity vector, w: -
 
 			public Vector4 _StagingOriginExtent;		// xyz: origin, w: scale
 			public Vector4 _StagingOriginExtentPrev;	// ...
@@ -142,7 +143,7 @@ namespace Unity.DemoTeam.Hair
 			//public float allGroupsMaxStrandLength;
 
 			public RenderTexture boundarySDF;			// x: signed distance to arbitrary solid
-			public RenderTexture boundarySDF_undefined;	// (placeholder for when inactive)
+			public RenderTexture boundarySDF_undefined;	// .. (placeholder for when inactive)
 
 			public ComputeBuffer boundaryShape;			// arr(HairBoundary.RuntimeShape.Data)
 			public ComputeBuffer boundaryMatrix;		// arr(float4x4): local to world

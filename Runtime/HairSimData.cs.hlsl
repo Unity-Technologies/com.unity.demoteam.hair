@@ -10,6 +10,7 @@ CBUFFER_START(SolverCBuffer)
     float4x4 _LocalToWorld;
     float4x4 _LocalToWorldInvT;
     float4 _WorldRotation;
+    float4 _WorldGravity;
     float4 _StagingOriginExtent;
     float4 _StagingOriginExtentPrev;
     uint _StrandCount;
@@ -35,7 +36,6 @@ CBUFFER_START(SolverCBuffer)
     float _AngularDampingInterval;
     float _CellPressure;
     float _CellVelocity;
-    float _Gravity;
     float _BoundaryFriction;
     float _FTLDamping;
     float _LocalCurvature;

@@ -213,6 +213,8 @@ namespace Unity.DemoTeam.Hair
 			public float cellVelocity;
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
+			[Tooltip("Additional rotation of gravity vector (Physics.gravity)")]
+			public Quaternion gravityRotation;
 
 			[LineHeader("Constraints")]
 
@@ -339,7 +341,7 @@ namespace Unity.DemoTeam.Hair
 				IncludeColliders,
 			}
 
-			[LineHeader("Volume")]
+			[LineHeader("Splats")]
 
 			public GridPrecision gridPrecision;
 			[FormerlySerializedAs("volumeGridResolution"), Range(8, 160)]
@@ -812,9 +814,9 @@ namespace Unity.DemoTeam.Hair
 
 			// derive constants
 			cbuffer._LocalToWorld = rootTransform;
-			cbuffer._LocalToWorldInvT = rootTransform.inverse.transpose;
-
+			cbuffer._LocalToWorldInvT = Matrix4x4.Transpose(Matrix4x4.Inverse(rootTransform));
 			cbuffer._WorldRotation = new Vector4(strandRotation.x, strandRotation.y, strandRotation.z, strandRotation.w);
+			cbuffer._WorldGravity = Quaternion.Normalize(solverSettings.gravityRotation) * (Physics.gravity * solverSettings.gravity);
 
 			cbuffer._StrandScale = strandScale;
 			cbuffer._StrandDiameter = strandDiameter * 0.001f;
@@ -830,7 +832,6 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._AngularDampingInterval = IntervalToSeconds(solverSettings.angularDampingInterval);
 			cbuffer._CellPressure = solverSettings.cellPressure;
 			cbuffer._CellVelocity = solverSettings.cellVelocity;
-			cbuffer._Gravity = solverSettings.gravity * -Vector3.Magnitude(Physics.gravity);
 
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
 			cbuffer._FTLDamping = solverSettings.distanceFTLDamping;

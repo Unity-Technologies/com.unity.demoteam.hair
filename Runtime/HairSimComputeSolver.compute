@@ -475,7 +475,7 @@ void KSolveConstraints_GaussSeidelReference(
 		{
 			const float3 x0 = _ParticlePositionPrev[i].xyz;
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + ApplyVolumeImpulse(x0, _ParticleVelocityPrev[i].xyz);
-			const float3 a0 = float3(0.0, _Gravity, 0.0);
+			const float3 a0 = _WorldGravity.xyz;
 			{
 #if SECOND_ORDER_POSITION
 				const float3 x0_minus1 = _ParticlePositionPrevPrev[i].xyz;
@@ -949,7 +949,7 @@ void KSolveConstraints_GaussSeidel(
 		{
 			const float3 x0 = _ParticlePositionPrev[i].xyz;
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + ApplyVolumeImpulse(x0, _ParticleVelocityPrev[i].xyz);
-			const float3 a0 = float3(0.0, _Gravity, 0.0);
+			const float3 a0 = _WorldGravity.xyz;
 			{
 #if SECOND_ORDER_POSITION
 				const float3 x0_minus1 = _ParticlePositionPrevPrev[i].xyz;
@@ -1104,7 +1104,7 @@ void KSolveConstraints_Jacobi(
 		else
 		{
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + ApplyVolumeImpulse(x0, _ParticleVelocityPrev[i].xyz);
-			const float3 a0 = float3(0.0, _Gravity, 0.0);
+			const float3 a0 = _WorldGravity.xyz;
 			{
 #if SECOND_ORDER_POSITION
 				const float3 x0_minus1 = _ParticlePositionPrevPrev[i].xyz;
