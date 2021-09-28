@@ -100,7 +100,6 @@ namespace Unity.DemoTeam.Hair
 			public float _AngularDampingInterval;
 			public float _CellPressure;
 			public float _CellVelocity;
-			public float _Gravity;
 
 			public float _BoundaryFriction;
 			public float _FTLDamping;
