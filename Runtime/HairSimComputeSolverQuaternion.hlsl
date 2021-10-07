@@ -28,6 +28,37 @@ float3 QMul(float4 q, float3 v)
 	return v + q.w * t + cross(q.xyz, t);
 }
 
+float4 QNlerp(float4 a, float4 b, float t)
+{
+	float d = dot(a, b);
+	if (d < 0.0)
+	{
+		b = -b;
+	}
+
+	return normalize(lerp(a, b, t));
+}
+
+float4 QSlerp(float4 a, float4 b, float t)
+{
+	float d = dot(a, b);
+	if (d < 0.0)
+	{
+		d = -d;
+		b = -b;
+	}
+
+	if (d < (1.0 - 1e-5))
+	{
+		float2 w = sin(acos(d) * float2(1.0 - t, t)) * rsqrt(1.0 - d * d);
+		return a * w.x + b * w.y;
+	}
+	else
+	{
+		return normalize(lerp(a, b, t));
+	}
+}
+
 float4 MakeQuaternionIdentity()
 {
 	return float4(0.0, 0.0, 0.0, 1.0);

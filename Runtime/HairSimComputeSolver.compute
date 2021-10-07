@@ -1,11 +1,12 @@
 ﻿#pragma kernel KInitialize								THREAD_GROUP_SIZE=64	F_INIT
 #pragma kernel KInitializePostVolume					THREAD_GROUP_SIZE=64	F_INIT
-#pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64	F_SOLVER
-#pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64	F_SOLVER
-#pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
-#pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
-#pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
-#pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	F_SOLVER	KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
+#pragma kernel KSubstepRoots							THREAD_GROUP_SIZE=64	F_SUBSTEP
+#pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64	F_SOLVE
+#pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64	F_SOLVE
+#pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
+#pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
+#pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
+#pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
 #pragma kernel KInterpolate								THREAD_GROUP_SIZE=64	F_INTERPOLATE
 #pragma kernel KInterpolateNearest						THREAD_GROUP_SIZE=64	F_INTERPOLATE
 #pragma kernel KStaging									THREAD_GROUP_SIZE=64	F_STAGING
@@ -451,6 +452,58 @@ void KInitializePostVolume(
 	}
 }
 
+//------------------
+// kernels pre-step
+
+float3 BlendPosition(float3 p0, float3 p1, float t)
+{
+	return lerp(p0, p1, t);
+}
+
+float3 BlendDirection(float3 v0, float3 v1, float t)
+{
+	float4 q0 = MakeQuaternionIdentity();
+	float4 q1 = MakeQuaternionFromTo(v0, v1);
+	float4 qt = QSlerp(q0, q1, t);
+	return QMul(qt, v0);
+}
+
+float4 BlendQuaternion(float4 q0, float4 q1, float t)
+{
+	return QSlerp(q0, q1, t);
+}
+
+float _SubstepFrac;
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KSubstepRoots(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	DECLARE_STRAND(worldIdx.x);
+
+	_SubstepRootPosition[strandIndex].xyz = BlendPosition(
+		_RootPositionPrev[strandIndex].xyz,
+		_RootPosition[strandIndex].xyz,
+		_SubstepFrac);
+
+	_SubstepRootDirection[strandIndex].xyz = BlendDirection(
+		_RootDirectionPrev[strandIndex].xyz,
+		_RootDirection[strandIndex].xyz,
+		_SubstepFrac);
+
+	_SubstepRootFrame[strandIndex] = BlendQuaternion(
+		_RootFramePrev[strandIndex],
+		_RootFrame[strandIndex],
+		_SubstepFrac);
+}
+
 //---------------
 // kernels solve
 
@@ -570,10 +623,13 @@ void KSolveConstraints_GaussSeidelReference(
 		// solve triangle bending constraints
 		if (ENABLE_CURVATURE)
 		{
+			float4 rootFrame = _RootFrame[strandIndex];
+			float3 rootVec = GetParticleInterval(strandIndex) * QMul(rootFrame, float3(0, 1, 0));
+
 			float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 			float3 p1 = _ParticlePosition[strandParticleBegin + strandParticleStride].xyz;
 			float3 p2 = _ParticlePosition[strandParticleBegin + strandParticleStride * 2].xyz;
-			float3 r0 = p0 - _RootDirection[strandIndex].xyz * GetParticleInterval(strandIndex);
+			float3 r0 = p0 - rootVec;
 
 			//      p1 <-- solve
 			//     /

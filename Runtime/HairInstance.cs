@@ -213,7 +213,6 @@ namespace Unity.DemoTeam.Hair
 		[NonSerialized] public float stepsLastFrameSmooth;
 		[NonSerialized] public int stepsLastFrameSkipped;
 
-		public event Action<CommandBuffer> onSimulationStateChangedStep;
 		public event Action<CommandBuffer> onSimulationStateChanged;
 		public event Action<CommandBuffer> onRenderingStateChanged;
 
@@ -448,7 +447,7 @@ namespace Unity.DemoTeam.Hair
 
 		void UpdateSimulationState(CommandBuffer cmd)
 		{
-			var stepCount = DispatchStepAccumulated(cmd, Time.deltaTime);
+			var stepCount = DispatchStepsAccumulated(cmd, Time.deltaTime);
 			if (stepCount > 0)
 			{
 				// fire event
@@ -723,23 +722,24 @@ namespace Unity.DemoTeam.Hair
 			return mat;
 		}
 
-		public int DispatchStepAccumulated(CommandBuffer cmd, float dt)
+		public int DispatchStepsAccumulated(CommandBuffer cmd, float dt)
 		{
 			var active = GetSimulationActive();
 			var stepDT = GetSimulationTimeStep();
 
-			// skip if inactive or time step zero
+			// skip if inactive or if time step zero
 			if (stepDT == 0.0f || active == false)
 			{
 				stepsLastFrame = 0;
 				stepsLastFrameSmooth = 0.0f;
 				stepsLastFrameSkipped = 0;
-				return 0;
+				return 0;// no steps performed
 			}
 
-			// calc number of steps
+			// add time passed
 			accumulatedTime += dt;
 
+			// calc number of steps
 			var stepCountRT = (int)Mathf.Floor(accumulatedTime / stepDT);
 			var stepCount = stepCountRT;
 			{
@@ -754,9 +754,9 @@ namespace Unity.DemoTeam.Hair
 				accumulatedTime = 0.0f;
 
 			// perform the steps
-			for (int i = 0; i != stepCount; i++)
+			if (stepCount > 0)
 			{
-				DispatchStep(cmd, stepDT);
+				DispatchSteps(cmd, stepDT, stepCount);
 			}
 
 			// update counters
@@ -764,11 +764,11 @@ namespace Unity.DemoTeam.Hair
 			stepsLastFrameSmooth = Mathf.Lerp(stepsLastFrameSmooth, stepsLastFrame, 1.0f - Mathf.Pow(0.01f, dt / 0.2f));
 			stepsLastFrameSkipped = Mathf.Max(0, stepCountRT - stepCount);
 
-			// return steps
+			// return steps performced
 			return stepCount;
 		}
 
-		public void DispatchStep(CommandBuffer cmd, float dt)
+		public void DispatchSteps(CommandBuffer cmd, float stepDT, int stepCount)
 		{
 			if (!InitializeRuntimeData(cmd))
 				return;
@@ -786,8 +786,8 @@ namespace Unity.DemoTeam.Hair
 				var rootTransform = strandGroupInstances[i].rootFilter.transform.localToWorldMatrix;
 				var strandRotation = GetRootRotation(strandGroupInstances[i]);
 
-				HairSim.PushSolverParams(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, dt);
-				HairSim.PushSolverRoots(cmd, solverData[i], rootMesh);// TODO handle substeps within frame (interpolate roots)
+				HairSim.PushSolverParams(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, stepDT);
+				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
 			}
 
 			// update volume boundaries
@@ -800,19 +800,22 @@ namespace Unity.DemoTeam.Hair
 				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
 
-			// step solver data
-			for (int i = 0; i != solverData.Length; i++)
+			// perform the steps
+			for (int i = 0; i != stepCount; i++)
 			{
-				HairSim.StepSolverData(cmd, ref solverData[i], solverSettings, volumeData);
+				float stepFracLo = (i + 0) / (float)stepCount;
+				float stepFracHi = (i + 1) / (float)stepCount;
+
+				// step solver data
+				for (int j = 0; j != solverData.Length; j++)
+				{
+					HairSim.StepSolverData(cmd, ref solverData[j], solverSettings, volumeData, stepFracLo, stepFracHi);
+				}
+
+				// step volume data
+				HairSim.PushVolumeParams(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
+				HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
 			}
-
-			// step volume data
-			HairSim.PushVolumeParams(cmd, ref volumeData, volumeSettings, simulationBounds, strandDiameter + strandMargin, strandScale);
-			HairSim.StepVolumeData(cmd, ref volumeData, volumeSettings, solverData);
-
-			// fire event
-			if (onSimulationStateChangedStep != null)
-				onSimulationStateChangedStep(cmd);
 		}
 
 		public void DispatchDraw(CommandBuffer cmd)
@@ -914,10 +917,14 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.PushSolverLOD(cmd, ref solverData[i], strandGroup.lodCount - 1);//TODO will need to move this around to generate rest density per LOD, to support target density initial pose in particles
 				HairSim.PushSolverParams(cmd, ref solverData[i], solverSettings, rootTransform, strandRotation, strandDiameter, strandScale, 1.0f);
-				HairSim.PushSolverRoots(cmd, solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
 				{
 					HairSim.InitSolverData(cmd, solverData[i]);
 				}
+
+				//TODO clean this up (currently necessary for full initialization of root buffers)
+				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
 			}
 
 			// init volume data

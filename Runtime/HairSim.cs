@@ -63,8 +63,15 @@ namespace Unity.DemoTeam.Hair
 			public static int _RootUV;
 			public static int _RootScale;
 			public static int _RootPosition;
+			public static int _RootPositionPrev;
 			public static int _RootDirection;
+			public static int _RootDirectionPrev;
 			public static int _RootFrame;
+			public static int _RootFramePrev;
+
+			public static int _SubstepRootPosition;
+			public static int _SubstepRootDirection;
+			public static int _SubstepRootFrame;
 
 			public static int _InitialRootFrame;
 			public static int _InitialParticleOffset;
@@ -123,6 +130,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public static int KInitialize;
 			public static int KInitializePostVolume;
+			public static int KSubstepRoots;
 			public static int KSolveConstraints_GaussSeidelReference;
 			public static int KSolveConstraints_GaussSeidel;
 			public static int KSolveConstraints_Jacobi_16;
@@ -553,9 +561,16 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref solverData.rootUV, "RootUV", strandCount, particleStrideVector2);
 				changed |= CreateBuffer(ref solverData.rootScale, "RootScale", strandCount, particleStrideScalar);
-				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition", strandCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection", strandCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverData.rootFrame, "RootFrame", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.rootPosition, "RootPosition_0", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.rootPositionPrev, "RootPosition_1", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.rootDirection, "RootDirection_0", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.rootDirectionPrev, "RootDirection_1", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.rootFrame, "RootFrame_0", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.rootFramePrev, "RootFrame_1", strandCount, particleStrideVector4);
+
+				changed |= CreateBuffer(ref solverData.substepRootPosition, "RootPosition_t", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.substepRootDirection, "RootDirection_t", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.substepRootFrame, "RootFrame_t", strandCount, particleStrideVector4);
 
 				changed |= CreateBuffer(ref solverData.initialRootFrame, "InitialRootFrame", strandCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.initialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector4);
@@ -648,8 +663,15 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverData.rootUV);
 			ReleaseBuffer(ref solverData.rootScale);
 			ReleaseBuffer(ref solverData.rootPosition);
+			ReleaseBuffer(ref solverData.rootPositionPrev);
 			ReleaseBuffer(ref solverData.rootDirection);
+			ReleaseBuffer(ref solverData.rootDirectionPrev);
 			ReleaseBuffer(ref solverData.rootFrame);
+			ReleaseBuffer(ref solverData.rootFramePrev);
+
+			ReleaseBuffer(ref solverData.substepRootPosition);
+			ReleaseBuffer(ref solverData.substepRootDirection);
+			ReleaseBuffer(ref solverData.substepRootFrame);
 
 			ReleaseBuffer(ref solverData.initialRootFrame);
 			ReleaseBuffer(ref solverData.initialParticleOffset);
@@ -722,8 +744,15 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(UniformIDs._RootUV, solverData.rootUV);
 			target.BindComputeBuffer(UniformIDs._RootScale, solverData.rootScale);
 			target.BindComputeBuffer(UniformIDs._RootPosition, solverData.rootPosition);
+			target.BindComputeBuffer(UniformIDs._RootPositionPrev, solverData.rootPositionPrev);
 			target.BindComputeBuffer(UniformIDs._RootDirection, solverData.rootDirection);
+			target.BindComputeBuffer(UniformIDs._RootDirectionPrev, solverData.rootDirectionPrev);
 			target.BindComputeBuffer(UniformIDs._RootFrame, solverData.rootFrame);
+			target.BindComputeBuffer(UniformIDs._RootFramePrev, solverData.rootFramePrev);
+
+			target.BindComputeBuffer(UniformIDs._SubstepRootPosition, solverData.substepRootPosition);
+			target.BindComputeBuffer(UniformIDs._SubstepRootDirection, solverData.substepRootDirection);
+			target.BindComputeBuffer(UniformIDs._SubstepRootFrame, solverData.substepRootFrame);
 
 			target.BindComputeBuffer(UniformIDs._InitialRootFrame, solverData.initialRootFrame);
 			target.BindComputeBuffer(UniformIDs._InitialParticleOffset, solverData.initialParticleOffset);
@@ -863,6 +892,25 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, solverData.cbufferStorage, cbuffer);
 		}
 
+		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, int lodIndex)
+		{
+			ref var cbuffer = ref solverData.cbuffer;
+
+			// derive constants
+			var clampedLODIndex = (uint)Mathf.Clamp(lodIndex, 0, solverData.lodThreshold.Length);
+			{
+				cbuffer._LODIndexLo = clampedLODIndex;
+				cbuffer._LODIndexHi = clampedLODIndex;
+				cbuffer._LODBlendFraction = 0.0f;
+			}
+
+			cbuffer._SolverStrandCount = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexHi];
+			cbuffer._SolverStrandCountFinal = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexLo];
+
+			// update cbuffer
+			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
+		}
+
 		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, float lodValue, bool lodBlending)
 		{
 			ref var cbuffer = ref solverData.cbuffer;
@@ -904,27 +952,12 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
 		}
 
-		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, int lodIndex)
+		public static void PushSolverRoots(CommandBuffer cmd, ref SolverData solverData, Mesh rootMesh)
 		{
-			ref var cbuffer = ref solverData.cbuffer;
+			CoreUtils.Swap(ref solverData.rootPosition, ref solverData.rootPositionPrev);
+			CoreUtils.Swap(ref solverData.rootDirection, ref solverData.rootDirectionPrev);
+			CoreUtils.Swap(ref solverData.rootFrame, ref solverData.rootFramePrev);
 
-			// derive constants
-			var clampedLODIndex = (uint)Mathf.Clamp(lodIndex, 0, solverData.lodThreshold.Length);
-			{
-				cbuffer._LODIndexLo = clampedLODIndex;
-				cbuffer._LODIndexHi = clampedLODIndex;
-				cbuffer._LODBlendFraction = 0.0f;
-			}
-
-			cbuffer._SolverStrandCount = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexHi];
-			cbuffer._SolverStrandCountFinal = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexLo];
-
-			// update cbuffer
-			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
-		}
-
-		public static void PushSolverRoots(CommandBuffer cmd, in SolverData solverData, Mesh rootMesh)
-		{
 			BindSolverData(cmd, solverData);
 
 			cmd.SetRandomWriteTarget(1, solverData.rootPosition);
@@ -1199,7 +1232,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KInitializePostVolume, numX, numY, numZ);
 		}
 
-		public static void StepSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in VolumeData volumeData)
+		public static void StepSolverData(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in VolumeData volumeData, float stepFracLo, float stepFracHi)
 		{
 			int numX = (int)solverData.cbuffer._SolverStrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)solverData.cbuffer._SolverStrandCount % PARTICLE_GROUP_SIZE);
 			int numY = 1;
@@ -1240,19 +1273,44 @@ namespace Unity.DemoTeam.Hair
 					break;
 			}
 
+			SolverData WithSubstepData(in SolverData data, bool dataSubstep)
+			{
+				var dataCopy = data;
+				if (dataSubstep)
+				{
+					CoreUtils.Swap(ref dataCopy.substepRootPosition, ref dataCopy.rootPosition);
+					CoreUtils.Swap(ref dataCopy.substepRootDirection, ref dataCopy.rootDirection);
+					CoreUtils.Swap(ref dataCopy.substepRootFrame, ref dataCopy.rootFrame);
+				}
+				return dataCopy;
+			}
+
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
 				BindVolumeData(cmd, s_solverCS, kernelSolveConstraints, volumeData);
 
 				var keywordState = solverData.keywords;
+				var substepCount = Mathf.Max(1, solverSettings.substeps);
 
-				for (int i = 0; i != Mathf.Max(1, solverSettings.substeps); i++)
+				for (int i = 0; i != substepCount; i++)
 				{
+					var substepFrac = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
+					if (substepFrac < (1.0f - float.Epsilon))
+					{
+						//TODO move into cbuffer?
+						cmd.SetComputeFloatParam(s_solverCS, "_SubstepFrac", substepFrac);
+
+						BindSolverData(cmd, s_solverCS, SolverKernels.KSubstepRoots, solverData);
+						cmd.DispatchCompute(s_solverCS, SolverKernels.KSubstepRoots, numX, numY, numZ);
+					}
+
+					//Debug.Log("substep " + i + ": " + (substepFrac < (1.0f - float.Epsilon)) + " (lo " + stepFracLo + " hi " + stepFracHi + ")");
+
 					CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);       // [0 1 2] -> (1 0 2)
 					CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);   // (1 0 2) -> [2 0 1]
 					CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
 
-					BindSolverData(cmd, s_solverCS, kernelSolveConstraints, solverData);
+					BindSolverData(cmd, s_solverCS, kernelSolveConstraints, WithSubstepData(solverData, substepFrac < (1.0f - float.Epsilon)));
 					cmd.DispatchCompute(s_solverCS, kernelSolveConstraints, numX, numY, numZ);
 
 					// volume impulse is only applied for first substep
@@ -1275,7 +1333,7 @@ namespace Unity.DemoTeam.Hair
 					numY = 1;
 					numZ = 1;
 
-					BindSolverData(cmd, s_solverCS, kernelInterpolate, solverData);
+					BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, stepFracHi < 1.0f - float.Epsilon));
 					cmd.DispatchCompute(s_solverCS, kernelInterpolate, numX, numY, numZ);
 				}
 			}
