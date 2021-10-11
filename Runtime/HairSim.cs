@@ -222,7 +222,7 @@ namespace Unity.DemoTeam.Hair
 			[Range(-1.0f, 1.0f), Tooltip("Scaling factor for gravity (Physics.gravity)")]
 			public float gravity;
 			[Tooltip("Additional rotation of gravity vector (Physics.gravity)")]
-			public Quaternion gravityRotation;
+			public Vector3 gravityRotation;
 
 			[LineHeader("Constraints")]
 
@@ -845,7 +845,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._LocalToWorld = rootTransform;
 			cbuffer._LocalToWorldInvT = Matrix4x4.Transpose(Matrix4x4.Inverse(rootTransform));
 			cbuffer._WorldRotation = new Vector4(strandRotation.x, strandRotation.y, strandRotation.z, strandRotation.w);
-			cbuffer._WorldGravity = Quaternion.Normalize(solverSettings.gravityRotation) * (Physics.gravity * solverSettings.gravity);
+			cbuffer._WorldGravity = Quaternion.Euler(solverSettings.gravityRotation) * (Physics.gravity * solverSettings.gravity);
 
 			cbuffer._StrandScale = strandScale;
 			cbuffer._StrandDiameter = strandDiameter * 0.001f;

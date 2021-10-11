@@ -243,6 +243,13 @@ namespace Unity.DemoTeam.Hair
 				// volume bounds
 				Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
 				Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData), 2.0f * HairSim.GetVolumeExtent(volumeData));
+
+				// volume gravity
+				for (int i = 0; i != strandGroupInstances.Length; i++)
+				{
+					Gizmos.color = Color.cyan;
+					Gizmos.DrawRay(HairSim.GetVolumeCenter(volumeData), solverData[i].cbuffer._WorldGravity * 0.1f);
+				}
 			}
 		}
 
