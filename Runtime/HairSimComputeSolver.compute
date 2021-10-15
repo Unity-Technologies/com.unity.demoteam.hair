@@ -182,10 +182,25 @@ float GetIterationStiffness(uint iteration)
 	return 1.0 - pow(saturate(1.0 - _Stiffness), 1.0 / (1 + iteration));
 }
 
-float GetDecay(float remainder, float interval)
+float GetDecay(float fraction, float interval)
 {
-	return pow(max(1e-5, remainder), _DT / interval);
+	return pow(max(1e-5, 1.0 - fraction), _DT / interval);
 }
+
+#define DEFINE_DECAY_FUNCS(T)									\
+	T Decay(T a, float fraction, float interval)				\
+	{															\
+		return a * GetDecay(fraction, interval);				\
+	}															\
+	T DecayTowards(T a, T b, float fraction, float interval)	\
+	{															\
+		return lerp(a, b, 1.0 - GetDecay(fraction, interval));	\
+	}
+
+DEFINE_DECAY_FUNCS(float);
+DEFINE_DECAY_FUNCS(float2);
+DEFINE_DECAY_FUNCS(float3);
+DEFINE_DECAY_FUNCS(float4);
 
 float3 IntegratePosition(float3 x0, float3 v0, float3 a0)
 {
@@ -274,7 +289,7 @@ void ApplyDampingFTL(inout float3 v, float3 d)
 
 void ApplyDampingLinear(inout float3 v)
 {
-	v *= GetDecay(1.0 - _Damping, _DampingInterval);
+	v *= GetDecay(_Damping, _DampingInterval);
 }
 
 void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
@@ -289,7 +304,7 @@ void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
 		float3 w = LinearToAngular(r, v);
 
 		float3 v_tan = AngularToLinear(r, w);
-		float3 v_tan_damp = v_tan * (1.0 - GetDecay(1.0 - _AngularDamping, _AngularDampingInterval));
+		float3 v_tan_damp = v_tan * (1.0 - GetDecay(_AngularDamping, _AngularDampingInterval));
 
 		v0 += v_tan_damp;
 		v1 -= v_tan_damp;
@@ -318,22 +333,47 @@ float GetBendingRadius(uint strandIndex)
 	return _LocalCurvature * GetParticleInterval(strandIndex);
 }
 
-float GetGlobalAttenuation(uint strandIndex, uint strandParticleNumber)
+float LinearRamp(float x, float4 ramp)
 {
-	float t = _RootScale[strandIndex] * (strandParticleNumber / (float)(_StrandParticleCount - 1));
-	float k = saturate((t - _GlobalFadeOffset) / _GlobalFadeExtent);
-	return 1.0 - k;
+	// ramp.x = x min
+	// ramp.y = x ext
+	// ramp.z = y min
+	// ramp.w = y ext
+	return ramp.z + ramp.w * saturate((x - ramp.x) / ramp.y);
+}
+
+float4 LinearRampUnpack(uint rampPack)
+{
+	return saturate(
+		float4(
+			rampPack >> 24,
+			rampPack >> 16,
+			rampPack >> 8,
+			rampPack
+			) / 255.0
+	);
+}
+
+float LinearRamp(float x, uint rampPack)
+{
+	return LinearRamp(x, LinearRampUnpack(rampPack));
+}
+
+float GetGlobalParamAttenuation(uint strandIndex, uint strandParticleNumber)
+{
+	float x = _RootScale[strandIndex] * (strandParticleNumber / (float)(_StrandParticleCount - 1));
+	return LinearRamp(x, float4(_GlobalFadeOffset, _GlobalFadeExtent, 1.0, -1.0));
 }
 
 float GetGlobalPositionInfluence(uint strandIndex, uint strandParticleNumber)
 {
-	float k = _GlobalPosition * GetGlobalAttenuation(strandIndex, strandParticleNumber);
-	return 1.0 - GetDecay(1.0 - k, _GlobalPositionInterval);// fits into lerp
+	float k = _GlobalPosition * GetGlobalParamAttenuation(strandIndex, strandParticleNumber);
+	return 1.0 - GetDecay(k, _GlobalPositionInterval);// fits into lerp(a, b, t), where b is the global position
 }
 
 float GetGlobalRotationInfluence(uint strandIndex, uint strandParticleNumber)
 {
-	float k = _GlobalRotation * GetGlobalAttenuation(strandIndex, strandParticleNumber);
+	float k = _GlobalRotation * GetGlobalParamAttenuation(strandIndex, strandParticleNumber);
 	return k;
 }
 
@@ -1427,7 +1467,7 @@ void KInterpolate(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x + _SolverStrandCountFinal);
+	DECLARE_STRAND(worldIdx.x + _SolverStrandCount);
 
 	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
 	uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
@@ -1443,8 +1483,8 @@ void KInterpolate(
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 	float strandContribHi = _RootScale[strandIndex] / _RootScale[strandIndexHi];
 
-	float3 rootPositionLo = _ParticlePosition[strandParticleBeginLo].xyz;
-	float3 rootPositionHi = _ParticlePosition[strandParticleBeginHi].xyz;
+	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
+	float3 rootPositionHi = _RootPosition[strandIndexHi].xyz;
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
 	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
@@ -1463,6 +1503,7 @@ void KInterpolate(
 		float3 positionDeltaHi = strandContribHi * (currentOffsetHi - initialOffsetHi);
 		float3 position = rootPosition + initialOffset + lerp(positionDeltaLo, positionDeltaHi, _LODBlendFraction);
 
+		//TODO transition strand to interpolated to avoid pops
 		_ParticlePosition[i].xyz = position;
 		_ParticleVelocity[i].xyz = DeriveParticleVelocity(i, position);
 	}
@@ -1479,7 +1520,7 @@ void KInterpolateNearest(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x + _SolverStrandCountFinal);
+	DECLARE_STRAND(worldIdx.x + _SolverStrandCount);
 
 	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
 
@@ -1491,7 +1532,7 @@ void KInterpolateNearest(
 
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 
-	float3 rootPositionLo = _ParticlePosition[strandParticleBeginLo].xyz;
+	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
 	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
@@ -1507,6 +1548,7 @@ void KInterpolateNearest(
 		float3 positionDeltaLo = strandContribLo * (currentOffsetLo - initialOffsetLo);
 		float3 position = rootPosition + initialOffset + positionDeltaLo;
 
+		//TODO transition strand to interpolated to avoid pops
 		_ParticlePosition[i].xyz = position;
 		_ParticleVelocity[i].xyz = DeriveParticleVelocity(i, position);
 	}

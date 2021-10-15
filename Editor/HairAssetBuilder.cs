@@ -760,7 +760,7 @@ namespace Unity.DemoTeam.Hair
 
 				strandGroup.lodThreshold[maxLOD] = 1.0f;
 
-				float Ramp(float x) => 2.0f * x - x * x;
+				float Ramp(float x) => 2.0f * x - x * x;//TODO remove or adjust
 
 				for (int i = 0; i != maxLOD; i++)
 				{

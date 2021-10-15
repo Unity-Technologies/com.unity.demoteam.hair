@@ -19,6 +19,7 @@ namespace Unity.DemoTeam.Hair
 		public uint labelCount;
 		public bool labelWrap;
 
+		//TODO optimize me + runs out of memory for clump maps >4k
 		public Texture2DLabels(Texture2D texture, TextureWrapMode wrapMode, Allocator allocator)
 		{
 			dimX = texture.width;
@@ -41,7 +42,7 @@ namespace Unity.DemoTeam.Hair
 
 			// discover matching neighbours
 			Profiler.BeginSample("discover matching neighbours");
-			var texelAdjacency = new UnsafeAdjacency(texelCount, 16 * texelCount, Allocator.Temp);
+			var texelAdjacency = new UnsafeAdjacency(texelCount, 8 * texelCount, Allocator.Temp);
 			{
 				bool CompareEquals(byte* ptrA, byte* ptrB, int count)
 				{

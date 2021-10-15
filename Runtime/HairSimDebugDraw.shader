@@ -23,6 +23,7 @@
 	#include "HairSimComputeStrandCountProbe.hlsl"
 	#include "HairSimDebugDrawUtility.hlsl"
 	
+	int _DebugCluster;
 	uint _DebugSliceAxis;
 	float _DebugSliceOffset;
 	float _DebugSliceDivider;
@@ -39,6 +40,22 @@
 	float4 WorldToClip(float3 worldPos)
 	{
 		return TransformWorldToHClip(worldPos);
+	}
+
+	float4 FilterClusters(float4 worldPos, uint strandIndex)
+	{
+		if (_DebugCluster >= 0)
+		{
+			uint guideIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
+			uint guideIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
+
+			if (guideIndexLo != _DebugCluster && guideIndexHi != _DebugCluster)
+			{
+				return sqrt(-1).xxxx;
+			}
+		}
+
+		return worldPos;
 	}
 
 	DebugVaryings DebugVert_StrandParticle(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
@@ -60,7 +77,7 @@
 		float3 worldPos = _ParticlePosition[i].xyz;
 
 		DebugVaryings output;
-		output.positionCS = WorldToClip(worldPos);
+		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
 		output.color = float4(ColorCycle(instanceID, _StrandCount), 1.0);
 		return output;
 	}
@@ -94,7 +111,7 @@
 		}
 
 		DebugVaryings output;
-		output.positionCS = WorldToClip(worldPos);
+		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
 		output.color = float4(0.0, vertexID & 1, vertexID & 2, 1.0);
 		return output;
 
@@ -125,11 +142,10 @@
 
 		float3 worldPosLo = _ParticlePosition[strandParticleBeginLo + strandParticleStride * (vertexID >> 1)].xyz;
 		float3 worldPosHi = _ParticlePosition[strandParticleBeginHi + strandParticleStride * (vertexID >> 1)].xyz;
+		float3 worldPos = lerp(worldPosLo, worldPosHi, _LODBlendFraction);
 
 		float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODIndexLo]);
 		float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODIndexHi]);
-
-		float3 worldPos = lerp(worldPosLo, worldPosHi, _LODBlendFraction);
 		float3 color = lerp(colorLo, colorHi, _LODBlendFraction);
 
 		if (vertexID & 1)
@@ -139,7 +155,7 @@
 		}
 
 		DebugVaryings output;
-		output.positionCS = WorldToClip(worldPos);
+		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
 		output.color = float4(color, 1.0);
 		return output;
 	}

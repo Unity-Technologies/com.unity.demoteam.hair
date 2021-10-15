@@ -82,7 +82,6 @@ namespace Unity.DemoTeam.Hair
 			public uint _StrandCount;					// group strand count
 			public uint _StrandParticleCount;			// group strand particle count
 			public uint _SolverStrandCount;
-			public uint _SolverStrandCountFinal;
 
 			public float _StrandMaxParticleInterval;	// group max particle interval
 			public float _StrandMaxParticleWeight;		// group max particle weight (relative to all groups within volume)

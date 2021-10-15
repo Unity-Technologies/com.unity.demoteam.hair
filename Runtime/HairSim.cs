@@ -118,6 +118,7 @@ namespace Unity.DemoTeam.Hair
 			public static int _BoundaryMatrixW2PrevW;
 
 			// debug
+			public static int _DebugCluster;
 			public static int _DebugSliceAxis;
 			public static int _DebugSliceOffset;
 			public static int _DebugSliceDivider;
@@ -446,6 +447,7 @@ namespace Unity.DemoTeam.Hair
 			public bool drawStrandParticles;
 			public bool drawStrandVelocities;
 			public bool drawStrandClusters;
+			public int specificCluster;
 
 			[LineHeader("Volume Cells")]
 
@@ -480,9 +482,11 @@ namespace Unity.DemoTeam.Hair
 				drawStrandRoots = false,
 				drawStrandParticles = false,
 				drawStrandVelocities = false,
+				drawStrandClusters = false,
+				specificCluster = -1,
+
 				drawCellDensity = false,
 				drawCellGradient = false,
-
 				drawIsosurface = false,
 				drawIsosurfaceDensity = 0.5f,
 				drawIsosurfaceSubsteps = 4,
@@ -905,7 +909,6 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			cbuffer._SolverStrandCount = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexHi];
-			cbuffer._SolverStrandCountFinal = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexLo];
 
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
@@ -937,16 +940,17 @@ namespace Unity.DemoTeam.Hair
 				cbuffer._LODIndexLo = (uint)lodIndexLo;
 				cbuffer._LODIndexHi = (uint)lodIndexHi;
 				cbuffer._LODBlendFraction = lodBlendFrac;
+				//Debug.Log("LOD: " + cbuffer._LODIndexLo + " -> " + cbuffer._LODIndexHi + " (" + cbuffer._LODBlendFraction + ")");
 			}
 			else
 			{
 				cbuffer._LODIndexLo = (uint)((lodBlendFrac > 0.5f) ? lodIndexHi : lodIndexLo);
 				cbuffer._LODIndexHi = cbuffer._LODIndexLo;
 				cbuffer._LODBlendFraction = 0.0f;
+				//Debug.Log("LOD: " + cbuffer._LODIndexLo + " (no blend)");
 			}
 
 			cbuffer._SolverStrandCount = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexHi];
-			cbuffer._SolverStrandCountFinal = (uint)solverData.lodGuideCountCPU[(int)cbuffer._LODIndexLo];
 
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
@@ -1313,6 +1317,26 @@ namespace Unity.DemoTeam.Hair
 					BindSolverData(cmd, s_solverCS, kernelSolveConstraints, WithSubstepData(solverData, substepFrac < (1.0f - float.Epsilon)));
 					cmd.DispatchCompute(s_solverCS, kernelSolveConstraints, numX, numY, numZ);
 
+					// interpolate follow-strands
+					//TODO move this out of the substep loop (bit finicky due to the buffer shuffling per substep)
+					var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
+					if (interpolateStrandCount > 0)
+					{
+						int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
+							? SolverKernels.KInterpolate
+							: SolverKernels.KInterpolateNearest;
+
+						using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
+						{
+							var interpolateNumX = (int)interpolateStrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)interpolateStrandCount % PARTICLE_GROUP_SIZE);
+							var interpolateNumY = 1;
+							var interpolateNumZ = 1;
+
+							BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, substepFrac < (1.0f - float.Epsilon)));
+							cmd.DispatchCompute(s_solverCS, kernelInterpolate, interpolateNumX, interpolateNumY, interpolateNumZ);
+						}
+					}
+
 					// volume impulse is only applied for first substep
 					solverData.keywords.APPLY_VOLUME_IMPULSE = false;
 				}
@@ -1320,23 +1344,23 @@ namespace Unity.DemoTeam.Hair
 				solverData.keywords = keywordState;
 			}
 
-			var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCountFinal;
-			if (interpolateStrandCount > 0)
-			{
-				int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
-					? SolverKernels.KInterpolate
-					: SolverKernels.KInterpolateNearest;
-
-				using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
-				{
-					numX = (int)interpolateStrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)interpolateStrandCount % PARTICLE_GROUP_SIZE);
-					numY = 1;
-					numZ = 1;
-
-					BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, stepFracHi < 1.0f - float.Epsilon));
-					cmd.DispatchCompute(s_solverCS, kernelInterpolate, numX, numY, numZ);
-				}
-			}
+			//var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
+			//if (interpolateStrandCount > 0)
+			//{
+			//	int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
+			//		? SolverKernels.KInterpolate
+			//		: SolverKernels.KInterpolateNearest;
+			//
+			//	using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
+			//	{
+			//		numX = (int)interpolateStrandCount / PARTICLE_GROUP_SIZE + Mathf.Min(1, (int)interpolateStrandCount % PARTICLE_GROUP_SIZE);
+			//		numY = 1;
+			//		numZ = 1;
+			//
+			//		BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, stepFracHi < (1.0f - float.Epsilon)));
+			//		cmd.DispatchCompute(s_solverCS, kernelInterpolate, numX, numY, numZ);
+			//	}
+			//}
 		}
 
 		public static void StepVolumeData(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData[] solverData)
@@ -1551,28 +1575,30 @@ namespace Unity.DemoTeam.Hair
 
 				BindSolverData(cmd, solverData);
 
+				s_debugDrawMPB.SetInt(UniformIDs._DebugCluster, debugSettings.specificCluster);
+
 				// strand roots
 				if (debugSettings.drawStrandRoots)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_POSITION, MeshTopology.Lines, vertexCount: 2, (int)solverData.cbuffer._StrandCount);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_POSITION, MeshTopology.Lines, vertexCount: 2, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
 				}
 
 				// strand particles
 				if (debugSettings.drawStrandParticles)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_POSITION, MeshTopology.Points, vertexCount: (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_POSITION, MeshTopology.Points, vertexCount: (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
 				}
 
 				// strand velocities
 				if (debugSettings.drawStrandVelocities)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_VELOCITY, MeshTopology.Lines, vertexCount: 4 * (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_VELOCITY, MeshTopology.Lines, vertexCount: 4 * (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
 				}
 
 				// strand clusters
 				if (debugSettings.drawStrandClusters)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_CLUSTERS, MeshTopology.Lines, vertexCount: 2, (int)solverData.cbuffer._StrandCount);
+					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_CLUSTERS, MeshTopology.Lines, vertexCount: 2, (int)solverData.cbuffer._StrandCount, s_debugDrawMPB);
 				}
 			}
 		}
