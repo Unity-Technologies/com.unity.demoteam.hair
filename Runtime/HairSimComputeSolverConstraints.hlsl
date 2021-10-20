@@ -83,24 +83,29 @@ void SolveCollisionFrictionConstraint(
 
 			depth -= _BoundaryWorldMargin;
 
-			//const float4x4 M_prev = mul(_BoundaryMatrixPrev[contact.index], _BoundaryMatrixInv[contact.index]);
-			const float4x4 M_prev = _BoundaryMatrixW2PrevW[index];
+			//... float4x4 M_prev = mul(_BoundaryMatrixPrev[index], _BoundaryMatrixInv[index]);
+			const float3x4 M_prev = (float3x4)_BoundaryMatrixW2PrevW[index];
 
 			const float3 x_star = p + normal * depth;
-			const float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
+			//... float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)).xyz);
+			const float3 x_delta = mul(M_prev, float4(x_star, 1.0)).xyz - x0;
 			const float3 x_delta_tan = x_delta - dot(x_delta, normal) * normal;
 
+			d += normal * depth;
+
+#if 1// force static friction
+			d -= x_delta_tan * friction;
+#else
 			const float norm2_delta_tan = dot(x_delta_tan, x_delta_tan);
 
 			const float muS = friction;// for now just using the same constant here
 			const float muK = friction;// ...
 
-			d += normal * depth;
-
 			if (norm2_delta_tan < muS * muS * depth * depth)
 				d -= x_delta_tan;
 			else
 				d -= x_delta_tan * min(-muK * depth * rsqrt_unsafe(norm2_delta_tan), 1.0);
+#endif
 		}
 	}
 }
