@@ -1,15 +1,15 @@
-﻿#pragma kernel KVolumeClear
-#pragma kernel KVolumeSplat
-#pragma kernel KVolumeSplatDensity
-#pragma kernel KVolumeSplatVelocityX
-#pragma kernel KVolumeSplatVelocityY
-#pragma kernel KVolumeSplatVelocityZ
-#pragma kernel KVolumeResolve
-#pragma kernel KVolumeResolveFromRasterization
-#pragma kernel KVolumeDivergence
-#pragma kernel KVolumePressureEOS
-#pragma kernel KVolumePressureSolve
-#pragma kernel KVolumePressureGradient
+﻿#pragma kernel KVolumeClear						F_CLEAR
+#pragma kernel KVolumeSplat						F_SPLAT
+#pragma kernel KVolumeSplatDensity				F_SPLAT
+#pragma kernel KVolumeSplatVelocityX			F_SPLAT
+#pragma kernel KVolumeSplatVelocityY			F_SPLAT
+#pragma kernel KVolumeSplatVelocityZ			F_SPLAT
+#pragma kernel KVolumeResolve					F_RESOLVE
+#pragma kernel KVolumeResolveFromRasterization	F_RESOLVE
+#pragma kernel KVolumeDivergence				F_DIVERGENCE
+#pragma kernel KVolumePressureEOS				F_PRESSURE
+#pragma kernel KVolumePressureSolve				F_PRESSURE
+#pragma kernel KVolumePressureGradient			F_PRESSURE
 #pragma kernel KVolumeStrandCountProbe			F_PROBE
 #pragma kernel KVolumeStrandCountProbeDefault	F_PROBE
 
@@ -80,18 +80,16 @@
 //---------
 // include
 
-#ifdef F_PROBE
-#define HAIRSIM_WRITEABLE_VOLUMEPROBE 1
-#else
-#define HAIRSIM_WRITEABLE_VOLUMEDATA 1
-#endif
+#define HAIRSIM_WRITEABLE_VOLUMEACCU (F_CLEAR || F_SPLAT)
+#define HAIRSIM_WRITEABLE_VOLUMEDATA (F_RESOLVE || F_DIVERGENCE || F_PRESSURE)
+#define HAIRSIM_WRITEABLE_VOLUMEPROBE (F_PROBE)
 
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
 #include "HairSimComputeSolverQuaternion.hlsl"
 
-#ifdef F_PROBE
+#if F_PROBE
 #include "HairSimComputeStrandCountProbe.hlsl"
 #endif
 
@@ -126,6 +124,14 @@
 	CHECK_SPLAT(x);					\
 	DECLARE_SPLAT_PARTICLE_UNCHECKED(x);
 
+#if PLATFORM_SUPPORTS_TEXTURE_ATOMICS
+  #define ACCUIDX uint3 
+  #define WORLDIDX_TO_ACCUIDX(idx) (idx)
+#else
+  #define ACCUIDX uint 
+  #define WORLDIDX_TO_ACCUIDX(idx) VolumeIndexToFlatIndex(idx)
+#endif
+
 //---------
 // utility
 
@@ -147,83 +153,87 @@ float GetParticleLODCarry(uint particleIndex)
 #endif
 }
 
+#if F_SPLAT
+
 #define WEIGHT_BITS 16
 #define WEIGHT_MASK 0xFFFF
 
-void InterlockedAddTrilinear(RWTexture3D<int> volume, float value, uint3 idx0, float3 w0, float3 w1)
+void InterlockedAddTrilinear(HAIRSIM_VOLUMEACCU<int> volume, float value, uint3 idx0, float3 w0, float3 w1)
 {
 	const uint2 h = uint2(1, 0);
-	InterlockedAdd(volume[idx0 + h.yyy], (int)round(value * w0.x * w0.y * w0.z));
-	InterlockedAdd(volume[idx0 + h.xyy], (int)round(value * w1.x * w0.y * w0.z));
-	InterlockedAdd(volume[idx0 + h.yxy], (int)round(value * w0.x * w1.y * w0.z));
-	InterlockedAdd(volume[idx0 + h.xxy], (int)round(value * w1.x * w1.y * w0.z));
-	InterlockedAdd(volume[idx0 + h.yyx], (int)round(value * w0.x * w0.y * w1.z));
-	InterlockedAdd(volume[idx0 + h.xyx], (int)round(value * w1.x * w0.y * w1.z));
-	InterlockedAdd(volume[idx0 + h.yxx], (int)round(value * w0.x * w1.y * w1.z));
-	InterlockedAdd(volume[idx0 + h.xxx], (int)round(value * w1.x * w1.y * w1.z));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yyy)], (int)round(value * w0.x * w0.y * w0.z));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xyy)], (int)round(value * w1.x * w0.y * w0.z));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yxy)], (int)round(value * w0.x * w1.y * w0.z));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xxy)], (int)round(value * w1.x * w1.y * w0.z));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yyx)], (int)round(value * w0.x * w0.y * w1.z));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xyx)], (int)round(value * w1.x * w0.y * w1.z));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yxx)], (int)round(value * w0.x * w1.y * w1.z));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xxx)], (int)round(value * w1.x * w1.y * w1.z));
 }
 
-void InterlockedAddTrilinearPackW(RWTexture3D<int> volume, float value, uint3 idx0, float3 w0, float3 w1)
+void InterlockedAddTrilinearPackW(HAIRSIM_VOLUMEACCU<int> volume, float value, uint3 idx0, float3 w0, float3 w1)
 {
 	const uint2 h = uint2(1, 0);
 	const float r = (1 << SPLAT_FRACTIONAL_BITS);
-	InterlockedAdd(volume[idx0 + h.yyy], ((int)round(value * w0.x * w0.y * w0.z) << WEIGHT_BITS) | ((uint)round(r * w0.x * w0.y * w0.z) & WEIGHT_MASK));
-	InterlockedAdd(volume[idx0 + h.xyy], ((int)round(value * w1.x * w0.y * w0.z) << WEIGHT_BITS) | ((uint)round(r * w1.x * w0.y * w0.z) & WEIGHT_MASK));
-	InterlockedAdd(volume[idx0 + h.yxy], ((int)round(value * w0.x * w1.y * w0.z) << WEIGHT_BITS) | ((uint)round(r * w0.x * w1.y * w0.z) & WEIGHT_MASK));
-	InterlockedAdd(volume[idx0 + h.xxy], ((int)round(value * w1.x * w1.y * w0.z) << WEIGHT_BITS) | ((uint)round(r * w1.x * w1.y * w0.z) & WEIGHT_MASK));
-	InterlockedAdd(volume[idx0 + h.yyx], ((int)round(value * w0.x * w0.y * w1.z) << WEIGHT_BITS) | ((uint)round(r * w0.x * w0.y * w1.z) & WEIGHT_MASK));
-	InterlockedAdd(volume[idx0 + h.xyx], ((int)round(value * w1.x * w0.y * w1.z) << WEIGHT_BITS) | ((uint)round(r * w1.x * w0.y * w1.z) & WEIGHT_MASK));
-	InterlockedAdd(volume[idx0 + h.yxx], ((int)round(value * w0.x * w1.y * w1.z) << WEIGHT_BITS) | ((uint)round(r * w0.x * w1.y * w1.z) & WEIGHT_MASK));
-	InterlockedAdd(volume[idx0 + h.xxx], ((int)round(value * w1.x * w1.y * w1.z) << WEIGHT_BITS) | ((uint)round(r * w1.x * w1.y * w1.z) & WEIGHT_MASK));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yyy)], ((int)round(value * w0.x * w0.y * w0.z) << WEIGHT_BITS) | ((uint)round(r * w0.x * w0.y * w0.z) & WEIGHT_MASK));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xyy)], ((int)round(value * w1.x * w0.y * w0.z) << WEIGHT_BITS) | ((uint)round(r * w1.x * w0.y * w0.z) & WEIGHT_MASK));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yxy)], ((int)round(value * w0.x * w1.y * w0.z) << WEIGHT_BITS) | ((uint)round(r * w0.x * w1.y * w0.z) & WEIGHT_MASK));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xxy)], ((int)round(value * w1.x * w1.y * w0.z) << WEIGHT_BITS) | ((uint)round(r * w1.x * w1.y * w0.z) & WEIGHT_MASK));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yyx)], ((int)round(value * w0.x * w0.y * w1.z) << WEIGHT_BITS) | ((uint)round(r * w0.x * w0.y * w1.z) & WEIGHT_MASK));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xyx)], ((int)round(value * w1.x * w0.y * w1.z) << WEIGHT_BITS) | ((uint)round(r * w1.x * w0.y * w1.z) & WEIGHT_MASK));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yxx)], ((int)round(value * w0.x * w1.y * w1.z) << WEIGHT_BITS) | ((uint)round(r * w0.x * w1.y * w1.z) & WEIGHT_MASK));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xxx)], ((int)round(value * w1.x * w1.y * w1.z) << WEIGHT_BITS) | ((uint)round(r * w1.x * w1.y * w1.z) & WEIGHT_MASK));
 }
 
-void InterlockedMaxTrilinear(RWTexture3D<int> volume, float value, uint3 idx0, float3 w0, float3 w1)
+void InterlockedMaxTrilinear(HAIRSIM_VOLUMEACCU<int> volume, float value, uint3 idx0, float3 w0, float3 w1)
 {
 	const uint2 h = uint2(1, 0);
-	InterlockedMax(volume[idx0 + h.yyy], (int)round(value * w0.x * w0.y * w0.z));
-	InterlockedMax(volume[idx0 + h.xyy], (int)round(value * w1.x * w0.y * w0.z));
-	InterlockedMax(volume[idx0 + h.yxy], (int)round(value * w0.x * w1.y * w0.z));
-	InterlockedMax(volume[idx0 + h.xxy], (int)round(value * w1.x * w1.y * w0.z));
-	InterlockedMax(volume[idx0 + h.yyx], (int)round(value * w0.x * w0.y * w1.z));
-	InterlockedMax(volume[idx0 + h.xyx], (int)round(value * w1.x * w0.y * w1.z));
-	InterlockedMax(volume[idx0 + h.yxx], (int)round(value * w0.x * w1.y * w1.z));
-	InterlockedMax(volume[idx0 + h.xxx], (int)round(value * w1.x * w1.y * w1.z));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yyy)], (int)round(value * w0.x * w0.y * w0.z));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xyy)], (int)round(value * w1.x * w0.y * w0.z));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yxy)], (int)round(value * w0.x * w1.y * w0.z));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xxy)], (int)round(value * w1.x * w1.y * w0.z));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yyx)], (int)round(value * w0.x * w0.y * w1.z));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xyx)], (int)round(value * w1.x * w0.y * w1.z));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.yxx)], (int)round(value * w0.x * w1.y * w1.z));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xxx)], (int)round(value * w1.x * w1.y * w1.z));
 }
 
-void InterlockedAddParticleContribution(float3 worldPos, float value, RWTexture3D<int> volume, float3 offset = 0.5)
+void InterlockedAddParticleContribution(float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
 	TrilinearWeights tri = VolumeWorldToCellTrilinear(worldPos, offset);
 	InterlockedAddTrilinear(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedAdd(volume[VolumeWorldToIndex(worldPos)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(worldPos))], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
 
-void InterlockedAddParticleContributionPackW(float3 worldPos, float value, RWTexture3D<int> volume, float3 offset = 0.5)
+void InterlockedAddParticleContributionPackW(float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
 	TrilinearWeights tri = VolumeWorldToCellTrilinear(worldPos, offset);
 	InterlockedAddTrilinearPackW(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedAdd(volume[VolumeWorldToIndex(worldPos)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(worldPos))], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
 
-void InterlockedMaxParticleContribution(float3 worldPos, float value, RWTexture3D<int> volume, float3 offset = 0.5)
+void InterlockedMaxParticleContribution(float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
 	TrilinearWeights tri = VolumeWorldToCellTrilinear(worldPos, offset);
 	InterlockedMaxTrilinear(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedMax(volume[VolumeWorldToIndex(worldPos)], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(worldPos))], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
+
+#endif//F_SPLAT
 
 //---------------
 // kernels clear
 
-#if !F_PROBE
+#if F_CLEAR
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeClear(
@@ -236,19 +246,25 @@ void KVolumeClear(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	_AccuWeight[worldIdx] = 0;
+	ACCUIDX accuIdx = WORLDIDX_TO_ACCUIDX(worldIdx);
+
+	_AccuWeight[accuIdx] = 0;
 
 #if VOLUME_TARGET_INITIAL_POSE || VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
-	_AccuWeight0[worldIdx] = 0;
+	_AccuWeight0[accuIdx] = 0;
 #endif
 
-	_AccuVelocityX[worldIdx] = 0;
-	_AccuVelocityY[worldIdx] = 0;
-	_AccuVelocityZ[worldIdx] = 0;
+	_AccuVelocityX[accuIdx] = 0;
+	_AccuVelocityY[accuIdx] = 0;
+	_AccuVelocityZ[accuIdx] = 0;
 }
+
+#endif//F_CLEAR
 
 //---------------
 // kernels splat
+
+#if F_SPLAT
 
 [numthreads(PARTICLE_NUM_X, PARTICLE_NUM_Y, PARTICLE_NUM_Z)]
 void KVolumeSplat(
@@ -281,7 +297,7 @@ void KVolumeSplat(
 	}
 
 	//TODO remap and pack according to max velocity within volume?
-	//float3 velocityStepLimit = _VolumeWorldMax - _VolumeWorldMin;
+	//float3 velocityStepLimit = _VolumeWorldMax.xyz - _VolumeWorldMin.xyz;
 	//float3 velocityStep = clamp(_ParticleVelocity[particleIndex].xyz * _DT, -velocityStepLimit, velocityStepLimit);
 
 	// splat velocity
@@ -399,8 +415,12 @@ void KVolumeSplatVelocityZ(
 #endif
 }
 
+#endif//F_SPLAT
+
 //-----------------
 // kernels resolve
+
+#if F_RESOLVE
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeResolve(
@@ -413,7 +433,9 @@ void KVolumeResolve(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	const int accu_n = _AccuWeight[worldIdx];
+	ACCUIDX accuIdx = WORLDIDX_TO_ACCUIDX(worldIdx);
+
+	const int accu_n = _AccuWeight[accuIdx];
 	const float accu_w = accu_n / (float)(1 << SPLAT_FRACTIONAL_BITS);
 
 #if DEBUG_STRAND_31_32
@@ -425,26 +447,26 @@ void KVolumeResolve(
 	_VolumeDensity[worldIdx] = rho_particle * accu_w;
 
 #if VOLUME_TARGET_INITIAL_POSE
-	_VolumeDensity0[worldIdx] = rho_particle * (_AccuWeight0[worldIdx] / (float)(1 << SPLAT_FRACTIONAL_BITS));
+	_VolumeDensity0[worldIdx] = rho_particle * (_AccuWeight0[accuIdx] / (float)(1 << SPLAT_FRACTIONAL_BITS));
 #elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
-	_VolumeDensity0[worldIdx] = rho_particle * (_AccuWeight0[worldIdx] / (float)(1 << SPLAT_FRACTIONAL_BITS));
+	_VolumeDensity0[worldIdx] = rho_particle * (_AccuWeight0[accuIdx] / (float)(1 << SPLAT_FRACTIONAL_BITS));
 #endif
 
 	_VolumeVelocity[worldIdx] = float4(
 		(float3(
 #if VOLUME_STAGGERED_GRID
-			_AccuVelocityX[worldIdx] >> WEIGHT_BITS,
-			_AccuVelocityY[worldIdx] >> WEIGHT_BITS,
-			_AccuVelocityZ[worldIdx] >> WEIGHT_BITS) /
+			_AccuVelocityX[accuIdx] >> WEIGHT_BITS,
+			_AccuVelocityY[accuIdx] >> WEIGHT_BITS,
+			_AccuVelocityZ[accuIdx] >> WEIGHT_BITS) /
 			float3(
-				max(1, _AccuVelocityX[worldIdx] & WEIGHT_MASK),
-				max(1, _AccuVelocityY[worldIdx] & WEIGHT_MASK),
-				max(1, _AccuVelocityZ[worldIdx] & WEIGHT_MASK)
+				max(1, _AccuVelocityX[accuIdx] & WEIGHT_MASK),
+				max(1, _AccuVelocityY[accuIdx] & WEIGHT_MASK),
+				max(1, _AccuVelocityZ[accuIdx] & WEIGHT_MASK)
 			)
 #else
-			_AccuVelocityX[worldIdx],
-			_AccuVelocityY[worldIdx],
-			_AccuVelocityZ[worldIdx]) / (float)max(1, accu_n)
+			_AccuVelocityX[accuIdx],
+			_AccuVelocityY[accuIdx],
+			_AccuVelocityZ[accuIdx]) / (float)max(1, accu_n)
 #endif
 		),
 		accu_w);
@@ -478,8 +500,12 @@ void KVolumeResolveFromRasterization(
 	}
 }
 
+#endif//F_RESOLVE
+
 //--------------------
 // kernels divergence
+
+#if F_DIVERGENCE
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeDivergence(
@@ -587,8 +613,12 @@ void KVolumeDivergence(
 	}
 }
 
+#endif//F_DIVERGENCE
+
 //------------------
 // kernels pressure
+
+#if F_PRESSURE
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumePressureEOS(
@@ -626,7 +656,7 @@ void KVolumePressureEOS(
 
 float GhostPressureStep(int3 index, int3 step)
 {
-	uint3 other = clamp(index + step, int3(0, 0, 0), (int3)_VolumeCells - 1);
+	uint3 other = clamp(index + step, int3(0, 0, 0), (int3)_VolumeCells.xyz - 1);
 	
 	float rho_0 = _VolumeDensity[index];
 	float rho_1 = _VolumeDensity[other];
@@ -835,10 +865,12 @@ void KVolumePressureGradient(
 	_VolumePressureGrad[worldIdx] = diff;
 }
 
+#endif//F_PRESSURE
+
 //----------------------------
 // kernels strand count probe
 
-#else// F_PROBE
+#if F_PROBE
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
 void KVolumeStrandCountProbe(
@@ -887,4 +919,4 @@ void KVolumeStrandCountProbeDefault(
 	_VolumeStrandCountProbe[worldIdx] = 0.0;
 }
 
-#endif
+#endif//F_PROBE

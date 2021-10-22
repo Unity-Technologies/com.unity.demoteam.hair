@@ -44,17 +44,15 @@ CBUFFER_START(SolverCBuffer)
     float _GlobalRotation;
     float _GlobalFadeOffset;
     float _GlobalFadeExtent;
+    float _scbpad1;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer
 // PackingRules = Exact
 CBUFFER_START(VolumeCBuffer)
-    float3 _VolumeCells;
-    uint __pad1;
-    float3 _VolumeWorldMin;
-    uint __pad2;
-    float3 _VolumeWorldMax;
-    uint __pad3;
+    float4 _VolumeCells;
+    float4 _VolumeWorldMin;
+    float4 _VolumeWorldMax;
     float _ResolveUnitVolume;
     float _ResolveUnitDebugWidth;
     float _TargetDensityFactor;
@@ -69,6 +67,8 @@ CBUFFER_START(VolumeCBuffer)
     uint _StrandCountTheta;
     uint _StrandCountSubstep;
     float _StrandCountDiameter;
+    float _vcbpad1;
+    float _vcbpad2;
 CBUFFER_END
 
 

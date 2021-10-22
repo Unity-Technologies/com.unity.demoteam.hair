@@ -828,8 +828,8 @@ namespace Unity.DemoTeam.Hair
 
 		static unsafe void BuildLODChainGenerated(ref LODChain lodData, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
-			//TODO not implemented
-			Debug.LogError("TODO not implemented");
+			//TODO procedural lod chain
+			Debug.LogError("TODO procedural lod chain");
 		}
 
 		static unsafe void BuildLODChainUVMapped(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
@@ -971,7 +971,7 @@ namespace Unity.DemoTeam.Hair
 						if (clusterCount < lodChain.strandCount)
 						{
 							//TODO not implemented
-							Debug.LogError("TODO not implemented");
+							Debug.LogError("TODO procedural lod chain");
 						}
 						else
 						{

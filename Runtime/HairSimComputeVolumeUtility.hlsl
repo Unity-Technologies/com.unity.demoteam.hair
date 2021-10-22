@@ -30,7 +30,7 @@
 
 float3 VolumeWorldSize()
 {
-	return _VolumeWorldMax - _VolumeWorldMin;
+	return _VolumeWorldMax.xyz - _VolumeWorldMin.xyz;
 }
 
 float3 VolumeWorldExtent()
@@ -40,7 +40,7 @@ float3 VolumeWorldExtent()
 
 float3 VolumeWorldCellSize()
 {
-	return VolumeWorldSize() / _VolumeCells;
+	return VolumeWorldSize() / _VolumeCells.xyz;
 }
 
 float VolumeWorldCellVolume()
@@ -51,31 +51,31 @@ float VolumeWorldCellVolume()
 
 float3 VolumeLocalToUVW(float3 localPos)
 {
-	float3 uvw = localPos / _VolumeCells;
+	float3 uvw = localPos / _VolumeCells.xyz;
 	return uvw;
 }
 
 float3 VolumeUVWToLocal(float3 uvw)
 {
-	float3 localPos = uvw * _VolumeCells;
+	float3 localPos = uvw * _VolumeCells.xyz;
 	return localPos;
 }
 
 float3 VolumeUVWToWorld(float3 uvw)
 {
-	return lerp(_VolumeWorldMin, _VolumeWorldMax, uvw);
+	return lerp(_VolumeWorldMin.xyz, _VolumeWorldMax.xyz, uvw);
 }
 
 //TODO sanitize out of bounds?
 float3 VolumeWorldToUVW(float3 worldPos)
 {
-	float3 uvw = (worldPos - _VolumeWorldMin) / (_VolumeWorldMax - _VolumeWorldMin);
+	float3 uvw = (worldPos - _VolumeWorldMin.xyz) / (_VolumeWorldMax.xyz - _VolumeWorldMin.xyz);
 	return uvw;
 }
 
 float3 VolumeWorldToLocal(float3 worldPos)
 {
-	float3 localPos = _VolumeCells * VolumeWorldToUVW(worldPos);
+	float3 localPos = _VolumeCells.xyz * VolumeWorldToUVW(worldPos);
 	return localPos;
 }
 
@@ -88,7 +88,7 @@ uint3 VolumeWorldToIndex(float3 worldPos)
 
 float3 VolumeIndexToUVW(uint3 index)
 {
-	float3 uvw = (index + 0.5) / _VolumeCells;
+	float3 uvw = (index + 0.5) / _VolumeCells.xyz;
 	return uvw;
 }
 
@@ -100,8 +100,19 @@ float3 VolumeIndexToLocal(uint3 index)
 
 float3 VolumeIndexToWorld(uint3 index)
 {
-	float3 worldPos = _VolumeWorldMin + (index + 0.5) * VolumeWorldCellSize();
+	float3 worldPos = _VolumeWorldMin.xyz + (index + 0.5) * VolumeWorldCellSize();
 	return worldPos;
+}
+
+uint VolumeIndexToFlatIndex(uint3 index)
+{
+	uint3 clampedIndex = min(index, _VolumeCells.xyz - 1);
+	uint flatIndex = (
+		clampedIndex.z * (_VolumeCells.x * _VolumeCells.y) +
+		clampedIndex.y * _VolumeCells.x +
+		clampedIndex.x
+	);
+	return flatIndex;
 }
 
 uint3 VolumeFlatIndexToIndex(uint flatIndex)
@@ -112,25 +123,25 @@ uint3 VolumeFlatIndexToIndex(uint flatIndex)
 	return uint3(x, y, z);
 }
 
-float3 VolumeStaggededOffsets()
+float3 VolumeStaggededOffsetUVW()
 {
-	return 0.5 / _VolumeCells;
+	return 0.5 / _VolumeCells.xyz;
 }
 
 float3 VolumeStaggeredSample(Texture3D<float3> volume, float3 uvw, SamplerState state)
 {
 	return float3(
-		volume.SampleLevel(state, uvw + float3(VolumeStaggededOffsets().x, 0.0, 0.0), 0).x,
-		volume.SampleLevel(state, uvw + float3(0.0, VolumeStaggededOffsets().y, 0.0), 0).y,
-		volume.SampleLevel(state, uvw + float3(0.0, 0.0, VolumeStaggededOffsets().z), 0).z);
+		volume.SampleLevel(state, uvw + float3(VolumeStaggededOffsetUVW().x, 0.0, 0.0), 0).x,
+		volume.SampleLevel(state, uvw + float3(0.0, VolumeStaggededOffsetUVW().y, 0.0), 0).y,
+		volume.SampleLevel(state, uvw + float3(0.0, 0.0, VolumeStaggededOffsetUVW().z), 0).z);
 }
 
 float3 VolumeStaggeredSample(Texture3D<float4> volume, float3 uvw, SamplerState state)
 {
 	return float3(
-		volume.SampleLevel(state, uvw + float3(VolumeStaggededOffsets().x, 0.0, 0.0), 0).x,
-		volume.SampleLevel(state, uvw + float3(0.0, VolumeStaggededOffsets().y, 0.0), 0).y,
-		volume.SampleLevel(state, uvw + float3(0.0, 0.0, VolumeStaggededOffsets().z), 0).z);
+		volume.SampleLevel(state, uvw + float3(VolumeStaggededOffsetUVW().x, 0.0, 0.0), 0).x,
+		volume.SampleLevel(state, uvw + float3(0.0, VolumeStaggededOffsetUVW().y, 0.0), 0).y,
+		volume.SampleLevel(state, uvw + float3(0.0, 0.0, VolumeStaggededOffsetUVW().z), 0).z);
 }
 
 float VolumeSampleScalar(Texture3D<float> volume, float3 uvw, SamplerState state)
@@ -256,7 +267,7 @@ struct VolumeTraceState
 
 VolumeTraceState VolumeTraceBegin(float3 worldPos, float3 worldDir, float cellOffset, int cellSubsteps)
 {
-	float3 uvwStep = VolumeWorldCellStep(worldDir) / (_VolumeWorldMax - _VolumeWorldMin);
+	float3 uvwStep = VolumeWorldCellStep(worldDir) / (_VolumeWorldMax.xyz - _VolumeWorldMin.xyz);
 	float3 uvw = VolumeWorldToUVW(worldPos) + cellOffset * uvwStep;
 
 	uvwStep /= cellSubsteps;

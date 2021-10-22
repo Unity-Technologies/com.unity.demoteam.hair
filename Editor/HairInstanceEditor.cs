@@ -79,6 +79,14 @@ namespace Unity.DemoTeam.Hair
 				EditorGUILayout.EndVertical();
 
 				EditorGUILayout.Space();
+				EditorGUILayout.LabelField("System Settings", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+				{
+					DrawSystemSettingsGUI();
+				}
+				EditorGUILayout.EndVertical();
+
+				EditorGUILayout.Space();
 				EditorGUILayout.LabelField("Strand Settings", EditorStyles.centeredGreyMiniLabel);
 				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 				{
@@ -87,10 +95,10 @@ namespace Unity.DemoTeam.Hair
 				EditorGUILayout.EndVertical();
 
 				EditorGUILayout.Space();
-				EditorGUILayout.LabelField("Simulation Settings", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.LabelField("Volume Settings", EditorStyles.centeredGreyMiniLabel);
 				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 				{
-					DrawSimulationSettingsGUI();
+					DrawVolumeSettingsGUI();
 				}
 				EditorGUILayout.EndVertical();
 
@@ -210,7 +218,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public void DrawStrandSettingsGUI()
+		public void DrawSystemSettingsGUI()
 		{
 			var hairInstance = target as HairInstance;
 			if (hairInstance == null)
@@ -296,7 +304,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public void DrawSimulationSettingsGUI()
+		public void DrawStrandSettingsGUI()
 		{
 			var hairInstance = target as HairInstance;
 			if (hairInstance == null)
@@ -305,8 +313,22 @@ namespace Unity.DemoTeam.Hair
 			EditorGUI.BeginChangeCheck();
 			{
 				StructPropertyFieldsWithHeader(_settingsSolver, "Settings Solver", ValidationGUISolver, hairInstance);
+			}
 
-				EditorGUILayout.Space();
+			if (EditorGUI.EndChangeCheck())
+			{
+				serializedObject.ApplyModifiedProperties();
+			}
+		}
+
+		public void DrawVolumeSettingsGUI()
+		{
+			var hairInstance = target as HairInstance;
+			if (hairInstance == null)
+				return;
+
+			EditorGUI.BeginChangeCheck();
+			{
 				StructPropertyFieldsWithHeader(_settingsVolume, "Settings Volume");
 				using (new EditorGUI.IndentLevelScope())
 				{

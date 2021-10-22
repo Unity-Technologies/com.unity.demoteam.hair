@@ -68,17 +68,22 @@ namespace Unity.DemoTeam.Hair
 			public bool STAGING_COMPRESSION;
 		}
 
+		// NOTE: update padding if modifying
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
 		public struct SolverCBuffer
 		{
+			// 0
 			public Matrix4x4 _LocalToWorld;				// root mesh vertex transform
 			public Matrix4x4 _LocalToWorldInvT;			// ...
+
+			// 32
 			public Vector4 _WorldRotation;				// quat(xyz,w): primary skinning bone rotation
 			public Vector4 _WorldGravity;				// xyz: gravity vector, w: -
 
 			public Vector4 _StagingOriginExtent;		// xyz: origin, w: scale
 			public Vector4 _StagingOriginExtentPrev;	// ...
 
+			// 48
 			public uint _StrandCount;					// group strand count
 			public uint _StrandParticleCount;			// group strand particle count
 			public uint _SolverStrandCount;
@@ -95,6 +100,7 @@ namespace Unity.DemoTeam.Hair
 			public uint _StagingVertexCount;			// staging strand vertex count
 			public uint _StagingSubdivision;			// staging strand segment subdivision count
 
+			// 60
 			public float _DT;
 			public uint _Iterations;
 			public float _Stiffness;
@@ -112,12 +118,30 @@ namespace Unity.DemoTeam.Hair
 			public float _LocalCurvature;
 			public float _LocalShape;
 
+			// 74
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
+
+			// 79 --> 80 (16 byte alignment)
+			public float _scbpad1;
 		}
+
+		/*
+		public static VolumeBuffers<uint> s_ID_VolumeBuffer;
+		public struct VolumeBuffers<T>
+		{
+			//TODO
+		}
+
+		public static VolumeTextures<uint> s_ID_VolumeTexture;
+		public struct VolumeTextures<T>
+		{
+			//TODO
+		}
+		*/
 
 		public struct VolumeData
 		{
@@ -131,6 +155,12 @@ namespace Unity.DemoTeam.Hair
 			public RenderTexture accuVelocityX;			// x: fp accumulated x-velocity
 			public RenderTexture accuVelocityY;			// x: ... ... ... .. y-velocity
 			public RenderTexture accuVelocityZ;			// x: .. ... ... ... z-velocity
+
+			public ComputeBuffer accuWeightBuffer;		// x: fp accumulated weight
+			public ComputeBuffer accuWeight0Buffer;		// x: fp accumulated target weight
+			public ComputeBuffer accuVelocityXBuffer;	// x: fp accumulated x-velocity
+			public ComputeBuffer accuVelocityYBuffer;	// x: ... ... ... .. y-velocity
+			public ComputeBuffer accuVelocityZBuffer;	// x: .. ... ... ... z-velocity
 
 			public RenderTexture volumeDensity;			// x: density (as fraction occupied)
 			public RenderTexture volumeDensity0;		// x: density target
@@ -169,20 +199,15 @@ namespace Unity.DemoTeam.Hair
 			public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
 		}
 
+		// NOTE: update padding if modifying
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
 		public struct VolumeCBuffer
 		{
-			public Vector3 _VolumeCells;
-			public uint __pad1;
-			public Vector3 _VolumeWorldMin;
-			public uint __pad2;
-			public Vector3 _VolumeWorldMax;
-			public uint __pad3;
 			/*
 				_VolumeCells = (3, 3, 3)
 
-						  +---+---+---Q
-					 +---+---+---+    |
+				          +---+---+---Q
+				     +---+---+---+    |
 				+---+---+---+    | ---+
 				|   |   |   | ---+    |
 				+---+---+---+    | ---+
@@ -195,11 +220,18 @@ namespace Unity.DemoTeam.Hair
 				_VolumeWorldMax = Q
 			*/
 
+			// 0
+			public Vector4 _VolumeCells;
+			public Vector4 _VolumeWorldMin;
+			public Vector4 _VolumeWorldMax;
+
+			// 12
 			public float _ResolveUnitVolume;
 			public float _ResolveUnitDebugWidth;
 
 			public float _TargetDensityFactor;
 
+			// 15
 			public uint _BoundaryCountDiscrete;
 			public uint _BoundaryCountCapsule;
 			public uint _BoundaryCountSphere;
@@ -209,10 +241,15 @@ namespace Unity.DemoTeam.Hair
 			public float _BoundaryWorldEpsilon;
 			public float _BoundaryWorldMargin;
 
+			// 22
 			public uint _StrandCountPhi;
 			public uint _StrandCountTheta;
 			public uint _StrandCountSubstep;
 			public float _StrandCountDiameter;
+
+			// 26 --> 28 (16 byte alignment)
+			public float _vcbpad1;
+			public float _vcbpad2;
 		}
 	}
 }

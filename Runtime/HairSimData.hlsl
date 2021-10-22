@@ -8,22 +8,28 @@
 //-------------
 // solver data
 
+#if HAIRSIM_WRITEABLE_SOLVERINPUT
+#define HAIRSIM_SOLVERINPUT RWStructuredBuffer
+#else
+#define HAIRSIM_SOLVERINPUT StructuredBuffer
+#endif
+
 #if HAIRSIM_WRITEABLE_SOLVERDATA
 #define HAIRSIM_SOLVERDATA RWStructuredBuffer
 #else
 #define HAIRSIM_SOLVERDATA StructuredBuffer
 #endif
 
-StructuredBuffer<float2> _RootUV;					// xy: strand root uv
-StructuredBuffer<float> _RootScale;					// x: relative strand length [0..1] (to maximum within group)
-StructuredBuffer<float4> _RootPosition;				// xyz: strand root position, w: -
-StructuredBuffer<float4> _RootPositionPrev;			// ...
-StructuredBuffer<float4> _RootDirection;			// xyz: strand root direction, w: -
-StructuredBuffer<float4> _RootDirectionPrev;		// ...
-StructuredBuffer<float4> _RootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
-StructuredBuffer<float4> _RootFramePrev;			// ...
+HAIRSIM_SOLVERINPUT<float2> _RootUV;				// xy: strand root uv
+HAIRSIM_SOLVERINPUT<float> _RootScale;				// x: relative strand length [0..1] (to maximum within group)
+HAIRSIM_SOLVERINPUT<float4> _RootPosition;			// xyz: strand root position, w: -
+HAIRSIM_SOLVERINPUT<float4> _RootPositionPrev;		// ...
+HAIRSIM_SOLVERINPUT<float4> _RootDirection;			// xyz: strand root direction, w: -
+HAIRSIM_SOLVERINPUT<float4> _RootDirectionPrev;		// ...
+HAIRSIM_SOLVERINPUT<float4> _RootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
+HAIRSIM_SOLVERINPUT<float4> _RootFramePrev;			// ...
 
-HAIRSIM_SOLVERDATA<float4> _SubstepRootPosition;	// substep test
+HAIRSIM_SOLVERDATA<float4> _SubstepRootPosition;	// substep data
 HAIRSIM_SOLVERDATA<float4> _SubstepRootDirection;	// ...
 HAIRSIM_SOLVERDATA<float4> _SubstepRootFrame;		// ...
 
@@ -56,6 +62,26 @@ HAIRSIM_SOLVERDATA<float3> _StagingPositionPrev;	// ...
 //-------------
 // volume data
 
+#if SHADER_API_METAL
+#define PLATFORM_SUPPORTS_TEXTURE_ATOMICS 0
+#else
+#define PLATFORM_SUPPORTS_TEXTURE_ATOMICS 1
+#endif
+
+#if PLATFORM_SUPPORTS_TEXTURE_ATOMICS
+#if HAIRSIM_WRITEABLE_VOLUMEACCU
+#define HAIRSIM_VOLUMEACCU RWTexture3D
+#else
+#define HAIRSIM_VOLUMEACCU Texture3D
+#endif
+#else
+#if HAIRSIM_WRITEABLE_VOLUMEACCU
+#define HAIRSIM_VOLUMEACCU RWStructuredBuffer
+#else
+#define HAIRSIM_VOLUMEACCU StructuredBuffer
+#endif
+#endif
+
 #if HAIRSIM_WRITEABLE_VOLUMEDATA
 #define HAIRSIM_VOLUMEDATA RWTexture3D
 #else
@@ -68,11 +94,11 @@ HAIRSIM_SOLVERDATA<float3> _StagingPositionPrev;	// ...
 #define HAIRSIM_VOLUMEPROBE Texture3D
 #endif
 
-HAIRSIM_VOLUMEDATA<int> _AccuWeight;				// x: fp accumulated weight
-HAIRSIM_VOLUMEDATA<int> _AccuWeight0;				// x: fp accumulated target weight
-HAIRSIM_VOLUMEDATA<int> _AccuVelocityX;				// x: fp accumulated x-velocity
-HAIRSIM_VOLUMEDATA<int> _AccuVelocityY;				// x: ... ... ... .. y-velocity
-HAIRSIM_VOLUMEDATA<int> _AccuVelocityZ;				// x: .. ... ... ... z-velocity
+HAIRSIM_VOLUMEACCU<int> _AccuWeight;				// x: fp accumulated weight
+HAIRSIM_VOLUMEACCU<int> _AccuWeight0;				// x: fp accumulated target weight
+HAIRSIM_VOLUMEACCU<int> _AccuVelocityX;				// x: fp accumulated x-velocity
+HAIRSIM_VOLUMEACCU<int> _AccuVelocityY;				// x: ... ... ... .. y-velocity
+HAIRSIM_VOLUMEACCU<int> _AccuVelocityZ;				// x: .. ... ... ... z-velocity
 //TODO this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 
 HAIRSIM_VOLUMEDATA<float> _VolumeDensity;			// x: density (as fraction occupied)

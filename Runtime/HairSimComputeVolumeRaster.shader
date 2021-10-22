@@ -3,7 +3,11 @@
 	HLSLINCLUDE
 
 	#pragma target 5.0
-	
+
+	#pragma multi_compile __ POINT_RASTERIZATION_NEEDS_PSIZE
+	// 0 == when platform does not require explicit psize
+	// 1 == when platform requires explicit psize
+
 	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
@@ -14,6 +18,9 @@
 		uint volumeSlice : SV_RenderTargetArrayIndex;
 		nointerpolation float2 valuePos : TEXCOORD0;
 		nointerpolation float4 value : TEXCOORD1;// xyz = velocity, w = density
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		float pointSize : PSIZE;
+#endif
 	};
 
 	void MakeVertex(inout TriangleStream<Varyings> outStream, float2 pos, float4 value, float2 valuePos, uint slice)
@@ -23,6 +30,9 @@
 		output.volumeSlice = slice;
 		output.valuePos = valuePos;
 		output.value = value;
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		outStream.Append(output);
 	}
 
@@ -120,6 +130,9 @@
 		output.volumeSlice = localPosFloor.z + j;
 		output.valuePos = localPos.xy;
 		output.value = float4((v.xyz * v.w), v.w) * lerp(w0, w1, j);
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		return output;
 	}
 

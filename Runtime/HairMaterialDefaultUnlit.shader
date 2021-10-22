@@ -53,7 +53,7 @@ Shader "Hair/Default/HairMaterialDefaultUnlit"
 
 			struct StrandVaryings
 			{
-				float4 positionCS : SV_Position;
+				float4 positionCS : SV_POSITION;
 				float3 strandColor : COLOR;
 				float2 strandUV : TEXCOORD0;
 			};

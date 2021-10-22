@@ -60,18 +60,18 @@
 
 	DebugVaryings DebugVert_StrandParticle(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
-	#if LAYOUT_INTERLEAVED
+#if LAYOUT_INTERLEAVED
 		const uint strandParticleBegin = instanceID;
 		const uint strandParticleStride = _StrandCount;
-	#else
+#else
 		const uint strandParticleBegin = instanceID * _StrandParticleCount;
 		const uint strandParticleStride = 1;
-	#endif
+#endif
 
-	#if DEBUG_STRAND_31_32 == 2
+#if DEBUG_STRAND_31_32 == 2
 		if (vertexID > 1)
 			vertexID = 1;
-	#endif
+#endif
 
 		uint i = strandParticleBegin + strandParticleStride * vertexID;
 		float3 worldPos = _ParticlePosition[i].xyz;
@@ -84,13 +84,13 @@
 
 	DebugVaryings DebugVert_StrandParticleWorldVelocity(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
-	#if LAYOUT_INTERLEAVED
+#if LAYOUT_INTERLEAVED
 		const uint strandParticleBegin = instanceID;
 		const uint strandParticleStride = _StrandCount;
-	#else
+#else
 		const uint strandParticleBegin = instanceID * _StrandParticleCount;
 		const uint strandParticleStride = 1;
-	#endif
+#endif
 
 		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 2);
 		float3 worldPos = _ParticlePosition[i].xyz;
@@ -221,7 +221,7 @@
 	{
 		float3 uvw = float3(((vertexID >> 1) ^ vertexID) & 1, vertexID >> 1, _DebugSliceOffset);
 		float3 uvwWorld = (_DebugSliceAxis == 0) ? uvw.zxy : (_DebugSliceAxis == 1 ? uvw.xzy : uvw.xyz);
-		float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvwWorld);
+		float3 worldPos = lerp(_VolumeWorldMin.xyz, _VolumeWorldMax.xyz, uvwWorld);
 
 		uvw = uvwWorld;
 
@@ -268,7 +268,7 @@
 		float volumeStrandCountGridNormal = DecodeStrandCount(gridNormal, volumeStrandCountProbe);
 
 #if 0
-		float3 worldPos = lerp(_VolumeWorldMin, _VolumeWorldMax, uvw);
+		float3 worldPos = lerp(_VolumeWorldMin.xyz, _VolumeWorldMax.xyz, uvw);
 		float sd = BoundaryDistance(worldPos);
 		if (abs(sd) < 0.1)
 		{

@@ -20,11 +20,11 @@ void HairVolume_float(
 	out Texture3D out_volumeStrandCountProbe,
 	out float3 out_volumeUVW)
 {
-	out_boundsMinWS = _VolumeWorldMin;
-	out_boundsMaxWS = _VolumeWorldMax;
-	out_cellCount = _VolumeCells;
+	out_boundsMinWS = _VolumeWorldMin.xyz;
+	out_boundsMaxWS = _VolumeWorldMax.xyz;
+	out_cellCount = _VolumeCells.xyz;
 	out_cellSizeWS = VolumeWorldCellSize();
-	out_cellSizeUVW = 1.0f / _VolumeCells;
+	out_cellSizeUVW = 1.0f / _VolumeCells.xyz;
 	out_volumeDensity = _UntypedVolumeDensity;
 	out_volumeVelocity = _UntypedVolumeVelocity;
 	out_volumeStrandCountProbe = _UntypedVolumeStrandCountProbe;
