@@ -1030,10 +1030,10 @@ namespace Unity.DemoTeam.Hair
 			CoreUtils.Swap(ref solverData.rootDirection, ref solverData.rootDirectionPrev);
 			CoreUtils.Swap(ref solverData.rootFrame, ref solverData.rootFramePrev);
 
-			BindSolverData(cmd, solverData);
-
 			if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsVertexStageUAVWrites))
 			{
+				BindSolverData(cmd, solverData);
+
 				cmd.SetRandomWriteTarget(1, solverData.rootPosition);
 				cmd.SetRandomWriteTarget(2, solverData.rootDirection);
 				cmd.SetRandomWriteTarget(3, solverData.rootFrame);
@@ -1064,18 +1064,19 @@ namespace Unity.DemoTeam.Hair
 					int numY = 1;
 					int numZ = 1;
 
-					cmd.SetComputeBufferParam(s_solverCS, SolverKernels.KPrepareRoots, UniformIDs._VertexBufferPosition, vertexBufferPosition);
-					cmd.SetComputeBufferParam(s_solverCS, SolverKernels.KPrepareRoots, UniformIDs._VertexBufferNormal, vertexBufferNormal);
+					cmd.SetComputeBufferParam(s_solverCS, SolverKernels.KUpdateRoots, UniformIDs._VertexBufferPosition, vertexBufferPosition);
+					cmd.SetComputeBufferParam(s_solverCS, SolverKernels.KUpdateRoots, UniformIDs._VertexBufferNormal, vertexBufferNormal);
 
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferPositionOffset, positionOffset);
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferPositionStride, positionStride);
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferNormalOffset, normalOffset);
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferNormalOffset, normalStride);
 
-					cmd.DispatchCompute(s_solverCS, SolverKernels.KInputRoots, numX, numY, numZ);
+					BindSolverData(cmd, s_solverCS, SolverKernels.KUpdateRoots, solverData);
+					cmd.DispatchCompute(s_solverCS, SolverKernels.KUpdateRoots, numX, numY, numZ);
 				}
 #else
-				Debug.LogError("Unable to update hair roots (compute fallback requires 2021.2+)");
+				Debug.LogError("Unable to update hair roots (vertex UAV writes not supported and compute path requires 2021.2+)");
 #endif
 			}
 		}
