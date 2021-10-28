@@ -93,13 +93,14 @@ void SolveCollisionFrictionConstraint(
 
 			d += normal * depth;
 
-#if 1// force static friction
-			d -= x_delta_tan * friction;
+#define BOUNDARY_FRICTION_AS_CONSTANT_FRACTION 0
+#if BOUNDARY_FRICTION_AS_CONSTANT_FRACTION
+			d -= x_delta_tan * friction;// always subtract specified fraction of tangential delta, regardless of ratio between depth and tangential delta
 #else
 			const float norm2_delta_tan = dot(x_delta_tan, x_delta_tan);
 
-			const float muS = friction;// for now just using the same constant here
-			const float muK = friction;// ...
+			const float muS = friction * 1.7;// for now just using a constant multiplier to ensure that static friction is higher than kinetic friction
+			const float muK = friction * 1.0;// ...
 
 			if (norm2_delta_tan < muS * muS * depth * depth)
 				d -= x_delta_tan;
