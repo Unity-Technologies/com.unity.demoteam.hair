@@ -503,11 +503,13 @@ namespace Unity.DemoTeam.Hair
 						}
 						break;
 
+#if HAS_PACKAGE_UNITY_VFXGRAPH
 					case SettingsStrands.StrandRenderer.VFXGraph:
 						{
 							//TODO support output to vfx graph
 						}
 						break;
+#endif
 				}
 			}
 
