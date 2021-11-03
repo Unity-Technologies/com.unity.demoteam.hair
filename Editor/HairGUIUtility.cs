@@ -3,7 +3,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	public static class HairGUIUtility
+	public static partial class HairGUIUtility
 	{
 		public struct ColorScope : System.IDisposable
 		{

@@ -182,7 +182,7 @@ namespace Unity.DemoTeam.Hair
 					serializedObject.ApplyModifiedProperties();
 				}
 
-				var hairAsset = hairInstance.hairAsset;
+				var hairAsset = _hairAsset.objectReferenceValue as HairAsset;
 				if (hairAsset != null && _hairAssetQuickEdit.boolValue)
 				{
 					Editor.CreateCachedEditor(hairAsset, typeof(HairAssetEditor), ref hairAssetEditor);

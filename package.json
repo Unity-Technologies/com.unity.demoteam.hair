@@ -7,7 +7,7 @@
   "description": "Strand based hair simulation and rendering.",
   "dependencies": {
     "com.unity.collections": "0.15.0-preview.21",
-    "com.unity.mathematics": "1.2.1",
+    "com.unity.mathematics": "1.2.4",
     "com.unity.render-pipelines.core": "10.2.2",
     "com.unity.shadergraph": "10.2.2"
   }

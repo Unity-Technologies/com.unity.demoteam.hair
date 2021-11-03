@@ -3,7 +3,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	public static class HairGUILayout
+	public static partial class HairGUILayout
 	{
 		public enum StructValidation
 		{

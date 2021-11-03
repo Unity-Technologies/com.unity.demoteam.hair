@@ -176,7 +176,7 @@ namespace Unity.DemoTeam.Hair
 			}
 			return StructValidation.Pass;
 #else
-			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.0-pre.4", MessageType.Warning, wide: true);
+			EditorGUILayout.HelpBox("Alembic settings require package 'com.unity.formats.alembic' >= 2.2.2", MessageType.Warning, wide: true);
 			return StructValidation.Inaccessible;
 #endif
 		}
@@ -303,21 +303,23 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			bool settingsChanged = EditorGUI.EndChangeCheck();
-
 			EditorGUILayout.Space();
 			EditorGUILayout.BeginHorizontal();
 			{
 				var buildNow = GUILayout.Button("Build strand groups");
 				var buildAuto = EditorGUILayout.ToggleLeft("Auto", _strandGroupsAutoBuild.boolValue, GUILayout.Width(50.0f));
-				var buildAutoDown = buildAuto && (_strandGroupsAutoBuild.boolValue == false);
 
-				_strandGroupsAutoBuild.boolValue = buildAuto;
+				if (_strandGroupsAutoBuild.boolValue != buildAuto)
+					_strandGroupsAutoBuild.boolValue = buildAuto;
 
-				if (buildNow || (buildAuto && settingsChanged) || buildAutoDown)
+				var settingsChanged = EditorGUI.EndChangeCheck();
+				if (settingsChanged)
 				{
-					HairAssetBuilder.ClearHairAsset(hairAsset);
 					serializedObject.ApplyModifiedPropertiesWithoutUndo();
+				}
+
+				if (buildNow || (buildAuto && settingsChanged))
+				{
 					HairAssetBuilder.BuildHairAsset(hairAsset);
 					serializedObject.Update();
 				}
