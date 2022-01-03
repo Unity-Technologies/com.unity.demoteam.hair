@@ -17,15 +17,15 @@ namespace Unity.DemoTeam.Hair
 	}
 
 	[AttributeUsage(AttributeTargets.Field)]
-	public abstract class CmpFieldAttribute : PropertyAttribute
+	public abstract class CompareFieldBase : PropertyAttribute
 	{
 		public readonly string fieldName;
 		public readonly object cmpValue;
 		public readonly TypeCode cmpType;
 		public readonly CmpOp cmpOp;
 
-		public CmpFieldAttribute(string fieldName, object cmpValue) : this(fieldName, CmpOp.Eq, cmpValue) { }
-		public CmpFieldAttribute(string fieldName, CmpOp cmpOp, object cmpValue)
+		public CompareFieldBase(string fieldName, object cmpValue) : this(fieldName, CmpOp.Eq, cmpValue) { }
+		public CompareFieldBase(string fieldName, CmpOp cmpOp, object cmpValue)
 		{
 			this.fieldName = fieldName;
 			this.cmpValue = cmpValue;
@@ -35,7 +35,7 @@ namespace Unity.DemoTeam.Hair
 	}
 
 #if UNITY_EDITOR
-	public abstract class CmpFieldAttributeDrawer : PropertyDrawer
+	public abstract class CompareFieldBaseDrawer : PropertyDrawer
 	{
 		private static bool Compare<T>(CmpOp op, T a, T b) where T : IComparable<T>
 		{
@@ -54,7 +54,7 @@ namespace Unity.DemoTeam.Hair
 		protected bool Compare(SerializedProperty property)
 		{
 			var result = false;
-			var attrib = (CmpFieldAttribute)base.attribute;
+			var attrib = (CompareFieldBase)base.attribute;
 			if (attrib.fieldName.Length > 0)
 			{
 				SerializedProperty searchProperty;

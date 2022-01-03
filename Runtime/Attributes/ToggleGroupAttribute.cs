@@ -8,29 +8,9 @@ using UnityEditorInternal;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class ToggleGroupItemAttribute : PropertyAttribute
-	{
-		public bool withLabel;
-		public bool allowSceneObjects;
-		public string withSuffix;
-		public ToggleGroupItemAttribute(bool withLabel = false, string withSuffix = null, bool allowSceneObjects = true)
-		{
-			this.withLabel = withLabel;
-			this.withSuffix = withSuffix;
-			this.allowSceneObjects = allowSceneObjects;
-		}
-	}
-
 	public class ToggleGroupAttribute : PropertyAttribute { }
 
 #if UNITY_EDITOR
-	[CustomPropertyDrawer(typeof(ToggleGroupItemAttribute))]
-	public class ToggleGroupItemAttributeDrawer : PropertyDrawer
-	{
-		public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => -EditorGUIUtility.standardVerticalSpacing;
-		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) { }
-	}
-
 	[CustomPropertyDrawer(typeof(ToggleGroupAttribute))]
 	public class ToggleGroupAttributeDrawer : PropertyDrawer
 	{

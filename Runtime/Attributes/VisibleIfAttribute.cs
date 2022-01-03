@@ -5,7 +5,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class VisibleIfAttribute : CmpFieldAttribute
+	public class VisibleIfAttribute : CompareFieldBase
 	{
 		public VisibleIfAttribute(string fieldName, object cmpValue) : base(fieldName, cmpValue) { }
 		public VisibleIfAttribute(string fieldName, CmpOp cmpOp, object cmpValue) : base(fieldName, cmpOp, cmpValue) { }
@@ -13,7 +13,7 @@ namespace Unity.DemoTeam.Hair
 
 #if UNITY_EDITOR
 	[CustomPropertyDrawer(typeof(VisibleIfAttribute))]
-	public class VisibleIfAttributeDrawer : CmpFieldAttributeDrawer
+	public class VisibleIfAttributeDrawer : CompareFieldBaseDrawer
 	{
 		public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
 		{

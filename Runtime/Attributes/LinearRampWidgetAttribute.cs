@@ -25,7 +25,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 #if UNITY_EDITOR
-		public static Vector2 Ramp(Rect position, Vector2 value, Vector2 limit, RampStyle style = RampStyle.LinearDecreasing)
+		public static Vector2 LinearRampWidget(Rect position, Vector2 value, Vector2 limit, RampStyle style = RampStyle.LinearDecreasing)
 		{
 			GUI.Box(position, GUIContent.none);
 
@@ -145,13 +145,13 @@ namespace Unity.DemoTeam.Hair
 #endif
 	}
 
-	public class RampAttribute : PropertyAttribute
+	public class LinearRampWidgetAttribute : PropertyAttribute
 	{
 		public float min;
 		public float max;
 		public HairGUI.RampStyle style;
 
-		public RampAttribute(float min, float max, HairGUI.RampStyle style = HairGUI.RampStyle.LinearDecreasing)
+		public LinearRampWidgetAttribute(float min, float max, HairGUI.RampStyle style = HairGUI.RampStyle.LinearDecreasing)
 		{
 			this.min = min;
 			this.max = max;
@@ -160,20 +160,20 @@ namespace Unity.DemoTeam.Hair
 	}
 
 #if UNITY_EDITOR
-	[CustomPropertyDrawer(typeof(RampAttribute))]
-	public class RampAttributeDrawer : PropertyDrawer
+	[CustomPropertyDrawer(typeof(LinearRampWidgetAttribute))]
+	public class LinearRampWidgetAttributeDrawer : PropertyDrawer
 	{
 		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
 			if (property.propertyType == SerializedPropertyType.Vector2)
 			{
-				var ramp = base.attribute as RampAttribute;
+				var ramp = base.attribute as LinearRampWidgetAttribute;
 
 				EditorGUI.BeginProperty(position, label, property);
 				position = EditorGUI.PrefixLabel(position, label);
 
 				//NOTE: EditorGUIUtility.fieldWidth
-				property.vector2Value = HairGUI.Ramp(position, property.vector2Value, new Vector2(ramp.min, ramp.max), ramp.style);
+				property.vector2Value = HairGUI.LinearRampWidget(position, property.vector2Value, new Vector2(ramp.min, ramp.max), ramp.style);
 
 				EditorGUI.EndProperty();
 			}

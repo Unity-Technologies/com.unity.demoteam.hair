@@ -12,7 +12,6 @@ namespace Unity.DemoTeam.Hair
 	[CustomPropertyDrawer(typeof(RenderingLayerMaskAttribute))]
 	public class RenderingLayerMaskAttributeDrawer : PropertyDrawer
 	{
-		public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => -EditorGUIUtility.standardVerticalSpacing;
 		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
 			var currentPipelineAsset = GraphicsSettings.currentRenderPipeline;
@@ -23,7 +22,21 @@ namespace Unity.DemoTeam.Hair
 			if (layerMaskNames == null)
 				return;
 
-			property.intValue = EditorGUILayout.MaskField(label, property.intValue, layerMaskNames);
+			label = EditorGUI.BeginProperty(position, label, property);
+			{
+				EditorGUI.BeginChangeCheck();
+
+				var mask = property.intValue;
+				{
+					mask = EditorGUI.MaskField(position, label, mask, layerMaskNames);
+				}
+
+				if (EditorGUI.EndChangeCheck())
+				{
+					property.intValue = mask;
+				}
+			}
+			EditorGUI.EndProperty();
 		}
 	}
 #endif
