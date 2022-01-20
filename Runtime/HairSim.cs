@@ -210,10 +210,10 @@ namespace Unity.DemoTeam.Hair
 
 			[Tooltip("Constraint solver")]
 			public Method method;
-			[Range(1, 100), Tooltip("Constraint iterations")]
-			public int iterations;
 			[Range(1, 12), Tooltip("Solver substeps")]
 			public int substeps;
+			[Range(1, 100), Tooltip("Constraint iterations")]
+			public int iterations;
 			[Range(0.0f, 1.0f), Tooltip("Constraint stiffness")]
 			public float stiffness;
 			[Range(1.0f, 2.0f), Tooltip("Successive-over-relaxation factor")]
@@ -272,7 +272,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape influence")]
 			public float localShapeInfluence;
 
-			[LineHeader("Global Pose")]
+			[LineHeader("Reference")]
 
 			[ToggleGroup, Tooltip("Enable global position constraint")]
 			public bool globalPosition;
@@ -294,8 +294,8 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SolverSettings defaults = new SolverSettings()
 			{
 				method = Method.GaussSeidel,
-				iterations = 3,
 				substeps = 1,
+				iterations = 3,
 				stiffness = 1.0f,
 				kSOR = 1.0f,
 
@@ -369,7 +369,7 @@ namespace Unity.DemoTeam.Hair
 				IncludeColliders,
 			}
 
-			[LineHeader("Splats")]
+			[LineHeader("Volume")]
 
 			public GridPrecision gridPrecision;
 			[FormerlySerializedAs("volumeGridResolution"), Range(8, 160)]

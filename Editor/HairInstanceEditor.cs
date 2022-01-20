@@ -13,27 +13,29 @@ namespace Unity.DemoTeam.Hair
 
 		Editor hairAssetEditor;
 
-		SerializedProperty _hairAsset;
-		SerializedProperty _hairAssetQuickEdit;
+		SerializedProperty _strandGroupProviders;
 
-		SerializedProperty _settingsRoots;
-		SerializedProperty _settingsStrands;
+		SerializedProperty _settingsSystem;
 
+		SerializedProperty _settingsSkinning;
+		SerializedProperty _settingsStrand;
 		SerializedProperty _settingsSolver;
+
 		SerializedProperty _settingsVolume;
 		SerializedProperty _settingsDebug;
 
 		void OnEnable()
 		{
-			_hairAsset = serializedObject.FindProperty(nameof(HairInstance.hairAsset));
-			_hairAssetQuickEdit = serializedObject.FindProperty(nameof(HairInstance.hairAssetQuickEdit));
+			_strandGroupProviders = serializedObject.FindProperty(nameof(HairInstance.strandGroupProviders));
 
-			_settingsRoots = serializedObject.FindProperty(nameof(HairInstance.settingsRoots));
-			_settingsStrands = serializedObject.FindProperty(nameof(HairInstance.settingsStrands));
+			_settingsSystem = serializedObject.FindProperty(nameof(HairInstance.settingsSystem));
 
-			_settingsSolver = serializedObject.FindProperty(nameof(HairInstance.solverSettings));
-			_settingsVolume = serializedObject.FindProperty(nameof(HairInstance.volumeSettings));
-			_settingsDebug = serializedObject.FindProperty(nameof(HairInstance.debugSettings));
+			_settingsSkinning = serializedObject.FindProperty(nameof(HairInstance.settingsSkinning));
+			_settingsStrand = serializedObject.FindProperty(nameof(HairInstance.settingsStrand));
+			_settingsSolver = serializedObject.FindProperty(nameof(HairInstance.settingsSolver));
+
+			_settingsVolume = serializedObject.FindProperty(nameof(HairInstance.settingsVolume));
+			_settingsDebug = serializedObject.FindProperty(nameof(HairInstance.settingsDebug));
 		}
 
 		void OnDisable()
@@ -90,7 +92,19 @@ namespace Unity.DemoTeam.Hair
 				EditorGUILayout.LabelField("Strand Settings", EditorStyles.centeredGreyMiniLabel);
 				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 				{
+					EditorGUILayout.BeginHorizontal();
+					{
+						GUILayout.Toggle(true, ". . .", EditorStyles.miniButton, GUILayout.Width(30.0f));
+						EditorGUILayout.LabelField("Default (All Groups)", EditorStyles.objectField);
+					}
+					EditorGUILayout.EndHorizontal();
+					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 					DrawStrandSettingsGUI();
+					EditorGUILayout.EndVertical();
+					using (new EditorGUI.DisabledScope(true))
+					{
+						GUILayout.Button("Add settings block ...");
+					}
 				}
 				EditorGUILayout.EndVertical();
 
@@ -102,20 +116,34 @@ namespace Unity.DemoTeam.Hair
 				}
 				EditorGUILayout.EndVertical();
 
-				EditorGUILayout.Space();
-				EditorGUILayout.LabelField(hairInstance.strandGroupInstancesChecksum, EditorStyles.centeredGreyMiniLabel);
+				//EditorGUILayout.Space();
+				//EditorGUILayout.LabelField(hairInstance.strandGroupInstancesChecksum, EditorStyles.centeredGreyMiniLabel);
 			}
 			EditorGUILayout.EndVertical();
 		}
 
-		static StructValidation ValidationGUIStrands(object userData)
+		static StructValidation ValidationGUISystem(object userData)
+		{
+			return StructValidation.Pass;
+		}
+
+		static StructValidation ValidationGUISkinning(object userData)
+		{
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
+			return StructValidation.Pass;
+#else
+			EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human >= 0.1.1-preview'.", MessageType.None, wide: true);
+#endif
+		}
+
+		static StructValidation ValidationGUIStrand(object userData)
 		{
 			var hairInstance = userData as HairInstance;
 			{
 				var material = hairInstance.GetStrandMaterial();
 				if (material == null)
 				{
-					EditorGUILayout.HelpBox("Configuration warning: No active material.", MessageType.Warning, wide: true);
+					EditorGUILayout.HelpBox("Configuration warning: No active material.", MessageType.Info, wide: true);
 				}
 			}
 
@@ -127,7 +155,7 @@ namespace Unity.DemoTeam.Hair
 			var hairInstance = userData as HairInstance;
 			if (hairInstance.solverData != null && hairInstance.solverData.Length > 0)
 			{
-				var strandSolver = hairInstance.solverSettings.method;
+				var strandSolver = hairInstance.settingsSolver.method;
 				var strandMemoryLayout = hairInstance.solverData[0].memoryLayout;
 				var strandParticleCount = hairInstance.solverData[0].cbuffer._StrandParticleCount;
 
@@ -169,12 +197,54 @@ namespace Unity.DemoTeam.Hair
 			if (hairInstance == null)
 				return;
 
+			const float widthSymbol = 30.0f;
+			const float widthUnlock = 70.0f;
+
 			using (new GovernedByPrefabScope(hairInstance))
 			{
 				EditorGUI.BeginChangeCheck();
 				{
-					EditorGUILayout.PropertyField(_hairAsset);
-					_hairAssetQuickEdit.boolValue = GUILayout.Toggle(_hairAssetQuickEdit.boolValue, "Quick Edit", EditorStyles.miniButton);
+					var multipleAssets = _strandGroupProviders.arraySize > 1;
+					for (int i = 0; i != _strandGroupProviders.arraySize; i++)
+					{
+						var property = _strandGroupProviders.GetArrayElementAtIndex(i);
+						var property_hairAsset = property.FindPropertyRelative("hairAsset");
+						var property_hairAssetQuickEdit = property.FindPropertyRelative("hairAssetQuickEdit");
+						var property_delete = false;
+
+						EditorGUILayout.BeginHorizontal();
+						{
+							property_hairAssetQuickEdit.boolValue = GUILayout.Toggle(property_hairAssetQuickEdit.boolValue, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+							EditorGUILayout.ObjectField(property_hairAsset, GUIContent.none);
+
+							if (multipleAssets == false)//using (new EditorGUI.DisabledScope(multipleAssets == false))
+							{
+								property_delete = GUILayout.Button("-", GUILayout.Width(widthSymbol));
+							}
+						}
+						EditorGUILayout.EndHorizontal();
+
+						if (property_delete)
+						{
+							_strandGroupProviders.DeleteArrayElementAtIndex(i--);
+							continue;
+						}
+
+						if (property_hairAssetQuickEdit.boolValue)
+						{
+							var hairAsset = property_hairAsset.objectReferenceValue as HairAsset;
+							if (hairAsset != null)
+							{
+								//TODO cached editor per asset
+								Editor.CreateCachedEditor(hairAsset, typeof(HairAssetEditor), ref hairAssetEditor);
+								EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+								{
+									(hairAssetEditor as HairAssetEditor).DrawImporterGUI();
+								}
+								EditorGUILayout.EndVertical();
+							}
+						}
+					}
 				}
 
 				if (EditorGUI.EndChangeCheck())
@@ -182,34 +252,37 @@ namespace Unity.DemoTeam.Hair
 					serializedObject.ApplyModifiedProperties();
 				}
 
-				var hairAsset = _hairAsset.objectReferenceValue as HairAsset;
-				if (hairAsset != null && _hairAssetQuickEdit.boolValue)
-				{
-					Editor.CreateCachedEditor(hairAsset, typeof(HairAssetEditor), ref hairAssetEditor);
-					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
-					{
-						(hairAssetEditor as HairAssetEditor).DrawImporterGUI();
-					}
-					EditorGUILayout.EndVertical();
-				}
-
 				EditorGUILayout.BeginHorizontal();
 				{
-					if (GUILayout.Button("Reload"))
+					if (GUILayout.Button("+", GUILayout.Width(widthSymbol)))
 					{
-						hairInstance.strandGroupInstancesChecksum = string.Empty;
+						var countPrev = _strandGroupProviders.arraySize;
+						var countNext = countPrev + 1;
+
+						_strandGroupProviders.arraySize = countNext;
+						serializedObject.ApplyModifiedProperties();
+
+						if (countNext == hairInstance.strandGroupProviders.Length)
+						{
+							hairInstance.strandGroupProviders[countNext - 1] = new HairInstance.GroupProvider();
+						}
 					}
 
-					if (GUILayout.Button("Unlock", GUILayout.Width(60.0f)))
+					if (GUILayout.Button("Reload"))
+					{
+						hairInstance.strandGroupChecksums = null;
+					}
+
+					if (GUILayout.Button("Unlock", GUILayout.Width(widthUnlock)))
 					{
 						var strandGroupInstances = hairInstance.strandGroupInstances;
 						if (strandGroupInstances != null)
 						{
 							foreach (var strandGroupInstance in hairInstance.strandGroupInstances)
 							{
-								strandGroupInstance.container.hideFlags &= ~HideFlags.NotEditable;
-								strandGroupInstance.rootFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
-								strandGroupInstance.strandFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
+								strandGroupInstance.sceneObjects.container.hideFlags &= ~HideFlags.NotEditable;
+								strandGroupInstance.sceneObjects.rootFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
+								strandGroupInstance.sceneObjects.strandFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
 							}
 						}
 					}
@@ -226,19 +299,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 			{
-				using (new GovernedByPrefabScope(hairInstance))
-				{
-					StructPropertyFieldsWithHeader(_settingsRoots);
-				}
-#if !HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-				using (new EditorGUI.IndentLevelScope())
-				{
-					EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human >= 0.1.1-preview'.", MessageType.None, wide: true);
-				}
-#endif
-
-				EditorGUILayout.Space();
-				StructPropertyFieldsWithHeader(_settingsStrands, ValidationGUIStrands, hairInstance);
+				StructPropertyFieldsWithHeader(_settingsSystem, ValidationGUISystem, hairInstance);
 
 				using (new EditorGUI.IndentLevelScope())
 				{
@@ -254,8 +315,8 @@ namespace Unity.DemoTeam.Hair
 
 					if (s_indicator)
 					{
-						var stepsMin = hairInstance.settingsStrands.stepsMin ? hairInstance.settingsStrands.stepsMinValue : 0;
-						var stepsMax = hairInstance.settingsStrands.stepsMax ? hairInstance.settingsStrands.stepsMaxValue : (int)Mathf.Ceil(hairInstance.stepsLastFrameSmooth);
+						var stepsMin = hairInstance.settingsSystem.stepsMin ? hairInstance.settingsSystem.stepsMinValue : 0;
+						var stepsMax = hairInstance.settingsSystem.stepsMax ? hairInstance.settingsSystem.stepsMaxValue : (int)Mathf.Ceil(hairInstance.stepsLastFrameSmooth);
 						if (stepsMax == 0)
 							stepsMax = 1;
 
@@ -291,11 +352,6 @@ namespace Unity.DemoTeam.Hair
 						EditorGUI.HelpBox(rect, "Click to toggle indicator.", MessageType.None);
 					}
 				}
-
-				//if (GUILayout.Button("Reset simulation"))
-				//{
-				//	hairInstance.ResetSimulationState();
-				//}
 			}
 
 			if (EditorGUI.EndChangeCheck())
@@ -312,6 +368,13 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 			{
+				using (new GovernedByPrefabScope(hairInstance))
+				{
+					StructPropertyFieldsWithHeader(_settingsSkinning, "Settings Skinning", ValidationGUISkinning, hairInstance);
+				}
+				EditorGUILayout.Space();
+				StructPropertyFieldsWithHeader(_settingsStrand, "Settings Strands", ValidationGUIStrand, hairInstance);
+				EditorGUILayout.Space();
 				StructPropertyFieldsWithHeader(_settingsSolver, "Settings Solver", ValidationGUISolver, hairInstance);
 			}
 
@@ -329,7 +392,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 			{
-				StructPropertyFieldsWithHeader(_settingsVolume, "Settings Volume");
+				StructPropertyFieldsWithHeader(_settingsVolume);
 				using (new EditorGUI.IndentLevelScope())
 				{
 					var countDiscrete = hairInstance.volumeData.cbuffer._BoundaryCountDiscrete;
@@ -365,7 +428,7 @@ namespace Unity.DemoTeam.Hair
 				StructPropertyFieldsWithHeader(_settingsDebug, "Settings Debug");
 				using (new EditorGUI.IndentLevelScope())
 				{
-					var divider = hairInstance.debugSettings.drawSliceDivider;
+					var divider = hairInstance.settingsDebug.drawSliceDivider;
 					var dividerBase = Mathf.Floor(divider);
 					var dividerFrac = divider - Mathf.Floor(divider);
 

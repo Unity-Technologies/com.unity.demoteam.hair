@@ -37,16 +37,21 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public static void StructPropertyFields(SerializedProperty property, StructValidationGUI validationGUI = null, object validationUserData = null)
+		{
+			var validationResult = (validationGUI != null) ? validationGUI(validationUserData) : StructValidation.Pass;
+			using (new EditorGUI.DisabledScope(validationResult == StructValidation.Inaccessible))
+			{
+				StructPropertyFields(property);
+			}
+		}
+
 		public static void StructPropertyFieldsWithHeader(SerializedProperty property, string label, StructValidationGUI validationGUI = null, object validationUserData = null)
 		{
 			EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
 			using (new EditorGUI.IndentLevelScope())
 			{
-				var validationResult = (validationGUI != null) ? validationGUI(validationUserData) : StructValidation.Pass;
-				using (new EditorGUI.DisabledScope(validationResult == StructValidation.Inaccessible))
-				{
-					StructPropertyFields(property);
-				}
+				StructPropertyFields(property, validationGUI, validationUserData);
 			}
 		}
 

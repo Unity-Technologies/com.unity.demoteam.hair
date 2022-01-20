@@ -356,8 +356,8 @@ namespace Unity.DemoTeam.Hair
 
 		public string checksum;
 
-		public void OnBeforeSerialize() { }
-		public void OnAfterDeserialize()
+		void ISerializationCallbackReceiver.OnBeforeSerialize() { }
+		void ISerializationCallbackReceiver.OnAfterDeserialize()
 		{
 			if (strandGroups == null)
 				return;

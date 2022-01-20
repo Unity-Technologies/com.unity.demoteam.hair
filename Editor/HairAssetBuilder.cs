@@ -106,9 +106,10 @@ namespace Unity.DemoTeam.Hair
 			if (hairAsset.strandGroups != null)
 			{
 				var hash = new Hash128();
+
 				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 				{
-					hash.Append(hairAsset.strandGroups[i].meshAssetLines.GetInstanceID());
+					hash.Append(hairAsset.strandGroups[i].meshAssetRoots.GetInstanceID());
 					hash.Append(hairAsset.strandGroups[i].particlePosition);
 				}
 

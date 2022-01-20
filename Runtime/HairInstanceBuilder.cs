@@ -16,63 +16,98 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (hairInstance.strandGroupInstances != null)
 			{
-				foreach (var strandGroupInstance in hairInstance.strandGroupInstances)
+				for (int i = 0; i != hairInstance.strandGroupInstances.Length; i++)
 				{
-					CoreUtils.Destroy(strandGroupInstance.container);
-					CoreUtils.Destroy(strandGroupInstance.materialInstance);
-					CoreUtils.Destroy(strandGroupInstance.meshInstanceLines);
-					CoreUtils.Destroy(strandGroupInstance.meshInstanceStrips);
+					CoreUtils.Destroy(hairInstance.strandGroupInstances[i].sceneObjects.container);
+					CoreUtils.Destroy(hairInstance.strandGroupInstances[i].sceneObjects.materialInstance);
+					CoreUtils.Destroy(hairInstance.strandGroupInstances[i].sceneObjects.meshInstanceLines);
+					CoreUtils.Destroy(hairInstance.strandGroupInstances[i].sceneObjects.meshInstanceStrips);
 				}
-
-				hairInstance.strandGroupInstances = null;
-				hairInstance.strandGroupInstancesChecksum = string.Empty;
 			}
+
+			hairInstance.strandGroupInstances = null;
+			hairInstance.strandGroupChecksums = null;
 
 #if UNITY_EDITOR
 			UnityEditor.EditorUtility.SetDirty(hairInstance);
 #endif
 		}
 
-		public static void BuildHairInstance(HairInstance hairInstance, HairAsset hairAsset, HideFlags hideFlags = HideFlags.NotEditable)
+		public static void BuildHairInstance(HairInstance hairInstance, HairInstance.GroupProvider[] strandGroupProviders, HideFlags hideFlags = HideFlags.NotEditable)
 		{
 			ClearHairInstance(hairInstance);
 
-			var strandGroups = hairAsset.strandGroups;
-			if (strandGroups == null || strandGroups.Length == 0)
-				return;
-
 			// prep strand group instances
-			hairInstance.strandGroupInstances = new HairInstance.StrandGroupInstance[strandGroups.Length];
+			var strandGroupInstanceCount = 0;
+			var strandGroupChecksumCount = 0;
 
-			// build strand group instances
-			for (int i = 0; i != strandGroups.Length; i++)
+			if (strandGroupProviders != null)
 			{
-				ref var strandGroupInstance = ref hairInstance.strandGroupInstances[i];
-
-				strandGroupInstance.container = CreateContainer("Group:" + i, hairInstance.gameObject, hideFlags);
-
-				// create scene objects for roots
-				strandGroupInstance.rootContainer = CreateContainer("Roots:" + i, strandGroupInstance.container, hideFlags);
+				for (int i = 0; i != strandGroupProviders.Length; i++)
 				{
-					strandGroupInstance.rootFilter = CreateComponent<MeshFilter>(strandGroupInstance.rootContainer, hideFlags);
-					strandGroupInstance.rootFilter.sharedMesh = strandGroups[i].meshAssetRoots;
+					var hairAsset = strandGroupProviders[i].hairAsset;
+					if (hairAsset == null || hairAsset.checksum == string.Empty)
+						continue;
 
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-					strandGroupInstance.rootAttachment = CreateComponent<SkinAttachment>(strandGroupInstance.rootContainer, hideFlags);
-					strandGroupInstance.rootAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
-					strandGroupInstance.rootAttachment.forceRecalculateBounds = true;
-#endif
-				}
+					var strandGroups = hairAsset.strandGroups;
+					if (strandGroups == null)
+						continue;
 
-				// create scene objects for strands
-				strandGroupInstance.strandContainer = CreateContainer("Strands:" + i, strandGroupInstance.container, hideFlags);
-				{
-					strandGroupInstance.strandFilter = CreateComponent<MeshFilter>(strandGroupInstance.strandContainer, hideFlags);
-					strandGroupInstance.strandRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.strandContainer, hideFlags);
+					strandGroupInstanceCount += hairAsset.strandGroups.Length;
+					strandGroupChecksumCount++;
 				}
 			}
 
-			hairInstance.strandGroupInstancesChecksum = hairAsset.checksum;
+			if (strandGroupInstanceCount == 0)
+				return;
+
+			hairInstance.strandGroupInstances = new HairInstance.GroupInstance[strandGroupInstanceCount];
+			hairInstance.strandGroupChecksums = new string[strandGroupChecksumCount];
+
+			// build strand group instances
+			for (int i = 0, writeIndexInstance = 0, writeIndexChecksum = 0; i != strandGroupProviders.Length; i++)
+			{
+				var hairAsset = strandGroupProviders[i].hairAsset;
+				if (hairAsset == null || hairAsset.checksum == string.Empty)
+					continue;
+
+				var strandGroups = hairAsset.strandGroups;
+				if (strandGroups == null)
+					continue;
+
+				for (int j = 0; j != strandGroups.Length; j++)
+				{
+					ref var strandGroupInstance = ref hairInstance.strandGroupInstances[writeIndexInstance++];
+
+					strandGroupInstance.hairAsset = hairAsset;
+					strandGroupInstance.hairAssetGroupIndex = j;
+
+					// create scene object for group
+					strandGroupInstance.sceneObjects.container = CreateContainer("Group:" + j, hairInstance.gameObject, hideFlags);
+
+					// create scene objects for roots
+					strandGroupInstance.sceneObjects.rootContainer = CreateContainer("Roots:" + j, strandGroupInstance.sceneObjects.container, hideFlags);
+					{
+						strandGroupInstance.sceneObjects.rootFilter = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.rootContainer, hideFlags);
+						strandGroupInstance.sceneObjects.rootFilter.sharedMesh = strandGroups[j].meshAssetRoots;
+
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
+						strandGroupInstance.sceneObjects.rootAttachment = CreateComponent<SkinAttachment>(strandGroupInstance.sceneObjects.rootContainer, hideFlags);
+						strandGroupInstance.sceneObjects.rootAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
+						strandGroupInstance.sceneObjects.rootAttachment.forceRecalculateBounds = true;
+#endif
+					}
+
+					// create scene objects for strands
+					strandGroupInstance.sceneObjects.strandContainer = CreateContainer("Strands:" + j, strandGroupInstance.sceneObjects.container, hideFlags);
+					{
+						strandGroupInstance.sceneObjects.strandFilter = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.strandContainer, hideFlags);
+						strandGroupInstance.sceneObjects.strandRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.strandContainer, hideFlags);
+					}
+				}
+
+				hairInstance.strandGroupChecksums[writeIndexChecksum++] = hairAsset.checksum;
+			}
 
 #if UNITY_EDITOR
 			UnityEditor.EditorUtility.SetDirty(hairInstance);
