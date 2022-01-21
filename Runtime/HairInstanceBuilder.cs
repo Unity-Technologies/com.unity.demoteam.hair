@@ -14,14 +14,17 @@ namespace Unity.DemoTeam.Hair
 	{
 		public static void ClearHairInstance(HairInstance hairInstance)
 		{
-			if (hairInstance.strandGroupInstances != null)
+			var strandGroupInstances = hairInstance.strandGroupInstances;
+			if (strandGroupInstances != null)
 			{
-				for (int i = 0; i != hairInstance.strandGroupInstances.Length; i++)
+				for (int i = 0; i != strandGroupInstances.Length; i++)
 				{
-					CoreUtils.Destroy(hairInstance.strandGroupInstances[i].sceneObjects.container);
-					CoreUtils.Destroy(hairInstance.strandGroupInstances[i].sceneObjects.materialInstance);
-					CoreUtils.Destroy(hairInstance.strandGroupInstances[i].sceneObjects.meshInstanceLines);
-					CoreUtils.Destroy(hairInstance.strandGroupInstances[i].sceneObjects.meshInstanceStrips);
+					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
+
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.groupContainer);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
 				}
 			}
 
@@ -82,27 +85,29 @@ namespace Unity.DemoTeam.Hair
 					strandGroupInstance.hairAsset = hairAsset;
 					strandGroupInstance.hairAssetGroupIndex = j;
 
-					// create scene object for group
-					strandGroupInstance.sceneObjects.container = CreateContainer("Group:" + j, hairInstance.gameObject, hideFlags);
+					var flatIndex = writeIndexInstance - 1;
 
-					// create scene objects for roots
-					strandGroupInstance.sceneObjects.rootContainer = CreateContainer("Roots:" + j, strandGroupInstance.sceneObjects.container, hideFlags);
+					// create scene object for group
+					strandGroupInstance.sceneObjects.groupContainer = CreateContainer("Group:" + flatIndex, hairInstance.gameObject, hideFlags);
+
+					// create scene objects for root mesh
+					strandGroupInstance.sceneObjects.rootMeshContainer = CreateContainer("Roots:" + flatIndex, strandGroupInstance.sceneObjects.groupContainer, hideFlags);
 					{
-						strandGroupInstance.sceneObjects.rootFilter = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.rootContainer, hideFlags);
-						strandGroupInstance.sceneObjects.rootFilter.sharedMesh = strandGroups[j].meshAssetRoots;
+						strandGroupInstance.sceneObjects.rootMeshFilter = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.rootMeshContainer, hideFlags);
+						strandGroupInstance.sceneObjects.rootMeshFilter.sharedMesh = strandGroups[j].meshAssetRoots;
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-						strandGroupInstance.sceneObjects.rootAttachment = CreateComponent<SkinAttachment>(strandGroupInstance.sceneObjects.rootContainer, hideFlags);
-						strandGroupInstance.sceneObjects.rootAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
-						strandGroupInstance.sceneObjects.rootAttachment.forceRecalculateBounds = true;
+						strandGroupInstance.sceneObjects.rootMeshAttachment = CreateComponent<SkinAttachment>(strandGroupInstance.sceneObjects.rootMeshContainer, hideFlags);
+						strandGroupInstance.sceneObjects.rootMeshAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
+						strandGroupInstance.sceneObjects.rootMeshAttachment.forceRecalculateBounds = true;
 #endif
 					}
 
-					// create scene objects for strands
-					strandGroupInstance.sceneObjects.strandContainer = CreateContainer("Strands:" + j, strandGroupInstance.sceneObjects.container, hideFlags);
+					// create scene objects for strand mesh
+					strandGroupInstance.sceneObjects.strandMeshContainer = CreateContainer("Strands:" + flatIndex, strandGroupInstance.sceneObjects.groupContainer, hideFlags);
 					{
-						strandGroupInstance.sceneObjects.strandFilter = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.strandContainer, hideFlags);
-						strandGroupInstance.sceneObjects.strandRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.strandContainer, hideFlags);
+						strandGroupInstance.sceneObjects.strandMeshFilter = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
+						strandGroupInstance.sceneObjects.strandMeshRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
 					}
 				}
 

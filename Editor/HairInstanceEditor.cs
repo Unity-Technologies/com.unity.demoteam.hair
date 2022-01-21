@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
@@ -11,14 +12,14 @@ namespace Unity.DemoTeam.Hair
 	{
 		static bool s_indicator;
 
-		Editor hairAssetEditor;
+		Dictionary<HairAsset, Editor> hairAssetEditorMap = new Dictionary<HairAsset, Editor>(1);
 
 		SerializedProperty _strandGroupProviders;
 
 		SerializedProperty _settingsSystem;
 
 		SerializedProperty _settingsSkinning;
-		SerializedProperty _settingsStrand;
+		SerializedProperty _settingsStrands;
 		SerializedProperty _settingsSolver;
 
 		SerializedProperty _settingsVolume;
@@ -31,7 +32,7 @@ namespace Unity.DemoTeam.Hair
 			_settingsSystem = serializedObject.FindProperty(nameof(HairInstance.settingsSystem));
 
 			_settingsSkinning = serializedObject.FindProperty(nameof(HairInstance.settingsSkinning));
-			_settingsStrand = serializedObject.FindProperty(nameof(HairInstance.settingsStrand));
+			_settingsStrands = serializedObject.FindProperty(nameof(HairInstance.settingsStrands));
 			_settingsSolver = serializedObject.FindProperty(nameof(HairInstance.settingsSolver));
 
 			_settingsVolume = serializedObject.FindProperty(nameof(HairInstance.settingsVolume));
@@ -40,10 +41,15 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDisable()
 		{
-			if (hairAssetEditor != null)
+			foreach (var hairAssetEditor in hairAssetEditorMap.Values)
 			{
-				DestroyImmediate(hairAssetEditor);
+				if (hairAssetEditor != null)
+				{
+					DestroyImmediate(hairAssetEditor);
+				}
 			}
+
+			hairAssetEditorMap.Clear();
 		}
 
 		public bool HasFrameBounds()
@@ -99,7 +105,9 @@ namespace Unity.DemoTeam.Hair
 					}
 					EditorGUILayout.EndHorizontal();
 					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
-					DrawStrandSettingsGUI();
+					{
+						DrawStrandSettingsGUI();
+					}
 					EditorGUILayout.EndVertical();
 					using (new EditorGUI.DisabledScope(true))
 					{
@@ -136,7 +144,7 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
-		static StructValidation ValidationGUIStrand(object userData)
+		static StructValidation ValidationGUIStrands(object userData)
 		{
 			var hairInstance = userData as HairInstance;
 			{
@@ -217,7 +225,7 @@ namespace Unity.DemoTeam.Hair
 							property_hairAssetQuickEdit.boolValue = GUILayout.Toggle(property_hairAssetQuickEdit.boolValue, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 							EditorGUILayout.ObjectField(property_hairAsset, GUIContent.none);
 
-							if (multipleAssets == false)//using (new EditorGUI.DisabledScope(multipleAssets == false))
+							if (multipleAssets)//TODO considering: using (new EditorGUI.DisabledScope(multipleAssets == false))
 							{
 								property_delete = GUILayout.Button("-", GUILayout.Width(widthSymbol));
 							}
@@ -235,8 +243,11 @@ namespace Unity.DemoTeam.Hair
 							var hairAsset = property_hairAsset.objectReferenceValue as HairAsset;
 							if (hairAsset != null)
 							{
-								//TODO cached editor per asset
-								Editor.CreateCachedEditor(hairAsset, typeof(HairAssetEditor), ref hairAssetEditor);
+								if (hairAssetEditorMap.TryGetValue(hairAsset, out var hairAssetEditor) == false)
+								{
+									CreateCachedEditor(hairAsset, typeof(HairAssetEditor), ref hairAssetEditor);
+									hairAssetEditorMap.Add(hairAsset, hairAssetEditor);
+								}
 								EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 								{
 									(hairAssetEditor as HairAssetEditor).DrawImporterGUI();
@@ -278,11 +289,13 @@ namespace Unity.DemoTeam.Hair
 						var strandGroupInstances = hairInstance.strandGroupInstances;
 						if (strandGroupInstances != null)
 						{
-							foreach (var strandGroupInstance in hairInstance.strandGroupInstances)
+							for (int i = 0; i != strandGroupInstances.Length; i++)
 							{
-								strandGroupInstance.sceneObjects.container.hideFlags &= ~HideFlags.NotEditable;
-								strandGroupInstance.sceneObjects.rootFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
-								strandGroupInstance.sceneObjects.strandFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
+								ref var strandGroupInstance = ref strandGroupInstances[i];
+
+								strandGroupInstance.sceneObjects.groupContainer.hideFlags &= ~HideFlags.NotEditable;
+								strandGroupInstance.sceneObjects.rootMeshFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
+								strandGroupInstance.sceneObjects.strandMeshFilter.gameObject.hideFlags &= ~HideFlags.NotEditable;
 							}
 						}
 					}
@@ -370,12 +383,12 @@ namespace Unity.DemoTeam.Hair
 			{
 				using (new GovernedByPrefabScope(hairInstance))
 				{
-					StructPropertyFieldsWithHeader(_settingsSkinning, "Settings Skinning", ValidationGUISkinning, hairInstance);
+					StructPropertyFieldsWithHeader(_settingsSkinning, ValidationGUISkinning, hairInstance);
 				}
 				EditorGUILayout.Space();
-				StructPropertyFieldsWithHeader(_settingsStrand, "Settings Strands", ValidationGUIStrand, hairInstance);
+				StructPropertyFieldsWithHeader(_settingsStrands, ValidationGUIStrands, hairInstance);
 				EditorGUILayout.Space();
-				StructPropertyFieldsWithHeader(_settingsSolver, "Settings Solver", ValidationGUISolver, hairInstance);
+				StructPropertyFieldsWithHeader(_settingsSolver, ValidationGUISolver, hairInstance);
 			}
 
 			if (EditorGUI.EndChangeCheck())

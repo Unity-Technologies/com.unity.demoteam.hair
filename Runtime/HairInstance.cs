@@ -1,12 +1,18 @@
-﻿using System;
+﻿#define PENDING_CONTENT_UPGRADE
+
+using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 using Unity.DemoTeam.DigitalHuman;
+#endif
+#if HAS_PACKAGE_UNITY_VFXGRAPH
+using UnityEngine.VFX;
 #endif
 
 namespace Unity.DemoTeam.Hair
@@ -26,23 +32,20 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct GroupInstance
 		{
-			public HairAsset hairAsset;
-			public int hairAssetGroupIndex;
-
 			[Serializable]
 			public struct SceneObjects
 			{
-				public GameObject container;
+				public GameObject groupContainer;
 
-				public GameObject rootContainer;
-				public MeshFilter rootFilter;
+				public GameObject rootMeshContainer;
+				public MeshFilter rootMeshFilter;
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-				public SkinAttachment rootAttachment;
+				public SkinAttachment rootMeshAttachment;
 #endif
 
-				public GameObject strandContainer;
-				public MeshFilter strandFilter;
-				public MeshRenderer strandRenderer;
+				public GameObject strandMeshContainer;
+				public MeshFilter strandMeshFilter;
+				public MeshRenderer strandMeshRenderer;
 
 				[NonSerialized] public Material materialInstance;
 				[NonSerialized] public Mesh meshInstanceLines;
@@ -50,16 +53,24 @@ namespace Unity.DemoTeam.Hair
 				[NonSerialized] public uint meshInstanceSubdivisionCount;
 			}
 
+#if PENDING_CONTENT_UPGRADE//TODO remove after upgrading content
+			public GameObject container;
+#endif
+
+			public HairAsset hairAsset;
+			public int hairAssetGroupIndex;
+
+			public int sceneObjectsIndex;
 			public SceneObjects sceneObjects;
 
-			public ref HairAsset.StrandGroup GetAssetReference()
+			public ref readonly HairAsset.StrandGroup GetAssetReference()
 			{
 				return ref hairAsset.strandGroups[hairAssetGroupIndex];
 			}
 		}
 
 		[Serializable]
-		public struct SystemSettings
+		public struct SettingsSystem
 		{
 			public enum LODSelection
 			{
@@ -77,6 +88,9 @@ namespace Unity.DemoTeam.Hair
 			{
 				BuiltinLines,
 				BuiltinStrips,
+#if HAS_PACKAGE_UNITY_VFXGRAPH
+				VFXGraph,//TODO
+#endif
 			}
 
 			public enum SimulationRate
@@ -107,6 +121,10 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Renderer")]
 
 			public StrandRenderer strandRenderer;
+#if HAS_PACKAGE_UNITY_VFXGRAPH
+			[VisibleIf(nameof(strandRenderer), StrandRenderer.VFXGraph)]
+			public VisualEffect strandOutputGraph;
+#endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
 			public int strandLayers;
@@ -131,7 +149,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem, Tooltip("Maximum number of simulation steps per rendered frame")]
 			public int stepsMaxValue;
 
-			public static readonly SystemSettings defaults = new SystemSettings()
+			public static readonly SettingsSystem defaults = new SettingsSystem()
 			{
 				kLODSearch = LODSelection.Fixed,
 				kLODSearchValue = 1.0f,
@@ -159,7 +177,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
-		public struct SkinningSettings
+		public struct SettingsSkinning
 		{
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 			[LineHeader("Skinning")]
@@ -172,7 +190,7 @@ namespace Unity.DemoTeam.Hair
 			public PrimarySkinningBone rootsAttachTargetBone;//TODO move to StrandGroupInstance?
 #endif
 
-			public static readonly SkinningSettings defaults = new SkinningSettings()
+			public static readonly SettingsSkinning defaults = new SettingsSkinning()
 			{
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 				rootsAttach = false,
@@ -182,7 +200,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
-		public struct StrandSettings
+		public struct SettingsStrands
 		{
 			public enum StrandScale
 			{
@@ -221,7 +239,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem(withLabel = true), Range(0, 10)]
 			public uint stagingSubdivision;
 
-			public static readonly StrandSettings defaults = new StrandSettings()
+			public static readonly SettingsStrands defaults = new SettingsStrands()
 			{
 				material = false,
 				materialValue = null,
@@ -239,23 +257,29 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsBlock
 		{
-			public bool overrideSkinning;
-			public SkinningSettings settingsSkinning;
+			public bool settingsSkinningOverride;
+			public SettingsSkinning settingsSkinning;
 
-			public bool overrideStrand;
-			public StrandSettings settingsStrand;
+			public bool settingsStrandsOverride;
+			public SettingsStrands settingsStrands;
 
-			public bool overrideSolver;
+			public bool settingsSolverOverride;
 			public HairSim.SolverSettings settingsSolver;
 		}
 
+#if PENDING_CONTENT_UPGRADE//TODO remove after upgrading content
+		[SerializeField, HideInInspector] private HairAsset hairAsset;
+		[SerializeField, HideInInspector] private bool hairAssetQuickEdit;
+#endif
+
 		public GroupProvider[] strandGroupProviders = new GroupProvider[1];
 		public GroupInstance[] strandGroupInstances;
-		public string[] strandGroupChecksums;// contains checksums of providers for current set of strand group instances
+		public string[] strandGroupChecksums;// stores checksums of providers for instantiated groups
 
-		public SystemSettings settingsSystem = SystemSettings.defaults;					// per instance
-		public SkinningSettings settingsSkinning = SkinningSettings.defaults;			// per group
-		public StrandSettings settingsStrand = StrandSettings.defaults;					// per group
+		public SettingsSystem settingsSystem = SettingsSystem.defaults;					// per instance
+		[FormerlySerializedAs("settingsRoots")]
+		public SettingsSkinning settingsSkinning = SettingsSkinning.defaults;			// per group
+		public SettingsStrands settingsStrands = SettingsStrands.defaults;				// per group
 		public HairSim.SolverSettings settingsSolver = HairSim.SolverSettings.defaults;	// per group
 		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults;	// per instance
 		public HairSim.DebugSettings settingsDebug = HairSim.DebugSettings.defaults;	// per instance
@@ -300,7 +324,7 @@ namespace Unity.DemoTeam.Hair
 				Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData), 2.0f * HairSim.GetVolumeExtent(volumeData));
 
 				// volume gravity
-				for (int i = 0; i != strandGroupInstances.Length; i++)
+				for (int i = 0; i != solverData.Length; i++)
 				{
 					Gizmos.color = Color.cyan;
 					Gizmos.DrawRay(HairSim.GetVolumeCenter(volumeData), solverData[i].cbuffer._WorldGravity * 0.1f);
@@ -312,10 +336,12 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (strandGroupInstances != null)
 			{
-				foreach (var strandGroupInstance in strandGroupInstances)
+				for (int i = 0; i != strandGroupInstances.Length; i++)
 				{
+					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
+
 					// root bounds
-					var rootFilter = strandGroupInstance.sceneObjects.rootFilter;
+					var rootFilter = strandGroupInstance.sceneObjects.rootMeshFilter;
 					if (rootFilter != null)
 					{
 						var rootMesh = rootFilter.sharedMesh;
@@ -379,14 +405,6 @@ namespace Unity.DemoTeam.Hair
 
 		StrandGroupInstancesStatus CheckStrandGroupInstances()
 		{
-			if (strandGroupInstances != null)
-			{
-				for (int i = 0; i != strandGroupInstances.Length; i++)
-				{
-					//TODO handle upgrade
-				}
-			}
-
 			var strandGroupChecksumCount = strandGroupChecksums?.Length ?? 0;
 			var strandGroupProviderPass = 0;
 			var strandGroupProviderFail = 0;
@@ -428,6 +446,22 @@ namespace Unity.DemoTeam.Hair
 
 		void UpdateStrandGroupInstances()
 		{
+#if PENDING_CONTENT_UPGRADE//TODO remove after upgrading content
+			if (hairAsset != null)
+			{
+				CoreUtils.Destroy(strandGroupInstances?[0].container);
+
+				strandGroupProviders = new GroupProvider[1];
+				strandGroupProviders[0].hairAsset = hairAsset;
+				strandGroupProviders[0].hairAssetQuickEdit = hairAssetQuickEdit;
+				strandGroupInstances = null;
+				strandGroupChecksums = null;
+
+				hairAsset = null;
+				hairAssetQuickEdit = false;
+			}
+#endif
+
 			var status = CheckStrandGroupInstances();
 
 #if UNITY_EDITOR
@@ -493,11 +527,13 @@ namespace Unity.DemoTeam.Hair
 			if (strandGroupInstances == null)
 				return;
 
-			foreach (var strandGroupInstance in strandGroupInstances)
+			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				strandGroupInstance.sceneObjects.container.hideFlags = hideFlags;
-				strandGroupInstance.sceneObjects.rootContainer.hideFlags = hideFlags;
-				strandGroupInstance.sceneObjects.strandContainer.hideFlags = hideFlags;
+				ref readonly var strandGroupInstance = ref strandGroupInstances[i];
+
+				strandGroupInstance.sceneObjects.groupContainer.hideFlags = hideFlags;
+				strandGroupInstance.sceneObjects.rootMeshContainer.hideFlags = hideFlags;
+				strandGroupInstance.sceneObjects.strandMeshContainer.hideFlags = hideFlags;
 			}
 		}
 
@@ -515,9 +551,11 @@ namespace Unity.DemoTeam.Hair
 
 			var attachmentsChanged = false;
 			{
-				foreach (var strandGroupInstance in strandGroupInstances)
+				for (int i = 0; i != strandGroupInstances.Length; i++)
 				{
-					var attachment = strandGroupInstance.sceneObjects.rootAttachment;
+					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
+
+					var attachment = strandGroupInstance.sceneObjects.rootMeshAttachment;
 					if (attachment != null && (attachment.target != settingsSkinning.rootsAttachTarget || attachment.attached != settingsSkinning.rootsAttach))
 					{
 						attachment.target = settingsSkinning.rootsAttachTarget;
@@ -575,10 +613,10 @@ namespace Unity.DemoTeam.Hair
 		{
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				if (settingsStrand.staging)
+				if (settingsStrands.staging)
 				{
-					var stagingCompression = (settingsStrand.stagingPrecision == StrandSettings.StagingPrecision.Half);
-					var stagingSubdivision = settingsStrand.stagingSubdivision;
+					var stagingCompression = (settingsStrands.stagingPrecision == SettingsStrands.StagingPrecision.Half);
+					var stagingSubdivision = settingsStrands.stagingSubdivision;
 
 					if (HairSim.PrepareSolverStaging(ref solverData[i], stagingCompression, stagingSubdivision))
 					{
@@ -601,8 +639,8 @@ namespace Unity.DemoTeam.Hair
 			{
 				switch (settingsSystem.strandRenderer)
 				{
-					case SystemSettings.StrandRenderer.BuiltinLines:
-					case SystemSettings.StrandRenderer.BuiltinStrips:
+					case SettingsSystem.StrandRenderer.BuiltinLines:
+					case SettingsSystem.StrandRenderer.BuiltinStrips:
 						{
 							UpdateRendererStateBuiltin(ref strandGroupInstances[i], solverData[i]);
 						}
@@ -617,8 +655,8 @@ namespace Unity.DemoTeam.Hair
 
 		void UpdateRendererStateBuiltin(ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData)
 		{
-			ref var meshFilter = ref strandGroupInstance.sceneObjects.strandFilter;
-			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandRenderer;
+			ref var meshFilter = ref strandGroupInstance.sceneObjects.strandMeshFilter;
+			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandMeshRenderer;
 
 			ref var materialInstance = ref strandGroupInstance.sceneObjects.materialInstance;
 			ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
@@ -635,7 +673,7 @@ namespace Unity.DemoTeam.Hair
 
 			switch (settingsSystem.strandRenderer)
 			{
-				case SystemSettings.StrandRenderer.BuiltinLines:
+				case SettingsSystem.StrandRenderer.BuiltinLines:
 					{
 						if (subdivisionCount == 0)
 						{
@@ -651,7 +689,7 @@ namespace Unity.DemoTeam.Hair
 					}
 					break;
 
-				case SystemSettings.StrandRenderer.BuiltinStrips:
+				case SettingsSystem.StrandRenderer.BuiltinStrips:
 					{
 						if (subdivisionCount == 0)
 						{
@@ -706,10 +744,10 @@ namespace Unity.DemoTeam.Hair
 				materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
 				materialInstance.SetTexture("_UntypedVolumeStrandCountProbe", volumeData.volumeStrandCountProbe);
 
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SystemSettings.StrandRenderer.BuiltinLines);
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SystemSettings.StrandRenderer.BuiltinStrips);
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrand.staging);
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrand.staging);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
+				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
 			}
 			else
 			{
@@ -719,8 +757,8 @@ namespace Unity.DemoTeam.Hair
 
 		public static Bounds GetRootBounds(in GroupInstance strandGroupInstance, Matrix4x4? worldTransform = null)
 		{
-			var rootLocalBounds = strandGroupInstance.sceneObjects.rootFilter.sharedMesh.bounds;
-			var rootLocalToWorld = strandGroupInstance.sceneObjects.rootFilter.transform.localToWorldMatrix;
+			var rootLocalBounds = strandGroupInstance.sceneObjects.rootMeshFilter.sharedMesh.bounds;
+			var rootLocalToWorld = strandGroupInstance.sceneObjects.rootMeshFilter.transform.localToWorldMatrix;
 			{
 				return rootLocalBounds.WithTransform((worldTransform != null) ? (worldTransform.Value * rootLocalToWorld) : rootLocalToWorld);
 			}
@@ -734,7 +772,7 @@ namespace Unity.DemoTeam.Hair
 				return settingsSkinning.rootsAttachTargetBone.skinningBone.rotation;
 			}
 #endif
-			return strandGroupInstance.sceneObjects.rootFilter.transform.rotation;
+			return strandGroupInstance.sceneObjects.rootMeshFilter.transform.rotation;
 		}
 
 		public bool GetSimulationActive()
@@ -746,10 +784,10 @@ namespace Unity.DemoTeam.Hair
 		{
 			switch (settingsSystem.simulationRate)
 			{
-				case SystemSettings.SimulationRate.Fixed30Hz: return 1.0f / 30.0f;
-				case SystemSettings.SimulationRate.Fixed60Hz: return 1.0f / 60.0f;
-				case SystemSettings.SimulationRate.Fixed120Hz: return 1.0f / 120.0f;
-				case SystemSettings.SimulationRate.CustomTimeStep: return settingsSystem.simulationTimeStep;
+				case SettingsSystem.SimulationRate.Fixed30Hz: return 1.0f / 30.0f;
+				case SettingsSystem.SimulationRate.Fixed60Hz: return 1.0f / 60.0f;
+				case SettingsSystem.SimulationRate.Fixed120Hz: return 1.0f / 120.0f;
+				case SettingsSystem.SimulationRate.CustomTimeStep: return settingsSystem.simulationTimeStep;
 				default: return 0.0f;
 			}
 		}
@@ -779,30 +817,30 @@ namespace Unity.DemoTeam.Hair
 
 		public float GetStrandDiameter()
 		{
-			return settingsStrand.strandDiameter;
+			return settingsStrands.strandDiameter;
 		}
 
 		public float GetStrandMargin()
 		{
-			return settingsStrand.strandMargin;
+			return settingsStrands.strandMargin;
 		}
 
 		public float GetStrandScale()
 		{
-			switch (settingsStrand.strandScale)
+			switch (settingsStrands.strandScale)
 			{
 				default:
-				case StrandSettings.StrandScale.Fixed:
+				case SettingsStrands.StrandScale.Fixed:
 					{
 						return 1.0f;
 					}
-				case StrandSettings.StrandScale.UniformWorldMin:
+				case SettingsStrands.StrandScale.UniformWorldMin:
 					{
 						var lossyScaleAbs = this.transform.lossyScale.Abs();
 						var lossyScaleAbsMin = lossyScaleAbs.CMin();
 						return lossyScaleAbsMin;
 					}
-				case StrandSettings.StrandScale.UniformWorldMax:
+				case SettingsStrands.StrandScale.UniformWorldMax:
 					{
 						var lossyScaleAbs = this.transform.lossyScale.Abs();
 						var lossyScaleAbsMax = lossyScaleAbs.CMax();
@@ -815,8 +853,8 @@ namespace Unity.DemoTeam.Hair
 		{
 			var mat = null as Material;
 
-			if (mat == null && settingsStrand.material)
-				mat = settingsStrand.materialValue;
+			if (mat == null && settingsStrands.material)
+				mat = settingsStrands.materialValue;
 
 			if (mat == null)
 				mat = HairMaterialUtility.GetCurrentPipelineDefault();
@@ -884,8 +922,8 @@ namespace Unity.DemoTeam.Hair
 			// update solver roots
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				var rootMesh = strandGroupInstances[i].sceneObjects.rootFilter.sharedMesh;
-				var rootTransform = strandGroupInstances[i].sceneObjects.rootFilter.transform.localToWorldMatrix;
+				var rootMesh = strandGroupInstances[i].sceneObjects.rootMeshFilter.sharedMesh;
+				var rootTransform = strandGroupInstances[i].sceneObjects.rootMeshFilter.transform.localToWorldMatrix;
 				var strandRotation = GetRootRotation(strandGroupInstances[i]);
 
 				HairSim.PushSolverParams(cmd, ref solverData[i], settingsSolver, rootTransform, strandRotation, strandDiameter, strandScale, stepDT);
@@ -962,7 +1000,7 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				ref var strandGroupAsset = ref strandGroupInstances[i].GetAssetReference();
+				ref readonly var strandGroupAsset = ref strandGroupInstances[i].GetAssetReference();
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroupAsset.strandCount, strandGroupAsset.strandParticleCount, strandGroupAsset.lodCount);
 				{
@@ -1007,8 +1045,8 @@ namespace Unity.DemoTeam.Hair
 					// NOTE: the remaining buffers are initialized in KInitialize and KInitializePostVolume
 				}
 
-				var rootMesh = strandGroupInstances[i].sceneObjects.rootFilter.sharedMesh;
-				var rootTransform = strandGroupInstances[i].sceneObjects.rootFilter.transform.localToWorldMatrix;
+				var rootMesh = strandGroupInstances[i].sceneObjects.rootMeshFilter.sharedMesh;
+				var rootTransform = strandGroupInstances[i].sceneObjects.rootMeshFilter.transform.localToWorldMatrix;
 
 				var strandDiameter = GetStrandDiameter();
 				var strandScale = GetStrandScale();
@@ -1050,8 +1088,10 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (strandGroupInstances != null)
 			{
-				foreach (var strandGroupInstance in strandGroupInstances)
+				for (int i = 0; i != strandGroupInstances.Length; i++)
 				{
+					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
+
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
