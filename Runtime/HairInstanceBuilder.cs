@@ -82,8 +82,9 @@ namespace Unity.DemoTeam.Hair
 				{
 					ref var strandGroupInstance = ref hairInstance.strandGroupInstances[writeIndexInstance++];
 
-					strandGroupInstance.hairAsset = hairAsset;
-					strandGroupInstance.hairAssetGroupIndex = j;
+					strandGroupInstance.groupAssetReference.hairAsset = hairAsset;
+					strandGroupInstance.groupAssetReference.hairAssetGroupIndex = j;
+					strandGroupInstance.settingsIndex = -1;
 
 					var flatIndex = writeIndexInstance - 1;
 

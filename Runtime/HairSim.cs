@@ -210,10 +210,10 @@ namespace Unity.DemoTeam.Hair
 
 			[Tooltip("Constraint solver")]
 			public Method method;
-			[Range(1, 12), Tooltip("Solver substeps")]
-			public int substeps;
 			[Range(1, 100), Tooltip("Constraint iterations")]
 			public int iterations;
+			[Range(1, 12), Tooltip("Solver substeps")]
+			public int substeps;
 			[Range(0.0f, 1.0f), Tooltip("Constraint stiffness")]
 			public float stiffness;
 			[Range(1.0f, 2.0f), Tooltip("Successive-over-relaxation factor")]

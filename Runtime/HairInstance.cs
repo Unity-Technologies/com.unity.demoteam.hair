@@ -1,4 +1,4 @@
-﻿#define PENDING_CONTENT_UPGRADE
+﻿#define REMOVE_AFTER_CONTENT_UPGRADE
 
 using System;
 using System.Collections.Generic;
@@ -30,6 +30,37 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
+		public struct GroupAssetReference : IEquatable<GroupAssetReference>
+		{
+			public HairAsset hairAsset;
+			public int hairAssetGroupIndex;
+
+			public ulong GetSortKey()
+			{
+				var a = (ulong)hairAsset.GetInstanceID();
+				var b = (ulong)hairAssetGroupIndex;
+				return (a << 32) | b;
+			}
+
+			public ulong GetSortKey48()
+			{
+				var a = (ulong)hairAsset.GetInstanceID();
+				var b = (ulong)hairAssetGroupIndex & 0xffffuL;
+				return (a << 16) | b;
+			}
+
+			public ref HairAsset.StrandGroup Resolve()
+			{
+				return ref hairAsset.strandGroups[hairAssetGroupIndex];
+			}
+
+			bool IEquatable<GroupAssetReference>.Equals(GroupAssetReference other)
+			{
+				return (GetSortKey() == other.GetSortKey());
+			}
+		}
+
+		[Serializable]
 		public struct GroupInstance
 		{
 			[Serializable]
@@ -53,20 +84,28 @@ namespace Unity.DemoTeam.Hair
 				[NonSerialized] public uint meshInstanceSubdivisionCount;
 			}
 
-#if PENDING_CONTENT_UPGRADE//TODO remove after upgrading content
+#if REMOVE_AFTER_CONTENT_UPGRADE
 			public GameObject container;
 #endif
 
-			public HairAsset hairAsset;
-			public int hairAssetGroupIndex;
-
-			public int sceneObjectsIndex;
+			public GroupAssetReference groupAssetReference;
 			public SceneObjects sceneObjects;
+			public int settingsIndex;
+		}
 
-			public ref readonly HairAsset.StrandGroup GetAssetReference()
-			{
-				return ref hairAsset.strandGroups[hairAssetGroupIndex];
-			}
+		[Serializable]
+		public struct GroupSettings
+		{
+			public List<GroupAssetReference> groupAssetReferences;
+
+			public bool settingsSkinningOverride;
+			public SettingsSkinning settingsSkinning;
+
+			public bool settingsStrandsOverride;
+			public SettingsStrands settingsStrands;
+
+			public bool settingsSolverOverride;
+			public HairSim.SolverSettings settingsSolver;
 		}
 
 		[Serializable]
@@ -252,28 +291,33 @@ namespace Unity.DemoTeam.Hair
 				stagingSubdivision = 0,
 				stagingPrecision = StagingPrecision.Half,
 			};
+
+#if REMOVE_AFTER_CONTENT_UPGRADE
+			[HideInInspector] public float kLODSearchValue;
+			[HideInInspector] public bool kLODBlending;
+			[HideInInspector] public SettingsSystem.StrandRenderer strandRenderer;
+			[HideInInspector] public ShadowCastingMode strandShadows;
+			[HideInInspector] public int strandLayers;
+			[HideInInspector] public MotionVectorGenerationMode motionVectors;
+			[HideInInspector] public bool simulation;
+			[HideInInspector] public SettingsSystem.SimulationRate simulationRate;
+			[HideInInspector] public bool simulationInEditor;
+			[HideInInspector] public float simulationTimeStep;
+			[HideInInspector] public bool stepsMin;
+			[HideInInspector] public int stepsMinValue;
+			[HideInInspector] public bool stepsMax;
+			[HideInInspector] public int stepsMaxValue;
+#endif
 		}
 
-		[Serializable]
-		public struct SettingsBlock
-		{
-			public bool settingsSkinningOverride;
-			public SettingsSkinning settingsSkinning;
-
-			public bool settingsStrandsOverride;
-			public SettingsStrands settingsStrands;
-
-			public bool settingsSolverOverride;
-			public HairSim.SolverSettings settingsSolver;
-		}
-
-#if PENDING_CONTENT_UPGRADE//TODO remove after upgrading content
+#if REMOVE_AFTER_CONTENT_UPGRADE
 		[SerializeField, HideInInspector] private HairAsset hairAsset;
 		[SerializeField, HideInInspector] private bool hairAssetQuickEdit;
 #endif
 
 		public GroupProvider[] strandGroupProviders = new GroupProvider[1];
 		public GroupInstance[] strandGroupInstances;
+		public GroupSettings[] strandGroupSettings;
 		public string[] strandGroupChecksums;// stores checksums of providers for instantiated groups
 
 		public SettingsSystem settingsSystem = SettingsSystem.defaults;					// per instance
@@ -299,6 +343,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			UpdateStrandGroupInstances();
 			UpdateStrandGroupHideFlags();
+			UpdateStrandGroupSettings();
 
 			s_instances.Add(this);
 		}
@@ -317,61 +362,61 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDrawGizmos()
 		{
-			if (strandGroupInstances != null)
-			{
-				// volume bounds
-				Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
-				Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData), 2.0f * HairSim.GetVolumeExtent(volumeData));
+			if (strandGroupInstances == null)
+				return;
 
-				// volume gravity
-				for (int i = 0; i != solverData.Length; i++)
-				{
-					Gizmos.color = Color.cyan;
-					Gizmos.DrawRay(HairSim.GetVolumeCenter(volumeData), solverData[i].cbuffer._WorldGravity * 0.1f);
-				}
+			// volume bounds
+			Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
+			Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData), 2.0f * HairSim.GetVolumeExtent(volumeData));
+
+			// volume gravity
+			for (int i = 0; i != solverData.Length; i++)
+			{
+				Gizmos.color = Color.cyan;
+				Gizmos.DrawRay(HairSim.GetVolumeCenter(volumeData), solverData[i].cbuffer._WorldGravity * 0.1f);
 			}
 		}
 
 		void OnDrawGizmosSelected()
 		{
-			if (strandGroupInstances != null)
+			if (strandGroupInstances == null)
+				return;
+
+			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				for (int i = 0; i != strandGroupInstances.Length; i++)
+				ref readonly var strandGroupInstance = ref strandGroupInstances[i];
+
+				// root bounds
+				var rootMeshFilter = strandGroupInstance.sceneObjects.rootMeshFilter;
+				if (rootMeshFilter != null)
 				{
-					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
-
-					// root bounds
-					var rootFilter = strandGroupInstance.sceneObjects.rootMeshFilter;
-					if (rootFilter != null)
+					var rootMesh = rootMeshFilter.sharedMesh;
+					if (rootMesh != null)
 					{
-						var rootMesh = rootFilter.sharedMesh;
-						if (rootMesh != null)
-						{
-							var rootBounds = rootMesh.bounds;
+						var rootBounds = rootMesh.bounds;
 
-							Gizmos.color = Color.Lerp(Color.blue, Color.clear, 0.5f);
-							Gizmos.matrix = rootFilter.transform.localToWorldMatrix;
-							Gizmos.DrawWireCube(rootBounds.center, rootBounds.size);
-						}
+						Gizmos.color = Color.Lerp(Color.blue, Color.clear, 0.5f);
+						Gizmos.matrix = rootMeshFilter.transform.localToWorldMatrix;
+						Gizmos.DrawWireCube(rootBounds.center, rootBounds.size);
 					}
+				}
 
 #if false
-					// strand bounds
-					var strandFilter = strandGroupInstance.sceneObjects.strandFilter;
-					if (strandFilter != null)
+				// strand bounds
+				var strandMeshFilter = strandGroupInstance.sceneObjects.strandMeshFilter;
+				if (strandMeshFilter != null)
+				{
+					var strandMesh = strandMeshFilter.sharedMesh;
+					if (strandMesh != null)
 					{
-						var strandMesh = strandFilter.sharedMesh;
-						if (strandMesh != null)
-						{
-							var strandBounds = strandMesh.bounds;
+						var strandBounds = strandMesh.bounds;
 
-							Gizmos.color = Color.Lerp(Color.green, Color.clear, 0.5f);
-							Gizmos.matrix = rootFilter.transform.localToWorldMatrix;
-							Gizmos.DrawWireCube(strandBounds.center, strandBounds.size);
-						}
+						Gizmos.color = Color.Lerp(Color.green, Color.clear, 0.5f);
+						Gizmos.matrix = rootMeshFilter.transform.localToWorldMatrix;
+						Gizmos.DrawWireCube(strandBounds.center, strandBounds.size);
 					}
-#endif
 				}
+#endif
 			}
 		}
 
@@ -446,23 +491,14 @@ namespace Unity.DemoTeam.Hair
 
 		void UpdateStrandGroupInstances()
 		{
-#if PENDING_CONTENT_UPGRADE//TODO remove after upgrading content
+			var status = CheckStrandGroupInstances();
+
+#if REMOVE_AFTER_CONTENT_UPGRADE
 			if (hairAsset != null)
 			{
-				CoreUtils.Destroy(strandGroupInstances?[0].container);
-
-				strandGroupProviders = new GroupProvider[1];
-				strandGroupProviders[0].hairAsset = hairAsset;
-				strandGroupProviders[0].hairAssetQuickEdit = hairAssetQuickEdit;
-				strandGroupInstances = null;
-				strandGroupChecksums = null;
-
-				hairAsset = null;
-				hairAssetQuickEdit = false;
+				status = StrandGroupInstancesStatus.RequireRebuild;
 			}
 #endif
-
-			var status = CheckStrandGroupInstances();
 
 #if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
@@ -508,6 +544,38 @@ namespace Unity.DemoTeam.Hair
 			}
 #endif
 
+#if REMOVE_AFTER_CONTENT_UPGRADE
+			if (hairAsset != null)
+			{
+				settingsSystem.kLODSearchValue = settingsStrands.kLODSearchValue;
+				settingsSystem.kLODBlending = settingsStrands.kLODBlending;
+				settingsSystem.strandRenderer = settingsStrands.strandRenderer;
+				settingsSystem.strandShadows = settingsStrands.strandShadows;
+				settingsSystem.strandLayers = settingsStrands.strandLayers;
+				settingsSystem.motionVectors = settingsStrands.motionVectors;
+				settingsSystem.simulation = settingsStrands.simulation;
+				settingsSystem.simulationRate = settingsStrands.simulationRate;
+				settingsSystem.simulationInEditor = settingsStrands.simulationInEditor;
+				settingsSystem.simulationTimeStep = settingsStrands.simulationTimeStep;
+				settingsSystem.stepsMin = settingsStrands.stepsMin;
+				settingsSystem.stepsMinValue = settingsStrands.stepsMinValue;
+				settingsSystem.stepsMax = settingsStrands.stepsMax;
+				settingsSystem.stepsMaxValue = settingsStrands.stepsMaxValue;
+
+				CoreUtils.Destroy(strandGroupInstances?[0].container);
+
+				strandGroupProviders = new GroupProvider[1];
+				strandGroupProviders[0].hairAsset = hairAsset;
+				strandGroupProviders[0].hairAssetQuickEdit = hairAssetQuickEdit;
+				strandGroupInstances = null;
+				strandGroupChecksums = null;
+				strandGroupSettings = null;
+
+				hairAsset = null;
+				hairAssetQuickEdit = false;
+			}
+#endif
+
 			switch (status)
 			{
 				case StrandGroupInstancesStatus.RequireRebuild:
@@ -537,17 +605,140 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		void UpdateStrandGroupSettings()
+		{
+			if (strandGroupInstances == null)
+				return;
+			if (strandGroupSettings == null)
+				return;
+
+			// remove duplicate references (meaning only one settings block can affect instances of a particular group asset)
+			{
+				var groupAssetKeyCapacity = 0;
+				{
+					for (int i = 0; i != strandGroupSettings.Length; i++)
+					{
+						groupAssetKeyCapacity += strandGroupSettings[i].groupAssetReferences.Count;
+					}
+				}
+
+				using (var groupAssetKeys = new UnsafeHashSet<ulong>(groupAssetKeyCapacity, Allocator.Temp))
+				{
+					for (int i = 0; i != strandGroupSettings.Length; i++)
+					{
+						var groupAssetReferences = strandGroupSettings[i].groupAssetReferences;
+
+						for (int j = groupAssetReferences.Count - 1; j >= 0; j--)
+						{
+							var groupAssetKey = groupAssetReferences[j].GetSortKey();
+							if (groupAssetKeys.Contains(groupAssetKey) == false)
+							{
+								groupAssetKeys.Add(groupAssetKey);
+							}
+							else
+							{
+								groupAssetReferences.RemoveAtSwapBack(j);
+							}
+						}
+					}
+				}
+			}
+
+			// map settings to group instances
+#if false
+			using (var groupAssetInstancesMap = new UnsafeMultiHashMap<ulong, int>(strandGroupInstances.Length, Allocator.Temp))
+			{
+				for (int i = 0; i != strandGroupInstances.Length; i++)
+				{
+					groupAssetInstancesMap.Add(strandGroupInstances[i].groupAssetReference.GetSortKey(), i);
+				}
+
+				for (int i = 0; i != strandGroupSettings.Length; i++)
+				{
+					foreach (var groupAssetReference in strandGroupSettings[i].groupAssetReferences)
+					{
+						var groupAssetKey = groupAssetReference.GetSortKey();
+						if (groupAssetInstancesMap.TryGetFirstValue(groupAssetKey, out var j, out var iterator))
+						{
+							do { strandGroupInstances[j].settingsIndex = i; }
+							while (groupAssetInstancesMap.TryGetNextValue(out j, ref iterator));
+						}
+					}
+				}
+			}
+#else		// alt. path without multihashmap
+			unsafe
+			{
+				using (var sortedGroupInstances = new NativeArray<ulong>(strandGroupInstances.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				{
+					var sortedGroupInstancesPtr = (ulong*)sortedGroupInstances.GetUnsafePtr();
+
+					for (int i = 0; i != strandGroupInstances.Length; i++)
+					{
+						var groupAssetKey = (strandGroupInstances[i].groupAssetReference.GetSortKey48() << 16);
+						{
+							sortedGroupInstancesPtr[i] = groupAssetKey | ((ulong)i & 0xffffuL);
+						}
+					}
+
+					sortedGroupInstances.Sort();
+
+					for (int i = 0; i != strandGroupSettings.Length; i++)
+					{
+						foreach (var groupAssetReference in strandGroupSettings[i].groupAssetReferences)
+						{
+							var groupAssetKey = groupAssetReference.GetSortKey48() << 16;
+							var groupAssetMask = (~0uL) << 16;
+
+							var j = sortedGroupInstances.BinarySearch(groupAssetKey);
+							if (j < 0)
+								j = ~j;
+
+							while (j < sortedGroupInstances.Length)
+							{
+								if ((sortedGroupInstancesPtr[j] & groupAssetMask) != groupAssetKey)
+									break;
+
+								strandGroupInstances[sortedGroupInstancesPtr[j++] & 0xffffuL].settingsIndex = i;
+							}
+						}
+					}
+				}
+			}
+#endif
+		}
+
+		public void AssignStrandGroupSettings(int instanceIndex, int settingsIndex)
+		{
+			if (strandGroupInstances == null || strandGroupInstances.Length <= instanceIndex)
+				return;
+			if (strandGroupSettings == null || strandGroupSettings.Length <= settingsIndex)
+				return;
+
+			ref var groupInstance = ref strandGroupInstances[instanceIndex];
+			ref var groupAssetReference = ref groupInstance.groupAssetReference;
+
+			strandGroupSettings[groupInstance.settingsIndex].groupAssetReferences.Remove(groupAssetReference);
+			groupInstance.settingsIndex = -1;
+
+			if (settingsIndex >= 0)
+			{
+				strandGroupSettings[settingsIndex].groupAssetReferences.Add(groupAssetReference);
+				groupInstance.settingsIndex = settingsIndex;
+			}
+		}
+
 		void UpdateAttachedState()
 		{
 			if (strandGroupInstances == null)
 				return;
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-	#if UNITY_EDITOR
+#if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
 				return;
-	#endif
+#endif
 
 			var attachmentsChanged = false;
 			{
@@ -580,9 +771,9 @@ namespace Unity.DemoTeam.Hair
 			{
 				settingsSkinning.rootsAttachTarget.CommitSubjectsIfRequired();
 				settingsSkinning.rootsAttachTargetBone = new PrimarySkinningBone(settingsSkinning.rootsAttachTarget.transform);
-	#if UNITY_EDITOR
+#if UNITY_EDITOR
 				UnityEditor.EditorUtility.SetDirty(settingsSkinning.rootsAttachTarget);
-	#endif
+#endif
 			}
 #endif
 		}
@@ -677,7 +868,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						if (subdivisionCount == 0)
 						{
-							HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroupInstance.GetAssetReference().meshAssetLines, HideFlags.HideAndDontSave);
+							HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroupInstance.groupAssetReference.Resolve().meshAssetLines, HideFlags.HideAndDontSave);
 						}
 						else
 						{
@@ -693,7 +884,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						if (subdivisionCount == 0)
 						{
-							HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, strandGroupInstance.GetAssetReference().meshAssetStrips, HideFlags.HideAndDontSave);
+							HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, strandGroupInstance.groupAssetReference.Resolve().meshAssetStrips, HideFlags.HideAndDontSave);
 						}
 						else
 						{
@@ -798,12 +989,12 @@ namespace Unity.DemoTeam.Hair
 
 			var strandScale = GetStrandScale();
 			var rootBounds = GetRootBounds(strandGroupInstances[0], worldToLocalTransform);
-			var rootMargin = strandGroupInstances[0].GetAssetReference().maxStrandLength * strandScale;
+			var rootMargin = strandGroupInstances[0].groupAssetReference.Resolve().maxStrandLength * strandScale;
 
 			for (int i = 1; i != strandGroupInstances.Length; i++)
 			{
 				rootBounds.Encapsulate(GetRootBounds(strandGroupInstances[i], worldToLocalTransform));
-				rootMargin = Mathf.Max(strandGroupInstances[i].GetAssetReference().maxStrandLength * strandScale, rootMargin);
+				rootMargin = Mathf.Max(strandGroupInstances[i].groupAssetReference.Resolve().maxStrandLength * strandScale, rootMargin);
 			}
 
 			rootMargin *= 1.25f;
@@ -989,10 +1180,11 @@ namespace Unity.DemoTeam.Hair
 			HairSim.PrepareVolumeData(ref volumeData, settingsVolume);
 
 			volumeData.allGroupsMaxParticleInterval = 0.0f;
-
-			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				volumeData.allGroupsMaxParticleInterval = Mathf.Max(volumeData.allGroupsMaxParticleInterval, strandGroupInstances[i].GetAssetReference().maxParticleInterval);
+				for (int i = 0; i != strandGroupInstances.Length; i++)
+				{
+					volumeData.allGroupsMaxParticleInterval = Mathf.Max(volumeData.allGroupsMaxParticleInterval, strandGroupInstances[i].groupAssetReference.Resolve().maxParticleInterval);
+				}
 			}
 
 			// init solver data
@@ -1000,7 +1192,7 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				ref readonly var strandGroupAsset = ref strandGroupInstances[i].GetAssetReference();
+				ref readonly var strandGroupAsset = ref strandGroupInstances[i].groupAssetReference.Resolve();
 
 				HairSim.PrepareSolverData(ref solverData[i], strandGroupAsset.strandCount, strandGroupAsset.strandParticleCount, strandGroupAsset.lodCount);
 				{
