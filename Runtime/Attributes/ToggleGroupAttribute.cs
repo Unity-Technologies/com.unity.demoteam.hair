@@ -148,9 +148,24 @@ namespace Unity.DemoTeam.Hair
 				var field = type.GetField(path.Substring(start, delim - start));
 				if (field != null)
 				{
-					type = field.FieldType;
-					start = delim + 1;
-					delim = path.IndexOf('.', start);
+					if (field.FieldType.IsArray)
+					{
+						type = field.FieldType.GetElementType();
+						// skip the array section of the property path
+						// e.g. foo.Array.data[0].bar
+						//         '--- skip ---> ###
+						for (int i = 0; i != 3; i++)
+						{
+							start = delim + 1;
+							delim = path.IndexOf('.', start);
+						}
+					}
+					else
+					{
+						type = field.FieldType;
+						start = delim + 1;
+						delim = path.IndexOf('.', start);
+					}
 				}
 				else
 				{

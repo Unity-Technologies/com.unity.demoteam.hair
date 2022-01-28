@@ -15,9 +15,11 @@ namespace Unity.DemoTeam.Hair
 		Dictionary<HairAsset, Editor> hairAssetEditorMap = new Dictionary<HairAsset, Editor>(1);
 
 		SerializedProperty _strandGroupProviders;
+		SerializedProperty _strandGroupSettings;
 
 		SerializedProperty _settingsSystem;
 
+		SerializedProperty _settingsExpanded;
 		SerializedProperty _settingsSkinning;
 		SerializedProperty _settingsStrands;
 		SerializedProperty _settingsSolver;
@@ -28,9 +30,11 @@ namespace Unity.DemoTeam.Hair
 		void OnEnable()
 		{
 			_strandGroupProviders = serializedObject.FindProperty(nameof(HairInstance.strandGroupProviders));
+			_strandGroupSettings = serializedObject.FindProperty(nameof(HairInstance.strandGroupSettings));
 
 			_settingsSystem = serializedObject.FindProperty(nameof(HairInstance.settingsSystem));
 
+			_settingsExpanded = serializedObject.FindProperty(nameof(HairInstance.settingsExpanded));
 			_settingsSkinning = serializedObject.FindProperty(nameof(HairInstance.settingsSkinning));
 			_settingsStrands = serializedObject.FindProperty(nameof(HairInstance.settingsStrands));
 			_settingsSolver = serializedObject.FindProperty(nameof(HairInstance.settingsSolver));
@@ -98,21 +102,7 @@ namespace Unity.DemoTeam.Hair
 				EditorGUILayout.LabelField("Strand Settings", EditorStyles.centeredGreyMiniLabel);
 				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 				{
-					EditorGUILayout.BeginHorizontal();
-					{
-						GUILayout.Toggle(true, ". . .", EditorStyles.miniButton, GUILayout.Width(30.0f));
-						EditorGUILayout.LabelField("Default (All Groups)", EditorStyles.objectField);
-					}
-					EditorGUILayout.EndHorizontal();
-					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
-					{
-						DrawStrandSettingsGUI();
-					}
-					EditorGUILayout.EndVertical();
-					using (new EditorGUI.DisabledScope(true))
-					{
-						GUILayout.Button("Add settings block ...");
-					}
+					DrawStrandSettingsGUI();
 				}
 				EditorGUILayout.EndVertical();
 
@@ -227,7 +217,7 @@ namespace Unity.DemoTeam.Hair
 
 							if (multipleAssets)//TODO considering: using (new EditorGUI.DisabledScope(multipleAssets == false))
 							{
-								property_delete = GUILayout.Button("-", GUILayout.Width(widthSymbol));
+								property_delete = GUILayout.Button("-", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 							}
 						}
 						EditorGUILayout.EndHorizontal();
@@ -235,7 +225,7 @@ namespace Unity.DemoTeam.Hair
 						if (property_delete)
 						{
 							_strandGroupProviders.DeleteArrayElementAtIndex(i--);
-							continue;
+							break;
 						}
 
 						if (property_hairAssetQuickEdit.boolValue)
@@ -275,6 +265,7 @@ namespace Unity.DemoTeam.Hair
 
 						if (countNext == hairInstance.strandGroupProviders.Length)
 						{
+							// write zero element to get rid of default duplicate of previous element
 							hairInstance.strandGroupProviders[countNext - 1] = new HairInstance.GroupProvider();
 						}
 					}
@@ -314,55 +305,58 @@ namespace Unity.DemoTeam.Hair
 			{
 				StructPropertyFieldsWithHeader(_settingsSystem, ValidationGUISystem, hairInstance);
 
-				using (new EditorGUI.IndentLevelScope())
+				//if (_settingsSystem.isExpanded)
 				{
-					var rect = GUILayoutUtility.GetRect(0.0f, EditorGUIUtility.singleLineHeight, GUILayout.ExpandWidth(true));
+					using (new EditorGUI.IndentLevelScope())
 					{
-						rect = EditorGUI.PrefixLabel(rect, new GUIContent("Steps Status"));
-					}
-
-					if (rect.Contains(Event.current.mousePosition) && Event.current.type == EventType.MouseDown)
-					{
-						s_indicator = !s_indicator;
-					}
-
-					if (s_indicator)
-					{
-						var stepsMin = hairInstance.settingsSystem.stepsMin ? hairInstance.settingsSystem.stepsMinValue : 0;
-						var stepsMax = hairInstance.settingsSystem.stepsMax ? hairInstance.settingsSystem.stepsMaxValue : (int)Mathf.Ceil(hairInstance.stepsLastFrameSmooth);
-						if (stepsMax == 0)
-							stepsMax = 1;
-
-						var stepDT = hairInstance.GetSimulationTimeStep();
-						var stepCount = hairInstance.stepsLastFrameSmooth;
-
-						var rectWidth = rect.width;
-						var rectWidthStep = rectWidth / stepsMax;
-						var rectWidthCount = Mathf.Min(rectWidth, rectWidthStep * stepCount);
-
-						rect.width = rectWidthCount;
+						var rect = GUILayoutUtility.GetRect(0.0f, EditorGUIUtility.singleLineHeight, GUILayout.ExpandWidth(true));
 						{
-							using (new ColorScope(hairInstance.stepsLastFrameSkipped > 0 ? Color.red : Color.green, ColorScope.Type.Color))
-							{
-								EditorGUI.HelpBox(rect, string.Empty, MessageType.None);
-							}
+							rect = EditorGUI.PrefixLabel(rect, new GUIContent("Steps Status"));
 						}
 
-						rect.width = rectWidthStep;
+						if (rect.Contains(Event.current.mousePosition) && Event.current.type == EventType.MouseDown)
 						{
-							var text = stepDT.ToString();
-							for (int i = 0; i != stepsMax; i++)
-							{
-								EditorGUI.HelpBox(rect, text, MessageType.None);
-								rect.x += rectWidthStep;
-							}
+							s_indicator = !s_indicator;
 						}
 
-						EditorUtility.SetDirty(hairInstance);
-					}
-					else
-					{
-						EditorGUI.HelpBox(rect, "Click to toggle indicator.", MessageType.None);
+						if (s_indicator)
+						{
+							var stepsMin = hairInstance.settingsSystem.stepsMin ? hairInstance.settingsSystem.stepsMinValue : 0;
+							var stepsMax = hairInstance.settingsSystem.stepsMax ? hairInstance.settingsSystem.stepsMaxValue : (int)Mathf.Ceil(hairInstance.stepsLastFrameSmooth);
+							if (stepsMax == 0)
+								stepsMax = 1;
+
+							var stepDT = hairInstance.GetSimulationTimeStep();
+							var stepCount = hairInstance.stepsLastFrameSmooth;
+
+							var rectWidth = rect.width;
+							var rectWidthStep = rectWidth / stepsMax;
+							var rectWidthCount = Mathf.Min(rectWidth, rectWidthStep * stepCount);
+
+							rect.width = rectWidthCount;
+							{
+								using (new ColorScope(hairInstance.stepsLastFrameSkipped > 0 ? Color.red : Color.green, ColorScope.Type.Color))
+								{
+									EditorGUI.HelpBox(rect, string.Empty, MessageType.None);
+								}
+							}
+
+							rect.width = rectWidthStep;
+							{
+								var text = stepDT.ToString();
+								for (int i = 0; i != stepsMax; i++)
+								{
+									EditorGUI.HelpBox(rect, text, MessageType.None);
+									rect.x += rectWidthStep;
+								}
+							}
+
+							EditorUtility.SetDirty(hairInstance);
+						}
+						else
+						{
+							EditorGUI.HelpBox(rect, "Click to toggle indicator.", MessageType.None);
+						}
 					}
 				}
 			}
@@ -379,16 +373,124 @@ namespace Unity.DemoTeam.Hair
 			if (hairInstance == null)
 				return;
 
+			const float widthSymbol = 30.0f;
+
 			EditorGUI.BeginChangeCheck();
 			{
-				using (new GovernedByPrefabScope(hairInstance))
+				EditorGUILayout.BeginHorizontal();
 				{
-					StructPropertyFieldsWithHeader(_settingsSkinning, ValidationGUISkinning, hairInstance);
+					_settingsExpanded.boolValue = GUILayout.Toggle(_settingsExpanded.boolValue, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+					EditorGUILayout.LabelField("Defaults (All Groups)", EditorStyles.textArea);
 				}
-				EditorGUILayout.Space();
-				StructPropertyFieldsWithHeader(_settingsStrands, ValidationGUIStrands, hairInstance);
-				EditorGUILayout.Space();
-				StructPropertyFieldsWithHeader(_settingsSolver, ValidationGUISolver, hairInstance);
+				EditorGUILayout.EndHorizontal();
+
+				if (_settingsExpanded.boolValue)
+				{
+					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+					{
+						using (new GovernedByPrefabScope(hairInstance))
+						{
+							StructPropertyFieldsWithHeader(_settingsSkinning, ValidationGUISkinning, hairInstance);
+						}
+						EditorGUILayout.Space();
+						StructPropertyFieldsWithHeader(_settingsStrands, ValidationGUIStrands, hairInstance);
+						EditorGUILayout.Space();
+						StructPropertyFieldsWithHeader(_settingsSolver, ValidationGUISolver, hairInstance);
+					}
+					EditorGUILayout.EndVertical();
+				}
+
+				for (int i = 0; i != _strandGroupSettings.arraySize; i++)
+				{
+					var property = _strandGroupSettings.GetArrayElementAtIndex(i);
+					var property_groupAssetReferences = property.FindPropertyRelative("groupAssetReferences");
+					var property_settingsSkinning = property.FindPropertyRelative("settingsSkinning");
+					var property_settingsStrands = property.FindPropertyRelative("settingsStrands");
+					var property_settingsSolver = property.FindPropertyRelative("settingsSolver");
+					var property_delete = false;
+
+					EditorGUILayout.BeginHorizontal();
+					{
+						property.isExpanded = GUILayout.Toggle(property.isExpanded, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+
+						var assetCount = property_groupAssetReferences.arraySize;
+						{
+							EditorGUILayout.LabelField("Overrides (" + assetCount + (assetCount == 1 ? " Group Asset)" : " Group Assets)"), EditorStyles.textArea);
+						}
+
+						var strandGroupInstances = hairInstance.strandGroupInstances;
+						if (strandGroupInstances != null && strandGroupInstances.Length > 0)
+						{
+							for (int j = 0; j != strandGroupInstances.Length; j++)
+							{
+								var groupLabel = "Grp." + j;
+								var groupAssigned = (strandGroupInstances[j].settingsIndex == i);
+								if (groupAssigned)
+								{
+									using (new ColorScope(Color.green, ColorScope.Type.BackgroundColor))
+									{
+										if (GUILayout.Toggle(true, groupLabel, EditorStyles.miniButton, GUILayout.ExpandWidth(false)) == false)
+										{
+											hairInstance.AssignStrandGroupSettings(-1, j);
+										}
+									}
+								}
+								else
+								{
+									using (new ColorScope(Color.Lerp(Color.white, Color.grey, 0.5f), ColorScope.Type.ContentColor))
+									{
+										if (GUILayout.Toggle(false, groupLabel, EditorStyles.miniButton, GUILayout.ExpandWidth(false)))
+										{
+											hairInstance.AssignStrandGroupSettings(i, j);
+										}
+									}
+								}
+							}
+						}
+
+						if (true)
+						{
+							property_delete = GUILayout.Button("-", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+						}
+					}
+					EditorGUILayout.EndHorizontal();
+
+					if (property_delete)
+					{
+						_strandGroupSettings.DeleteArrayElementAtIndex(i--);
+						break;
+					}
+
+					if (property.isExpanded)
+					{
+						EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+						{
+							using (new GovernedByPrefabScope(hairInstance))
+							{
+								StructPropertyFieldsWithHeader(property_settingsSkinning, ValidationGUISkinning, hairInstance);
+							}
+							EditorGUILayout.Space();
+							StructPropertyFieldsWithHeader(property_settingsStrands, ValidationGUIStrands, hairInstance);
+							EditorGUILayout.Space();
+							StructPropertyFieldsWithHeader(property_settingsSolver, ValidationGUISolver, hairInstance);
+						}
+						EditorGUILayout.EndVertical();
+					}
+				}
+
+				if (GUILayout.Button("Add settings block ..."))
+				{
+					var countPrev = _strandGroupSettings.arraySize;
+					var countNext = countPrev + 1;
+
+					_strandGroupSettings.arraySize = countNext;
+					serializedObject.ApplyModifiedProperties();
+
+					if (countNext == hairInstance.strandGroupSettings.Length)
+					{
+						hairInstance.strandGroupSettings[countNext - 1] = HairInstance.GroupSettings.defaults;
+					}
+				}
 			}
 
 			if (EditorGUI.EndChangeCheck())

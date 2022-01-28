@@ -263,7 +263,7 @@ namespace Unity.DemoTeam.Hair
 							var placementType = (HairAsset.SettingsProcedural.PlacementType)_settingsProcedural_placement.enumValueIndex;
 							if (placementType == HairAsset.SettingsProcedural.PlacementType.Custom && hairAsset.settingsProcedural.placementProvider is HairAssetProvider)
 							{
-								Editor.CreateCachedEditor(hairAsset.settingsProcedural.placementProvider, editorType: null, ref rootGeneratorEditor);
+								CreateCachedEditor(hairAsset.settingsProcedural.placementProvider, editorType: null, ref rootGeneratorEditor);
 								EditorGUILayout.Space();
 								EditorGUILayout.LabelField("Settings Procedural Placement", EditorStyles.miniBoldLabel);
 								using (new EditorGUI.IndentLevelScope())

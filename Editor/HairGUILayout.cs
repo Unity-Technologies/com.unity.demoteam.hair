@@ -15,25 +15,17 @@ namespace Unity.DemoTeam.Hair
 
 		public static void StructPropertyFields(SerializedProperty property)
 		{
-			if (property.hasChildren)
+			var propertyIt = property.Copy();
+			var propertyEnd = property.Copy();
+
+			propertyEnd.Next(enterChildren: false);
+
+			for (int i = 0; propertyIt.NextVisible(enterChildren: i == 0); i++)
 			{
-				var nextSibling = property.Copy();
-				var nextChild = property.Copy();
+				if (SerializedProperty.EqualContents(propertyIt, propertyEnd))
+					break;
 
-				nextSibling.Next(enterChildren: false);
-
-				if (nextChild.NextVisible(enterChildren: true))
-				{
-					EditorGUILayout.PropertyField(nextChild, includeChildren: true);
-
-					while (nextChild.NextVisible(enterChildren: false))
-					{
-						if (SerializedProperty.EqualContents(nextSibling, nextChild))
-							break;
-
-						EditorGUILayout.PropertyField(nextChild, includeChildren: true);
-					}
-				}
+				EditorGUILayout.PropertyField(propertyIt, includeChildren: true);
 			}
 		}
 
@@ -48,11 +40,23 @@ namespace Unity.DemoTeam.Hair
 
 		public static void StructPropertyFieldsWithHeader(SerializedProperty property, string label, StructValidationGUI validationGUI = null, object validationUserData = null)
 		{
+#if false
+			var expanded = EditorGUILayout.Foldout(property.isExpanded, label, toggleOnLabelClick: true, HairGUIStyles.settingsFoldout);
+			if (expanded)
+			{
+				using (new EditorGUI.IndentLevelScope())
+				{
+					StructPropertyFields(property, validationGUI, validationUserData);
+				}
+			}
+			property.isExpanded = expanded;//TODO changecheck
+#else
 			EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
 			using (new EditorGUI.IndentLevelScope())
 			{
 				StructPropertyFields(property, validationGUI, validationUserData);
 			}
+#endif
 		}
 
 		public static void StructPropertyFieldsWithHeader(SerializedProperty property, StructValidationGUI validationGUI = null, object validationUserData = null)

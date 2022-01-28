@@ -106,6 +106,20 @@ namespace Unity.DemoTeam.Hair
 
 			public bool settingsSolverOverride;
 			public HairSim.SolverSettings settingsSolver;
+
+			public static GroupSettings defaults => new GroupSettings()
+			{
+				groupAssetReferences = new List<GroupAssetReference>(1),
+
+				settingsSkinningOverride = true,
+				settingsSkinning = SettingsSkinning.defaults,
+
+				settingsStrandsOverride = true,
+				settingsStrands = SettingsStrands.defaults,
+
+				settingsSolverOverride = true,
+				settingsSolver = HairSim.SolverSettings.defaults,
+			};
 		}
 
 		[Serializable]
@@ -321,6 +335,7 @@ namespace Unity.DemoTeam.Hair
 		public string[] strandGroupChecksums;// stores checksums of providers for instantiated groups
 
 		public SettingsSystem settingsSystem = SettingsSystem.defaults;					// per instance
+		public bool settingsExpanded = true;
 		[FormerlySerializedAs("settingsRoots")]
 		public SettingsSkinning settingsSkinning = SettingsSkinning.defaults;			// per group
 		public SettingsStrands settingsStrands = SettingsStrands.defaults;				// per group
@@ -423,6 +438,7 @@ namespace Unity.DemoTeam.Hair
 		void Update()
 		{
 			UpdateStrandGroupInstances();
+			UpdateStrandGroupSettings();
 			UpdateAttachedState();
 		}
 
@@ -607,9 +623,9 @@ namespace Unity.DemoTeam.Hair
 
 		void UpdateStrandGroupSettings()
 		{
-			if (strandGroupInstances == null)
-				return;
 			if (strandGroupSettings == null)
+				return;
+			if (strandGroupInstances == null)
 				return;
 
 			// remove duplicate references (meaning only one settings block can affect instances of a particular group asset)
@@ -645,12 +661,13 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// map settings to group instances
-#if false
+#if true
 			using (var groupAssetInstancesMap = new UnsafeMultiHashMap<ulong, int>(strandGroupInstances.Length, Allocator.Temp))
 			{
 				for (int i = 0; i != strandGroupInstances.Length; i++)
 				{
 					groupAssetInstancesMap.Add(strandGroupInstances[i].groupAssetReference.GetSortKey(), i);
+					strandGroupInstances[i].settingsIndex = -1;
 				}
 
 				for (int i = 0; i != strandGroupSettings.Length; i++)
@@ -708,17 +725,22 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
-		public void AssignStrandGroupSettings(int instanceIndex, int settingsIndex)
+		public void AssignStrandGroupSettings(int settingsIndex, int instanceIndex)
 		{
-			if (strandGroupInstances == null || strandGroupInstances.Length <= instanceIndex)
-				return;
 			if (strandGroupSettings == null || strandGroupSettings.Length <= settingsIndex)
+				return;
+			if (strandGroupInstances == null || strandGroupInstances.Length <= instanceIndex)
 				return;
 
 			ref var groupInstance = ref strandGroupInstances[instanceIndex];
 			ref var groupAssetReference = ref groupInstance.groupAssetReference;
 
-			strandGroupSettings[groupInstance.settingsIndex].groupAssetReferences.Remove(groupAssetReference);
+			var prevSettingsIndex = groupInstance.settingsIndex;
+			if (prevSettingsIndex >= 0 && prevSettingsIndex < strandGroupSettings.Length)
+			{
+				strandGroupSettings[prevSettingsIndex].groupAssetReferences.Remove(groupAssetReference);
+			}
+
 			groupInstance.settingsIndex = -1;
 
 			if (settingsIndex >= 0)
@@ -726,6 +748,8 @@ namespace Unity.DemoTeam.Hair
 				strandGroupSettings[settingsIndex].groupAssetReferences.Add(groupAssetReference);
 				groupInstance.settingsIndex = settingsIndex;
 			}
+
+			UpdateStrandGroupSettings();
 		}
 
 		void UpdateAttachedState()

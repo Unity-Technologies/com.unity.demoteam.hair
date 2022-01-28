@@ -6,6 +6,7 @@ namespace Unity.DemoTeam.Hair
 	public static partial class HairGUIStyles
 	{
 		public static readonly GUIStyle settingsBox;
+		public static readonly GUIStyle settingsFoldout;
 
 		public static readonly GUIStyle statusBox;
 		public static readonly GUIStyle statusBoxVertical;
@@ -13,6 +14,13 @@ namespace Unity.DemoTeam.Hair
 		static HairGUIStyles()
 		{
 			settingsBox = new GUIStyle(EditorStyles.helpBox);
+
+			settingsFoldout = new GUIStyle(EditorStyles.foldout);
+			settingsFoldout.margin.left += 9;
+			settingsFoldout.padding.left += 1;
+			settingsFoldout.font = EditorStyles.miniBoldLabel.font;
+			settingsFoldout.fontSize = EditorStyles.miniBoldLabel.fontSize;
+			settingsFoldout.fontStyle = EditorStyles.miniBoldLabel.fontStyle;
 
 			statusBox = new GUIStyle(GUI.skin.box);
 			statusBox.normal.textColor = statusBox.hover.textColor;
