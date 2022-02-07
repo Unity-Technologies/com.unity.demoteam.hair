@@ -21,6 +21,11 @@ namespace Unity.DemoTeam.Hair
 				{
 					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
 
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
+					if (strandGroupInstance.sceneObjects.rootMeshAttachment != null)
+						strandGroupInstance.sceneObjects.rootMeshAttachment.Detach(false);
+#endif
+
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.groupContainer);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);

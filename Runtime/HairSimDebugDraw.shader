@@ -46,8 +46,8 @@
 	{
 		if (_DebugCluster >= 0)
 		{
-			uint guideIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
-			uint guideIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
+			int guideIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
+			int guideIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
 
 			if (guideIndexLo != _DebugCluster && guideIndexHi != _DebugCluster)
 			{

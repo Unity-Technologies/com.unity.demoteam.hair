@@ -27,6 +27,8 @@ namespace Unity.DemoTeam.Hair
 		static Material s_debugDrawMat;
 		static MaterialPropertyBlock s_debugDrawPB;
 
+		static RuntimeFlags s_runtimeFlags;
+
 		[Flags]
 		enum RuntimeFlags
 		{
@@ -35,8 +37,6 @@ namespace Unity.DemoTeam.Hair
 			SupportsVertexStageUAVWrites = 1 << 1,
 			PointRasterizationRequiresPointSize = 1 << 2,
 		}
-
-		static RuntimeFlags s_runtimeFlags;
 
 		static class MarkersCPU
 		{
@@ -896,7 +896,7 @@ namespace Unity.DemoTeam.Hair
 			target.BindKeyword("VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 		}
 
-		public static void PushSolverParams(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, in Quaternion strandRotation, float strandDiameter, float strandScale, float dt)
+		public static void PushSolverParams(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, in Quaternion strandRotation, float strandDiameter, float strandMargin, float strandScale, float dt)
 		{
 			float IntervalToSeconds(SolverSettings.TimeInterval interval)
 			{
@@ -919,8 +919,10 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._WorldRotation = new Vector4(strandRotation.x, strandRotation.y, strandRotation.z, strandRotation.w);
 			cbuffer._WorldGravity = Quaternion.Euler(solverSettings.gravityRotation) * (Physics.gravity * solverSettings.gravity);
 
-			cbuffer._StrandScale = strandScale;
-			cbuffer._StrandDiameter = strandDiameter * 0.001f;
+			cbuffer._GroupScale = strandScale;
+			cbuffer._GroupMaxParticleInterval = strandScale * solverData.initialMaxParticleInterval;
+			cbuffer._GroupMaxParticleDiameter = strandScale * 0.001f * strandDiameter;
+			cbuffer._GroupMaxParticleFootprint = 0.25f * Mathf.PI * Mathf.Pow(strandScale * 0.001f * (strandDiameter + strandMargin), 2.0f);
 
 			cbuffer._DT = dt / Mathf.Max(1, solverSettings.substeps);
 			cbuffer._Iterations = (uint)solverSettings.iterations;
@@ -1123,7 +1125,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void PushVolumeParams(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in Bounds volumeBounds, float strandDiameter, float strandScale)
+		public static void PushVolumeParams(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData[] solverData, in Bounds volumeBounds)
 		{
 			ref var cbuffer = ref volumeData.cbuffer;
 			ref var keywords = ref volumeData.keywords;
@@ -1133,18 +1135,37 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._VolumeWorldMin = volumeBounds.min;
 			cbuffer._VolumeWorldMax = volumeBounds.max;
 
-			float resolveCrossSection = 0.25f * Mathf.PI * strandDiameter * strandDiameter;
-			float resolveUnitVolume = (1000.0f * volumeData.allGroupsMaxParticleInterval) * resolveCrossSection;
+			cbuffer._AllGroupsDebugWeight = Mathf.Pow(volumeSettings.splatDebugWidth, 3.0f);
+			cbuffer._AllGroupsMaxParticleVolume = 0.0f;
+			{
+				for (int i = 0; i != solverData.Length; i++)
+				{
+					float V =
+						solverData[i].cbuffer._GroupMaxParticleInterval *
+						solverData[i].cbuffer._GroupMaxParticleFootprint;
 
-			cbuffer._ResolveUnitVolume = resolveUnitVolume * (strandScale * strandScale * strandScale);
-			cbuffer._ResolveUnitDebugWidth = volumeSettings.splatDebugWidth;
+					cbuffer._AllGroupsMaxParticleVolume = Mathf.Max(cbuffer._AllGroupsMaxParticleVolume, V);
+				}
+			}
 
 			cbuffer._TargetDensityFactor = volumeSettings.targetDensityInfluence;
 
 			cbuffer._StrandCountPhi = volumeSettings.probeStepsPhi;
 			cbuffer._StrandCountTheta = volumeSettings.probeStepsTheta;
 			cbuffer._StrandCountSubstep = volumeSettings.strandCountProbeCellSubsteps;
-			cbuffer._StrandCountDiameter = (strandDiameter / 1000.0f) * (1.0f / Mathf.Max(1e-7f, volumeSettings.strandCountBias));
+			cbuffer._StrandCountDiameter = 0.0f;
+			{
+				var d = 0.0f;
+				var w = 0.0f;
+
+				for (int i = 0; i != solverData.Length; i++)
+				{
+					d += solverData[i].initialTotalLength * solverData[i].cbuffer._GroupMaxParticleDiameter;
+					w += solverData[i].initialTotalLength;
+				}
+
+				cbuffer._StrandCountDiameter = (d / w) * (1.0f / Mathf.Max(1e-7f, volumeSettings.strandCountBias));
+			}
 
 			// derive keywords
 			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);

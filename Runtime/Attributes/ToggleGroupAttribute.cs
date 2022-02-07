@@ -30,7 +30,7 @@ namespace Unity.DemoTeam.Hair
 
 			property.boolValue = EditorGUILayout.Toggle(label, property.boolValue, GUILayout.ExpandWidth(false));
 
-			using (new EditorGUI.DisabledScope(!property.boolValue))
+			using (new EditorGUI.DisabledScope(property.boolValue == false))
 			{
 				while (property.Next(enterChildren: false))
 				{

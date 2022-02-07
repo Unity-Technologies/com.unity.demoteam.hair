@@ -327,7 +327,7 @@ void ApplyDampingDistance(float3 p0, float3 p1, inout float3 v0, inout float3 v1
 
 float GetParticleInterval(uint strandIndex)
 {
-	return (_StrandMaxParticleInterval * _StrandScale) * _RootScale[strandIndex];
+	return _GroupMaxParticleInterval * _RootScale[strandIndex];
 }
 
 float GetBendingRadius(uint strandIndex)
@@ -406,15 +406,15 @@ void KInitialize(
 	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 	{
 		float3 particleOffset0 = _ParticlePosition[i].xyz - rootPos0;
-		float3 particleOffsetWorld = QMul(_WorldRotation, particleOffset0 * _StrandScale);
+		float3 particleOffsetWorld = QMul(_WorldRotation, particleOffset0 * _GroupScale);
 
 		_InitialParticleOffset[i].xyz = particleOffset0;
 
 		_ParticlePosition[i].xyz = (rootPosWorld + particleOffsetWorld);
 		_ParticlePositionPrev[i].xyz = (rootPosWorld + particleOffsetWorld);
 		_ParticlePositionPrevPrev[i].xyz = (rootPosWorld + particleOffsetWorld);
-		_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _StrandMaxParticleWeight * _RootScale[strandIndex]);
-		_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _StrandMaxParticleWeight * _RootScale[strandIndex]);
+		_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _GroupMaxParticleInterval * _RootScale[strandIndex]);
+		_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _GroupMaxParticleInterval * _RootScale[strandIndex]);
 	}
 
 	// calc initial strand root material frame
@@ -649,7 +649,7 @@ void KSolveConstraints_GaussSeidelReference(
 		for (uint i = strandParticleBegin + strandParticleStride, k = 1; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
 			float3 r0 = _ParticlePosition[i].xyz - p0;
-			float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _StrandScale);
+			float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _GroupScale);
 
 			_ParticlePosition[i].xyz = p0 + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, k));
 		}
@@ -1110,7 +1110,7 @@ void KSolveConstraints_GaussSeidel(
 				if (ENABLE_POSE_GLOBAL_POSITION)
 				{
 					const float3 r0 = x1_pre - rootPos;
-					const float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _StrandScale);
+					const float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _GroupScale);
 
 					x1_pre = rootPos + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, k));
 				}
@@ -1320,7 +1320,7 @@ void KSolveConstraints_Jacobi(
 		if (threadIdx > 0)
 		{
 			float3 r0 = gs_x[j].xyz - gs_x[1].xyz;
-			float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _StrandScale);
+			float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _GroupScale);
 
 			gs_x[j].xyz = gs_x[1].xyz + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, threadIdx));
 		}
@@ -1547,9 +1547,9 @@ void KInterpolate(
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride, iHi = strandParticleBeginHi + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
 	{
-		float3 initialOffsetLo = QMul(_WorldRotation, _InitialParticleOffset[iLo].xyz) * _StrandScale;
-		float3 initialOffsetHi = QMul(_WorldRotation, _InitialParticleOffset[iHi].xyz) * _StrandScale;
-		float3 initialOffset = QMul(_WorldRotation, _InitialParticleOffset[i].xyz) * _StrandScale;
+		float3 initialOffsetLo = QMul(_WorldRotation, _InitialParticleOffset[iLo].xyz) * _GroupScale;
+		float3 initialOffsetHi = QMul(_WorldRotation, _InitialParticleOffset[iHi].xyz) * _GroupScale;
+		float3 initialOffset = QMul(_WorldRotation, _InitialParticleOffset[i].xyz) * _GroupScale;
 
 		float3 currentOffsetLo = _ParticlePosition[iLo].xyz - rootPositionLo;
 		float3 currentOffsetHi = _ParticlePosition[iHi].xyz - rootPositionHi;
@@ -1595,8 +1595,8 @@ void KInterpolateNearest(
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride)
 	{
-		float3 initialOffsetLo = QMul(_WorldRotation, _InitialParticleOffset[iLo].xyz) * _StrandScale;
-		float3 initialOffset = QMul(_WorldRotation, _InitialParticleOffset[i].xyz) * _StrandScale;
+		float3 initialOffsetLo = QMul(_WorldRotation, _InitialParticleOffset[iLo].xyz) * _GroupScale;
+		float3 initialOffset = QMul(_WorldRotation, _InitialParticleOffset[i].xyz) * _GroupScale;
 
 		float3 currentOffsetLo = _ParticlePosition[iLo].xyz - rootPositionLo;
 

@@ -320,6 +320,8 @@ namespace Unity.DemoTeam.Hair
 			public float maxStrandLength;
 			public float maxParticleInterval;
 
+			public float totalLength;
+
 			[HideInInspector] public Bounds bounds;
 
 			[HideInInspector] public Vector2[] rootUV;

@@ -600,10 +600,12 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					// find maximum strand length
+					strandGroup.totalLength = 0.0f;
 					strandGroup.maxStrandLength = 0.0f;
 
 					for (int i = 0; i != strandCount; i++)
 					{
+						strandGroup.totalLength += strandLengthsPtr[i];
 						strandGroup.maxStrandLength = Mathf.Max(strandGroup.maxStrandLength, strandLengthsPtr[i]);
 					}
 

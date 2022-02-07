@@ -98,7 +98,8 @@ namespace Unity.DemoTeam.Hair
 						using (new ColorScope(Color.white))
 						using (new ColorScope(Color.green, ColorScope.Type.BackgroundColor))
 						{
-							GUILayout.Box("Bound to component: " + component.GetType().Name, GUILayout.ExpandWidth(true));
+							GUILayout.Label("Bound to component: " + component.GetType().Name, HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
+							//TODO change to EditorGUILayout.LabelField to preserve indent level?
 						}
 					}
 					else

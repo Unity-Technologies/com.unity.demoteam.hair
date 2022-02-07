@@ -28,14 +28,18 @@ namespace Unity.DemoTeam.Hair
 
 			public ComputeBuffer initialRootFrame;			// quat(xyz,w): initial strand root material frame
 			public ComputeBuffer initialParticleOffset;		// xyz: initial particle offset from strand root, w: -
-			public ComputeBuffer initialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
+			public ComputeBuffer initialParticleFrameDelta; // quat(xyz,w): initial particle material frame delta
+
+			public float initialMaxParticleInterval;
+			public float initialMaxParticleDiameter;
+			public float initialTotalLength;
 
 			public ComputeBuffer particlePosition;		// xyz: position, w: initial local accumulated weight (gather)
 			public ComputeBuffer particlePositionPrev;		// ...
 			public ComputeBuffer particlePositionPrevPrev;	// ...
 			public ComputeBuffer particlePositionCorr;	// xyz: ftl correction, w: -
 			public ComputeBuffer particleVelocity;		// xyz: velocity, w: splatting weight
-			public ComputeBuffer particleVelocityPrev;	// xyz: velocity, w: splatting weight
+			public ComputeBuffer particleVelocityPrev;  // xyz: velocity, w: splatting weight
 
 			public ComputeBuffer lodGuideCount;			// n: lod index -> num. guides
 			public ComputeBuffer lodGuideIndex;			// i: lod index * strand count + strand index -> guide index
@@ -45,7 +49,7 @@ namespace Unity.DemoTeam.Hair
 			public NativeArray<float> lodThreshold;		// f: lod index -> relative guide count [0..1] (to maximum lod in group)
 
 			public ComputeBuffer stagingPosition;		// xy: encoded position | xyz: position
-			public ComputeBuffer stagingPositionPrev;	// ...
+			public ComputeBuffer stagingPositionPrev;   // ...
 
 			public HairAsset.MemoryLayout memoryLayout;
 		}
@@ -68,7 +72,6 @@ namespace Unity.DemoTeam.Hair
 			public bool STAGING_COMPRESSION;
 		}
 
-		// NOTE: update padding if modifying
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
 		public struct SolverCBuffer
 		{
@@ -84,14 +87,14 @@ namespace Unity.DemoTeam.Hair
 			public Vector4 _StagingOriginExtentPrev;	// ...
 
 			// 48
-			public uint _StrandCount;					// group strand count
-			public uint _StrandParticleCount;			// group strand particle count
-			public uint _SolverStrandCount;
+			public uint _StrandCount;					// number of strands
+			public uint _StrandParticleCount;			// number of particles per strand
+			public uint _SolverStrandCount;				// number of strands touched by solver
 
-			public float _StrandMaxParticleInterval;	// group max particle interval
-			public float _StrandMaxParticleWeight;		// group max particle weight (relative to all groups within volume)
-			public float _StrandScale;					// group scale
-			public float _StrandDiameter;//TODO fold under maximum + group scale scheme
+			public float _GroupScale;                   // group scale
+			public float _GroupMaxParticleInterval;     // (scaled) max particle interval
+			public float _GroupMaxParticleDiameter;     // (scaled) max particle diameter
+			public float _GroupMaxParticleFootprint;    // (scaled) max particle footprint
 
 			public uint _LODIndexLo;					// lod index (lower detail in blend)
 			public uint _LODIndexHi;					// lod index (higher detail in blend)
@@ -127,6 +130,8 @@ namespace Unity.DemoTeam.Hair
 
 			// 79 --> 80 (16 byte alignment)
 			public float _scbpad1;
+
+			// NOTE: explicit padding to 16 byte alignment required on some platforms, please update if modifying
 		}
 
 		/*
@@ -173,10 +178,6 @@ namespace Unity.DemoTeam.Hair
 
 			public RenderTexture volumeStrandCountProbe;
 
-			public float allGroupsMaxParticleInterval;
-			//public float allGroupsMaxStrandDiameter;
-			//public float allGroupsMaxStrandLength;
-
 			public RenderTexture boundarySDF;			// x: signed distance to arbitrary solid
 			public RenderTexture boundarySDF_undefined;	// .. (placeholder for when inactive)
 
@@ -199,7 +200,6 @@ namespace Unity.DemoTeam.Hair
 			public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
 		}
 
-		// NOTE: update padding if modifying
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
 		public struct VolumeCBuffer
 		{
@@ -226,8 +226,8 @@ namespace Unity.DemoTeam.Hair
 			public Vector4 _VolumeWorldMax;
 
 			// 12
-			public float _ResolveUnitVolume;
-			public float _ResolveUnitDebugWidth;
+			public float _AllGroupsDebugWeight;
+			public float _AllGroupsMaxParticleVolume;
 
 			public float _TargetDensityFactor;
 
@@ -250,6 +250,8 @@ namespace Unity.DemoTeam.Hair
 			// 26 --> 28 (16 byte alignment)
 			public float _vcbpad1;
 			public float _vcbpad2;
+
+			// NOTE: explicit padding to 16 byte alignment required on some platforms, please update if modifying
 		}
 	}
 }

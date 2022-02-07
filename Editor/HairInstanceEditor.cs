@@ -35,9 +35,9 @@ namespace Unity.DemoTeam.Hair
 			_settingsSystem = serializedObject.FindProperty(nameof(HairInstance.settingsSystem));
 
 			_settingsExpanded = serializedObject.FindProperty(nameof(HairInstance.settingsExpanded));
-			_settingsSkinning = serializedObject.FindProperty(nameof(HairInstance.settingsSkinning));
-			_settingsStrands = serializedObject.FindProperty(nameof(HairInstance.settingsStrands));
-			_settingsSolver = serializedObject.FindProperty(nameof(HairInstance.settingsSolver));
+			_settingsSkinning = serializedObject.FindProperty(nameof(HairInstance.OLD__settingsSkinning));
+			_settingsStrands = serializedObject.FindProperty(nameof(HairInstance.OLD__settingsStrands));
+			_settingsSolver = serializedObject.FindProperty(nameof(HairInstance.OLD__settingsSolver));
 
 			_settingsVolume = serializedObject.FindProperty(nameof(HairInstance.settingsVolume));
 			_settingsDebug = serializedObject.FindProperty(nameof(HairInstance.settingsDebug));
@@ -136,14 +136,15 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUIStrands(object userData)
 		{
-			var hairInstance = userData as HairInstance;
-			{
-				var material = hairInstance.GetStrandMaterial();
-				if (material == null)
-				{
-					EditorGUILayout.HelpBox("Configuration warning: No active material.", MessageType.Info, wide: true);
-				}
-			}
+			//TODO needs to be aware of multiple settings groups
+			//var hairInstance = userData as HairInstance;
+			//{
+			//	var material = hairInstance.GetStrandMaterial();
+			//	if (material == null)
+			//	{
+			//		EditorGUILayout.HelpBox("Configuration warning: No active material.", MessageType.Info, wide: true);
+			//	}
+			//}
 
 			return StructValidation.Pass;
 		}
@@ -153,7 +154,7 @@ namespace Unity.DemoTeam.Hair
 			var hairInstance = userData as HairInstance;
 			if (hairInstance.solverData != null && hairInstance.solverData.Length > 0)
 			{
-				var strandSolver = hairInstance.settingsSolver.method;
+				var strandSolver = hairInstance.OLD__settingsSolver.method;
 				var strandMemoryLayout = hairInstance.solverData[0].memoryLayout;
 				var strandParticleCount = hairInstance.solverData[0].cbuffer._StrandParticleCount;
 
@@ -303,9 +304,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 			{
-				StructPropertyFieldsWithHeader(_settingsSystem, ValidationGUISystem, hairInstance);
-
-				//if (_settingsSystem.isExpanded)
+				if (StructPropertyFieldsWithHeader(_settingsSystem, ValidationGUISystem, hairInstance))
 				{
 					using (new EditorGUI.IndentLevelScope())
 					{
@@ -403,10 +402,13 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != _strandGroupSettings.arraySize; i++)
 				{
 					var property = _strandGroupSettings.GetArrayElementAtIndex(i);
-					var property_groupAssetReferences = property.FindPropertyRelative("groupAssetReferences");
-					var property_settingsSkinning = property.FindPropertyRelative("settingsSkinning");
-					var property_settingsStrands = property.FindPropertyRelative("settingsStrands");
-					var property_settingsSolver = property.FindPropertyRelative("settingsSolver");
+					var property_groupAssetReferences = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.groupAssetReferences));
+					var property_settingsSkinning = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsSkinning));
+					var property_settingsStrands = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsStrands));
+					var property_settingsSolver = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsSolver));
+					var property_settingsSkinningToggle = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsSkinningToggle));
+					var property_settingsStrandsToggle = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsStrandsToggle));
+					var property_settingsSolverToggle = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsSolverToggle));
 					var property_delete = false;
 
 					EditorGUILayout.BeginHorizontal();
@@ -467,18 +469,18 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (new GovernedByPrefabScope(hairInstance))
 							{
-								StructPropertyFieldsWithHeader(property_settingsSkinning, ValidationGUISkinning, hairInstance);
+								StructPropertyFieldsWithHeader(property_settingsSkinning, property_settingsSkinningToggle, ValidationGUISkinning, hairInstance);
 							}
 							EditorGUILayout.Space();
-							StructPropertyFieldsWithHeader(property_settingsStrands, ValidationGUIStrands, hairInstance);
+							StructPropertyFieldsWithHeader(property_settingsStrands, property_settingsStrandsToggle, ValidationGUIStrands, hairInstance);
 							EditorGUILayout.Space();
-							StructPropertyFieldsWithHeader(property_settingsSolver, ValidationGUISolver, hairInstance);
+							StructPropertyFieldsWithHeader(property_settingsSolver, property_settingsSolverToggle, ValidationGUISolver, hairInstance);
 						}
 						EditorGUILayout.EndVertical();
 					}
 				}
 
-				if (GUILayout.Button("Add settings block ..."))
+				if (GUILayout.Button("Add override block ..."))
 				{
 					var countPrev = _strandGroupSettings.arraySize;
 					var countNext = countPrev + 1;
@@ -507,78 +509,75 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 			{
-				StructPropertyFieldsWithHeader(_settingsVolume);
-				using (new EditorGUI.IndentLevelScope())
+				if (StructPropertyFieldsWithHeader(_settingsVolume))
 				{
-					var countDiscrete = hairInstance.volumeData.cbuffer._BoundaryCountDiscrete;
-					var countCapsule = hairInstance.volumeData.cbuffer._BoundaryCountCapsule;
-					var countSphere = hairInstance.volumeData.cbuffer._BoundaryCountSphere;
-					var countTorus = hairInstance.volumeData.cbuffer._BoundaryCountTorus;
-					var countCube = hairInstance.volumeData.cbuffer._BoundaryCountCube;
-
-					var countAll = countDiscrete + countCapsule + countSphere + countTorus + countCube;
-					var countTxt = countAll + " boundaries (" + countDiscrete + " discrete, " + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus, " + countCube + " cube)";
-
-					var rectHeight = HairGUIStyles.statusBox.CalcHeight(new GUIContent(string.Empty), 0.0f);
-					var rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
-
-					using (new ColorScope(Color.white))
+					using (new EditorGUI.IndentLevelScope())
 					{
-						GUI.Box(EditorGUI.IndentedRect(rect), countTxt, HairGUIStyles.statusBox);
-					}
+						var countDiscrete = hairInstance.volumeData.cbuffer._BoundaryCountDiscrete;
+						var countCapsule = hairInstance.volumeData.cbuffer._BoundaryCountCapsule;
+						var countSphere = hairInstance.volumeData.cbuffer._BoundaryCountSphere;
+						var countTorus = hairInstance.volumeData.cbuffer._BoundaryCountTorus;
+						var countCube = hairInstance.volumeData.cbuffer._BoundaryCountCube;
 
-					var countDiscarded = hairInstance.volumeData.boundaryPrevCountDiscard;
-					if (countDiscarded > 0)
-					{
-						rect = GUILayoutUtility.GetRect(0.0f, rectHeight, GUILayout.ExpandWidth(true));
+						var countAll = countDiscrete + countCapsule + countSphere + countTorus + countCube;
+						var countTxt = countAll + " boundaries (" + countDiscrete + " discrete, " + countCapsule + " capsule, " + countSphere + " sphere, " + countTorus + " torus, " + countCube + " cube)";
 
-						using (new ColorScope(Color.Lerp(Color.red, Color.yellow, 0.5f)))
+						EditorGUILayout.LabelField(countTxt, HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
+
+						var countDiscarded = hairInstance.volumeData.boundaryPrevCountDiscard;
+						if (countDiscarded > 0)
 						{
-							GUI.Box(EditorGUI.IndentedRect(rect), countDiscarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox);
+							using (new ColorScope(Color.Lerp(Color.red, Color.yellow, 0.5f)))
+							{
+								EditorGUILayout.LabelField(countDiscarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
+							}
 						}
 					}
+
 				}
 
 				EditorGUILayout.Space();
-				StructPropertyFieldsWithHeader(_settingsDebug, "Settings Debug");
-				using (new EditorGUI.IndentLevelScope())
+				if (StructPropertyFieldsWithHeader(_settingsDebug))
 				{
-					var divider = hairInstance.settingsDebug.drawSliceDivider;
-					var dividerBase = Mathf.Floor(divider);
-					var dividerFrac = divider - Mathf.Floor(divider);
-
-					var rect = GUILayoutUtility.GetRect(0.0f, EditorGUIUtility.singleLineHeight, GUILayout.ExpandWidth(true));
-
-					rect = EditorGUI.IndentedRect(rect);
-
-					var rect0 = new Rect(rect);
-					var rect1 = new Rect(rect);
-
-					rect0.width = (rect.width) * (1.0f - dividerFrac);
-					rect1.width = (rect.width) * dividerFrac;
-					rect1.x += rect0.width;
-
-					string DividerLabel(int index)
+					using (new EditorGUI.IndentLevelScope())
 					{
-						switch (index)
+						var divider = hairInstance.settingsDebug.drawSliceDivider;
+						var dividerBase = Mathf.Floor(divider);
+						var dividerFrac = divider - Mathf.Floor(divider);
+
+						var rect = GUILayoutUtility.GetRect(0.0f, EditorGUIUtility.singleLineHeight, GUILayout.ExpandWidth(true));
+
+						rect = EditorGUI.IndentedRect(rect);
+
+						var rect0 = new Rect(rect);
+						var rect1 = new Rect(rect);
+
+						rect0.width = (rect.width) * (1.0f - dividerFrac);
+						rect1.width = (rect.width) * dividerFrac;
+						rect1.x += rect0.width;
+
+						string DividerLabel(int index)
 						{
-							case 0: return "density";
-							case 1: return "rest-density";
-							case 2: return "velocity";
-							case 3: return "divergence";
-							case 4: return "pressure";
-							case 5: return "grad(pressure)";
-							case 6: return "scattering";
+							switch (index)
+							{
+								case 0: return "density";
+								case 1: return "rest-density";
+								case 2: return "velocity";
+								case 3: return "divergence";
+								case 4: return "pressure";
+								case 5: return "grad(pressure)";
+								case 6: return "scattering";
+							}
+							return "unknown";
 						}
-						return "unknown";
-					}
 
-					EditorGUILayout.BeginHorizontal();
-					{
-						GUI.Box(rect0, DividerLabel((int)dividerBase + 0), EditorStyles.helpBox);
-						GUI.Box(rect1, DividerLabel((int)dividerBase + 1), EditorStyles.helpBox);
+						EditorGUILayout.BeginHorizontal();
+						{
+							GUI.Box(rect0, DividerLabel((int)dividerBase + 0), EditorStyles.helpBox);
+							GUI.Box(rect1, DividerLabel((int)dividerBase + 1), EditorStyles.helpBox);
+						}
+						EditorGUILayout.EndHorizontal();
 					}
-					EditorGUILayout.EndHorizontal();
 				}
 			}
 

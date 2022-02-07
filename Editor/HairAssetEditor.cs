@@ -250,7 +250,6 @@ namespace Unity.DemoTeam.Hair
 				StructPropertyFieldsWithHeader(_settingsBasic);
 
 				EditorGUILayout.Space();
-
 				switch ((HairAsset.Type)_settingsBasic_type.enumValueIndex)
 				{
 					case HairAsset.Type.Alembic:
@@ -263,12 +262,14 @@ namespace Unity.DemoTeam.Hair
 							var placementType = (HairAsset.SettingsProcedural.PlacementType)_settingsProcedural_placement.enumValueIndex;
 							if (placementType == HairAsset.SettingsProcedural.PlacementType.Custom && hairAsset.settingsProcedural.placementProvider is HairAssetProvider)
 							{
-								CreateCachedEditor(hairAsset.settingsProcedural.placementProvider, editorType: null, ref rootGeneratorEditor);
 								EditorGUILayout.Space();
-								EditorGUILayout.LabelField("Settings Procedural Placement", EditorStyles.miniBoldLabel);
-								using (new EditorGUI.IndentLevelScope())
+								if (StructHeader("Settings Custom Placement"))
 								{
-									rootGeneratorEditor.DrawDefaultInspector();
+									using (new EditorGUI.IndentLevelScope())
+									{
+										CreateCachedEditor(hairAsset.settingsProcedural.placementProvider, editorType: null, ref rootGeneratorEditor);
+										rootGeneratorEditor.OnInspectorGUI();
+									}
 								}
 							}
 						}
@@ -353,91 +354,96 @@ namespace Unity.DemoTeam.Hair
 					InitializePreviewData(hairAsset);
 				}
 
-				EditorGUILayout.LabelField("Summary", EditorStyles.miniBoldLabel);
-				using (new EditorGUI.IndentLevelScope())
-				using (new EditorGUI.DisabledScope(true))
+				if (StructHeader("Summary"))
 				{
-					EditorGUILayout.IntField("Number of groups", hairAsset.strandGroups.Length);
-					EditorGUILayout.IntField("Number of strands (total)", numStrands);
-					EditorGUILayout.IntField("Number of particles (total)", numParticles);
+					using (new EditorGUI.IndentLevelScope())
+					using (new EditorGUI.DisabledScope(true))
+					{
+						EditorGUILayout.IntField("Number of groups", hairAsset.strandGroups.Length);
+						EditorGUILayout.IntField("Number of strands (total)", numStrands);
+						EditorGUILayout.IntField("Number of particles (total)", numParticles);
+					}
 				}
 
 				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 				{
 					EditorGUILayout.Space();
-					EditorGUILayout.LabelField("Group:" + i, EditorStyles.miniBoldLabel);
-					using (new EditorGUI.IndentLevelScope())
+					if (StructHeader("Group:" + i))
 					{
-						EditorGUILayout.BeginVertical();
+						using (new EditorGUI.IndentLevelScope())
 						{
-							var rect = GUILayoutUtility.GetAspectRect(16.0f / 9.0f, EditorStyles.helpBox, GUILayout.MaxHeight(400.0f));
-							if (rect.width >= 20.0f)
+							EditorGUILayout.Space(1.0f);
+							EditorGUILayout.BeginVertical();
 							{
-								rect = EditorGUI.IndentedRect(rect);
-
-								GUI.Box(rect, Texture2D.blackTexture, EditorStyles.textField);
+								var rect = GUILayoutUtility.GetAspectRect(16.0f / 9.0f, EditorStyles.helpBox, GUILayout.MaxHeight(400.0f));
+								if (rect.width >= 20.0f)
 								{
-									rect.xMin += 1;
-									rect.yMin += 1;
-									rect.xMax -= 1;
-									rect.yMax -= 1;
+									rect = EditorGUI.IndentedRect(rect);
+
+									GUI.Box(rect, Texture2D.blackTexture, EditorStyles.textField);
+									{
+										rect.xMin += 1;
+										rect.yMin += 1;
+										rect.xMax -= 1;
+										rect.yMax -= 1;
+									}
+
+									// apply zoom
+									var e = Event.current;
+									if (e.alt && e.type == EventType.ScrollWheel && rect.Contains(e.mousePosition))
+									{
+										previewZoom -= 0.05f * e.delta.y;
+										previewZoom = Mathf.Clamp01(previewZoom);
+										e.Use();
+									}
+
+									// apply rotation
+									var drag = Vector2.zero;
+									if (Drag2D(ref drag, rect))
+									{
+										drag *= Vector2.one;
+									}
+
+									// draw preview
+									var meshLines = hairAsset.strandGroups[i].meshAssetLines;
+									var meshCenter = hairAsset.strandGroups[i].bounds.center;
+									var meshRadius = hairAsset.strandGroups[i].bounds.extents.magnitude * Mathf.Lerp(1.0f, 0.5f, previewZoom);
+
+									var cameraDistance = meshRadius / Mathf.Sin(0.5f * Mathf.Deg2Rad * previewRenderer.cameraFieldOfView);
+									var cameraTransform = previewRenderer.camera.transform;
+									{
+										cameraTransform.Rotate(drag.y, drag.x, 0.0f, Space.Self);
+										cameraTransform.position = meshCenter - cameraDistance * cameraTransform.forward;
+									}
+
+									var sourceMaterial = HairMaterialUtility.GetCurrentPipelineDefault();
+									if (sourceMaterial != null)
+									{
+										if (previewMaterial.shader != sourceMaterial.shader)
+											previewMaterial.shader = sourceMaterial.shader;
+
+										previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
+									}
+
+									HairSim.BindSolverData(previewMaterial, previewData[i]);
+
+									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_LINES", true);
+									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_STRIPS", false);
+									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_SOLVER", true);
+									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_STAGING", false);
+
+									previewRenderer.BeginPreview(rect, GUIStyle.none);
+									previewRenderer.DrawMesh(meshLines, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
+									previewRenderer.Render(true, true);
+									previewRenderer.EndAndDrawPreview(rect);
 								}
-
-								// apply zoom
-								var e = Event.current;
-								if (e.alt && e.type == EventType.ScrollWheel && rect.Contains(e.mousePosition))
-								{
-									previewZoom -= 0.05f * e.delta.y;
-									previewZoom = Mathf.Clamp01(previewZoom);
-									e.Use();
-								}
-
-								// apply rotation
-								var drag = Vector2.zero;
-								if (Drag2D(ref drag, rect))
-								{
-									drag *= Vector2.one;
-								}
-
-								// draw preview
-								var meshLines = hairAsset.strandGroups[i].meshAssetLines;
-								var meshCenter = hairAsset.strandGroups[i].bounds.center;
-								var meshRadius = hairAsset.strandGroups[i].bounds.extents.magnitude * Mathf.Lerp(1.0f, 0.5f, previewZoom);
-
-								var cameraDistance = meshRadius / Mathf.Sin(0.5f * Mathf.Deg2Rad * previewRenderer.cameraFieldOfView);
-								var cameraTransform = previewRenderer.camera.transform;
-								{
-									cameraTransform.Rotate(drag.y, drag.x, 0.0f, Space.Self);
-									cameraTransform.position = meshCenter - cameraDistance * cameraTransform.forward;
-								}
-
-								var sourceMaterial = HairMaterialUtility.GetCurrentPipelineDefault();
-								if (sourceMaterial != null)
-								{
-									if (previewMaterial.shader != sourceMaterial.shader)
-										previewMaterial.shader = sourceMaterial.shader;
-
-									previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
-								}
-
-								HairSim.BindSolverData(previewMaterial, previewData[i]);
-
-								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_LINES", true);
-								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_STRIPS", false);
-								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_SOLVER", true);
-								CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_STAGING", false);
-
-								previewRenderer.BeginPreview(rect, GUIStyle.none);
-								previewRenderer.DrawMesh(meshLines, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
-								previewRenderer.Render(true, true);
-								previewRenderer.EndAndDrawPreview(rect);
 							}
-						}
-						EditorGUILayout.EndVertical();
+							EditorGUILayout.EndVertical();
 
-						using (new EditorGUI.DisabledScope(true))
-						{
-							StructPropertyFields(_strandGroups.GetArrayElementAtIndex(i));
+							using (new EditorGUI.DisabledScope(true))
+							{
+								StructPropertyFields(_strandGroups.GetArrayElementAtIndex(i));
+							}
 						}
 					}
 				}
@@ -447,7 +453,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					if (GUILayout.Button("Save changes"))
 					{
-						//TODO
+						//TODO remove this?
 					}
 				}
 			}
@@ -507,7 +513,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					for (int i = 0; i != previewData.Length; i++)
 					{
-						HairSim.PushSolverParams(cmd, ref previewData[i], HairSim.SolverSettings.defaults, Matrix4x4.identity, Quaternion.identity, 1.0f, 1.0f, 1.0f);
+						HairSim.PushSolverParams(cmd, ref previewData[i], HairSim.SolverSettings.defaults, Matrix4x4.identity, Quaternion.identity, 1.0f, 1.0f, 0.0f, 1.0f);
 					}
 
 					Graphics.ExecuteCommandBuffer(cmd);

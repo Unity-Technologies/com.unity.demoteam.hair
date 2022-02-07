@@ -16,10 +16,10 @@ CBUFFER_START(SolverCBuffer)
     uint _StrandCount;
     uint _StrandParticleCount;
     uint _SolverStrandCount;
-    float _StrandMaxParticleInterval;
-    float _StrandMaxParticleWeight;
-    float _StrandScale;
-    float _StrandDiameter;
+    float _GroupScale;
+    float _GroupMaxParticleInterval;
+    float _GroupMaxParticleDiameter;
+    float _GroupMaxParticleFootprint;
     uint _LODIndexLo;
     uint _LODIndexHi;
     float _LODBlendFraction;
@@ -53,8 +53,8 @@ CBUFFER_START(VolumeCBuffer)
     float4 _VolumeCells;
     float4 _VolumeWorldMin;
     float4 _VolumeWorldMax;
-    float _ResolveUnitVolume;
-    float _ResolveUnitDebugWidth;
+    float _AllGroupsDebugWeight;
+    float _AllGroupsMaxParticleVolume;
     float _TargetDensityFactor;
     uint _BoundaryCountDiscrete;
     uint _BoundaryCountCapsule;
