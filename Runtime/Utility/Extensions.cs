@@ -39,7 +39,7 @@ namespace Unity.DemoTeam.Hair
 	{
 		public static Bounds WithTransform(this Bounds bounds, Matrix4x4 transform)
 		{
-			//TODO rely on Unity.Mathematics
+			//TODO revisit Unity.Mathematics
 
 			var aPos = bounds.center;
 			var aExt = bounds.extents;

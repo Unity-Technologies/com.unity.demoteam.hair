@@ -163,13 +163,13 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Bounds")]
 
-			public BoundsMode bounds;
-			[VisibleIf(nameof(bounds), BoundsMode.Fixed)]
+			public BoundsMode boundsMode;
+			[VisibleIf(nameof(boundsMode), BoundsMode.Fixed)]
 			public Vector3 boundsCenter;
-			[VisibleIf(nameof(bounds), BoundsMode.Fixed)]
+			[VisibleIf(nameof(boundsMode), BoundsMode.Fixed)]
 			public Vector3 boundsExtent;
-			[Range(0.0f, 1.0f)]
-			public float boundsTrim;
+			[Range(0.0f, 2.0f)]
+			public float boundsScale;
 
 			[LineHeader("Renderer")]
 
@@ -208,10 +208,10 @@ namespace Unity.DemoTeam.Hair
 				kLODSearchValue = 1.0f,
 				kLODBlending = false,
 
-				bounds = BoundsMode.Automatic,
+				boundsMode = BoundsMode.Automatic,
 				boundsCenter = new Vector3(0.0f, 0.0f, 0.0f),
 				boundsExtent = new Vector3(1.0f, 1.0f, 1.0f),
-				boundsTrim = 0.0f,
+				boundsScale = 1.25f,
 
 				strandRenderer = StrandRenderer.BuiltinLines,
 				strandShadows = ShadowCastingMode.On,
@@ -1043,22 +1043,41 @@ namespace Unity.DemoTeam.Hair
 		{
 			Debug.Assert(worldSquare == false || worldToLocalTransform == null);
 
-			var rootBounds = GetRootBounds(strandGroupInstances[0], worldToLocalTransform);
-			var rootMargin = GetStrandScale(strandGroupInstances[0]) * strandGroupInstances[0].groupAssetReference.Resolve().maxStrandLength;
-
-			for (int i = 1; i != strandGroupInstances.Length; i++)
+			var systemBounds = new Bounds();
 			{
-				rootBounds.Encapsulate(GetRootBounds(strandGroupInstances[i], worldToLocalTransform));
-				rootMargin = Mathf.Max(GetStrandScale(strandGroupInstances[i]) * strandGroupInstances[i].groupAssetReference.Resolve().maxStrandLength, rootMargin);
+				systemBounds.center = Vector3.zero;
+				systemBounds.extents = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
 			}
 
-			rootMargin *= 1.25f;
-			rootBounds.Expand(2.0f * rootMargin);
+			switch (settingsSystem.boundsMode)
+			{
+				case SettingsSystem.BoundsMode.Automatic:
+					{
+						for (int i = 0; i != strandGroupInstances.Length; i++)
+						{
+							var rootMargin = GetStrandScale(strandGroupInstances[i]) * strandGroupInstances[i].groupAssetReference.Resolve().maxStrandLength;
+							var rootBounds = GetRootBounds(strandGroupInstances[i], worldToLocalTransform);
+							{
+								rootBounds.Expand(2.0f * rootMargin * settingsSystem.boundsScale);
+							}
+
+							systemBounds.Encapsulate(rootBounds);
+						}
+					}
+					break;
+
+				case SettingsSystem.BoundsMode.Fixed:
+					{
+						systemBounds.center = settingsSystem.boundsCenter + this.transform.position;
+						systemBounds.extents = settingsSystem.boundsExtent * settingsSystem.boundsScale;
+					}
+					break;
+			}
 
 			if (worldSquare)
-				return new Bounds(rootBounds.center, rootBounds.size.CMax() * Vector3.one);
+				return new Bounds(systemBounds.center, systemBounds.size.CMax() * Vector3.one);
 			else
-				return rootBounds;
+				return systemBounds;
 		}
 
 		public ref readonly SettingsSkinning GetSettingsSkinning(in GroupInstance strandGroupInstance)
