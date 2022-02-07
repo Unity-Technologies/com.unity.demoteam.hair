@@ -16,14 +16,9 @@ namespace Unity.DemoTeam.Hair
 
 		SerializedProperty _strandGroupProviders;
 		SerializedProperty _strandGroupSettings;
+		SerializedProperty _strandGroupDefaults;
 
 		SerializedProperty _settingsSystem;
-
-		SerializedProperty _settingsExpanded;
-		SerializedProperty _settingsSkinning;
-		SerializedProperty _settingsStrands;
-		SerializedProperty _settingsSolver;
-
 		SerializedProperty _settingsVolume;
 		SerializedProperty _settingsDebug;
 
@@ -31,14 +26,9 @@ namespace Unity.DemoTeam.Hair
 		{
 			_strandGroupProviders = serializedObject.FindProperty(nameof(HairInstance.strandGroupProviders));
 			_strandGroupSettings = serializedObject.FindProperty(nameof(HairInstance.strandGroupSettings));
+			_strandGroupDefaults = serializedObject.FindProperty(nameof(HairInstance.strandGroupDefaults));
 
 			_settingsSystem = serializedObject.FindProperty(nameof(HairInstance.settingsSystem));
-
-			_settingsExpanded = serializedObject.FindProperty(nameof(HairInstance.settingsExpanded));
-			_settingsSkinning = serializedObject.FindProperty(nameof(HairInstance.OLD__settingsSkinning));
-			_settingsStrands = serializedObject.FindProperty(nameof(HairInstance.OLD__settingsStrands));
-			_settingsSolver = serializedObject.FindProperty(nameof(HairInstance.OLD__settingsSolver));
-
 			_settingsVolume = serializedObject.FindProperty(nameof(HairInstance.settingsVolume));
 			_settingsDebug = serializedObject.FindProperty(nameof(HairInstance.settingsDebug));
 		}
@@ -136,7 +126,8 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUIStrands(object userData)
 		{
-			//TODO needs to be aware of multiple settings groups
+			//TODO make aware of multiple settings groups
+			//
 			//var hairInstance = userData as HairInstance;
 			//{
 			//	var material = hairInstance.GetStrandMaterial();
@@ -151,41 +142,43 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUISolver(object userData)
 		{
-			var hairInstance = userData as HairInstance;
-			if (hairInstance.solverData != null && hairInstance.solverData.Length > 0)
-			{
-				var strandSolver = hairInstance.OLD__settingsSolver.method;
-				var strandMemoryLayout = hairInstance.solverData[0].memoryLayout;
-				var strandParticleCount = hairInstance.solverData[0].cbuffer._StrandParticleCount;
+			//TODO make aware of multiple settings groups
+			//
+			//var hairInstance = userData as HairInstance;
+			//if (hairInstance.solverData != null && hairInstance.solverData.Length > 0)
+			//{
+			//	var strandSolver = hairInstance.strandGroupDefaults.settingsSolver.method;
+			//	var strandMemoryLayout = hairInstance.solverData[0].memoryLayout;
+			//	var strandParticleCount = hairInstance.solverData[0].cbuffer._StrandParticleCount;
 
-				switch (strandSolver)
-				{
-					case HairSim.SolverSettings.Method.GaussSeidelReference:
-						EditorGUILayout.HelpBox("Performance warning: Using slow reference solver.", MessageType.Warning, wide: true);
-						break;
+			//	switch (strandSolver)
+			//	{
+			//		case HairSim.SolverSettings.Method.GaussSeidelReference:
+			//			EditorGUILayout.HelpBox("Performance warning: Using slow reference solver.", MessageType.Warning, wide: true);
+			//			break;
 
-					case HairSim.SolverSettings.Method.GaussSeidel:
-						if (strandMemoryLayout != HairAsset.MemoryLayout.Interleaved)
-						{
-							EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'. This can be solved by changing memory layout in the asset.", MessageType.Warning, wide: true);
-						}
-						break;
+			//		case HairSim.SolverSettings.Method.GaussSeidel:
+			//			if (strandMemoryLayout != HairAsset.MemoryLayout.Interleaved)
+			//			{
+			//				EditorGUILayout.HelpBox("Performance warning: Gauss-Seidel solver performs better with memory layout 'Interleaved'. This can be solved by changing memory layout in the asset.", MessageType.Warning, wide: true);
+			//			}
+			//			break;
 
-					case HairSim.SolverSettings.Method.Jacobi:
-						if (strandParticleCount != 16 &&
-							strandParticleCount != 32 &&
-							strandParticleCount != 64 &&
-							strandParticleCount != 128)
-						{
-							EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64, 128. Using slow reference solver as fallback. This can be solved by resampling curves in the asset.", MessageType.Error, wide: true);
-						}
-						else if (strandMemoryLayout != HairAsset.MemoryLayout.Sequential)
-						{
-							EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'. This can be solved by changing memory layout in the asset.", MessageType.Warning, wide: true);
-						}
-						break;
-				}
-			}
+			//		case HairSim.SolverSettings.Method.Jacobi:
+			//			if (strandParticleCount != 16 &&
+			//				strandParticleCount != 32 &&
+			//				strandParticleCount != 64 &&
+			//				strandParticleCount != 128)
+			//			{
+			//				EditorGUILayout.HelpBox("Configuration error: Jacobi solver requires strand particle count of 16, 32, 64, 128. Using slow reference solver as fallback. This can be solved by resampling curves in the asset.", MessageType.Error, wide: true);
+			//			}
+			//			else if (strandMemoryLayout != HairAsset.MemoryLayout.Sequential)
+			//			{
+			//				EditorGUILayout.HelpBox("Performance warning: Jacobi solver performs better with memory layout 'Sequential'. This can be solved by changing memory layout in the asset.", MessageType.Warning, wide: true);
+			//			}
+			//			break;
+			//	}
+			//}
 
 			return StructValidation.Pass;
 		}
@@ -376,29 +369,41 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 			{
-				EditorGUILayout.BeginHorizontal();
+				// settings default
 				{
-					_settingsExpanded.boolValue = GUILayout.Toggle(_settingsExpanded.boolValue, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
-					EditorGUILayout.LabelField("Defaults (All Groups)", EditorStyles.textArea);
-				}
-				EditorGUILayout.EndHorizontal();
+					var property = _strandGroupDefaults;
+					var property_settingsSkinning = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsSkinning));
+					var property_settingsStrands = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsStrands));
+					var property_settingsSolver = property.FindPropertyRelative(nameof(HairInstance.GroupSettings.settingsSolver));
 
-				if (_settingsExpanded.boolValue)
-				{
-					EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+					EditorGUILayout.BeginHorizontal();
 					{
-						using (new GovernedByPrefabScope(hairInstance))
-						{
-							StructPropertyFieldsWithHeader(_settingsSkinning, ValidationGUISkinning, hairInstance);
-						}
-						EditorGUILayout.Space();
-						StructPropertyFieldsWithHeader(_settingsStrands, ValidationGUIStrands, hairInstance);
-						EditorGUILayout.Space();
-						StructPropertyFieldsWithHeader(_settingsSolver, ValidationGUISolver, hairInstance);
+						var expanded = GUILayout.Toggle(property.isExpanded, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+						if (expanded != property.isExpanded)
+							property.isExpanded = expanded;
+
+						EditorGUILayout.LabelField("Defaults (All Groups)", EditorStyles.textArea);
 					}
-					EditorGUILayout.EndVertical();
+					EditorGUILayout.EndHorizontal();
+
+					if (property.isExpanded)
+					{
+						EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
+						{
+							using (new GovernedByPrefabScope(hairInstance))
+							{
+								StructPropertyFieldsWithHeader(property_settingsSkinning, ValidationGUISkinning, hairInstance);
+							}
+							EditorGUILayout.Space();
+							StructPropertyFieldsWithHeader(property_settingsStrands, ValidationGUIStrands, hairInstance);
+							EditorGUILayout.Space();
+							StructPropertyFieldsWithHeader(property_settingsSolver, ValidationGUISolver, hairInstance);
+						}
+						EditorGUILayout.EndVertical();
+					}
 				}
 
+				// settings override
 				for (int i = 0; i != _strandGroupSettings.arraySize; i++)
 				{
 					var property = _strandGroupSettings.GetArrayElementAtIndex(i);
@@ -413,7 +418,9 @@ namespace Unity.DemoTeam.Hair
 
 					EditorGUILayout.BeginHorizontal();
 					{
-						property.isExpanded = GUILayout.Toggle(property.isExpanded, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+						var expanded = GUILayout.Toggle(property.isExpanded, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+						if (expanded != property.isExpanded)
+							property.isExpanded = expanded;
 
 						var assetCount = property_groupAssetReferences.arraySize;
 						{
@@ -425,7 +432,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							for (int j = 0; j != strandGroupInstances.Length; j++)
 							{
-								var groupLabel = "Grp." + j;
+								var groupLabel = "Gr." + j;
 								var groupAssigned = (strandGroupInstances[j].settingsIndex == i);
 								if (groupAssigned)
 								{

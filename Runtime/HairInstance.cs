@@ -325,23 +325,19 @@ namespace Unity.DemoTeam.Hair
 		}
 
 #if REMOVE_AFTER_CONTENT_UPGRADE
-		[SerializeField, HideInInspector] private HairAsset hairAsset;
-		[SerializeField, HideInInspector] private bool hairAssetQuickEdit;
-
-		public bool settingsExpanded = true;
-		[FormerlySerializedAs("settingsRoots")]
-		public SettingsSkinning OLD__settingsSkinning = SettingsSkinning.defaults;
-		[FormerlySerializedAs("settingsStrands")]
-		public SettingsStrands OLD__settingsStrands = SettingsStrands.defaults;
-		[FormerlySerializedAs("settingsSolver")]
-		public HairSim.SolverSettings OLD__settingsSolver = HairSim.SolverSettings.defaults;
+		[SerializeField, HideInInspector, FormerlySerializedAs("hairAsset")] private HairAsset OLD__hairAsset;
+		[SerializeField, HideInInspector, FormerlySerializedAs("hairAssetQuickEdit")] private bool OLD__hairAssetQuickEdit;
+		[SerializeField, HideInInspector, FormerlySerializedAs("settingsRoots")] public SettingsSkinning OLD__settingsRoots = SettingsSkinning.defaults;
+		[SerializeField, HideInInspector, FormerlySerializedAs("settingsStrands")] public SettingsStrands OLD__settingsStrands = SettingsStrands.defaults;
+		[SerializeField, HideInInspector, FormerlySerializedAs("settingsSolver")] public HairSim.SolverSettings OLD__settingsSolver = HairSim.SolverSettings.defaults;
 #endif
+
+		public string[] strandGroupChecksums;// checksums of active providers for instantiated groups
 
 		public GroupProvider[] strandGroupProviders = new GroupProvider[1];
 		public GroupInstance[] strandGroupInstances;
 		public GroupSettings[] strandGroupSettings;
-		public GroupSettings strandGroupDefaults;
-		public string[] strandGroupChecksums;// stores checksums of providers for instantiated groups
+		public GroupSettings strandGroupDefaults = GroupSettings.defaults;
 
 		public SettingsSystem settingsSystem = SettingsSystem.defaults;					// per instance
 		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults;	// per instance
@@ -381,7 +377,7 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDrawGizmos()
 		{
-			if (strandGroupInstances == null)
+			if (solverData == null)
 				return;
 
 			// volume bounds
@@ -514,7 +510,7 @@ namespace Unity.DemoTeam.Hair
 			var status = CheckStrandGroupInstances();
 
 #if REMOVE_AFTER_CONTENT_UPGRADE
-			if (hairAsset != null)
+			if (OLD__hairAsset != null)
 			{
 				status = StrandGroupInstancesStatus.RequireRebuild;
 			}
@@ -565,7 +561,7 @@ namespace Unity.DemoTeam.Hair
 #endif
 
 #if REMOVE_AFTER_CONTENT_UPGRADE
-			if (hairAsset != null)
+			if (OLD__hairAsset != null)
 			{
 				settingsSystem.kLODSearchValue = OLD__settingsStrands.kLODSearchValue;
 				settingsSystem.kLODBlending = OLD__settingsStrands.kLODBlending;
@@ -585,14 +581,17 @@ namespace Unity.DemoTeam.Hair
 				CoreUtils.Destroy(strandGroupInstances?[0].container);
 
 				strandGroupProviders = new GroupProvider[1];
-				strandGroupProviders[0].hairAsset = hairAsset;
-				strandGroupProviders[0].hairAssetQuickEdit = hairAssetQuickEdit;
+				strandGroupProviders[0].hairAsset = OLD__hairAsset;
+				strandGroupProviders[0].hairAssetQuickEdit = OLD__hairAssetQuickEdit;
 				strandGroupInstances = null;
 				strandGroupChecksums = null;
 				strandGroupSettings = null;
+				strandGroupDefaults.settingsSkinning = OLD__settingsRoots;
+				strandGroupDefaults.settingsStrands = OLD__settingsStrands;
+				strandGroupDefaults.settingsSolver = OLD__settingsSolver;
 
-				hairAsset = null;
-				hairAssetQuickEdit = false;
+				OLD__hairAsset = null;
+				OLD__hairAssetQuickEdit = false;
 			}
 #endif
 
@@ -627,9 +626,15 @@ namespace Unity.DemoTeam.Hair
 
 		void UpdateStrandGroupSettings()
 		{
-			if (strandGroupSettings == null)
-				return;
 			if (strandGroupInstances == null)
+				return;
+
+			for (int i = 0; i != strandGroupInstances.Length; i++)
+			{
+				strandGroupInstances[i].settingsIndex = -1;
+			}
+
+			if (strandGroupSettings == null)
 				return;
 
 			// remove duplicate references (meaning only one settings block can affect instances of a particular group asset)
@@ -671,7 +676,6 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != strandGroupInstances.Length; i++)
 				{
 					groupAssetInstancesMap.Add(strandGroupInstances[i].groupAssetReference.GetSortKey(), i);
-					strandGroupInstances[i].settingsIndex = -1;
 				}
 
 				for (int i = 0; i != strandGroupSettings.Length; i++)
@@ -687,7 +691,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 			}
-#else		// alt. path without multihashmap
+#else// alt. path without multihashmap
 			unsafe
 			{
 				using (var sortedGroupInstances = new NativeArray<ulong>(strandGroupInstances.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
@@ -813,7 +817,7 @@ namespace Unity.DemoTeam.Hair
 					if (attachmentsChangedMask.IsSet(i))
 					{
 						if (i == 0)
-							CommitAttachments(ref OLD__settingsSkinning);
+							CommitAttachments(ref strandGroupDefaults.settingsSkinning);
 						else
 							CommitAttachments(ref strandGroupSettings[i - 1].settingsSkinning);
 					}
@@ -1063,7 +1067,7 @@ namespace Unity.DemoTeam.Hair
 			if (i != -1 && strandGroupSettings[i].settingsSkinningToggle)
 				return ref strandGroupSettings[i].settingsSkinning;
 			else
-				return ref OLD__settingsSkinning;
+				return ref strandGroupDefaults.settingsSkinning;
 		}
 
 		public ref readonly SettingsStrands GetSettingsStrands(in GroupInstance strandGroupInstance)
@@ -1072,7 +1076,7 @@ namespace Unity.DemoTeam.Hair
 			if (i != -1 && strandGroupSettings[i].settingsStrandsToggle)
 				return ref strandGroupSettings[i].settingsStrands;
 			else
-				return ref OLD__settingsStrands;
+				return ref strandGroupDefaults.settingsStrands;
 		}
 
 		public ref readonly HairSim.SolverSettings GetSettingsSolver(in GroupInstance strandGroupInstance)
@@ -1081,7 +1085,7 @@ namespace Unity.DemoTeam.Hair
 			if (i != -1 && strandGroupSettings[i].settingsSolverToggle)
 				return ref strandGroupSettings[i].settingsSolver;
 			else
-				return ref OLD__settingsSolver;
+				return ref strandGroupDefaults.settingsSolver;
 		}
 
 		public Material GetStrandMaterial(in GroupInstance strandGroupInstance)
