@@ -168,8 +168,10 @@ namespace Unity.DemoTeam.Hair
 			public Vector3 boundsCenter;
 			[VisibleIf(nameof(boundsMode), BoundsMode.Fixed)]
 			public Vector3 boundsExtent;
-			[Range(0.0f, 2.0f)]
-			public float boundsScale;
+			[ToggleGroup]
+			public bool boundsScale;
+			[ToggleGroupItem, Range(0.0f, 2.0f)]
+			public float boundsScaleValue;
 
 			[LineHeader("Renderer")]
 
@@ -211,7 +213,8 @@ namespace Unity.DemoTeam.Hair
 				boundsMode = BoundsMode.Automatic,
 				boundsCenter = new Vector3(0.0f, 0.0f, 0.0f),
 				boundsExtent = new Vector3(1.0f, 1.0f, 1.0f),
-				boundsScale = 1.25f,
+				boundsScale = false,
+				boundsScaleValue = 1.25f,
 
 				strandRenderer = StrandRenderer.BuiltinLines,
 				strandShadows = ShadowCastingMode.On,
@@ -1043,11 +1046,13 @@ namespace Unity.DemoTeam.Hair
 		{
 			Debug.Assert(worldSquare == false || worldToLocalTransform == null);
 
-			var systemBounds = new Bounds();
+			var boundsScale = settingsSystem.boundsScale ? settingsSystem.boundsScaleValue : 1.25f;
+			var bounds = new Bounds();
 			{
-				systemBounds.center = Vector3.zero;
-				systemBounds.extents = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+				bounds.center = Vector3.zero;
+				bounds.extents = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
 			}
+
 
 			switch (settingsSystem.boundsMode)
 			{
@@ -1058,26 +1063,26 @@ namespace Unity.DemoTeam.Hair
 							var rootMargin = GetStrandScale(strandGroupInstances[i]) * strandGroupInstances[i].groupAssetReference.Resolve().maxStrandLength;
 							var rootBounds = GetRootBounds(strandGroupInstances[i], worldToLocalTransform);
 							{
-								rootBounds.Expand(2.0f * rootMargin * settingsSystem.boundsScale);
+								rootBounds.Expand(2.0f * rootMargin * boundsScale);
 							}
 
-							systemBounds.Encapsulate(rootBounds);
+							bounds.Encapsulate(rootBounds);
 						}
 					}
 					break;
 
 				case SettingsSystem.BoundsMode.Fixed:
 					{
-						systemBounds.center = settingsSystem.boundsCenter + this.transform.position;
-						systemBounds.extents = settingsSystem.boundsExtent * settingsSystem.boundsScale;
+						bounds.center = settingsSystem.boundsCenter + this.transform.position;
+						bounds.extents = settingsSystem.boundsExtent * boundsScale;
 					}
 					break;
 			}
 
 			if (worldSquare)
-				return new Bounds(systemBounds.center, systemBounds.size.CMax() * Vector3.one);
+				return new Bounds(bounds.center, bounds.size.CMax() * Vector3.one);
 			else
-				return systemBounds;
+				return bounds;
 		}
 
 		public ref readonly SettingsSkinning GetSettingsSkinning(in GroupInstance strandGroupInstance)
