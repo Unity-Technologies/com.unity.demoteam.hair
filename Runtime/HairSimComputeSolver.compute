@@ -28,7 +28,7 @@
 // 0 == mute volume impulse, by default the case for secondary substeps (unless application is forced)
 // 1 == apply volume impulses, always the case for first substep
 
-//#pragma multi_compile __ ENABLE_BOUNDARY ENABLE_BOUNDARY_FRICTION
+#pragma multi_compile __ ENABLE_BOUNDARY// ENABLE_BOUNDARY_FRICTION
 #pragma multi_compile __ ENABLE_DISTANCE
 #pragma multi_compile __ ENABLE_DISTANCE_LRA
 //#pragma multi_compile __ ENABLE_DISTANCE_FTL
