@@ -85,7 +85,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 #if REMOVE_AFTER_CONTENT_UPGRADE
-			public GameObject container;
+			[FormerlySerializedAs("container")] public GameObject OLD__container;
 #endif
 
 			public GroupAssetReference groupAssetReference;
@@ -273,9 +273,9 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Material")]
 
-			[ToggleGroup]
+			[ToggleGroup, FormerlySerializedAs("strandMaterial")]
 			public bool material;
-			[ToggleGroupItem]
+			[ToggleGroupItem, FormerlySerializedAs("strandMaterialValue")]
 			public Material materialValue;
 
 			[LineHeader("Proportions")]
@@ -332,7 +332,7 @@ namespace Unity.DemoTeam.Hair
 		[SerializeField, HideInInspector, FormerlySerializedAs("hairAssetQuickEdit")] private bool OLD__hairAssetQuickEdit;
 		[SerializeField, HideInInspector, FormerlySerializedAs("settingsRoots")] public SettingsSkinning OLD__settingsRoots = SettingsSkinning.defaults;
 		[SerializeField, HideInInspector, FormerlySerializedAs("settingsStrands")] public SettingsStrands OLD__settingsStrands = SettingsStrands.defaults;
-		[SerializeField, HideInInspector, FormerlySerializedAs("settingsSolver")] public HairSim.SolverSettings OLD__settingsSolver = HairSim.SolverSettings.defaults;
+		[SerializeField, HideInInspector, FormerlySerializedAs("solverSettings")] public HairSim.SolverSettings OLD__settingsSolver = HairSim.SolverSettings.defaults;
 #endif
 
 		public string[] strandGroupChecksums;// checksums of active providers for instantiated groups
@@ -342,9 +342,9 @@ namespace Unity.DemoTeam.Hair
 		public GroupSettings[] strandGroupSettings;
 		public GroupSettings strandGroupDefaults = GroupSettings.defaults;
 
-		public SettingsSystem settingsSystem = SettingsSystem.defaults;					// per instance
-		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults;	// per instance
-		public HairSim.DebugSettings settingsDebug = HairSim.DebugSettings.defaults;    // per instance
+		public SettingsSystem settingsSystem = SettingsSystem.defaults;                 // per instance
+		[FormerlySerializedAs("volumeSettings")]		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults; // per instance
+		[FormerlySerializedAs("debugSettings")]		public HairSim.DebugSettings settingsDebug = HairSim.DebugSettings.defaults;    // per instance
 
 		[NonSerialized] public HairSim.SolverData[] solverData; // per group
 		[NonSerialized] public HairSim.VolumeData volumeData;	// per instance
@@ -550,7 +550,25 @@ namespace Unity.DemoTeam.Hair
 								UnityEditor.PrefabUtility.SaveAsPrefabAsset(prefabContainer, prefabPath);
 								UnityEditor.PrefabUtility.UnloadPrefabContents(prefabContainer);
 							}
-						}
+
+							var serializedObject = new UnityEditor.SerializedObject(this);
+							{
+								var property_strandGroupProviders = serializedObject.FindProperty(nameof(strandGroupChecksums));
+								var property_strandGroupChecksums = serializedObject.FindProperty(nameof(strandGroupProviders));
+								var property_strandGroupDefaults = serializedObject.FindProperty(nameof(strandGroupDefaults));
+								var property_strandGroupSettings = serializedObject.FindProperty(nameof(strandGroupSettings));
+
+								UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupProviders, UnityEditor.InteractionMode.AutomatedAction);
+								UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupChecksums, UnityEditor.InteractionMode.AutomatedAction);
+								UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupDefaults.FindPropertyRelative(nameof(GroupSettings.settingsSkinning)), UnityEditor.InteractionMode.AutomatedAction);
+
+								for (int i = 0; i != property_strandGroupSettings.arraySize; i++)
+								{
+									UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupSettings.GetArrayElementAtIndex(i).FindPropertyRelative(nameof(GroupSettings.settingsSkinning)), UnityEditor.InteractionMode.AutomatedAction);
+								}
+							}
+
+							serializedObject.ApplyModifiedProperties();						}
 						ReleaseRuntimeData();
 						break;
 
@@ -581,7 +599,7 @@ namespace Unity.DemoTeam.Hair
 				settingsSystem.stepsMax = OLD__settingsStrands.stepsMax;
 				settingsSystem.stepsMaxValue = OLD__settingsStrands.stepsMaxValue;
 
-				CoreUtils.Destroy(strandGroupInstances?[0].container);
+				CoreUtils.Destroy(strandGroupInstances?[0].OLD__container);
 
 				strandGroupProviders = new GroupProvider[1];
 				strandGroupProviders[0].hairAsset = OLD__hairAsset;
