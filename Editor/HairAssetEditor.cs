@@ -168,6 +168,10 @@ namespace Unity.DemoTeam.Hair
 				{
 					EditorGUILayout.HelpBox("Configuration warning: Unable to locate curves in the assigned alembic asset.", MessageType.Warning, wide: true);
 				}
+				else
+				{
+					WarnIfNotAssigned(alembicAsset, LabelName(nameof(hairAsset.settingsAlembic.alembicAsset)));
+				}
 
 				if (hairAsset.settingsAlembic.rootUV == HairAsset.SettingsAlembic.RootUV.ResolveFromMesh)
 				{
@@ -281,24 +285,27 @@ namespace Unity.DemoTeam.Hair
 					EditorGUILayout.Space();
 
 					var clustersProvider = (HairAsset.LODClusters)_settingsBasic_kLODClustersProvider.enumValueIndex;
-					var clustersSubdivided = _settingsBasic_kLODClustersHighLOD.boolValue;
+					var clustersProviderExpanded = false;
 
 					switch (clustersProvider)
 					{
 						case HairAsset.LODClusters.Generated:
-							StructPropertyFieldsWithHeader(_settingsLODGenerated, "Settings Clusters Generated", ValidationGUILODClusters, hairAsset);
+							clustersProviderExpanded = StructPropertyFieldsWithHeader(_settingsLODGenerated, "Settings Clusters Generated", ValidationGUILODClusters, hairAsset);
 							break;
 
 						case HairAsset.LODClusters.UVMapped:
-							StructPropertyFieldsWithHeader(_settingsLODUVMapped, "Settings Clusters UV Mapped", ValidationGUILODClusters, hairAsset);
+							clustersProviderExpanded = StructPropertyFieldsWithHeader(_settingsLODUVMapped, "Settings Clusters UV Mapped", ValidationGUILODClusters, hairAsset);
 							break;
 					}
 
-					if (clustersSubdivided)
+					if (clustersProviderExpanded)
 					{
-						using (new EditorGUI.IndentLevelScope())
+						if (_settingsBasic_kLODClustersHighLOD.boolValue)
 						{
-							StructPropertyFields(_settingsLODPyramid);
+							using (new EditorGUI.IndentLevelScope())
+							{
+								StructPropertyFields(_settingsLODPyramid);
+							}
 						}
 					}
 				}

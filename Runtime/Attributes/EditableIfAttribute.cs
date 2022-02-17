@@ -13,14 +13,22 @@ namespace Unity.DemoTeam.Hair
 
 #if UNITY_EDITOR
 	[CustomPropertyDrawer(typeof(EditableIfAttribute))]
-	public class EditableIfAttributeDrawer : CompareFieldBaseDrawer
+	public class EditableIfAttributeDrawer : PropertyDrawer
 	{
-		public override void OnGUI(Rect rect, SerializedProperty property, GUIContent label)
+		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
-			var enabled = GUI.enabled;
-			GUI.enabled = base.Compare(property) && enabled;
-			EditorGUI.PropertyField(rect, property, label, true);
-			GUI.enabled = enabled;
+			var editable = base.attribute as EditableIfAttribute;
+
+			if (GUI.enabled && editable.EvaluateAt(property) == false)
+			{
+				GUI.enabled = false;
+				EditorGUI.PropertyField(position, property, label, includeChildren: true);
+				GUI.enabled = true;
+			}
+			else
+			{
+				EditorGUI.PropertyField(position, property, label, includeChildren: true);
+			}
 		}
 	}
 #endif

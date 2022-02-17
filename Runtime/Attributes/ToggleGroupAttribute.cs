@@ -14,24 +14,62 @@ namespace Unity.DemoTeam.Hair
 	[CustomPropertyDrawer(typeof(ToggleGroupAttribute))]
 	public class ToggleGroupAttributeDrawer : PropertyDrawer
 	{
+		const float widthSlider = 100.0f;
+		const float widthSpacing = 5.0f;
+		const float widthToggle = 14.0f;
+
+		public struct PropertyScope : IDisposable
+		{
+			public readonly Rect position;
+			public readonly GUIContent label;
+
+			public PropertyScope(GUIContent label, SerializedProperty property, float widthFixed, GUIStyle style)
+			{
+				this.position = GUILayoutUtility.GetRect(widthFixed, EditorGUIUtility.singleLineHeight, style, GUILayout.Width(widthFixed));
+				this.label = EditorGUI.BeginProperty(position, label, property);
+			}
+
+			public PropertyScope(GUIContent label, SerializedProperty property, float widthMin, float widthMax, GUIStyle style)
+			{
+				this.position = GUILayoutUtility.GetRect(widthMin, widthMax, EditorGUIUtility.singleLineHeight, EditorGUIUtility.singleLineHeight, style);
+				this.label = EditorGUI.BeginProperty(position, label, property);
+			}
+
+			public void Dispose()
+			{
+				EditorGUI.EndProperty();
+			}
+		}
+
 		public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => -EditorGUIUtility.standardVerticalSpacing;
 		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
-			EditorGUI.BeginProperty(position, label, property);
+			var ev = Event.current;
+			var evClick = (ev.type == EventType.MouseDown) || (ev.type == EventType.MouseUp);
+			var evClickRight = evClick && (ev.button == 1);
+
 			EditorGUILayout.BeginHorizontal();
 
-			var labelText = label.text;
-			var labelTooltip = label.tooltip;
-
-			if (TryGetTooltipAttribute(fieldInfo, out labelTooltip))
+			var labelPrefix = label.text + " ";
 			{
-				label.tooltip = labelTooltip;
+				if (TryGetTooltipAttribute(fieldInfo, out var tooltip))
+				{
+					label.tooltip = tooltip;
+				}
 			}
 
-			property.boolValue = EditorGUILayout.Toggle(label, property.boolValue, GUILayout.ExpandWidth(false));
+			using (var scope = new PropertyScope(label, property, EditorGUIUtility.labelWidth + widthToggle + 3.0f, EditorStyles.toggle))
+			{
+				var toggle = EditorGUI.Toggle(scope.position, scope.label, property.boolValue);
+				if (toggle != property.boolValue)
+					property.boolValue = toggle;
+			}
 
 			using (new EditorGUI.DisabledScope(property.boolValue == false))
 			{
+				var storedIndentLevel = EditorGUI.indentLevel;
+				EditorGUI.indentLevel = 0;
+
 				while (property.Next(enterChildren: false))
 				{
 					var target = property.serializedObject.targetObject;
@@ -46,96 +84,227 @@ namespace Unity.DemoTeam.Hair
 					if (groupItem == null)
 						break;
 
+					var groupItem_withTooltip = TryGetTooltipAttribute(field, out var groupItemTooltip);
 					if (groupItem.withLabel)
 					{
-						var fieldLabelText = property.displayName;
-						if (fieldLabelText.StartsWith(labelText))
-							fieldLabelText = fieldLabelText.Substring(labelText.Length).TrimStart();
+						var groupItemLabel = property.displayName;
+						if (groupItemLabel.StartsWith(labelPrefix))
+							groupItemLabel = groupItemLabel.Substring(labelPrefix.Length);
 
-						TryGetTooltipAttribute(field, out var fieldLabelTooltip);
-
-						GUILayout.Space(2.0f);
-						GUILayout.Label(new GUIContent(fieldLabelText, fieldLabelTooltip));
+						label = new GUIContent(groupItemLabel, groupItemTooltip);
+					}
+					else
+					{
+						label = GUIContent.none;
 					}
 
-					GUILayout.Space(-12.0f);
+					EditorGUIUtility.labelWidth = GUI.skin.label.CalcSize(label).x;
+
+					var reserveFixed = false;
+					var reserveStyle = EditorStyles.layerMaskField;
+
+					var reserveLabel = widthSpacing + EditorGUIUtility.labelWidth;
+					var reserveField = widthSpacing + EditorGUIUtility.fieldWidth;
+					var reserveExtra = 0.0f;
+
+					var fieldHasRange = false;
+					var fieldHasRangeMin = 0.0f;
+					var fieldHasRangeMax = 0.0f;
+
 					switch (property.propertyType)
 					{
-						case SerializedPropertyType.Enum:
-							{
-								var enumValue = (Enum)Enum.GetValues(field.FieldType).GetValue(property.enumValueIndex);
-								var enumValueSelected = EditorGUILayout.EnumPopup(enumValue);
-								property.enumValueIndex = Convert.ToInt32(enumValueSelected);
-							}
+						case SerializedPropertyType.Boolean:
+							reserveFixed = true;
+							reserveField = widthSpacing + widthToggle + (groupItem.withLabel ? -3.0f : 0.0f);
 							break;
 
 						case SerializedPropertyType.Float:
-							{
-								if (TryGetRangeAttribute(field, out var min, out var max))
-									property.floatValue = EditorGUILayout.Slider(property.floatValue, min, max);
-								else
-									property.floatValue = EditorGUILayout.FloatField(property.floatValue);
-							}
-							break;
-
 						case SerializedPropertyType.Integer:
+							if (TryGetRangeAttribute(field, out fieldHasRangeMin, out fieldHasRangeMax))
 							{
-								if (TryGetRangeAttribute(field, out var min, out var max))
-									property.intValue = EditorGUILayout.IntSlider(property.intValue, (int)min, (int)max);
-								else
-									property.intValue = EditorGUILayout.IntField(property.intValue);
+								fieldHasRange = true;
+								reserveExtra = widthSpacing + widthSlider;
 							}
-							break;
-
-						case SerializedPropertyType.Boolean:
-							{
-								property.boolValue = EditorGUILayout.Toggle(property.boolValue, GUILayout.Width(30.0f));
-							}
-							break;
-
-						case SerializedPropertyType.ObjectReference:
-							{
-								property.objectReferenceValue = EditorGUILayout.ObjectField(property.objectReferenceValue, field.FieldType, allowSceneObjects: groupItem.allowSceneObjects);
-							}
-							break;
-
-						case SerializedPropertyType.LayerMask:
-							{
-								var concatName = InternalEditorUtility.layers;
-								var concatMask = (property.intValue == -1) ? -1 : InternalEditorUtility.LayerMaskToConcatenatedLayersMask(property.intValue);
-
-								concatMask = EditorGUILayout.MaskField(concatMask, concatName);
-
-								if (concatMask == -1)
-									property.intValue = -1;
-								else
-									property.intValue = InternalEditorUtility.ConcatenatedLayersMaskToLayerMask(concatMask);
-							}
-							break;
-
-						default:
-							Debug.Log("unsupported [ToggleGroupItem] " + property.propertyPath + ": " + property.propertyType.ToString());
 							break;
 					}
 
-					if (!groupItem.withLabel)
+					PropertyScope propertyScope;
 					{
-						if (TryGetTooltipAttribute(field, out var fieldTooltip))
+						var reserveMin = reserveField + (groupItem.withLabel ? reserveLabel : 0.0f);
+						var reserveMax = reserveField + reserveLabel + reserveExtra;
+
+						if (reserveFixed)
+							propertyScope = new PropertyScope(label, property, reserveMin, reserveStyle);
+						else
+							propertyScope = new PropertyScope(label, property, reserveMin, reserveMax, reserveStyle);
+					}
+
+					using (propertyScope)
+					{
+						position = propertyScope.position.ClipLeft(widthSpacing);
+						label = propertyScope.label;
+
+						switch (property.propertyType)
 						{
-							GUI.Label(GUILayoutUtility.GetLastRect(), new GUIContent(string.Empty, fieldTooltip));
+							case SerializedPropertyType.Enum:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var enumValue = (Enum)Enum.GetValues(field.FieldType).GetValue(property.enumValueIndex);
+									{
+										enumValue = EditorGUI.EnumPopup(position, label, enumValue, EditorStyles.popup);
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.enumValueIndex = Convert.ToInt32(enumValue);
+									}
+								}
+								break;
+
+							case SerializedPropertyType.AnimationCurve:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var curve = property.animationCurveValue;
+									{
+										using (new EditorGUI.DisabledScope(evClickRight))
+										{
+											if (TryGetLinearRampAttribute(field, out var ranges))
+												curve = HairEditorGUI.LinearRamp(position, label, curve, ranges);
+											else
+												curve = EditorGUI.CurveField(position, label, curve);
+										}
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.animationCurveValue = curve;
+									}
+								}
+								break;
+
+							case SerializedPropertyType.Float:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var value = property.floatValue;
+									{
+										using (new EditorGUI.DisabledScope(evClickRight))
+										{
+											if (fieldHasRange)
+												value = EditorGUI.Slider(position, label, value, fieldHasRangeMin, fieldHasRangeMax);
+											else
+												value = EditorGUI.FloatField(position, label, value);
+										}
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.floatValue = value;
+									}
+								}
+								break;
+
+							case SerializedPropertyType.Integer:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var value = property.intValue;
+									{
+										using (new EditorGUI.DisabledScope(evClickRight))
+										{
+											if (fieldHasRange)
+												value = EditorGUI.IntSlider(position, label, value, (int)fieldHasRangeMin, (int)fieldHasRangeMax);
+											else
+												value = EditorGUI.IntField(position, label, value);
+										}
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.intValue = value;
+									}
+								}
+								break;
+
+							case SerializedPropertyType.Boolean:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var toggle = property.boolValue;
+									{
+										toggle = EditorGUI.Toggle(position, label, toggle);
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.boolValue = toggle;
+									}
+								}
+								break;
+
+							case SerializedPropertyType.ObjectReference:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var objectReference = property.objectReferenceValue;
+									{
+										objectReference = EditorGUI.ObjectField(position, label, objectReference, field.FieldType, allowSceneObjects: groupItem.allowSceneObjects);
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.objectReferenceValue = objectReference;
+									}
+								}
+								break;
+
+							case SerializedPropertyType.LayerMask:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var concatName = InternalEditorUtility.layers;
+									var concatMask = (property.intValue == -1) ? -1 : InternalEditorUtility.LayerMaskToConcatenatedLayersMask(property.intValue);
+									{
+										concatMask = EditorGUI.MaskField(position, label, concatMask, concatName);
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										if (concatMask == -1)
+											property.intValue = -1;
+										else
+											property.intValue = InternalEditorUtility.ConcatenatedLayersMaskToLayerMask(concatMask);
+									}
+								}
+								break;
+
+							default:
+								Debug.Log("ToggleGroupItem: unsupported property type " + property.propertyType.ToString() + " (at " + property.propertyPath + ")");
+								break;
+						}
+
+						if (groupItem.withLabel == false && groupItem_withTooltip)
+						{
+							GUI.Label(position, new GUIContent(string.Empty, groupItemTooltip));
 						}
 					}
 
 					if (groupItem.withSuffix != null)
 					{
-						GUILayout.Space(2.0f);
-						GUILayout.Label(new GUIContent(groupItem.withSuffix));
+						var suffix = new GUIContent(groupItem.withSuffix);
+						var suffixWidth = GUI.skin.label.CalcSize(suffix).x;
+						var suffixPosition = GUILayoutUtility.GetRect(suffixWidth, EditorGUIUtility.singleLineHeight, reserveStyle, GUILayout.Width(suffixWidth));
+						GUI.Label(suffixPosition, suffix);
 					}
 				}
+
+				EditorGUIUtility.labelWidth = 0;// reset to default
+				EditorGUI.indentLevel = storedIndentLevel;
 			}
 
 			EditorGUILayout.EndHorizontal();
-			EditorGUI.EndProperty();
 		}
 
 		static FieldInfo GetFieldByPropertyPath(Type type, string path)
@@ -176,10 +345,24 @@ namespace Unity.DemoTeam.Hair
 			return type.GetField(path.Substring(start));
 		}
 
+		static bool TryGetAttribute<T>(FieldInfo field, out T attribute) where T : PropertyAttribute
+		{
+			var a = field.GetCustomAttribute<T>();
+			if (a != null)
+			{
+				attribute = a;
+				return true;
+			}
+			else
+			{
+				attribute = null;
+				return false;
+			}
+		}
+
 		static bool TryGetMinAttribute(FieldInfo field, out float min)
 		{
-			var a = field.GetCustomAttribute<MinAttribute>();
-			if (a != null)
+			if (TryGetAttribute<MinAttribute>(field, out var a))
 			{
 				min = a.min;
 				return true;
@@ -193,8 +376,7 @@ namespace Unity.DemoTeam.Hair
 
 		static bool TryGetRangeAttribute(FieldInfo field, out float min, out float max)
 		{
-			var a = field.GetCustomAttribute<RangeAttribute>();
-			if (a != null)
+			if (TryGetAttribute<RangeAttribute>(field, out var a))
 			{
 				min = a.min;
 				max = a.max;
@@ -210,8 +392,7 @@ namespace Unity.DemoTeam.Hair
 
 		static bool TryGetTooltipAttribute(FieldInfo field, out string tooltip)
 		{
-			var a = field.GetCustomAttribute<TooltipAttribute>();
-			if (a != null)
+			if (TryGetAttribute<TooltipAttribute>(field, out var a))
 			{
 				tooltip = a.tooltip;
 				return true;
@@ -221,6 +402,25 @@ namespace Unity.DemoTeam.Hair
 				tooltip = string.Empty;
 				return false;
 			}
+		}
+
+		static bool TryGetLinearRampAttribute(FieldInfo field, out Rect ranges)
+		{
+			if (TryGetAttribute<LinearRampAttribute>(field, out var a))
+			{
+				ranges = a.ranges;
+				return true;
+			}
+			else
+			{
+				ranges = Rect.zero;
+				return false;
+			}
+		}
+
+		static bool TryGetRenderingLayerMaskAttribute(FieldInfo field)
+		{
+			return TryGetAttribute<RenderingLayerMaskAttribute>(field, out var a);
 		}
 	}
 #endif

@@ -7,10 +7,10 @@ namespace Unity.DemoTeam.Hair
 {
 	public class LineHeaderAttribute : PropertyAttribute
 	{
-		public string header;
-		public LineHeaderAttribute(string header = null)
+		public string label;
+		public LineHeaderAttribute(string label = null)
 		{
-			this.header = header;
+			this.label = label;
 		}
 	}
 
@@ -18,22 +18,44 @@ namespace Unity.DemoTeam.Hair
 	[CustomPropertyDrawer(typeof(LineHeaderAttribute))]
 	public class LineHeaderAttributeDrawer : DecoratorDrawer
 	{
-		const float lineWidth = 2.0f;
-		const float paddingTop = 11.0f;
-		const float paddingBottom = 4.0f;
-
-		const float headerAlign = 0.05f;
-		const float headerMargin = 3.0f;
-
-		public override float GetHeight() => lineWidth + paddingTop + paddingBottom;
+		public override float GetHeight() => HairEditorGUI.lineHeaderHeight;
 		public override void OnGUI(Rect position)
 		{
-			var attrib = attribute as LineHeaderAttribute;
-			if (attrib.header == null)
+			var header = attribute as LineHeaderAttribute;
+			{
+				HairEditorGUI.LineHeader(position, header.label);
+			}
+		}
+	}
+#endif
+
+#if UNITY_EDITOR
+	public static partial class HairEditorGUILayout
+	{
+		public static void LineHeader(string label)
+		{
+			HairEditorGUI.LineHeader(EditorGUILayout.GetControlRect(), label);
+		}
+	}
+
+	public static partial class HairEditorGUI
+	{
+		const float lineHeight = 2.0f;
+		const float lineMarginTop = 11.0f;
+		const float lineMarginBottom = 4.0f;
+
+		const float labelAlign = 0.05f;
+		const float labelMargin = 3.0f;
+
+		public const float lineHeaderHeight = lineHeight + lineMarginTop + lineMarginBottom;
+
+		public static void LineHeader(Rect position, string label)
+		{
+			if (label == null)
 			{
 				position = EditorGUI.IndentedRect(position);
-				position.y += paddingTop;
-				position.height = lineWidth;
+				position.y += lineMarginTop;
+				position.height = lineHeight;
 
 				var color = GUI.color;
 				GUI.color = Color.white;
@@ -43,32 +65,32 @@ namespace Unity.DemoTeam.Hair
 			else
 			{
 				position = EditorGUI.IndentedRect(position);
-				position.y += paddingTop;
-				position.height = lineWidth;
+				position.y += lineMarginTop;
+				position.height = lineHeight;
 
-				var headerSize = EditorStyles.miniLabel.CalcSize(new GUIContent(attrib.header));
-				var headerWidth = headerSize.x + 2.0f * headerMargin;
-				var spacerWidth = position.width - headerWidth;
+				var labelSize = EditorStyles.miniLabel.CalcSize(new GUIContent(label));
+				var labelWidth = labelSize.x + 2.0f * labelMargin;
+				var spacerWidth = position.width - labelWidth;
 
-				var delimL = position.xMin + headerAlign * spacerWidth;
-				var delimR = position.xMax - (1.0f - headerAlign) * spacerWidth;
+				var delimL = position.xMin + labelAlign * spacerWidth;
+				var delimR = position.xMax - (1.0f - labelAlign) * spacerWidth;
 
 				var posL = position;
 				var posC = position;
 				var posR = position;
 
 				posL.xMax = delimL;
-				posC.xMin = delimL + headerMargin;
-				posC.xMax = delimR - headerMargin;
-				posC.y -= 0.6f * headerSize.y;
-				posC.height = headerSize.y;
+				posC.xMin = delimL + labelMargin;
+				posC.xMax = delimR - labelMargin;
+				posC.y -= 0.6f * labelSize.y;
+				posC.height = labelSize.y;
 				posR.xMin = delimR;
 
 				var color = GUI.color;
 				GUI.color = Color.white;
 				GUI.Box(posL, "");
 				GUI.color = Color.Lerp(Color.white, Color.black, 0.45f);
-				GUI.Box(posC, attrib.header, EditorStyles.miniLabel);
+				GUI.Box(posC, label, EditorStyles.miniLabel);
 				GUI.color = Color.white;
 				GUI.Box(posR, "");
 				GUI.color = color;

@@ -165,5 +165,24 @@ namespace Unity.DemoTeam.Hair
 
 			return expand;
 		}
+
+		public struct PropertyScope : IDisposable
+		{
+			public readonly Rect position;
+			public readonly GUIContent label;
+
+			public PropertyScope(SerializedProperty property, params GUILayoutOption[] options) : this(GUIContent.none, property, options) { }
+			public PropertyScope(string label, SerializedProperty property, params GUILayoutOption[] options) : this(new GUIContent(label), property, options) { }
+			public PropertyScope(GUIContent label, SerializedProperty property, params GUILayoutOption[] options)
+			{
+				this.position = EditorGUILayout.GetControlRect(false, options);
+				this.label = EditorGUI.BeginProperty(position, label, property);
+			}
+
+			public void Dispose()
+			{
+				EditorGUI.EndProperty();
+			}
+		}
 	}
 }

@@ -5,7 +5,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	public static class HairGUI
+	public static partial class HairEditorGUI
 	{
 		const float kIndentPerLevel = 15.0f;
 		const float kSpacing = 5.0f;
@@ -149,13 +149,13 @@ namespace Unity.DemoTeam.Hair
 	{
 		public float min;
 		public float max;
-		public HairGUI.RampStyle style;
+		public HairEditorGUI.RampStyle style;
 
-		public LinearRampWidgetAttribute(float min, float max, HairGUI.RampStyle style = HairGUI.RampStyle.LinearDecreasing)
+		public LinearRampWidgetAttribute(float min, float max, HairEditorGUI.RampStyle style = HairEditorGUI.RampStyle.LinearDecreasing)
 		{
 			this.min = min;
 			this.max = max;
-			this.style = HairGUI.RampStyle.LinearDecreasing;
+			this.style = HairEditorGUI.RampStyle.LinearDecreasing;
 		}
 	}
 
@@ -173,7 +173,7 @@ namespace Unity.DemoTeam.Hair
 				position = EditorGUI.PrefixLabel(position, label);
 
 				//NOTE: EditorGUIUtility.fieldWidth
-				property.vector2Value = HairGUI.LinearRampWidget(position, property.vector2Value, new Vector2(ramp.min, ramp.max), ramp.style);
+				property.vector2Value = HairEditorGUI.LinearRampWidget(position, property.vector2Value, new Vector2(ramp.min, ramp.max), ramp.style);
 
 				EditorGUI.EndProperty();
 			}

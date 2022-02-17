@@ -72,4 +72,18 @@ namespace Unity.DemoTeam.Hair
 			return new Bounds(bounds.center, bounds.size * scale);
 		}
 	}
+
+	public static class RectExtensions
+	{
+		public static Rect ClipLeft(this Rect position, float width)
+		{
+			return new Rect(position.x + width, position.y, position.width - width, position.height);
+		}
+
+		public static Rect ClipLeft(this Rect position, float width, out Rect clipped)
+		{
+			clipped = new Rect(position.x, position.y, width, position.height);
+			return position.ClipLeft(width);
+		}
+	}
 }

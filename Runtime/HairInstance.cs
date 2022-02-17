@@ -343,8 +343,10 @@ namespace Unity.DemoTeam.Hair
 		public GroupSettings strandGroupDefaults = GroupSettings.defaults;
 
 		public SettingsSystem settingsSystem = SettingsSystem.defaults;                 // per instance
-		[FormerlySerializedAs("volumeSettings")]		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults; // per instance
-		[FormerlySerializedAs("debugSettings")]		public HairSim.DebugSettings settingsDebug = HairSim.DebugSettings.defaults;    // per instance
+		[FormerlySerializedAs("volumeSettings")]
+		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults; // per instance
+		[FormerlySerializedAs("debugSettings")]
+		public HairSim.DebugSettings settingsDebug = HairSim.DebugSettings.defaults;    // per instance
 
 		[NonSerialized] public HairSim.SolverData[] solverData; // per group
 		[NonSerialized] public HairSim.VolumeData volumeData;	// per instance
@@ -568,7 +570,8 @@ namespace Unity.DemoTeam.Hair
 								}
 							}
 
-							serializedObject.ApplyModifiedProperties();						}
+							serializedObject.ApplyModifiedProperties();
+						}
 						ReleaseRuntimeData();
 						break;
 

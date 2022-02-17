@@ -32,29 +32,22 @@ namespace Unity.DemoTeam.Hair
 			this.cmpType = cmpValue is null ? TypeCode.Empty : Type.GetTypeCode(cmpValue.GetType());
 			this.cmpOp = cmpOp;
 		}
+
+#if UNITY_EDITOR
+		public bool EvaluateAt(SerializedProperty property)
+		{
+			return CompareFieldUtility.Evaluate(this, property);
+		}
+#endif
 	}
 
 #if UNITY_EDITOR
-	public abstract class CompareFieldBaseDrawer : PropertyDrawer
+	public static class CompareFieldUtility
 	{
-		private static bool Compare<T>(CmpOp op, T a, T b) where T : IComparable<T>
-		{
-			switch (op)
-			{
-				case CmpOp.Eq: return a.CompareTo(b) == 0;
-				case CmpOp.Geq: return a.CompareTo(b) >= 0;
-				case CmpOp.Gt: return a.CompareTo(b) > 0;
-				case CmpOp.Leq: return a.CompareTo(b) <= 0;
-				case CmpOp.Lt: return a.CompareTo(b) < 0;
-				case CmpOp.Neq: return a.CompareTo(b) != 0;
-				default: return false;
-			}
-		}
-
-		protected bool Compare(SerializedProperty property)
+		public static bool Evaluate(CompareFieldBase attribute, SerializedProperty property)
 		{
 			var result = false;
-			var attrib = (CompareFieldBase)base.attribute;
+			var attrib = attribute;
 			if (attrib.fieldName.Length > 0)
 			{
 				SerializedProperty searchProperty;
@@ -114,6 +107,20 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 			return result;
+		}
+
+		static bool Compare<T>(CmpOp op, T a, T b) where T : IComparable<T>
+		{
+			switch (op)
+			{
+				case CmpOp.Eq: return a.CompareTo(b) == 0;
+				case CmpOp.Geq: return a.CompareTo(b) >= 0;
+				case CmpOp.Gt: return a.CompareTo(b) > 0;
+				case CmpOp.Leq: return a.CompareTo(b) <= 0;
+				case CmpOp.Lt: return a.CompareTo(b) < 0;
+				case CmpOp.Neq: return a.CompareTo(b) != 0;
+				default: return false;
+			}
 		}
 	}
 #endif

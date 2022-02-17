@@ -382,7 +382,10 @@ namespace Unity.DemoTeam.Hair
 						if (expanded != property.isExpanded)
 							property.isExpanded = expanded;
 
-						EditorGUILayout.LabelField("Defaults (All Groups)", EditorStyles.textArea);
+						using (var scope = new HairGUILayout.PropertyScope("Defaults (All Groups)", property))
+						{
+							EditorGUI.LabelField(scope.position, scope.label, EditorStyles.textArea);
+						}
 					}
 					EditorGUILayout.EndHorizontal();
 
@@ -422,9 +425,13 @@ namespace Unity.DemoTeam.Hair
 						if (expanded != property.isExpanded)
 							property.isExpanded = expanded;
 
-						var assetCount = property_groupAssetReferences.arraySize;
+						var blockCount = property_groupAssetReferences.arraySize;
+						var blockLabel = "Overrides (" + blockCount + (blockCount == 1 ? " Group Asset)" : " Group Assets)");
 						{
-							EditorGUILayout.LabelField("Overrides (" + assetCount + (assetCount == 1 ? " Group Asset)" : " Group Assets)"), EditorStyles.textArea);
+							using (var scope = new HairGUILayout.PropertyScope(blockLabel, property))
+							{
+								EditorGUI.LabelField(scope.position, scope.label, EditorStyles.textArea);
+							}
 						}
 
 						var strandGroupInstances = hairInstance.strandGroupInstances;
