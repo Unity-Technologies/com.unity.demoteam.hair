@@ -314,8 +314,12 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.Space();
 			EditorGUILayout.BeginHorizontal();
 			{
-				var buildNow = GUILayout.Button("Build strand groups");
-				var buildAuto = EditorGUILayout.ToggleLeft("Auto", _strandGroupsAutoBuild.boolValue, GUILayout.Width(50.0f));
+				EditorGUIUtility.labelWidth = GUI.skin.label.CalcSize(new GUIContent("Auto")).x;
+
+				var buildNow = GUILayout.Button("Build strand groups"); GUILayout.Space(.0f);
+				var buildAuto = EditorGUILayout.ToggleLeft("Auto", _strandGroupsAutoBuild.boolValue, GUILayout.ExpandHeight(true), GUILayout.Width(EditorGUIUtility.labelWidth + 16.0f));
+
+				EditorGUIUtility.labelWidth = 0;
 
 				if (_strandGroupsAutoBuild.boolValue != buildAuto)
 					_strandGroupsAutoBuild.boolValue = buildAuto;
@@ -375,6 +379,7 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != hairAsset.strandGroups.Length; i++)
 				{
 					EditorGUILayout.Space();
+
 					if (StructHeader("Group:" + i))
 					{
 						using (new EditorGUI.IndentLevelScope())

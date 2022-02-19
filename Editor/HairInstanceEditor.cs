@@ -5,7 +5,7 @@ using UnityEditor;
 namespace Unity.DemoTeam.Hair
 {
 	using static HairGUILayout;
-	using static HairGUIUtility;
+	using static HairGUI;
 
 	[CustomEditor(typeof(HairInstance)), CanEditMultipleObjects]
 	public class HairInstanceEditor : Editor
@@ -327,7 +327,7 @@ namespace Unity.DemoTeam.Hair
 
 							rect.width = rectWidthCount;
 							{
-								using (new ColorScope(hairInstance.stepsLastFrameSkipped > 0 ? Color.red : Color.green, ColorScope.Type.Color))
+								using (new ColorScope(hairInstance.stepsLastFrameSkipped > 0 ? Color.red : Color.green, ColorType.Color))
 								{
 									EditorGUI.HelpBox(rect, string.Empty, MessageType.None);
 								}
@@ -382,7 +382,7 @@ namespace Unity.DemoTeam.Hair
 						if (expanded != property.isExpanded)
 							property.isExpanded = expanded;
 
-						using (var scope = new HairGUILayout.PropertyScope("Defaults (All Groups)", property))
+						using (var scope = new HairGUILayout.PropertyRectScope(property, "Defaults (All Groups)"))
 						{
 							EditorGUI.LabelField(scope.position, scope.label, EditorStyles.textArea);
 						}
@@ -428,7 +428,7 @@ namespace Unity.DemoTeam.Hair
 						var blockCount = property_groupAssetReferences.arraySize;
 						var blockLabel = "Overrides (" + blockCount + (blockCount == 1 ? " Group Asset)" : " Group Assets)");
 						{
-							using (var scope = new HairGUILayout.PropertyScope(blockLabel, property))
+							using (var scope = new HairGUILayout.PropertyRectScope(property, blockLabel))
 							{
 								EditorGUI.LabelField(scope.position, scope.label, EditorStyles.textArea);
 							}
@@ -443,7 +443,7 @@ namespace Unity.DemoTeam.Hair
 								var groupAssigned = (strandGroupInstances[j].settingsIndex == i);
 								if (groupAssigned)
 								{
-									using (new ColorScope(Color.green, ColorScope.Type.BackgroundColor))
+									using (new ColorScope(Color.green, ColorType.BackgroundColor))
 									{
 										if (GUILayout.Toggle(true, groupLabel, EditorStyles.miniButton, GUILayout.ExpandWidth(false)) == false)
 										{
@@ -453,7 +453,7 @@ namespace Unity.DemoTeam.Hair
 								}
 								else
 								{
-									using (new ColorScope(Color.Lerp(Color.white, Color.grey, 0.5f), ColorScope.Type.ContentColor))
+									using (new ColorScope(Color.Lerp(Color.white, Color.grey, 0.5f), ColorType.ContentColor))
 									{
 										if (GUILayout.Toggle(false, groupLabel, EditorStyles.miniButton, GUILayout.ExpandWidth(false)))
 										{

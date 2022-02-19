@@ -1,31 +1,17 @@
 using UnityEngine;
-#if UNITY_EDITOR
 using UnityEditor;
-#endif
 
 namespace Unity.DemoTeam.Hair
 {
-	public static partial class HairEditorGUI
+	public static partial class HairGUI
 	{
-		const float kIndentPerLevel = 15.0f;
-		const float kSpacing = 5.0f;
-
 		static readonly int s_idHintRampMin = "RampMin".GetHashCode();
 		static readonly int s_idHintRampMax = "RampMax".GetHashCode();
 
 		static Vector3[] s_pointsLinear = new Vector3[4];
 		static Vector3[] s_pointsSmooth = new Vector3[16];
 
-		public enum RampStyle
-		{
-			LinearDecreasing,
-			LinearIncreasing,
-			SmoothDecreasing,
-			SmoothIncreasing,
-		}
-
-#if UNITY_EDITOR
-		public static Vector2 LinearRampWidget(Rect position, Vector2 value, Vector2 limit, RampStyle style = RampStyle.LinearDecreasing)
+		public static Vector2 LinearRampWidget(Rect position, Vector2 value, Vector2 limit, LinearRampStyle style = LinearRampStyle.LinearDecreasing)
 		{
 			GUI.Box(position, GUIContent.none);
 
@@ -86,7 +72,7 @@ namespace Unity.DemoTeam.Hair
 				var y0 = position.yMax;
 				var y1 = position.yMin;
 
-				var styleIncreasing = (style == RampStyle.LinearIncreasing || style == RampStyle.SmoothIncreasing);
+				var styleIncreasing = (style == LinearRampStyle.LinearIncreasing || style == LinearRampStyle.SmoothIncreasing);
 				if (styleIncreasing)
 				{
 					y0 = position.yMin;
@@ -98,7 +84,7 @@ namespace Unity.DemoTeam.Hair
 				s_pointsLinear[2] = new Vector3(x0 + tmax * (x1 - x0), y0);
 				s_pointsLinear[3] = new Vector3(x1, y0);
 
-				var styleSmooth = (style == RampStyle.SmoothDecreasing || style == RampStyle.SmoothIncreasing);
+				var styleSmooth = (style == LinearRampStyle.SmoothDecreasing || style == LinearRampStyle.SmoothIncreasing);
 				if (styleSmooth)
 				{
 					s_pointsSmooth[0] = s_pointsLinear[0];
@@ -142,46 +128,5 @@ namespace Unity.DemoTeam.Hair
 			// done
 			return value;
 		}
-#endif
 	}
-
-	public class LinearRampWidgetAttribute : PropertyAttribute
-	{
-		public float min;
-		public float max;
-		public HairEditorGUI.RampStyle style;
-
-		public LinearRampWidgetAttribute(float min, float max, HairEditorGUI.RampStyle style = HairEditorGUI.RampStyle.LinearDecreasing)
-		{
-			this.min = min;
-			this.max = max;
-			this.style = HairEditorGUI.RampStyle.LinearDecreasing;
-		}
-	}
-
-#if UNITY_EDITOR
-	[CustomPropertyDrawer(typeof(LinearRampWidgetAttribute))]
-	public class LinearRampWidgetAttributeDrawer : PropertyDrawer
-	{
-		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-		{
-			if (property.propertyType == SerializedPropertyType.Vector2)
-			{
-				var ramp = base.attribute as LinearRampWidgetAttribute;
-
-				EditorGUI.BeginProperty(position, label, property);
-				position = EditorGUI.PrefixLabel(position, label);
-
-				//NOTE: EditorGUIUtility.fieldWidth
-				property.vector2Value = HairEditorGUI.LinearRampWidget(position, property.vector2Value, new Vector2(ramp.min, ramp.max), ramp.style);
-
-				EditorGUI.EndProperty();
-			}
-			else
-			{
-				base.OnGUI(position, property, label);
-			}
-		}
-	}
-#endif
 }

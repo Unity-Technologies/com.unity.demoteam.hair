@@ -1,48 +1,18 @@
 using System;
 using System.Reflection;
 using UnityEngine;
-#if UNITY_EDITOR
 using UnityEditor;
 using UnityEditorInternal;
-#endif
 
 namespace Unity.DemoTeam.Hair
 {
-	public class ToggleGroupAttribute : PropertyAttribute { }
-
-#if UNITY_EDITOR
-	[CustomPropertyDrawer(typeof(ToggleGroupAttribute))]
-	public class ToggleGroupAttributeDrawer : PropertyDrawer
+	public static partial class HairGUILayout
 	{
 		const float widthSlider = 100.0f;
 		const float widthSpacing = 5.0f;
 		const float widthToggle = 14.0f;
 
-		public struct PropertyScope : IDisposable
-		{
-			public readonly Rect position;
-			public readonly GUIContent label;
-
-			public PropertyScope(GUIContent label, SerializedProperty property, float widthFixed, GUIStyle style)
-			{
-				this.position = GUILayoutUtility.GetRect(widthFixed, EditorGUIUtility.singleLineHeight, style, GUILayout.Width(widthFixed));
-				this.label = EditorGUI.BeginProperty(position, label, property);
-			}
-
-			public PropertyScope(GUIContent label, SerializedProperty property, float widthMin, float widthMax, GUIStyle style)
-			{
-				this.position = GUILayoutUtility.GetRect(widthMin, widthMax, EditorGUIUtility.singleLineHeight, EditorGUIUtility.singleLineHeight, style);
-				this.label = EditorGUI.BeginProperty(position, label, property);
-			}
-
-			public void Dispose()
-			{
-				EditorGUI.EndProperty();
-			}
-		}
-
-		public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => -EditorGUIUtility.standardVerticalSpacing;
-		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		public static void ToggleGroup(FieldInfo fieldInfo, SerializedProperty property, GUIContent label)
 		{
 			var ev = Event.current;
 			var evClick = (ev.type == EventType.MouseDown) || (ev.type == EventType.MouseUp);
@@ -50,7 +20,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUILayout.BeginHorizontal();
 
-			var labelPrefix = label.text + " ";
+			var groupLabelPrefix = label.text + " ";
 			{
 				if (TryGetTooltipAttribute(fieldInfo, out var tooltip))
 				{
@@ -58,9 +28,9 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			using (var scope = new PropertyScope(label, property, EditorGUIUtility.labelWidth + widthToggle + 3.0f, EditorStyles.toggle))
+			using (var groupScope = new PropertyRectScope(label, property, EditorGUIUtility.labelWidth + widthToggle + 3.0f, EditorStyles.toggle))
 			{
-				var toggle = EditorGUI.Toggle(scope.position, scope.label, property.boolValue);
+				var toggle = EditorGUI.Toggle(groupScope.position, groupScope.label, property.boolValue);
 				if (toggle != property.boolValue)
 					property.boolValue = toggle;
 			}
@@ -88,8 +58,8 @@ namespace Unity.DemoTeam.Hair
 					if (groupItem.withLabel)
 					{
 						var groupItemLabel = property.displayName;
-						if (groupItemLabel.StartsWith(labelPrefix))
-							groupItemLabel = groupItemLabel.Substring(labelPrefix.Length);
+						if (groupItemLabel.StartsWith(groupLabelPrefix))
+							groupItemLabel = groupItemLabel.Substring(groupLabelPrefix.Length);
 
 						label = new GUIContent(groupItemLabel, groupItemTooltip);
 					}
@@ -128,20 +98,20 @@ namespace Unity.DemoTeam.Hair
 							break;
 					}
 
-					PropertyScope propertyScope;
+					PropertyRectScope propertyScope;
 					{
 						var reserveMin = reserveField + (groupItem.withLabel ? reserveLabel : 0.0f);
 						var reserveMax = reserveField + reserveLabel + reserveExtra;
 
 						if (reserveFixed)
-							propertyScope = new PropertyScope(label, property, reserveMin, reserveStyle);
+							propertyScope = new PropertyRectScope(label, property, reserveMin, reserveStyle);
 						else
-							propertyScope = new PropertyScope(label, property, reserveMin, reserveMax, reserveStyle);
+							propertyScope = new PropertyRectScope(label, property, reserveMin, reserveMax, reserveStyle);
 					}
 
 					using (propertyScope)
 					{
-						position = propertyScope.position.ClipLeft(widthSpacing);
+						var position = propertyScope.position.ClipLeft(widthSpacing);
 						label = propertyScope.label;
 
 						switch (property.propertyType)
@@ -171,7 +141,7 @@ namespace Unity.DemoTeam.Hair
 										using (new EditorGUI.DisabledScope(evClickRight))
 										{
 											if (TryGetLinearRampAttribute(field, out var ranges))
-												curve = HairEditorGUI.LinearRamp(position, label, curve, ranges);
+												curve = HairGUI.LinearRamp(position, label, curve, ranges);
 											else
 												curve = EditorGUI.CurveField(position, label, curve);
 										}
@@ -423,5 +393,4 @@ namespace Unity.DemoTeam.Hair
 			return TryGetAttribute<RenderingLayerMaskAttribute>(field, out var a);
 		}
 	}
-#endif
 }

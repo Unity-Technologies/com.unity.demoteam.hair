@@ -1,45 +1,20 @@
 using UnityEngine;
-#if UNITY_EDITOR
 using UnityEditor;
-#endif
 
 namespace Unity.DemoTeam.Hair
 {
-	public class LineHeaderAttribute : PropertyAttribute
+	public static partial class HairGUILayout
 	{
-		public string label;
-		public LineHeaderAttribute(string label = null)
+		public static void LineHeader(GUIContent label = null)
 		{
-			this.label = label;
+			HairGUI.LineHeader(EditorGUILayout.GetControlRect(), label);
 		}
 	}
 
-#if UNITY_EDITOR
-	[CustomPropertyDrawer(typeof(LineHeaderAttribute))]
-	public class LineHeaderAttributeDrawer : DecoratorDrawer
+	public static partial class HairGUI
 	{
-		public override float GetHeight() => HairEditorGUI.lineHeaderHeight;
-		public override void OnGUI(Rect position)
-		{
-			var header = attribute as LineHeaderAttribute;
-			{
-				HairEditorGUI.LineHeader(position, header.label);
-			}
-		}
-	}
-#endif
+		public const float lineHeaderHeight = lineHeight + lineMarginTop + lineMarginBottom;
 
-#if UNITY_EDITOR
-	public static partial class HairEditorGUILayout
-	{
-		public static void LineHeader(string label)
-		{
-			HairEditorGUI.LineHeader(EditorGUILayout.GetControlRect(), label);
-		}
-	}
-
-	public static partial class HairEditorGUI
-	{
 		const float lineHeight = 2.0f;
 		const float lineMarginTop = 11.0f;
 		const float lineMarginBottom = 4.0f;
@@ -47,9 +22,7 @@ namespace Unity.DemoTeam.Hair
 		const float labelAlign = 0.05f;
 		const float labelMargin = 3.0f;
 
-		public const float lineHeaderHeight = lineHeight + lineMarginTop + lineMarginBottom;
-
-		public static void LineHeader(Rect position, string label)
+		public static void LineHeader(Rect position, GUIContent label = null)
 		{
 			if (label == null)
 			{
@@ -68,7 +41,7 @@ namespace Unity.DemoTeam.Hair
 				position.y += lineMarginTop;
 				position.height = lineHeight;
 
-				var labelSize = EditorStyles.miniLabel.CalcSize(new GUIContent(label));
+				var labelSize = EditorStyles.miniLabel.CalcSize(label);
 				var labelWidth = labelSize.x + 2.0f * labelMargin;
 				var spacerWidth = position.width - labelWidth;
 
@@ -97,5 +70,4 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 	}
-#endif
 }

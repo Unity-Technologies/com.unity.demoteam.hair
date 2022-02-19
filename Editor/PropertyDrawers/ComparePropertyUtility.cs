@@ -1,50 +1,11 @@
 using System;
-using UnityEngine;
-#if UNITY_EDITOR
 using UnityEditor;
-#endif
 
 namespace Unity.DemoTeam.Hair
 {
-	public enum CmpOp
+	public static class ComparePropertyUtility
 	{
-		Eq,
-		Geq,
-		Gt,
-		Leq,
-		Lt,
-		Neq,
-	}
-
-	[AttributeUsage(AttributeTargets.Field)]
-	public abstract class CompareFieldBase : PropertyAttribute
-	{
-		public readonly string fieldName;
-		public readonly object cmpValue;
-		public readonly TypeCode cmpType;
-		public readonly CmpOp cmpOp;
-
-		public CompareFieldBase(string fieldName, object cmpValue) : this(fieldName, CmpOp.Eq, cmpValue) { }
-		public CompareFieldBase(string fieldName, CmpOp cmpOp, object cmpValue)
-		{
-			this.fieldName = fieldName;
-			this.cmpValue = cmpValue;
-			this.cmpType = cmpValue is null ? TypeCode.Empty : Type.GetTypeCode(cmpValue.GetType());
-			this.cmpOp = cmpOp;
-		}
-
-#if UNITY_EDITOR
-		public bool EvaluateAt(SerializedProperty property)
-		{
-			return CompareFieldUtility.Evaluate(this, property);
-		}
-#endif
-	}
-
-#if UNITY_EDITOR
-	public static class CompareFieldUtility
-	{
-		public static bool Evaluate(CompareFieldBase attribute, SerializedProperty property)
+		public static bool Evaluate(ComparePropertyBase attribute, SerializedProperty property)
 		{
 			var result = false;
 			var attrib = attribute;
@@ -109,19 +70,18 @@ namespace Unity.DemoTeam.Hair
 			return result;
 		}
 
-		static bool Compare<T>(CmpOp op, T a, T b) where T : IComparable<T>
+		static bool Compare<T>(CompareOp op, T a, T b) where T : IComparable<T>
 		{
 			switch (op)
 			{
-				case CmpOp.Eq: return a.CompareTo(b) == 0;
-				case CmpOp.Geq: return a.CompareTo(b) >= 0;
-				case CmpOp.Gt: return a.CompareTo(b) > 0;
-				case CmpOp.Leq: return a.CompareTo(b) <= 0;
-				case CmpOp.Lt: return a.CompareTo(b) < 0;
-				case CmpOp.Neq: return a.CompareTo(b) != 0;
+				case CompareOp.Eq: return a.CompareTo(b) == 0;
+				case CompareOp.Geq: return a.CompareTo(b) >= 0;
+				case CompareOp.Gt: return a.CompareTo(b) > 0;
+				case CompareOp.Leq: return a.CompareTo(b) <= 0;
+				case CompareOp.Lt: return a.CompareTo(b) < 0;
+				case CompareOp.Neq: return a.CompareTo(b) != 0;
 				default: return false;
 			}
 		}
 	}
-#endif
 }

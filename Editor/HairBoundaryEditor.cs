@@ -4,7 +4,7 @@ using UnityEditor;
 namespace Unity.DemoTeam.Hair
 {
 	using static HairGUILayout;
-	using static HairGUIUtility;
+	using static HairGUI;
 
 	[CustomEditor(typeof(HairBoundary)), CanEditMultipleObjects]
 	public class HairBoundaryEditor : Editor
@@ -96,7 +96,7 @@ namespace Unity.DemoTeam.Hair
 					if (HairBoundary.TryGetMatchingComponent(hairBoundary, out var component))
 					{
 						using (new ColorScope(Color.white))
-						using (new ColorScope(Color.green, ColorScope.Type.BackgroundColor))
+						using (new ColorScope(Color.green, ColorType.BackgroundColor))
 						{
 							GUILayout.Label("Bound to component: " + component.GetType().Name, HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
 							//TODO change to EditorGUILayout.LabelField to preserve indent level?

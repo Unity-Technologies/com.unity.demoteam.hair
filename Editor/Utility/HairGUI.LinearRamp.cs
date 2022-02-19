@@ -5,46 +5,22 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class LinearRampAttribute : PropertyAttribute
+	public static partial class HairGUILayout
 	{
-		public Rect ranges;
-		public LinearRampAttribute(float x0, float y0, float x1, float y1)
+		public static void LinearRamp(GUIContent label, SerializedProperty property, Rect ranges, params GUILayoutOption[] options)
 		{
-			this.ranges = new Rect(x0, y0, x1 - x0, y1 - y0);
-		}
-	}
-
-#if UNITY_EDITOR
-	[CustomPropertyDrawer(typeof(LinearRampAttribute))]
-	public class LinearRampAttributeDrawer : PropertyDrawer
-	{
-		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-		{
-			var ramp = base.attribute as LinearRampAttribute;
-			{
-				HairEditorGUI.LinearRampProperty(position, label, property, ramp.ranges);
-			}
-		}
-	}
-#endif
-
-#if UNITY_EDITOR
-	public static partial class HairEditorGUILayout
-	{
-		public static void LinearRampProperty(GUIContent label, SerializedProperty property, Rect ranges, params GUILayoutOption[] options)
-		{
-			HairEditorGUI.LinearRampProperty(EditorGUILayout.GetControlRect(options), label, property, ranges);
+			HairGUI.LinearRamp(EditorGUILayout.GetControlRect(options), label, property, ranges);
 		}
 
 		public static AnimationCurve LinearRamp(GUIContent label, AnimationCurve curve, Rect ranges, params GUILayoutOption[] options)
 		{
-			return HairEditorGUI.LinearRamp(EditorGUILayout.GetControlRect(options), label, curve, ranges);
+			return HairGUI.LinearRamp(EditorGUILayout.GetControlRect(options), label, curve, ranges);
 		}
 	}
 
-	public static partial class HairEditorGUI
+	public static partial class HairGUI
 	{
-		public static void LinearRampProperty(Rect position, GUIContent label, SerializedProperty property, Rect ranges)
+		public static void LinearRamp(Rect position, GUIContent label, SerializedProperty property, Rect ranges)
 		{
 			label = EditorGUI.BeginProperty(position, label, property);
 			{
@@ -124,5 +100,4 @@ namespace Unity.DemoTeam.Hair
 			);
 		}
 	}
-#endif
 }
