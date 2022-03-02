@@ -1528,7 +1528,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						var cluster = strandClusterPtr[i];
 						{
-							clusterCenterPtr[cluster] += strandGroup.rootPosition[i];
+							clusterCenterPtr[cluster] += strandGroup.rootScale[i] * strandGroup.rootPosition[i];
 							clusterWeightPtr[cluster] += strandGroup.rootScale[i];
 						}
 					}
