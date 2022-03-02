@@ -647,8 +647,8 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverData.stagingPosition, "StagingPosition_0", vertexCount, vertexStridePosition);
 				changed |= CreateBuffer(ref solverData.stagingPositionPrev, "StagingPosition_1", vertexCount, vertexStridePosition);
 
-				changed |= (solverData.cbuffer._StagingVertexCount == 0);
 				changed |= (solverData.cbuffer._StagingSubdivision != stagingSubdivision);
+				changed |= (solverData.cbuffer._StagingVertexCount == 0);
 
 				return changed;
 			}
@@ -1098,8 +1098,19 @@ namespace Unity.DemoTeam.Hair
 			var segmentCount = (cbuffer._StrandParticleCount - 1);
 			var segmentCountStaging = segmentCount * (1 + stagingSubdivisions);
 
-			cbuffer._StagingVertexCount = segmentCountStaging + 1;
 			cbuffer._StagingSubdivision = stagingSubdivisions;
+			cbuffer._StagingVertexCount = segmentCountStaging + 1;
+
+			switch (solverData.memoryLayout)
+			{
+				case HairAsset.MemoryLayout.Interleaved:
+					cbuffer._StagingVertexOffset = 1;
+					break;
+
+				case HairAsset.MemoryLayout.Sequential:
+					cbuffer._StagingVertexOffset = cbuffer._StagingVertexCount;
+					break;
+			}
 
 			// derive keywords
 			keywords.STAGING_COMPRESSION = stagingCompression;

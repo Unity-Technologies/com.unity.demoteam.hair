@@ -16,10 +16,6 @@
 //----------
 // features
 
-#pragma multi_compile __ LAYOUT_INTERLEAVED
-// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
-// 1 == particles grouped by index, i.e. root, root, root+1, root+1
-
 #pragma multi_compile __ STAGING_COMPRESSION
 // 0 == staging data full precision
 // 1 == staging data compressed
@@ -125,19 +121,11 @@
 #define CHECK_STRAND_SOLVER(x)	\
 	if (x >= _SolverStrandCount) return;
 
-#if LAYOUT_INTERLEAVED
-  #define DECLARE_STRAND_UNCHECKED(x)				\
-	const uint strandIndex = x;						\
-	const uint strandParticleBegin = strandIndex;	\
-	const uint strandParticleStride = _StrandCount;	\
-	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
-#else
-  #define DECLARE_STRAND_UNCHECKED(x)										\
+#define DECLARE_STRAND_UNCHECKED(x)											\
 	const uint strandIndex = x;												\
-	const uint strandParticleBegin = strandIndex * _StrandParticleCount;	\
-	const uint strandParticleStride = 1;									\
+	const uint strandParticleBegin = strandIndex * _StrandParticleOffset;	\
+	const uint strandParticleStride = _StrandParticleStride;				\
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
-#endif
 
 #define DECLARE_STRAND(x)	\
 	CHECK_STRAND(x);		\
@@ -1527,13 +1515,8 @@ void KInterpolate(
 	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
 	uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
 
-#if LAYOUT_INTERLEAVED
-	const uint strandParticleBeginLo = strandIndexLo;
-	const uint strandParticleBeginHi = strandIndexHi;
-#else
-	const uint strandParticleBeginLo = strandIndexLo * _StrandParticleCount;
-	const uint strandParticleBeginHi = strandIndexHi * _StrandParticleCount;
-#endif
+	const uint strandParticleBeginLo = strandIndexLo * _StrandParticleOffset;
+	const uint strandParticleBeginHi = strandIndexHi * _StrandParticleOffset;
 
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 	float strandContribHi = _RootScale[strandIndex] / _RootScale[strandIndexHi];
@@ -1578,12 +1561,8 @@ void KInterpolateNearest(
 	DECLARE_STRAND(worldIdx.x + _SolverStrandCount);
 
 	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
-
-#if LAYOUT_INTERLEAVED
-	const uint strandParticleBeginLo = strandIndexLo;
-#else
-	const uint strandParticleBeginLo = strandIndexLo * _StrandParticleCount;
-#endif
+	
+	const uint strandParticleBeginLo = strandIndexLo * _StrandParticleOffset;
 
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 
@@ -1692,13 +1671,8 @@ void KStagingSubdivision(
 	const uint segmentStepCount = _StagingSubdivision + 1;
 	const float segmentStep = 1.0 / segmentStepCount;
 
-#if LAYOUT_INTERLEAVED
-	uint writeIndex = strandIndex;
-	uint writeStride = _StrandCount;
-#else
-	uint writeIndex = strandIndex * _StagingVertexCount;
-	uint writeStride = 1;
-#endif
+	uint writeIndex = strandIndex * _StagingVertexOffset;
+	uint writeStride = strandParticleStride;
 
 	// segment 1..N-1
 	for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd - strandParticleStride; i += strandParticleStride)

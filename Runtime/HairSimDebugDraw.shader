@@ -4,10 +4,6 @@
 
 	#pragma target 5.0
 
-	#pragma multi_compile __ LAYOUT_INTERLEAVED
-	// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
-	// 1 == particles grouped by index, i.e. root, root, root+1, root+1
-	
 	#pragma multi_compile __ VOLUME_TARGET_INITIAL_POSE VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
 	// 0 == uniform target density
 	// 1 == non uniform target density
@@ -60,13 +56,8 @@
 
 	DebugVaryings DebugVert_StrandParticle(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
-#if LAYOUT_INTERLEAVED
-		const uint strandParticleBegin = instanceID;
-		const uint strandParticleStride = _StrandCount;
-#else
-		const uint strandParticleBegin = instanceID * _StrandParticleCount;
-		const uint strandParticleStride = 1;
-#endif
+		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
+		const uint strandParticleStride = _StrandParticleStride;
 
 #if DEBUG_STRAND_31_32 == 2
 		if (vertexID > 1)
@@ -84,13 +75,8 @@
 
 	DebugVaryings DebugVert_StrandParticleWorldVelocity(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
-#if LAYOUT_INTERLEAVED
-		const uint strandParticleBegin = instanceID;
-		const uint strandParticleStride = _StrandCount;
-#else
-		const uint strandParticleBegin = instanceID * _StrandParticleCount;
-		const uint strandParticleStride = 1;
-#endif
+		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
+		const uint strandParticleStride = _StrandParticleStride;
 
 		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 2);
 		float3 worldPos = _ParticlePosition[i].xyz;
@@ -119,26 +105,16 @@
 
 	DebugVaryings DebugVert_StrandParticleClusters(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
-#if LAYOUT_INTERLEAVED
-		const uint strandParticleBegin = instanceID;
-		const uint strandParticleStride = _StrandCount;
-#else
-		const uint strandParticleBegin = instanceID * _StrandParticleCount;
-		const uint strandParticleStride = 1;
-#endif
+		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
+		const uint strandParticleStride = _StrandParticleStride;
 
 		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 1);
 
 		uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + instanceID];
 		uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + instanceID];
 
-#if LAYOUT_INTERLEAVED
-		const uint strandParticleBeginLo = strandIndexLo;
-		const uint strandParticleBeginHi = strandIndexHi;
-#else
-		const uint strandParticleBeginLo = strandIndexLo * _StrandParticleCount;
-		const uint strandParticleBeginHi = strandIndexHi * _StrandParticleCount;
-#endif
+		const uint strandParticleBeginLo = strandIndexLo * _StrandParticleOffset;
+		const uint strandParticleBeginHi = strandIndexHi * _StrandParticleOffset;
 
 		float3 worldPosLo = _ParticlePosition[strandParticleBeginLo + strandParticleStride * (vertexID >> 1)].xyz;
 		float3 worldPosHi = _ParticlePosition[strandParticleBeginHi + strandParticleStride * (vertexID >> 1)].xyz;
@@ -163,13 +139,8 @@
 	/*
 	DebugVaryings DebugVert_StrandParticleMotion(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
-	#if LAYOUT_INTERLEAVED
-		const uint strandParticleBegin = instanceID;
-		const uint strandParticleStride = _StrandCount;
-	#else
-		const uint strandParticleBegin = instanceID * _StrandParticleCount;
-		const uint strandParticleStride = 1;
-	#endif
+		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
+		const uint strandParticleStride = _StrandParticleStride;
 
 		uint i = strandParticleBegin + strandParticleStride * vertexID;
 		float3 worldPos0 = _ParticlePositionPrev[i].xyz;

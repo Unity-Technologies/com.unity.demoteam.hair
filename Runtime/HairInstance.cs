@@ -895,8 +895,8 @@ namespace Unity.DemoTeam.Hair
 				}
 				else
 				{
-					solverData[i].cbuffer._StagingVertexCount = 0;// forces re-init after enable (see HairSim.PrepareSolverStaging)
-					solverData[i].cbuffer._StagingSubdivision = 0;// ...
+					solverData[i].cbuffer._StagingSubdivision = 0;// forces re-init after enable (see HairSim.PrepareSolverStaging)
+					solverData[i].cbuffer._StagingVertexCount = 0;// ...
 				}
 			}
 
@@ -1318,6 +1318,20 @@ namespace Unity.DemoTeam.Hair
 					solverData[i].memoryLayout = strandGroupAsset.particleMemoryLayout;
 					solverData[i].cbuffer._StrandCount = (uint)strandGroupAsset.strandCount;
 					solverData[i].cbuffer._StrandParticleCount = (uint)strandGroupAsset.strandParticleCount;
+
+					switch (solverData[i].memoryLayout)
+					{
+						case HairAsset.MemoryLayout.Interleaved:
+							solverData[i].cbuffer._StrandParticleOffset = 1;
+							solverData[i].cbuffer._StrandParticleStride = solverData[i].cbuffer._StrandCount;
+							break;
+
+						case HairAsset.MemoryLayout.Sequential:
+							solverData[i].cbuffer._StrandParticleOffset = solverData[i].cbuffer._StrandParticleCount;
+							solverData[i].cbuffer._StrandParticleStride = 1;
+							break;
+					}
+
 					solverData[i].initialMaxParticleInterval = strandGroupAsset.maxParticleInterval;
 					solverData[i].initialMaxParticleDiameter = 0.0f;//TODO
 					solverData[i].initialTotalLength = strandGroupAsset.totalLength;

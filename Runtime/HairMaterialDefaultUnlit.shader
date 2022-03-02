@@ -17,10 +17,6 @@ Shader "Hair/Default/HairMaterialDefaultUnlit"
 	#pragma multi_compile __ HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
 	#pragma multi_compile __ HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
 
-	#pragma multi_compile __ LAYOUT_INTERLEAVED
-	// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
-	// 1 == particles grouped by index, i.e. root, root, root+1, root+1
-
 	#pragma multi_compile __ STAGING_COMPRESSION
 	// 0 == staging data full precision
 	// 1 == staging data compressed

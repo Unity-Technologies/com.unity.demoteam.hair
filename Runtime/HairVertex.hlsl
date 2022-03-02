@@ -2,10 +2,6 @@
 #define __HAIRVERTEX_HLSL__
 
 /*
-#pragma multi_compile __ LAYOUT_INTERLEAVED
-// 0 == particles grouped by strand, i.e. root, root+1, root, root+1
-// 1 == particles grouped by index, i.e. root, root, root+1, root+1
-
 #pragma multi_compile __ STAGING_COMPRESSION
 // 0 == staging data full precision
 // 1 == staging data compressed
@@ -36,24 +32,18 @@ float4x4 unity_MatrixPreviousMI;
 #endif
 
 #if HAIR_VERTEX_SRC_STAGING
-#define STRAND_PARTICLE_COUNT _StagingVertexCount
+#define STRAND_PARTICLE_COUNT	_StagingVertexCount
+#define STRAND_PARTICLE_OFFSET	_StagingVertexOffset
 #else
-#define STRAND_PARTICLE_COUNT _StrandParticleCount
+#define STRAND_PARTICLE_COUNT	_StrandParticleCount
+#define STRAND_PARTICLE_OFFSET	_StrandParticleOffset
 #endif
 
-#if LAYOUT_INTERLEAVED
-  #define DECLARE_STRAND(x)							\
-	const uint strandIndex = x;						\
-	const uint strandParticleBegin = strandIndex;	\
-	const uint strandParticleStride = _StrandCount;	\
-	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * STRAND_PARTICLE_COUNT;
-#else
-  #define DECLARE_STRAND(x)													\
+#define DECLARE_STRAND(x)													\
 	const uint strandIndex = x;												\
-	const uint strandParticleBegin = strandIndex * STRAND_PARTICLE_COUNT;	\
-	const uint strandParticleStride = 1;									\
+	const uint strandParticleBegin = strandIndex * STRAND_PARTICLE_OFFSET;	\
+	const uint strandParticleStride = _StrandParticleStride;				\
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * STRAND_PARTICLE_COUNT;
-#endif
 
 float3 LoadPosition(uint i)
 {

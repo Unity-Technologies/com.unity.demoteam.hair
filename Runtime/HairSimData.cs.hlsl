@@ -15,6 +15,8 @@ CBUFFER_START(SolverCBuffer)
     float4 _StagingOriginExtentPrev;
     uint _StrandCount;
     uint _StrandParticleCount;
+    uint _StrandParticleOffset;
+    uint _StrandParticleStride;
     uint _SolverStrandCount;
     float _GroupScale;
     float _GroupMaxParticleInterval;
@@ -23,8 +25,9 @@ CBUFFER_START(SolverCBuffer)
     uint _LODIndexLo;
     uint _LODIndexHi;
     float _LODBlendFraction;
-    uint _StagingVertexCount;
     uint _StagingSubdivision;
+    uint _StagingVertexCount;
+    uint _StagingVertexOffset;
     float _DT;
     uint _Iterations;
     float _Stiffness;
@@ -45,6 +48,7 @@ CBUFFER_START(SolverCBuffer)
     float _GlobalFadeOffset;
     float _GlobalFadeExtent;
     float _scbpad1;
+    float _scbpad2;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

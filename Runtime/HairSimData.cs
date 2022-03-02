@@ -89,6 +89,9 @@ namespace Unity.DemoTeam.Hair
 			// 48
 			public uint _StrandCount;					// number of strands
 			public uint _StrandParticleCount;			// number of particles per strand
+			public uint _StrandParticleOffset;			// offset in particles to reach the ith strand
+			public uint _StrandParticleStride;			// stride in particles between strand particles
+
 			public uint _SolverStrandCount;				// number of strands touched by solver
 
 			public float _GroupScale;                   // group scale
@@ -100,10 +103,11 @@ namespace Unity.DemoTeam.Hair
 			public uint _LODIndexHi;					// lod index (higher detail in blend)
 			public float _LODBlendFraction;				// lod blend fraction (lo -> hi)
 
+			public uint _StagingSubdivision;			// staging segment subdivision samples
 			public uint _StagingVertexCount;			// staging strand vertex count
-			public uint _StagingSubdivision;			// staging strand segment subdivision count
+			public uint _StagingVertexOffset;			// staging strand vertex offset
 
-			// 60
+			// 63
 			public float _DT;
 			public uint _Iterations;
 			public float _Stiffness;
@@ -121,15 +125,16 @@ namespace Unity.DemoTeam.Hair
 			public float _LocalCurvature;
 			public float _LocalShape;
 
-			// 74
+			// 77
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
 
-			// 79 --> 80 (16 byte alignment)
+			// 82 --> 84 (16 byte alignment)
 			public float _scbpad1;
+			public float _scbpad2;
 
 			// NOTE: explicit padding to 16 byte alignment required on some platforms, please update if modifying
 		}

@@ -5,9 +5,6 @@
     "m_Properties": [],
     "m_Keywords": [
         {
-            "m_Id": "a8df33b2efa54718a41220d363de0787"
-        },
-        {
             "m_Id": "713b1bf6463c468aba186a6346036b5c"
         },
         {
@@ -1070,25 +1067,6 @@
         "m_SerializableColors": []
     },
     "m_OutputChannel": 1
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
-    "m_ObjectId": "a8df33b2efa54718a41220d363de0787",
-    "m_Guid": {
-        "m_GuidSerialized": "5a1b02fd-f983-4c6e-80fc-b7359187de08"
-    },
-    "m_Name": "LAYOUT_INTERLEAVED",
-    "m_DefaultReferenceName": "BOOLEAN_A8DF33B2EFA54718A41220D363DE0787_ON",
-    "m_OverrideReferenceName": "LAYOUT_INTERLEAVED",
-    "m_GeneratePropertyBlock": true,
-    "m_KeywordType": 0,
-    "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_Entries": [],
-    "m_Value": 0,
-    "m_IsEditable": true
 }
 
 {
