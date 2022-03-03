@@ -200,8 +200,8 @@ namespace Unity.DemoTeam.Hair
 					for (int i = 0; i != _strandGroupProviders.arraySize; i++)
 					{
 						var property = _strandGroupProviders.GetArrayElementAtIndex(i);
-						var property_hairAsset = property.FindPropertyRelative("hairAsset");
-						var property_hairAssetQuickEdit = property.FindPropertyRelative("hairAssetQuickEdit");
+						var property_hairAsset = property.FindPropertyRelative(nameof(HairInstance.GroupProvider.hairAsset));
+						var property_hairAssetQuickEdit = property.FindPropertyRelative(nameof(HairInstance.GroupProvider.hairAssetQuickEdit));
 						var property_delete = false;
 
 						EditorGUILayout.BeginHorizontal();
