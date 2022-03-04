@@ -509,6 +509,19 @@ namespace Unity.DemoTeam.Hair
 						previewData[i].memoryLayout = strandGroup.particleMemoryLayout;
 						previewData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
 						previewData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
+
+						switch (previewData[i].memoryLayout)
+						{
+							case HairAsset.MemoryLayout.Interleaved:
+								previewData[i].cbuffer._StrandParticleOffset = 1;
+								previewData[i].cbuffer._StrandParticleStride = previewData[i].cbuffer._StrandCount;
+								break;
+
+							case HairAsset.MemoryLayout.Sequential:
+								previewData[i].cbuffer._StrandParticleOffset = previewData[i].cbuffer._StrandParticleCount;
+								previewData[i].cbuffer._StrandParticleStride = 1;
+								break;
+						}
 					}
 
 					using (var stagingData = new NativeArray<Vector4>(strandGroup.particlePosition.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))

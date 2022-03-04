@@ -860,10 +860,8 @@ namespace Unity.DemoTeam.Hair
 			using (var clusterLookupColor = new UnsafeHashMap<Color, int>(strandCount, Allocator.Temp))
 			using (var clusterLookupLabel = new UnsafeHashMap<uint, int>(strandCount, Allocator.Temp))
 			using (var strandCluster = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-			using (var strandGuide = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
 				var strandClusterPtr = (int*)strandCluster.GetUnsafePtr();
-				var strandGuidePtr = (int*)strandCluster.GetUnsafePtr();
 
 				foreach (var clusterMap in clusterMaps)
 				{
