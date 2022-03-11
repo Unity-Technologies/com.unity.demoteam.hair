@@ -291,7 +291,16 @@ namespace Unity.DemoTeam.Hair
 			{
 				baseLODClusterMapFormat = ClusterMapFormat.OneClusterPerColor,
 				baseLODClusterMapChain = null,
+
+				refinement = true,
+				refinementMaxIterations = 100,
 			};
+
+			[LineHeader("Base LOD Refinement")]
+
+			public bool refinement;
+			[Range(1, 200)]
+			public int refinementMaxIterations;
 		}
 
 		[Serializable]
@@ -434,6 +443,25 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			strandParticleEnd = strandParticleBegin + strandParticleStride * strandParticleCount;
+		}
+
+		public static void DeclareParticleStride(HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount,
+			out int strandParticleOffset,
+			out int strandParticleStride)
+		{
+			switch (memoryLayout)
+			{
+				default:
+				case HairAsset.MemoryLayout.Sequential:
+					strandParticleOffset = strandParticleCount;
+					strandParticleStride = 1;
+					break;
+
+				case HairAsset.MemoryLayout.Interleaved:
+					strandParticleOffset = 1;
+					strandParticleStride = strandCount;
+					break;
+			}
 		}
 	}
 }

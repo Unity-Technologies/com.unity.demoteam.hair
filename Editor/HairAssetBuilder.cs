@@ -9,6 +9,8 @@ using UnityEngine;
 using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Burst;
+using Unity.Jobs;
 
 #if HAS_PACKAGE_UNITY_ALEMBIC
 using UnityEngine.Formats.Alembic.Importer;
@@ -397,6 +399,8 @@ namespace Unity.DemoTeam.Hair
 									dstVertexOffset += dstVertexCount;
 								}
 							}
+
+							resampledVertexDataPosition.Length = combinedCurveCount * resampleVertexCount;
 						}
 
 						combinedCurveVertexCountMin = resampleVertexCount;
@@ -932,6 +936,11 @@ namespace Unity.DemoTeam.Hair
 					var clusterSet = new ClusterSet(clusterCount, strandCount, Allocator.Temp);
 					{
 						clusterSet.InitializeFromStrandCluster(strandGroup, strandCluster, lodChain.lodCount);
+
+						if (hairAsset.settingsLODUVMapped.refinement)
+						{
+							clusterSet.RefineClusters(strandGroup, hairAsset.settingsLODUVMapped.refinementMaxIterations, ClusterSet.EmptyClusterStrategy.Preserve);
+						}
 					}
 
 					// append to chain
@@ -1569,6 +1578,506 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			static void PsClearA(Vector3* pointsA, int strideA, Vector3 value, int count)
+			{
+				for (int i = 0; i != count; i++)
+				{
+					pointsA[i * strideA] = value;
+				}
+			}
+
+			static void PsCopyA(Vector3* pointsA, int strideA, Vector3* pointsB, int strideB, int count)
+			{
+				for (int i = 0; i != count; i++)
+				{
+					pointsA[i * strideA] = pointsB[i * strideB];
+				}
+			}
+
+			static void PsAddA(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
+			{
+				for (int i = 0; i != count; i++)
+				{
+					pointsA[i * strideA] += pointsB[i * strideB];
+				}
+			}
+
+			static void PsSubA(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
+			{
+				for (int i = 0; i != count; i++)
+				{
+					pointsA[i * strideA] -= pointsB[i * strideB];
+				}
+			}
+
+			static void PsMulA(Vector3* pointsA, int strideA, float scalarB, int count)
+			{
+				for (int i = 0; i != count; i++)
+				{
+					pointsA[i * strideA] *= scalarB;
+				}
+			}
+
+			static void PsMulAddA(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, float scalarC, int count)
+			{
+				for (int i = 0; i != count; i++)
+				{
+					pointsA[i * strideA] += pointsB[i * strideB] * scalarC;
+				}
+			}
+
+			static float PsDot(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
+			{
+				var sum = 0.0f;
+				for (int i = 0; i != count; i++)
+				{
+					ref readonly var a = ref pointsA[i * strideA];
+					ref readonly var b = ref pointsB[i * strideB];
+					sum += (a.x * b.x);
+					sum += (a.y * b.y);
+					sum += (a.z * b.z);
+				}
+				return sum;
+			}
+
+			static float PsNorm(Vector3* pointsA, int strideA, int count) => Mathf.Sqrt(PsNormSq(pointsA, strideA, count));
+			static float PsNormSq(Vector3* pointsA, int strideA, int count)
+			{
+				var sum = 0.0f;
+				for (int i = 0; i != count; i++)
+				{
+					ref readonly var a = ref pointsA[i * strideA];
+					sum += (a.x * a.x);
+					sum += (a.y * a.y);
+					sum += (a.z * a.z);
+				}
+				return sum;
+			}
+
+			static float PsNormL1(Vector3* pointsA, int strideA, int count)
+			{
+				var sum = 0.0f;
+				for (int i = 0; i != count; i++)
+				{
+					ref readonly var a = ref pointsA[i * strideA];
+					sum += Mathf.Abs(a.x);
+					sum += Mathf.Abs(a.y);
+					sum += Mathf.Abs(a.z);
+				}
+				return sum;
+			}
+
+			static float PsDistance(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count) => Mathf.Sqrt(PsDistanceSq(pointsA, pointsB, strideA, strideB, count));
+			static float PsDistanceSq(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
+			{
+				var sum = 0.0f;
+				for (int i = 0; i != count; i++)
+				{
+					ref readonly var a = ref pointsA[i * strideA];
+					ref readonly var b = ref pointsB[i * strideB];
+					var dx = a.x - b.x;
+					var dy = a.y - b.y;
+					var dz = a.z - b.z;
+					sum += (dx * dx);
+					sum += (dy * dy);
+					sum += (dz * dz);
+				}
+				return sum;
+			}
+
+			static float PsDistanceL1(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
+			{
+				var sum = 0.0f;
+				for (int i = 0; i != count; i++)
+				{
+					ref readonly var a = ref pointsA[i * strideA];
+					ref readonly var b = ref pointsB[i * strideB];
+					var dx = a.x - b.x;
+					var dy = a.y - b.y;
+					var dz = a.z - b.z;
+					sum += Mathf.Abs(dx);
+					sum += Mathf.Abs(dy);
+					sum += Mathf.Abs(dz);
+				}
+				return sum;
+			}
+
+			static float PsCosineSimilarity(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
+			{
+				var dotAB = PsDot(pointsA, pointsB, strideA, strideB, count);
+				var normA = PsNorm(pointsA, strideA, count);
+				var normB = PsNorm(pointsB, strideB, count);
+				return dotAB / (normA * normB);
+			}
+
+			//CONSIDERATIONS:
+			//
+			// k-means:
+			//	1) per cluster: calc mean
+			//	2) per strand: find closest mean, select that cluster
+			//	3) goto 1
+			//
+			// closest mean:
+			//	L1 distance		: abs(dx) + abs(dy) + ...
+			//	L2 distance		: distance(a, b)
+			//	cos similarity	: dot(a, b) / ||a|| * ||b||
+			//
+			// outliers:
+			//	classify A		: distance > percentile within cluster
+			//	classify B		: distance > fraction of cluster with at root
+			//	after k-means	: identify and split into sep. guides
+			//	during k-means	: ?
+			//
+
+			struct RefineClustersData
+			{
+				[NativeDisableUnsafePtrRestriction] public Vector3* particlePositionPtr;
+
+				[NativeDisableUnsafePtrRestriction] public int* strandClusterPtr;
+				public int strandParticleOffset;
+				public int strandParticleStride;
+
+				[NativeDisableUnsafePtrRestriction] public Vector3* clusterPositionPtr;
+				[NativeDisableUnsafePtrRestriction] public float* clusterWeightPtr;
+				[NativeDisableUnsafePtrRestriction] public float* clusterScorePtr;
+				[NativeDisableUnsafePtrRestriction] public bool* clusterLivePtr;
+
+				public int clusterCount;
+				public int clusterPositionCount;
+				public int clusterPositionOffset;
+				public int clusterPositionStride;
+			}
+
+			[BurstCompile]
+			struct RefineClustersAssignClustersJob : IJobParallelFor
+			{
+				public RefineClustersData jobData;
+
+				[NativeDisableUnsafePtrRestriction]
+				public int* reassignedCountPtr;
+
+				public void Execute(int i)
+				{
+					var bestCluster = jobData.strandClusterPtr[i];
+					var bestDistance = float.PositiveInfinity;
+
+					for (int j = 0; j != jobData.clusterCount; j++)
+					{
+						var distance = PsDistanceSq(
+							pointsA: jobData.clusterPositionPtr + jobData.clusterPositionOffset * j,
+							pointsB: jobData.particlePositionPtr + jobData.strandParticleOffset * i,
+							strideA: jobData.clusterPositionStride,
+							strideB: jobData.strandParticleStride,
+							count: jobData.clusterPositionCount);
+
+						if (distance < bestDistance)
+						{
+							bestDistance = distance;
+							bestCluster = j;
+						}
+					}
+
+					if (jobData.strandClusterPtr[i] != bestCluster)
+					{
+						jobData.strandClusterPtr[i] = bestCluster;
+						System.Threading.Interlocked.Add(ref *reassignedCountPtr, 1);
+					}
+
+					jobData.clusterLivePtr[bestCluster] = true;
+				}
+			}
+
+			public enum EmptyClusterStrategy
+			{
+				Remove,
+				Preserve,
+				//Reallocate,
+			}
+
+			public void RefineClusters(in HairAsset.StrandGroup strandGroup, int maxIterations, EmptyClusterStrategy emptyClusterStrategy)
+			{
+				HairAssetUtility.DeclareParticleStride(strandGroup.particleMemoryLayout, strandGroup.strandCount, strandGroup.strandParticleCount,
+					out var strandParticleOffset,
+					out var strandParticleStride);
+
+				var clusterPositionCount = strandGroup.strandParticleCount;
+				var clusterPositionOffset = clusterPositionCount;
+				var clusterPositionStride = 1;
+
+				using (var clusterPosition = new NativeArray<Vector3>(clusterCount * clusterPositionCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				using (var clusterWeight = new NativeArray<float>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				using (var clusterScore = new NativeArray<float>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				using (var clusterLive = new NativeArray<bool>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				{
+					var clusterPositionPtr = (Vector3*)clusterPosition.GetUnsafePtr();
+					var clusterWeightPtr = (float*)clusterWeight.GetUnsafePtr();
+					var clusterScorePtr = (float*)clusterScore.GetUnsafePtr();
+					var clusterLivePtr = (bool*)clusterLive.GetUnsafePtr();
+
+					// assume at this point that all clusters are non-empty (i.e. that each cluster is referenced by at least one strand)
+					for (int i = 0; i != clusterCount; i++)
+					{
+						clusterLivePtr[i] = true;
+					}
+
+					fixed (Vector3* particlePositionPtr = strandGroup.particlePosition)
+					{
+						var jobData = new RefineClustersData
+						{
+							particlePositionPtr = particlePositionPtr,
+							strandClusterPtr = strandClusterPtr,
+							strandParticleOffset = strandParticleOffset,
+							strandParticleStride = strandParticleStride,
+							clusterPositionPtr = clusterPositionPtr,
+							clusterWeightPtr = clusterWeightPtr,
+							clusterScorePtr = clusterScorePtr,
+							clusterLivePtr = clusterLivePtr,
+							clusterCount = clusterCount,
+							clusterPositionCount = clusterPositionCount,
+							clusterPositionOffset = clusterPositionOffset,
+							clusterPositionStride = clusterPositionStride,
+						};
+
+						// k-means
+						var validMeans = false;
+						var validMeansClusterIteration = 0;
+
+						while (validMeans == false)
+						{
+							// find weighted cluster means
+							for (int i = 0; i != clusterCount; i++)
+							{
+								if (clusterLivePtr[i])
+								{
+									PsClearA(
+										pointsA: clusterPositionPtr + clusterPositionOffset * i,
+										strideA: clusterPositionStride,
+										value: Vector3.zero,
+										count: clusterPositionCount);
+
+									clusterWeightPtr[i] = 0.0f;
+								}
+							}
+
+							for (int i = 0; i != strandCount; i++)
+							{
+								var cluster = strandClusterPtr[i];
+								{
+									var weight = strandGroup.rootScale[i];
+									{
+										PsMulAddA(
+											pointsA: clusterPositionPtr + clusterPositionOffset * cluster,
+											pointsB: particlePositionPtr + strandParticleOffset * i,
+											strideA: clusterPositionStride,
+											strideB: strandParticleStride,
+											scalarC: weight,
+											count: clusterPositionCount);
+
+										clusterWeightPtr[cluster] += weight;
+									}
+								}
+							}
+
+							for (int i = 0; i != clusterCount; i++)
+							{
+								if (clusterLivePtr[i])
+								{
+									PsMulA(
+										pointsA: clusterPositionPtr + clusterPositionOffset * i,
+										strideA: clusterPositionStride,
+										scalarB: 1.0f / clusterWeightPtr[i],
+										count: clusterPositionCount);
+								}
+							}
+
+							validMeans = true;
+
+							// assign strands to clusters based on closest mean
+							if (++validMeansClusterIteration <= maxIterations)
+							{
+								var reassignedCount = 0;
+								{
+									UnsafeUtility.MemClear(clusterLivePtr, sizeof(bool) * clusterCount);
+
+									var sw = System.Diagnostics.Stopwatch.StartNew();
+#if true
+									var job = new RefineClustersAssignClustersJob
+									{
+										jobData = jobData,
+										reassignedCountPtr = &reassignedCount
+									};
+
+									var jobHandle = job.Schedule(strandCount, 64);
+									{
+										JobHandle.ScheduleBatchedJobs();
+										jobHandle.Complete();
+									}
+#else
+									for (int i = 0; i != strandCount; i++)
+									{
+										var bestCluster = strandClusterPtr[i];
+										var bestDistance = float.PositiveInfinity;
+
+										for (int j = 0; j != clusterCount; j++)
+										{
+											var distance = PsDistanceSq(
+												pointsA: clusterPositionPtr + clusterPositionOffset * j,
+												pointsB: particlePositionPtr + strandParticleOffset * i,
+												strideA: clusterPositionStride,
+												strideB: strandParticleStride,
+												count: clusterPositionCount);
+
+											if (distance < bestDistance)
+											{
+												bestDistance = distance;
+												bestCluster = j;
+											}
+										}
+
+										if (strandClusterPtr[i] != bestCluster)
+										{
+											strandClusterPtr[i] = bestCluster;
+											reassignedStrandCount++;
+										}
+
+										clusterLivePtr[bestCluster] = true;
+									}
+#endif
+									sw.Stop();
+
+									Debug.Log("iteration " + validMeansClusterIteration + " took " + sw.Elapsed.Milliseconds + " ms ... strands reassigned: " + reassignedCount);
+								}
+
+								if (reassignedCount > 0)
+								{
+									validMeans = false;
+								}
+
+								// handle empty clusters between iterations
+								switch (emptyClusterStrategy)
+								{
+									case EmptyClusterStrategy.Remove:
+										{
+											for (int i = 0; i != clusterCount; i++)
+											{
+												if (clusterLivePtr[i] == false)
+												{
+													PsClearA(
+														pointsA: clusterPositionPtr + clusterPositionOffset * i,
+														strideA: clusterPositionStride,
+														value: Vector3.positiveInfinity,
+														count: clusterPositionCount);
+												}
+											}
+										}
+										break;
+
+									case EmptyClusterStrategy.Preserve:
+										{
+											// nothing needs to be done here
+										}
+										break;
+								}
+							}
+						}
+
+						// remove any remaining empty clusters once all iterations have completed
+						var emptyClusterCount = 0;
+						{
+							for (int i = 0; i != clusterCount; i++)
+							{
+								if (clusterLivePtr[i] == false)
+								{
+									emptyClusterCount++;
+								}
+							}
+
+							Debug.Log("found " + emptyClusterCount + " empty clusters (out of " + clusterCount + ")");
+						}
+
+						if (emptyClusterCount > 0)
+						{
+							using (var clusterLiveIndex = new NativeArray<int>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+							{
+								var clusterLiveIndexPtr = (int*)clusterLiveIndex.GetUnsafePtr();
+
+								for (int i = 0, writeIndex = 0; i != clusterCount; i++)
+								{
+									if (clusterLivePtr[i])
+									{
+										clusterLiveIndexPtr[i] = writeIndex;
+
+										if (i != writeIndex)
+										{
+											PsCopyA(
+												clusterPositionPtr + clusterPositionOffset * writeIndex,
+												clusterPositionStride,
+												clusterPositionPtr + clusterPositionOffset * i,
+												clusterPositionStride,
+												clusterPositionCount);
+										}
+
+										writeIndex++;
+									}
+									else
+									{
+										clusterLiveIndexPtr[i] = -1;
+									}
+								}
+
+								// update strand cluster map
+								for (int i = 0; i != strandCount; i++)
+								{
+									strandClusterPtr[i] = clusterLiveIndexPtr[strandClusterPtr[i]];
+								}
+
+								clusterCount -= emptyClusterCount;
+							}
+						}
+
+						// select one guide per cluster based on distance to mean
+						for (int i = 0; i != clusterCount; i++)
+						{
+							clusterScorePtr[i] = float.PositiveInfinity;
+							clusterGuidePtr[i] = -1;
+						}
+
+						for (int i = 0; i != strandCount; i++)
+						{
+							var cluster = strandClusterPtr[i];
+							{
+								var strandLength = strandGroup.maxParticleInterval * strandGroup.rootScale[i];
+								var strandOffset = PsDistance(
+									pointsA: clusterPositionPtr + clusterPositionOffset * cluster,
+									pointsB: particlePositionPtr + strandParticleOffset * i,
+									strideA: clusterPositionStride,
+									strideB: strandParticleStride,
+									count: clusterPositionCount);
+
+								var strandScore = strandOffset / strandLength;// smaller score is better
+								if (strandScore < clusterScorePtr[cluster])
+								{
+									clusterScorePtr[cluster] = strandScore;
+									clusterGuidePtr[cluster] = i;
+								}
+							}
+						}
+
+						// find cluster carry (weight of all strands in cluster relative to weight of guide)
+						for (int i = 0; i != clusterCount; i++)
+						{
+							var guide = clusterGuidePtr[i];
+							if (guide != -1)
+							{
+								clusterCarryPtr[i] = clusterWeightPtr[i] / strandGroup.rootScale[clusterGuidePtr[i]];
+							}
+						}
+					}
+					// fixed (...)
+				}
+				// using (...)
+			}
+
 			public bool InjectGuidesFrom(in ClusterSet existingClusters)
 			{
 				using (var clusterUpdated = new NativeArray<bool>(clusterCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
@@ -1714,7 +2223,7 @@ namespace Unity.DemoTeam.Hair
 
 			public void ApplyShuffleUntyped(byte* attrPtr, int attrSize, int attrStride, int attrCount)
 			{
-				using (var buffer = new NativeArray<byte>(attrCount * attrSize, Allocator.Temp))
+				using (var buffer = new NativeArray<byte>(attrCount * attrSize, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 				{
 					var bufferPtr = (byte*)buffer.GetUnsafePtr();
 

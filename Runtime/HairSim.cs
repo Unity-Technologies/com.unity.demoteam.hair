@@ -46,6 +46,8 @@ namespace Unity.DemoTeam.Hair
 		static class MarkersGPU
 		{
 			public static ProfilingSampler Solver;
+			public static ProfilingSampler Solver_SubstepRoots;
+			public static ProfilingSampler Solver_SolveConstraints;
 			public static ProfilingSampler Solver_Interpolate;
 			public static ProfilingSampler Solver_Staging;
 			public static ProfilingSampler Volume;
@@ -1433,8 +1435,6 @@ namespace Unity.DemoTeam.Hair
 
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
-				BindVolumeData(cmd, s_solverCS, kernelSolveConstraints, volumeData);
-
 				var keywordState = solverData.keywords;
 				var substepCount = Mathf.Max(1, solverSettings.substeps);
 
@@ -1443,21 +1443,28 @@ namespace Unity.DemoTeam.Hair
 					var substepFrac = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
 					if (substepFrac < (1.0f - float.Epsilon))
 					{
-						//TODO move into cbuffer?
-						cmd.SetComputeFloatParam(s_solverCS, "_SubstepFraction", substepFrac);
+						using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepRoots))
+						{
+							//TODO move into cbuffer?
+							cmd.SetComputeFloatParam(s_solverCS, "_SubstepFraction", substepFrac);
 
-						BindSolverData(cmd, s_solverCS, SolverKernels.KSubstepRoots, solverData);
-						cmd.DispatchCompute(s_solverCS, SolverKernels.KSubstepRoots, numX, numY, numZ);
+							BindSolverData(cmd, s_solverCS, SolverKernels.KSubstepRoots, solverData);
+							cmd.DispatchCompute(s_solverCS, SolverKernels.KSubstepRoots, numX, numY, numZ);
+						}
 					}
 
 					//Debug.Log("substep " + i + ": " + (substepFrac < (1.0f - float.Epsilon)) + " (lo " + stepFracLo + " hi " + stepFracHi + ")");
 
-					CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);       // [0 1 2] -> (1 0 2)
-					CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);   // (1 0 2) -> [2 0 1]
-					CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
+					using (new ProfilingScope(cmd, MarkersGPU.Solver_SolveConstraints))
+					{
+						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);       // [0 1 2] -> (1 0 2)
+						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);   // (1 0 2) -> [2 0 1]
+						CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
 
-					BindSolverData(cmd, s_solverCS, kernelSolveConstraints, WithSubstepData(solverData, substepFrac < (1.0f - float.Epsilon)));
-					cmd.DispatchCompute(s_solverCS, kernelSolveConstraints, numX, numY, numZ);
+						BindVolumeData(cmd, s_solverCS, kernelSolveConstraints, volumeData);
+						BindSolverData(cmd, s_solverCS, kernelSolveConstraints, WithSubstepData(solverData, substepFrac < (1.0f - float.Epsilon)));
+						cmd.DispatchCompute(s_solverCS, kernelSolveConstraints, numX, numY, numZ);
+					}
 
 					// interpolate follow-strands
 					//TODO move this out of the substep loop (bit finicky due to the buffer shuffling per substep)
@@ -1468,12 +1475,12 @@ namespace Unity.DemoTeam.Hair
 							? SolverKernels.KInterpolate
 							: SolverKernels.KInterpolateNearest;
 
+						var interpolateNumX = ((int)interpolateStrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
+						var interpolateNumY = 1;
+						var interpolateNumZ = 1;
+
 						using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
 						{
-							var interpolateNumX = ((int)interpolateStrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
-							var interpolateNumY = 1;
-							var interpolateNumZ = 1;
-
 							BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, substepFrac < (1.0f - float.Epsilon)));
 							cmd.DispatchCompute(s_solverCS, kernelInterpolate, interpolateNumX, interpolateNumY, interpolateNumZ);
 						}
@@ -1484,25 +1491,25 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				solverData.keywords = keywordState;
-			}
 
-			//var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
-			//if (interpolateStrandCount > 0)
-			//{
-			//	int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
-			//		? SolverKernels.KInterpolate
-			//		: SolverKernels.KInterpolateNearest;
-			//
-			//	using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
-			//	{
-			//		numX = ((int)interpolateStrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
-			//		numY = 1;
-			//		numZ = 1;
-			//
-			//		BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, stepFracHi < (1.0f - float.Epsilon)));
-			//		cmd.DispatchCompute(s_solverCS, kernelInterpolate, numX, numY, numZ);
-			//	}
-			//}
+				//var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
+				//if (interpolateStrandCount > 0)
+				//{
+				//	int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
+				//		? SolverKernels.KInterpolate
+				//		: SolverKernels.KInterpolateNearest;
+				//
+				//	using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
+				//	{
+				//		numX = ((int)interpolateStrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
+				//		numY = 1;
+				//		numZ = 1;
+				//
+				//		BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, stepFracHi < (1.0f - float.Epsilon)));
+				//		cmd.DispatchCompute(s_solverCS, kernelInterpolate, numX, numY, numZ);
+				//	}
+				//}
+			}
 		}
 
 		public static void StepVolumeData(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData[] solverData)

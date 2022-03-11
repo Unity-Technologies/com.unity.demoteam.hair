@@ -121,6 +121,7 @@ namespace Unity.DemoTeam.Hair
 			return StructValidation.Pass;
 #else
 			EditorGUILayout.HelpBox("Root attachments require package: 'com.unity.demoteam.digital-human >= 0.1.1-preview'.", MessageType.None, wide: true);
+			return StructValidation.Inaccessible;
 #endif
 		}
 
