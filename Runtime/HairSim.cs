@@ -1435,7 +1435,7 @@ namespace Unity.DemoTeam.Hair
 
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
-				var keywordState = solverData.keywords;
+				var substepKeywordState = solverData.keywords;
 				var substepCount = Mathf.Max(1, solverSettings.substeps);
 
 				for (int i = 0; i != substepCount; i++)
@@ -1443,13 +1443,17 @@ namespace Unity.DemoTeam.Hair
 					var substepFrac = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
 					if (substepFrac < (1.0f - float.Epsilon))
 					{
+						var rootsNumX = ((int)solverData.cbuffer._StrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
+						var rootsNumY = 1;
+						var rootsNumZ = 1;
+
 						using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepRoots))
 						{
 							//TODO move into cbuffer?
 							cmd.SetComputeFloatParam(s_solverCS, "_SubstepFraction", substepFrac);
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KSubstepRoots, solverData);
-							cmd.DispatchCompute(s_solverCS, SolverKernels.KSubstepRoots, numX, numY, numZ);
+							cmd.DispatchCompute(s_solverCS, SolverKernels.KSubstepRoots, rootsNumX, rootsNumY, rootsNumZ);
 						}
 					}
 
@@ -1457,8 +1461,8 @@ namespace Unity.DemoTeam.Hair
 
 					using (new ProfilingScope(cmd, MarkersGPU.Solver_SolveConstraints))
 					{
-						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);       // [0 1 2] -> (1 0 2)
-						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);   // (1 0 2) -> [2 0 1]
+						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);		// [0 1 2] -> (1 0 2)
+						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);	// (1 0 2) -> [2 0 1]
 						CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
 
 						BindVolumeData(cmd, s_solverCS, kernelSolveConstraints, volumeData);
@@ -1490,7 +1494,7 @@ namespace Unity.DemoTeam.Hair
 					solverData.keywords.APPLY_VOLUME_IMPULSE = false;
 				}
 
-				solverData.keywords = keywordState;
+				solverData.keywords = substepKeywordState;
 
 				//var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
 				//if (interpolateStrandCount > 0)
