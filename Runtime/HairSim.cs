@@ -927,6 +927,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._GroupMaxParticleFootprint = 0.25f * Mathf.PI * Mathf.Pow(strandScale * 0.001f * (strandDiameter + strandMargin), 2.0f);
 
 			cbuffer._DT = dt / Mathf.Max(1, solverSettings.substeps);
+			cbuffer._Substeps = (uint)Mathf.Max(1, solverSettings.substeps);
 			cbuffer._Iterations = (uint)solverSettings.iterations;
 			cbuffer._Stiffness = solverSettings.stiffness;
 			cbuffer._SOR = (solverSettings.iterations > 1) ? solverSettings.kSOR : 1.0f;
@@ -1435,7 +1436,7 @@ namespace Unity.DemoTeam.Hair
 
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
-				var substepKeywordState = solverData.keywords;
+				var substepKeywords = solverData.keywords;
 				var substepCount = Mathf.Max(1, solverSettings.substeps);
 
 				for (int i = 0; i != substepCount; i++)
@@ -1461,8 +1462,8 @@ namespace Unity.DemoTeam.Hair
 
 					using (new ProfilingScope(cmd, MarkersGPU.Solver_SolveConstraints))
 					{
-						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);		// [0 1 2] -> (1 0 2)
-						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);	// (1 0 2) -> [2 0 1]
+						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);		// A B C -> b a c
+						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);	// b a c -> C A B
 						CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
 
 						BindVolumeData(cmd, s_solverCS, kernelSolveConstraints, volumeData);
@@ -1470,6 +1471,7 @@ namespace Unity.DemoTeam.Hair
 						cmd.DispatchCompute(s_solverCS, kernelSolveConstraints, numX, numY, numZ);
 					}
 
+					/* TODO remove
 					// interpolate follow-strands
 					//TODO move this out of the substep loop (bit finicky due to the buffer shuffling per substep)
 					var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
@@ -1489,30 +1491,31 @@ namespace Unity.DemoTeam.Hair
 							cmd.DispatchCompute(s_solverCS, kernelInterpolate, interpolateNumX, interpolateNumY, interpolateNumZ);
 						}
 					}
+					*/
 
 					// volume impulse is only applied for first substep
 					solverData.keywords.APPLY_VOLUME_IMPULSE = false;
 				}
 
-				solverData.keywords = substepKeywordState;
+				solverData.keywords = substepKeywords;
 
-				//var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
-				//if (interpolateStrandCount > 0)
-				//{
-				//	int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
-				//		? SolverKernels.KInterpolate
-				//		: SolverKernels.KInterpolateNearest;
-				//
-				//	using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
-				//	{
-				//		numX = ((int)interpolateStrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
-				//		numY = 1;
-				//		numZ = 1;
-				//
-				//		BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, stepFracHi < (1.0f - float.Epsilon)));
-				//		cmd.DispatchCompute(s_solverCS, kernelInterpolate, numX, numY, numZ);
-				//	}
-				//}
+				var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
+				if (interpolateStrandCount > 0)
+				{
+					int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
+						? SolverKernels.KInterpolate
+						: SolverKernels.KInterpolateNearest;
+
+					var interpolateNumX = ((int)interpolateStrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
+					var interpolateNumY = 1;
+					var interpolateNumZ = 1;
+
+					using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
+					{
+						BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, stepFracHi < (1.0f - float.Epsilon)));
+						cmd.DispatchCompute(s_solverCS, kernelInterpolate, interpolateNumX, interpolateNumY, interpolateNumZ);
+					}
+				}
 			}
 		}
 

@@ -109,6 +109,7 @@ namespace Unity.DemoTeam.Hair
 
 			// 63
 			public float _DT;
+			public uint _Substeps;
 			public uint _Iterations;
 			public float _Stiffness;
 			public float _SOR;
@@ -125,16 +126,15 @@ namespace Unity.DemoTeam.Hair
 			public float _LocalCurvature;
 			public float _LocalShape;
 
-			// 77
+			// 78
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
 
-			// 82 --> 84 (16 byte alignment)
+			// 83 --> 84 (16 byte alignment)
 			public float _scbpad1;
-			public float _scbpad2;
 
 			// NOTE: explicit padding to 16 byte alignment required on some platforms, please update if modifying
 		}

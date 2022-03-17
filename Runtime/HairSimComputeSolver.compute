@@ -1499,6 +1499,31 @@ void KSolveConstraints_Jacobi(
 
 #if F_INTERPOLATE
 
+void WriteInterpolatedParticle(int particleIndex, float3 position)
+{
+	float3 positionPrev;
+	{
+		// locate previous interpolated position, taking into account buffer rotations from substeps
+		// (s=1) A B C --> C *A* B
+		// (s=2) A B C --> C A B --> B C *A*
+		// (s=3) A B C --> C A B --> B C A --> *A* B C
+		switch (_Substeps % 3)
+		{
+		case 0: positionPrev = _ParticlePosition[particleIndex].xyz; break;
+		case 1: positionPrev = _ParticlePositionPrev[particleIndex].xyz; break;
+		case 2: positionPrev = _ParticlePositionPrevPrev[particleIndex].xyz; break;
+		}
+	}
+
+	_ParticleVelocity[particleIndex].xyz = (position - positionPrev) / (_DT * _Substeps);
+	_ParticlePosition[particleIndex].xyz = position;
+
+#if SECOND_ORDER_POSITION || SECOND_ORDER_VELOCITY
+	_ParticleVelocityPrev[particleIndex].xyz = 0;
+	_ParticlePositionPrev[particleIndex].xyz = position;
+#endif
+}
+
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void KInterpolate(
 	uint3 groupIdx : SV_GroupID,
@@ -1512,8 +1537,8 @@ void KInterpolate(
 {
 	DECLARE_STRAND(worldIdx.x + _SolverStrandCount);
 
-	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
-	uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
+	const uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
+	const uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
 
 	const uint strandParticleBeginLo = strandIndexLo * _StrandParticleOffset;
 	const uint strandParticleBeginHi = strandIndexHi * _StrandParticleOffset;
@@ -1525,8 +1550,7 @@ void KInterpolate(
 	float3 rootPositionHi = _RootPosition[strandIndexHi].xyz;
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
-	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
-	_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin, rootPosition);
+	WriteInterpolatedParticle(strandParticleBegin, rootPosition);
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride, iHi = strandParticleBeginHi + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
 	{
@@ -1542,8 +1566,7 @@ void KInterpolate(
 		float3 position = rootPosition + initialOffset + lerp(positionDeltaLo, positionDeltaHi, _LODBlendFraction);
 
 		//TODO transition strand to interpolated to avoid pops
-		_ParticlePosition[i].xyz = position;
-		_ParticleVelocity[i].xyz = DeriveParticleVelocity(i, position);
+		WriteInterpolatedParticle(i, position);
 	}
 }
 
@@ -1560,7 +1583,7 @@ void KInterpolateNearest(
 {
 	DECLARE_STRAND(worldIdx.x + _SolverStrandCount);
 
-	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
+	const uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
 	
 	const uint strandParticleBeginLo = strandIndexLo * _StrandParticleOffset;
 
@@ -1569,8 +1592,7 @@ void KInterpolateNearest(
 	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
-	_ParticlePosition[strandParticleBegin].xyz = rootPosition;
-	_ParticleVelocity[strandParticleBegin].xyz = DeriveParticleVelocity(strandParticleBegin, rootPosition);
+	WriteInterpolatedParticle(strandParticleBegin, rootPosition);
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride)
 	{
@@ -1583,8 +1605,7 @@ void KInterpolateNearest(
 		float3 position = rootPosition + initialOffset + positionDeltaLo;
 
 		//TODO transition strand to interpolated to avoid pops
-		_ParticlePosition[i].xyz = position;
-		_ParticleVelocity[i].xyz = DeriveParticleVelocity(i, position);
+		WriteInterpolatedParticle(i, position);
 	}
 }
 
