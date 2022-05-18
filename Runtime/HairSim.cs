@@ -208,6 +208,12 @@ namespace Unity.DemoTeam.Hair
 				GreaterThan,
 			}
 
+			public enum LocalShapeMode
+			{
+				Forward,
+				Stitched,
+			}
+
 			[LineHeader("Solver")]
 
 			[Tooltip("Constraint solver")]
@@ -218,7 +224,7 @@ namespace Unity.DemoTeam.Hair
 			public int substeps;
 			[Range(0.0f, 1.0f), Tooltip("Constraint stiffness")]
 			public float stiffness;
-			[Range(1.0f, 2.0f), Tooltip("Successive-over-relaxation factor")]
+			[Range(1.0f, 2.0f), Tooltip("Successive over-relaxation factor")]
 			public float kSOR;
 
 			[LineHeader("Integration")]
@@ -271,8 +277,14 @@ namespace Unity.DemoTeam.Hair
 
 			[ToggleGroup, Tooltip("Enable local shape constraint")]
 			public bool localShape;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape influence")]
+			[ToggleGroupItem, Tooltip("Local shape constraint application mode")]
+			public LocalShapeMode localShapeMode;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape constraint influence")]
 			public float localShapeInfluence;
+			[ToggleGroup, Tooltip("Enable local shape bias")]
+			public bool localShapeBias;
+			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Local shape bias (skews local solution towards global reference)")]
+			public float localShapeBiasValue;
 
 			[LineHeader("Reference")]
 
@@ -321,7 +333,10 @@ namespace Unity.DemoTeam.Hair
 				localCurvatureMode = LocalCurvatureMode.LessThan,
 				localCurvatureValue = 0.1f,
 				localShape = true,
+				localShapeMode = LocalShapeMode.Stitched,
 				localShapeInfluence = 1.0f,
+				localShapeBias = true,
+				localShapeBiasValue = 0.5f,
 
 				globalPosition = false,
 				globalPositionInfluence = 1.0f,
@@ -836,18 +851,10 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(UniformIDs._StagingPositionPrev, solverData.stagingPositionPrev);
 
 			target.BindKeyword("LAYOUT_INTERLEAVED", solverData.keywords.LAYOUT_INTERLEAVED);
-			target.BindKeyword("APPLY_VOLUME_IMPULSE", solverData.keywords.APPLY_VOLUME_IMPULSE);
-			target.BindKeyword("ENABLE_BOUNDARY", solverData.keywords.ENABLE_BOUNDARY);
-			target.BindKeyword("ENABLE_BOUNDARY_FRICTION", solverData.keywords.ENABLE_BOUNDARY_FRICTION);
-			target.BindKeyword("ENABLE_DISTANCE", solverData.keywords.ENABLE_DISTANCE);
-			target.BindKeyword("ENABLE_DISTANCE_LRA", solverData.keywords.ENABLE_DISTANCE_LRA);
-			target.BindKeyword("ENABLE_DISTANCE_FTL", solverData.keywords.ENABLE_DISTANCE_FTL);
-			target.BindKeyword("ENABLE_CURVATURE_EQ", solverData.keywords.ENABLE_CURVATURE_EQ);
-			target.BindKeyword("ENABLE_CURVATURE_GEQ", solverData.keywords.ENABLE_CURVATURE_GEQ);
-			target.BindKeyword("ENABLE_CURVATURE_LEQ", solverData.keywords.ENABLE_CURVATURE_LEQ);
-			target.BindKeyword("ENABLE_POSE_LOCAL_BEND_TWIST", solverData.keywords.ENABLE_POSE_LOCAL_BEND_TWIST);
-			target.BindKeyword("ENABLE_POSE_GLOBAL_POSITION", solverData.keywords.ENABLE_POSE_GLOBAL_POSITION);
-			target.BindKeyword("ENABLE_POSE_GLOBAL_ROTATION", solverData.keywords.ENABLE_POSE_GLOBAL_ROTATION);
+			target.BindKeyword("LIVE_POSITIONS_3", solverData.keywords.LIVE_POSITIONS_3);
+			target.BindKeyword("LIVE_POSITIONS_2", solverData.keywords.LIVE_POSITIONS_2);
+			target.BindKeyword("LIVE_POSITIONS_1", solverData.keywords.LIVE_POSITIONS_1);
+			target.BindKeyword("LIVE_ROTATIONS_2", solverData.keywords.LIVE_ROTATIONS_2);
 			target.BindKeyword("STAGING_COMPRESSION", solverData.keywords.STAGING_COMPRESSION);
 		}
 
@@ -943,6 +950,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._FTLDamping = solverSettings.distanceFTLDamping;
 			cbuffer._LocalCurvature = solverSettings.localCurvatureValue * 0.5f;
 			cbuffer._LocalShape = solverSettings.localShapeInfluence;
+			cbuffer._LocalShapeBias = solverSettings.localShapeBias ? solverSettings.localShapeBiasValue : 0.0f;
 
 			cbuffer._GlobalPosition = solverSettings.globalPositionInfluence;
 			cbuffer._GlobalPositionInterval = IntervalToSeconds(solverSettings.globalPositionInterval);
@@ -950,20 +958,36 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._GlobalFadeOffset = solverSettings.globalFade ? solverSettings.globalFadeOffset : 1e9f;
 			cbuffer._GlobalFadeExtent = solverSettings.globalFade ? solverSettings.globalFadeExtent : 1e9f;
 
+			// derive features
+			SolverFeatures features = 0;
+			{
+				features |= (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f) ? SolverFeatures.Boundary : 0;
+				features |= (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f) ? SolverFeatures.BoundaryFriction : 0;
+				features |= (solverSettings.distance) ? SolverFeatures.Distance : 0;
+				features |= (solverSettings.distanceLRA) ? SolverFeatures.DistanceLRA : 0;
+				features |= (solverSettings.distanceFTL) ? SolverFeatures.DistanceFTL : 0;
+				features |= (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.Equals) ? SolverFeatures.CurvatureEQ : 0;
+				features |= (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.GreaterThan) ? SolverFeatures.CurvatureGEQ : 0;
+				features |= (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.LessThan) ? SolverFeatures.CurvatureLEQ : 0;
+				features |= (solverSettings.localShape && solverSettings.localShapeInfluence > 0.0f && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.Forward) ? SolverFeatures.PoseLocalShape : 0;
+				features |= (solverSettings.localShape && solverSettings.localShapeInfluence > 0.0f && solverSettings.localShapeMode == SolverSettings.LocalShapeMode.Stitched) ? SolverFeatures.PoseLocalShapeRWD : 0;
+				features |= (solverSettings.globalPosition && solverSettings.globalPositionInfluence > 0.0f) ? SolverFeatures.PoseGlobalPosition : 0;
+				features |= (solverSettings.globalRotation && solverSettings.globalRotationInfluence > 0.0f) ? SolverFeatures.PoseGlobalRotation : 0;
+
+				if (features.HasFlag(SolverFeatures.PoseLocalShapeRWD) && solverSettings.method != SolverSettings.Method.GaussSeidel)
+				{
+					features &= ~SolverFeatures.PoseLocalShapeRWD;
+					features |= SolverFeatures.PoseLocalShape;
+				}
+			}
+			cbuffer._SolverFeatures = (uint)features;
+
 			// derive keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == HairAsset.MemoryLayout.Interleaved);
-			keywords.APPLY_VOLUME_IMPULSE = (solverSettings.cellPressure > 0.0f) || (solverSettings.cellVelocity > 0.0f);
-			keywords.ENABLE_BOUNDARY = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction == 0.0f);
-			keywords.ENABLE_BOUNDARY_FRICTION = (solverSettings.boundaryCollision && solverSettings.boundaryCollisionFriction > 0.0f);
-			keywords.ENABLE_DISTANCE = solverSettings.distance;
-			keywords.ENABLE_DISTANCE_LRA = solverSettings.distanceLRA;
-			keywords.ENABLE_DISTANCE_FTL = solverSettings.distanceFTL;
-			keywords.ENABLE_CURVATURE_EQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.Equals);
-			keywords.ENABLE_CURVATURE_GEQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.GreaterThan);
-			keywords.ENABLE_CURVATURE_LEQ = (solverSettings.localCurvature && solverSettings.localCurvatureMode == SolverSettings.LocalCurvatureMode.LessThan);
-			keywords.ENABLE_POSE_LOCAL_BEND_TWIST = (solverSettings.localShape && solverSettings.localShapeInfluence > 0.0f);
-			keywords.ENABLE_POSE_GLOBAL_POSITION = (solverSettings.globalPosition && solverSettings.globalPositionInfluence > 0.0f);
-			keywords.ENABLE_POSE_GLOBAL_ROTATION = (solverSettings.globalRotation && solverSettings.globalRotationInfluence > 0.0f);
+			keywords.LIVE_POSITIONS_3 = ((features & (SolverFeatures.CurvatureEQ | SolverFeatures.CurvatureGEQ | SolverFeatures.CurvatureLEQ | SolverFeatures.PoseLocalShapeRWD)) != 0);
+			keywords.LIVE_POSITIONS_2 = !keywords.LIVE_POSITIONS_3 && ((features & (SolverFeatures.Distance | SolverFeatures.PoseLocalShape | SolverFeatures.PoseGlobalRotation)) != 0);
+			keywords.LIVE_POSITIONS_1 = !keywords.LIVE_POSITIONS_3 && !keywords.LIVE_POSITIONS_2 && ((features & ~SolverFeatures.PoseGlobalPosition) != 0);
+			keywords.LIVE_ROTATIONS_2 = ((features & (SolverFeatures.PoseLocalShape | SolverFeatures.PoseLocalShapeRWD | SolverFeatures.PoseGlobalRotation)) != 0);
 
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.cbufferStorage, cbuffer);
@@ -1436,7 +1460,7 @@ namespace Unity.DemoTeam.Hair
 
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
-				var substepKeywords = solverData.keywords;
+				var substepCBuffer = solverData.cbuffer;
 				var substepCount = Mathf.Max(1, solverSettings.substeps);
 
 				for (int i = 0; i != substepCount; i++)
@@ -1494,10 +1518,19 @@ namespace Unity.DemoTeam.Hair
 					*/
 
 					// volume impulse is only applied for first substep
-					solverData.keywords.APPLY_VOLUME_IMPULSE = false;
+					if (substepCount > 1)
+					{
+						solverData.cbuffer._CellPressure = 0.0f;
+						solverData.cbuffer._CellVelocity = 0.0f;
+						PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
+					}
 				}
 
-				solverData.keywords = substepKeywords;
+				if (substepCount > 1)
+				{
+					solverData.cbuffer = substepCBuffer;
+					PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
+				}
 
 				var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
 				if (interpolateStrandCount > 0)

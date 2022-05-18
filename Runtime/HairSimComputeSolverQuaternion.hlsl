@@ -64,6 +64,11 @@ float4 MakeQuaternionIdentity()
 	return float4(0.0, 0.0, 0.0, 1.0);
 }
 
+float4 MakeQuaternionTwistIdentity()
+{
+	return float4(0.0, 1.0, 0.0, 0.0);
+}
+
 float4 MakeQuaternionFromAxisAngle(float3 axis, float angle)
 {
 	float sina = sin(0.5 * angle);
@@ -88,11 +93,86 @@ float4 MakeQuaternionFromTo(float3 u, float3 v)
 	return normalize(q);
 }
 
+float4 MakeQuaternionFromToWithFallback(float3 u, float3 v, float3 w)
+{
+	float4 q;
+	float s = 1.0 + dot(u, v);
+	if (s < 1e-6)// if 'u' and 'v' are directly opposing
+	{
+		q.xyz = w;
+		q.w = 0.0;
+	}
+	else
+	{
+		q.xyz = cross(u, v);
+		q.w = s;
+	}
+	return normalize(q);
+}
+
 float4 MakeQuaternionFromBend(float3 p0, float3 p1, float3 p2)
 {
 	float3 u = normalize(p1 - p0);
 	float3 v = normalize(p2 - p1);
 	return MakeQuaternionFromTo(u, v);
+}
+
+float4 NextQuaternionFromBend(float3 p0, float3 p1, float3 p2, float4 q1)
+{
+	float3 u = QMul(q1, float3(0, 1, 0));
+	float3 v = normalize(p2 - p1);
+
+	float4 rotTangent = MakeQuaternionFromToWithFallback(u, v, QMul(q1, float3(1, 0, 0)));
+	float4 rotTwist = MakeQuaternionTwistIdentity();
+
+	return QMul(rotTangent, QMul(q1, rotTwist));
+}
+
+float4 NextQuaternionFromBendRMF(float3 p0, float3 p1, float3 p2, float4 q1)
+{
+	// see: "Computation of Rotation Minimizing Frames" by W. Wang, B. Jüttler, D. Zheng and Y. Liu
+	// https://www.microsoft.com/en-us/research/wp-content/uploads/2016/12/Computation-of-rotation-minimizing-frames.pdf
+
+	float3 localNormal = float3(0, 0, 1);
+	float3 localTangent = float3(0, 1, 0);
+	float3 localBitangent = float3(1, 0, 0);
+
+	float3 v1 = normalize(p2 - p1);
+	float3 ri = QMul(q1, localBitangent);
+	float3 ti = QMul(q1, localTangent);
+
+	float3 rLi = reflect(ri, v1);
+	float3 tLi = reflect(ti, v1);
+
+	float3 t2 = v1;
+	float3 v2 = normalize(t2 - tLi);
+	float3 r2 = reflect(rLi, v2);
+	float3 s2 = cross(r2, t2);
+
+#if 1
+	// build new frame
+	float4 rotTangent = MakeQuaternionFromToWithFallback(localTangent, t2, ri);
+	float4 rotTangentTwist = MakeQuaternionFromToWithFallback(QMul(rotTangent, localNormal), -s2, t2);
+	return QMul(rotTangentTwist, rotTangent);
+#else
+	// rotate existing frame
+	float4 rotTangent = MakeQuaternionFromToWithFallback(ti, t2, ri);
+	q1 = QMul(rotTangent, q1);
+	float4 rotTangentTwist = MakeQuaternionFromToWithFallback(QMul(q1, localBitangent), r2, t2);
+	q1 = QMul(rotTangentTwist, q1);
+	return q1;
+#endif
+}
+
+float4 MakeQuaternionLookAt(float3 forward, float3 up)
+{
+	float3 localForward = float3(0, 0, 1);
+	float3 localUp = float3(0, 1, 0);
+
+	float4 rotForward = MakeQuaternionFromTo(localForward, forward);
+	float4 rotForwardTwist = MakeQuaternionFromToWithFallback(QMul(rotForward, localUp), up, forward);
+
+	return QMul(rotForwardTwist, rotForward);
 }
 
 #endif//__HAIRSIMCOMPUTEQUATERNION_HLSL__

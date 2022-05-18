@@ -1074,7 +1074,6 @@ namespace Unity.DemoTeam.Hair
 				bounds.extents = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
 			}
 
-
 			switch (settingsSystem.boundsMode)
 			{
 				case SettingsSystem.BoundsMode.Automatic:
@@ -1340,6 +1339,33 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				int strandGroupParticleCount = strandGroupAsset.strandCount * strandGroupAsset.strandParticleCount;
+
+				//DEBUG BEGIN
+				/*
+				int debugIndex = 315;// squiggly strand
+				debugIndex = 0;
+				if (debugIndex < strandGroupAsset.strandCount)
+				{
+					HairAssetUtility.DeclareStrandIterator(strandGroupAsset.particleMemoryLayout, debugIndex, strandGroupAsset.strandCount, strandGroupAsset.strandParticleCount, out var debugBegin, out var debugStride, out var debugEnd);
+
+					var fmt = "R";
+					var cul = System.Globalization.CultureInfo.InvariantCulture;
+
+					var tmp = "float[] x = new float[] { ";
+					for (int particleIndex = debugBegin; particleIndex != debugEnd; particleIndex += debugStride)
+					{
+						tmp += (
+							(particleIndex != debugBegin ? ", " : "") +
+							strandGroupAsset.particlePosition[particleIndex].x.ToString(fmt, cul) + "f, " +
+							strandGroupAsset.particlePosition[particleIndex].y.ToString(fmt, cul) + "f, " +
+							strandGroupAsset.particlePosition[particleIndex].z.ToString(fmt, cul) + "f"
+						);
+					}
+					tmp += " };\nfloat stepLength = " + (strandGroupAsset.maxParticleInterval * strandGroupAsset.rootScale[debugIndex]).ToString(fmt, cul) + "f;";
+					Debug.Log(tmp);
+				}
+				*/
+				//DEBUG END
 
 				using (var alignedRootPosition = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var alignedRootDirection = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))

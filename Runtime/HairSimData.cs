@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Collections;
 
@@ -54,10 +55,31 @@ namespace Unity.DemoTeam.Hair
 			public HairAsset.MemoryLayout memoryLayout;
 		}
 
+		[Flags, GenerateHLSL]
+		public enum SolverFeatures : uint
+		{
+			Boundary			= 1 << 0,
+			BoundaryFriction	= 1 << 1,
+			Distance			= 1 << 2,
+			DistanceLRA			= 1 << 3,
+			DistanceFTL			= 1 << 4,
+			CurvatureEQ			= 1 << 5,
+			CurvatureGEQ		= 1 << 6,
+			CurvatureLEQ		= 1 << 7,
+			PoseLocalShape		= 1 << 8,
+			PoseLocalShapeRWD	= 1 << 9,
+			PoseGlobalPosition	= 1 << 10,
+			PoseGlobalRotation	= 1 << 11,
+		}
+
 		public struct SolverKeywords
 		{
 			public bool LAYOUT_INTERLEAVED;
-			public bool APPLY_VOLUME_IMPULSE;
+			public bool LIVE_POSITIONS_3;
+			public bool LIVE_POSITIONS_2;
+			public bool LIVE_POSITIONS_1;
+			public bool LIVE_ROTATIONS_2;
+			/*
 			public bool ENABLE_BOUNDARY;
 			public bool ENABLE_BOUNDARY_FRICTION;
 			public bool ENABLE_DISTANCE;
@@ -66,9 +88,10 @@ namespace Unity.DemoTeam.Hair
 			public bool ENABLE_CURVATURE_EQ;
 			public bool ENABLE_CURVATURE_GEQ;
 			public bool ENABLE_CURVATURE_LEQ;
-			public bool ENABLE_POSE_LOCAL_BEND_TWIST;
+			public bool ENABLE_POSE_LOCAL_SHAPE;
 			public bool ENABLE_POSE_GLOBAL_POSITION;
 			public bool ENABLE_POSE_GLOBAL_ROTATION;
+			*/
 			public bool STAGING_COMPRESSION;
 		}
 
@@ -92,12 +115,13 @@ namespace Unity.DemoTeam.Hair
 			public uint _StrandParticleOffset;			// offset in particles to reach the ith strand
 			public uint _StrandParticleStride;			// stride in particles between strand particles
 
+			public uint _SolverFeatures;				// bitmask with solver feature flags
 			public uint _SolverStrandCount;				// number of strands touched by solver
 
-			public float _GroupScale;                   // group scale
-			public float _GroupMaxParticleInterval;     // (scaled) max particle interval
-			public float _GroupMaxParticleDiameter;     // (scaled) max particle diameter
-			public float _GroupMaxParticleFootprint;    // (scaled) max particle footprint
+			public float _GroupScale;					// group scale
+			public float _GroupMaxParticleInterval;		// (scaled) max particle interval
+			public float _GroupMaxParticleDiameter;		// (scaled) max particle diameter
+			public float _GroupMaxParticleFootprint;	// (scaled) max particle footprint
 
 			public uint _LODIndexLo;					// lod index (lower detail in blend)
 			public uint _LODIndexHi;					// lod index (higher detail in blend)
@@ -107,7 +131,7 @@ namespace Unity.DemoTeam.Hair
 			public uint _StagingVertexCount;			// staging strand vertex count
 			public uint _StagingVertexOffset;			// staging strand vertex offset
 
-			// 63
+			// 64
 			public float _DT;
 			public uint _Substeps;
 			public uint _Iterations;
@@ -125,16 +149,19 @@ namespace Unity.DemoTeam.Hair
 			public float _FTLDamping;
 			public float _LocalCurvature;
 			public float _LocalShape;
+			public float _LocalShapeBias;
 
-			// 78
+			// 80
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
 
-			// 83 --> 84 (16 byte alignment)
+			// 85 --> 88 (16 byte alignment)
 			public float _scbpad1;
+			public float _scbpad2;
+			public float _scbpad3;
 
 			// NOTE: explicit padding to 16 byte alignment required on some platforms, please update if modifying
 		}

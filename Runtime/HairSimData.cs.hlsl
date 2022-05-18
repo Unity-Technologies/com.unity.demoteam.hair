@@ -4,6 +4,22 @@
 
 #ifndef HAIRSIMDATA_CS_HLSL
 #define HAIRSIMDATA_CS_HLSL
+//
+// Unity.DemoTeam.Hair.HairSim+SolverFeatures:  static fields
+//
+#define SOLVERFEATURES_BOUNDARY (1)
+#define SOLVERFEATURES_BOUNDARY_FRICTION (2)
+#define SOLVERFEATURES_DISTANCE (4)
+#define SOLVERFEATURES_DISTANCE_LRA (8)
+#define SOLVERFEATURES_DISTANCE_FTL (16)
+#define SOLVERFEATURES_CURVATURE_EQ (32)
+#define SOLVERFEATURES_CURVATURE_GEQ (64)
+#define SOLVERFEATURES_CURVATURE_LEQ (128)
+#define SOLVERFEATURES_POSE_LOCAL_SHAPE (256)
+#define SOLVERFEATURES_POSE_LOCAL_SHAPE_RWD (512)
+#define SOLVERFEATURES_POSE_GLOBAL_POSITION (1024)
+#define SOLVERFEATURES_POSE_GLOBAL_ROTATION (2048)
+
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer
 // PackingRules = Exact
 CBUFFER_START(SolverCBuffer)
@@ -17,6 +33,7 @@ CBUFFER_START(SolverCBuffer)
     uint _StrandParticleCount;
     uint _StrandParticleOffset;
     uint _StrandParticleStride;
+    uint _SolverFeatures;
     uint _SolverStrandCount;
     float _GroupScale;
     float _GroupMaxParticleInterval;
@@ -43,12 +60,15 @@ CBUFFER_START(SolverCBuffer)
     float _FTLDamping;
     float _LocalCurvature;
     float _LocalShape;
+    float _LocalShapeBias;
     float _GlobalPosition;
     float _GlobalPositionInterval;
     float _GlobalRotation;
     float _GlobalFadeOffset;
     float _GlobalFadeExtent;
     float _scbpad1;
+    float _scbpad2;
+    float _scbpad3;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

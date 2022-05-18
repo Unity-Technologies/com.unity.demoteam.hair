@@ -333,6 +333,10 @@ void SolveMaterialFrameBendTwistConstraint(
 	float4 delta_sub = (darboux - darboux0);
 	float4 delta = (dot(delta_add, delta_add) < dot(delta_sub, delta_sub)) ? delta_add : delta_sub;
 
+	//TODO consider this?
+	//if (dot(delta.xyz, delta.xyz) < 1e-7)
+	//	return;
+
 	// apply eq. 40 to calc corrections
 	float W_inv = stiffness / (w0 + w1 + w_EPSILON);
 
@@ -360,7 +364,7 @@ void SolveMaterialFrameStretchShearConstraint(
 
 	d0 += (w0 * W_inv * distance0) * r;
 	d1 -= (w1 * W_inv * distance0) * r;
-	dq += (wq * W_inv * distance0 * distance0) * QMul(float4(r, 0), QMul(q, QConjugate(float4(0, 1, 0, 0))));
+	dq += (wq * W_inv * distance0 * distance0) * QMul(float4(r, 0), QMul(q, QConjugate(float4(e3, 0))));
 }
 
 //--------------------------------------------------
