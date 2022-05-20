@@ -151,19 +151,19 @@ float GetIterationStiffness(uint iteration)
 	return 1.0 - pow(saturate(1.0 - _Stiffness), 1.0 / (1 + iteration));
 }
 
-float GetDecay(float fraction, float interval)
+float GetDecayMultiplier(float fraction, float interval)
 {
 	return pow(max(1e-5, 1.0 - fraction), _DT / interval);
 }
 
-#define DEFINE_DECAY_FUNCTIONS(T)								\
-	T Decay(T a, float fraction, float interval)				\
-	{															\
-		return a * GetDecay(fraction, interval);				\
-	}															\
-	T DecayTowards(T a, T b, float fraction, float interval)	\
-	{															\
-		return lerp(a, b, 1.0 - GetDecay(fraction, interval));	\
+#define DEFINE_DECAY_FUNCTIONS(T)										\
+	T Decay(T a, float fraction, float interval)						\
+	{																	\
+		return a * GetDecayMultiplier(fraction, interval);				\
+	}																	\
+	T DecayTowards(T a, T b, float fraction, float interval)			\
+	{																	\
+		return lerp(a, b, 1.0 - GetDecayMultiplier(fraction, interval));\
 	}
 
 DEFINE_DECAY_FUNCTIONS(float);
@@ -258,25 +258,36 @@ void ApplyDampingFTL(inout float3 v, float3 d)
 
 void ApplyDampingLinear(inout float3 v)
 {
-	v *= GetDecay(_Damping, _DampingInterval);
+	v *= GetDecayMultiplier(_Damping, _DampingInterval);
 }
 
 void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
 {
 	if (_AngularDamping > 0.0)
 	{
-		float3 pF = 0.5 * (p0 + p1);
-		float3 vF = 0.5 * (v0 + v1);
+#if 1
+		float3 r = 0.5 * (p1 - p0);
+		float3 v = 0.5 * (v1 - v0);
 
-		float3 r = p1 - pF;
-		float3 v = 1.0 * (v1 - v0);
 		float3 w = LinearToAngular(r, v);
+		float3 w_damp = Decay(w, _AngularDamping, _AngularDampingInterval);
 
-		float3 v_tan = AngularToLinear(r, w);
-		float3 v_tan_damp = v_tan * (1.0 - GetDecay(_AngularDamping, _AngularDampingInterval));
+		float3 dv = AngularToLinear(r, w_damp - w);
 
-		v0 += v_tan_damp;
-		v1 -= v_tan_damp;
+		v0 -= dv;
+		v1 += dv;
+#else
+		float3 r = 0.5 * (p1 - p0);
+		float3 v = 0.5 * (v1 - v0);
+		
+		float3 v_tan = AngularToLinear(r, LinearToAngular(r, v));
+		float3 v_tan_damp = Decay(v_tan, _AngularDamping, _AngularDampingInterval);
+
+		float3 dv = v_tan_damp - v_tan;
+
+		v0 -= dv;
+		v1 += dv;
+#endif
 	}
 }
 
@@ -337,7 +348,7 @@ float GetGlobalParamAttenuation(uint strandIndex, uint strandParticleNumber)
 float GetGlobalPositionInfluence(uint strandIndex, uint strandParticleNumber)
 {
 	float k = _GlobalPosition * GetGlobalParamAttenuation(strandIndex, strandParticleNumber);
-	return 1.0 - GetDecay(k, _GlobalPositionInterval);// fits into lerp(a, b, t), where b is the global position
+	return 1.0 - GetDecayMultiplier(k, _GlobalPositionInterval);// fits into lerp(a, b, t), where b is the global position
 }
 
 float GetGlobalRotationInfluence(uint strandIndex, uint strandParticleNumber)
