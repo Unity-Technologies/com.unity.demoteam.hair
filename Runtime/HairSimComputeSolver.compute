@@ -261,37 +261,46 @@ void ApplyDampingLinear(inout float3 v)
 	v *= GetDecayMultiplier(_Damping, _DampingInterval);
 }
 
+void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1, inout float3 d0, inout float3 d1)
+{
+#if 1
+	float3 r = 0.5 * (p1 - p0);
+	float3 v = 0.5 * (v1 - v0);
+
+	float3 w = LinearToAngular(r, v);
+	float3 w_damp = Decay(w, _AngularDamping, _AngularDampingInterval);
+
+	float3 dv = AngularToLinear(r, w_damp - w);
+
+	d0 -= dv;
+	d1 += dv;
+#else
+	float3 r = 0.5 * (p1 - p0);
+	float3 v = 0.5 * (v1 - v0);
+
+	float3 v_tan = AngularToLinear(r, LinearToAngular(r, v));
+	float3 v_tan_damp = Decay(v_tan, _AngularDamping, _AngularDampingInterval);
+
+	float3 dv = v_tan_damp - v_tan;
+
+	d0 -= dv;
+	d1 += dv;
+#endif
+}
+
 void ApplyDampingAngular(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
 {
 	if (_AngularDamping > 0.0)
 	{
-#if 1
-		float3 r = 0.5 * (p1 - p0);
-		float3 v = 0.5 * (v1 - v0);
-
-		float3 w = LinearToAngular(r, v);
-		float3 w_damp = Decay(w, _AngularDamping, _AngularDampingInterval);
-
-		float3 dv = AngularToLinear(r, w_damp - w);
-
-		v0 -= dv;
-		v1 += dv;
-#else
-		float3 r = 0.5 * (p1 - p0);
-		float3 v = 0.5 * (v1 - v0);
-		
-		float3 v_tan = AngularToLinear(r, LinearToAngular(r, v));
-		float3 v_tan_damp = Decay(v_tan, _AngularDamping, _AngularDampingInterval);
-
-		float3 dv = v_tan_damp - v_tan;
-
-		v0 -= dv;
-		v1 += dv;
-#endif
+		float3 d0 = 0;
+		float3 d1 = 0;
+		ApplyDampingAngular(p0, p1, v0, v1, d0, d1);
+		v0 += d0;
+		v1 += d1;
 	}
 }
 
-void ApplyDampingDistance(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
+void ApplyDampingDistance(float3 p0, float3 p1, inout float3 v0, inout float3 v1, inout float3 d0, inout float3 d1)
 {
 	//TODO separate damping coeff or group with linear/point?
 	return;// disabled until then
@@ -301,6 +310,15 @@ void ApplyDampingDistance(float3 p0, float3 p1, inout float3 v0, inout float3 v1
 
 	v0 += 0.5 * n * dot(n, v);
 	v1 -= 0.5 * n * dot(n, v);
+}
+
+void ApplyDampingDistance(float3 p0, float3 p1, inout float3 v0, inout float3 v1)
+{
+	float3 d0 = 0;
+	float3 d1 = 0;
+	ApplyDampingDistance(p0, p1, v0, v1, d0, d1);
+	p0 += d0;
+	p1 += d1;
 }
 
 float GetParticleInterval(uint strandIndex)
@@ -1456,9 +1474,27 @@ void KSolveConstraints_Jacobi(
 		}
 
 		ApplyDampingLinear(v);
-		//TODO angular damping in jacobi kernel
-		//ApplyDampingAngular(p0, p1, v0, v1);
-		//ApplyDampingDistance(p0, p1, v0, v1);
+
+		gs_d[j] = v;
+
+		GroupMemoryBarrierWithGroupSync();
+
+		// [threads: root+1..]
+		if (threadIdx > 0)
+		{
+			float3 NOP;
+			float3 dv = 0;
+
+			ApplyDampingAngular(gs_x[j - 1].xyz, gs_x[j].xyz, gs_d[j - 1], gs_d[j], NOP, v);
+			ApplyDampingDistance(gs_x[j - 1].xyz, gs_x[j].xyz, gs_d[j - 1], gs_d[j], NOP, v);
+
+			// [threads: ..end-1]
+			if (threadIdx < THREAD_GROUP_SIZE - 1)
+			{
+				ApplyDampingAngular(gs_x[j].xyz, gs_x[j + 1].xyz, gs_d[j], gs_d[j + 1], v, NOP);
+				ApplyDampingDistance(gs_x[j].xyz, gs_x[j + 1].xyz, gs_d[j], gs_d[j + 1], v, NOP);
+			}
+		}
 
 		_ParticleVelocity[i].xyz = v;
 	}
@@ -1471,7 +1507,7 @@ void KSolveConstraints_Jacobi(
 
 #if F_INTERPOLATE
 
-void WriteInterpolatedParticle(int particleIndex, float3 position)
+void StoreInterpolatedPosition(int particleIndex, float3 position)
 {
 	float3 positionPrev;
 	{
@@ -1522,7 +1558,7 @@ void KInterpolate(
 	float3 rootPositionHi = _RootPosition[strandIndexHi].xyz;
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
-	WriteInterpolatedParticle(strandParticleBegin, rootPosition);
+	StoreInterpolatedPosition(strandParticleBegin, rootPosition);
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride, iHi = strandParticleBeginHi + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
 	{
@@ -1538,7 +1574,7 @@ void KInterpolate(
 		float3 position = rootPosition + initialOffset + lerp(positionDeltaLo, positionDeltaHi, _LODBlendFraction);
 
 		//TODO transition strand to interpolated to avoid pops
-		WriteInterpolatedParticle(i, position);
+		StoreInterpolatedPosition(i, position);
 	}
 }
 
@@ -1564,7 +1600,7 @@ void KInterpolateNearest(
 	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
-	WriteInterpolatedParticle(strandParticleBegin, rootPosition);
+	StoreInterpolatedPosition(strandParticleBegin, rootPosition);
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride)
 	{
@@ -1577,7 +1613,7 @@ void KInterpolateNearest(
 		float3 position = rootPosition + initialOffset + positionDeltaLo;
 
 		//TODO transition strand to interpolated to avoid pops
-		WriteInterpolatedParticle(i, position);
+		StoreInterpolatedPosition(i, position);
 	}
 }
 
