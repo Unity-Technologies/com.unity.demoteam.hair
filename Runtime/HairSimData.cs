@@ -123,6 +123,7 @@ namespace Unity.DemoTeam.Hair
 			public float _GroupMaxParticleDiameter;		// (scaled) max particle diameter
 			public float _GroupMaxParticleFootprint;	// (scaled) max particle footprint
 
+			public uint _LODCount;						// lod count (total)
 			public uint _LODIndexLo;					// lod index (lower detail in blend)
 			public uint _LODIndexHi;					// lod index (higher detail in blend)
 			public float _LODBlendFraction;				// lod blend fraction (lo -> hi)
@@ -131,7 +132,7 @@ namespace Unity.DemoTeam.Hair
 			public uint _StagingVertexCount;			// staging strand vertex count
 			public uint _StagingVertexOffset;			// staging strand vertex offset
 
-			// 64
+			// 65
 			public float _DT;
 			public uint _Substeps;
 			public uint _Iterations;
@@ -151,17 +152,16 @@ namespace Unity.DemoTeam.Hair
 			public float _LocalShape;
 			public float _LocalShapeBias;
 
-			// 80
+			// 81
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
 
-			// 85 --> 88 (16 byte alignment)
+			// 86 --> 88 (16 byte alignment)
 			public float _scbpad1;
 			public float _scbpad2;
-			public float _scbpad3;
 
 			// NOTE: explicit padding to 16 byte alignment required on some platforms, please update if modifying
 		}

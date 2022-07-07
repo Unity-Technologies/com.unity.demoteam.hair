@@ -39,6 +39,7 @@ CBUFFER_START(SolverCBuffer)
     float _GroupMaxParticleInterval;
     float _GroupMaxParticleDiameter;
     float _GroupMaxParticleFootprint;
+    uint _LODCount;
     uint _LODIndexLo;
     uint _LODIndexHi;
     float _LODBlendFraction;
@@ -68,7 +69,6 @@ CBUFFER_START(SolverCBuffer)
     float _GlobalFadeExtent;
     float _scbpad1;
     float _scbpad2;
-    float _scbpad3;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

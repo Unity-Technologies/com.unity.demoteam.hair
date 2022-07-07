@@ -54,7 +54,7 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != strandGroupProviders.Length; i++)
 				{
 					var hairAsset = strandGroupProviders[i].hairAsset;
-					if (hairAsset == null || hairAsset.checksum == string.Empty)
+					if (hairAsset == null || hairAsset.checksum == "")
 						continue;
 
 					var strandGroups = hairAsset.strandGroups;
@@ -76,7 +76,7 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0, writeIndexInstance = 0, writeIndexChecksum = 0; i != strandGroupProviders.Length; i++)
 			{
 				var hairAsset = strandGroupProviders[i].hairAsset;
-				if (hairAsset == null || hairAsset.checksum == string.Empty)
+				if (hairAsset == null || hairAsset.checksum == "")
 					continue;
 
 				var strandGroups = hairAsset.strandGroups;
@@ -180,7 +180,7 @@ namespace Unity.DemoTeam.Hair
 				// write vertex ID
 				for (int i = 0, k = 0; i != strandCount; i++)
 				{
-					HairAssetUtility.DeclareStrandIterator(memoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
 					{
@@ -191,7 +191,7 @@ namespace Unity.DemoTeam.Hair
 				// write vertex UV
 				for (int i = 0; i != strandCount; i++)
 				{
-					HairAssetUtility.DeclareStrandIterator(memoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 					for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
 					{
@@ -254,7 +254,7 @@ namespace Unity.DemoTeam.Hair
 				// write vertex ID
 				for (int i = 0, k = 0; i != strandCount; i++)
 				{
-					HairAssetUtility.DeclareStrandIterator(memoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
 					{
@@ -267,7 +267,7 @@ namespace Unity.DemoTeam.Hair
 				// write vertex UV
 				for (int i = 0; i != strandCount; i++)
 				{
-					HairAssetUtility.DeclareStrandIterator(memoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 					for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
 					{

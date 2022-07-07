@@ -18,22 +18,20 @@ namespace Unity.DemoTeam.Hair
 		Editor rootGeneratorEditor;
 
 		SerializedProperty _settingsBasic;
-		SerializedProperty _settingsBasic_type;
-		SerializedProperty _settingsBasic_kLODClusters;
-		SerializedProperty _settingsBasic_kLODClustersProvider;
-		SerializedProperty _settingsBasic_kLODClustersHighLOD;
 		SerializedProperty _settingsAlembic;
 		SerializedProperty _settingsProcedural;
-		SerializedProperty _settingsProcedural_placement;
-		SerializedProperty _settingsLODGenerated;
-		SerializedProperty _settingsLODUVMapped;
-		SerializedProperty _settingsLODPyramid;
+		SerializedProperty _settingsLODClusters;
+		SerializedProperty _settingsLODClusters_baseLOD;
+		SerializedProperty _settingsLODClusters_baseLODParamsGenerated;
+		SerializedProperty _settingsLODClusters_baseLODParamsUVMapped;
+		SerializedProperty _settingsLODClusters_highLOD;
+		SerializedProperty _settingsLODClusters_highLODParamsAutomatic;
+		SerializedProperty _settingsLODClusters_highLODParamsManual;
 
 		SerializedProperty _strandGroups;
 		SerializedProperty _strandGroupsAutoBuild;
 
 		PreviewRenderUtility previewRenderer;
-
 		Material previewMaterial;
 		Vector2 previewAngle;
 		float previewZoom;
@@ -65,16 +63,15 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			_settingsBasic = serializedObject.FindProperty(nameof(HairAsset.settingsBasic));
-			_settingsBasic_type = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.type));
-			_settingsBasic_kLODClusters = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClusters));
-			_settingsBasic_kLODClustersProvider = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClustersProvider));
-			_settingsBasic_kLODClustersHighLOD = _settingsBasic.FindPropertyRelative(nameof(HairAsset.settingsBasic.kLODClustersHighLOD));
 			_settingsAlembic = serializedObject.FindProperty(nameof(HairAsset.settingsAlembic));
 			_settingsProcedural = serializedObject.FindProperty(nameof(HairAsset.settingsProcedural));
-			_settingsProcedural_placement = _settingsProcedural.FindPropertyRelative(nameof(HairAsset.settingsProcedural.placement));
-			_settingsLODGenerated = serializedObject.FindProperty(nameof(HairAsset.settingsLODGenerated));
-			_settingsLODUVMapped = serializedObject.FindProperty(nameof(HairAsset.settingsLODUVMapped));
-			_settingsLODPyramid = serializedObject.FindProperty(nameof(HairAsset.settingsLODPyramid));
+			_settingsLODClusters = serializedObject.FindProperty(nameof(HairAsset.settingsLODClusters));
+			_settingsLODClusters_baseLOD = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLOD));
+			_settingsLODClusters_baseLODParamsGenerated = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLODParamsGenerated));
+			_settingsLODClusters_baseLODParamsUVMapped = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLODParamsUVMapped));
+			_settingsLODClusters_highLOD = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLOD));
+			_settingsLODClusters_highLODParamsAutomatic = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLODParamsAutomatic));
+			_settingsLODClusters_highLODParamsManual = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLODParamsManual));
 
 			_strandGroups = serializedObject.FindProperty(nameof(HairAsset.strandGroups));
 			_strandGroupsAutoBuild = serializedObject.FindProperty(nameof(HairAsset.strandGroupsAutoBuild));
@@ -209,34 +206,23 @@ namespace Unity.DemoTeam.Hair
 			var hairAsset = userData as HairAsset;
 			if (hairAsset.settingsBasic.kLODClusters)
 			{
-				switch (hairAsset.settingsBasic.kLODClustersProvider)
+				switch (hairAsset.settingsLODClusters.baseLOD.baseLOD)
 				{
-					case HairAsset.LODClusters.Generated:
-						{
-							EditorGUILayout.HelpBox("Configuration warning: Not yet implemented.", MessageType.Warning, wide: true);
-							return StructValidation.Inaccessible;
-						}
+					case HairAsset.SettingsLODClusters.BaseLODMode.Generated:
+						break;
 
-					case HairAsset.LODClusters.UVMapped:
+					case HairAsset.SettingsLODClusters.BaseLODMode.UVMapped:
 						{
-							var clusterMaps = hairAsset.settingsLODUVMapped.baseLODClusterMapChain;
+							var clusterMaps = hairAsset.settingsLODClusters.baseLODParamsUVMapped.baseLODClusterMaps;
 							if (clusterMaps != null)
 							{
 								for (int i = 0; i != clusterMaps.Length; i++)
 								{
-									WarnIfNotReadable(clusterMaps[i], string.Format("{0}[{1}]", LabelName(nameof(hairAsset.settingsLODUVMapped.baseLODClusterMapChain)), i));
+									WarnIfNotReadable(clusterMaps[i], string.Format("{0}[{1}]", LabelName(nameof(hairAsset.settingsLODClusters.baseLODParamsUVMapped.baseLODClusterMaps)), i));
 								}
 							}
 						}
 						break;
-				}
-
-				if (hairAsset.settingsBasic.kLODClustersHighLOD)
-				{
-					if (hairAsset.settingsLODPyramid.highLODIntermediateLevels > 0)
-					{
-						EditorGUILayout.HelpBox("Configuration warning: Not yet implemented.", MessageType.Warning, wide: true);
-					}
 				}
 			}
 
@@ -254,7 +240,8 @@ namespace Unity.DemoTeam.Hair
 				StructPropertyFieldsWithHeader(_settingsBasic);
 
 				EditorGUILayout.Space();
-				switch ((HairAsset.Type)_settingsBasic_type.enumValueIndex)
+
+				switch (hairAsset.settingsBasic.type)
 				{
 					case HairAsset.Type.Alembic:
 						StructPropertyFieldsWithHeader(_settingsAlembic, ValidationGUIAlembic, hairAsset);
@@ -263,7 +250,7 @@ namespace Unity.DemoTeam.Hair
 					case HairAsset.Type.Procedural:
 						StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
 						{
-							var placementType = (HairAsset.SettingsProcedural.PlacementType)_settingsProcedural_placement.enumValueIndex;
+							var placementType = hairAsset.settingsProcedural.placement;
 							if (placementType == HairAsset.SettingsProcedural.PlacementType.Custom && hairAsset.settingsProcedural.placementProvider is HairAssetProvider)
 							{
 								EditorGUILayout.Space();
@@ -280,31 +267,42 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 
-				if (_settingsBasic_kLODClusters.boolValue)
+				if (hairAsset.settingsBasic.kLODClusters)
 				{
 					EditorGUILayout.Space();
 
-					var clustersProvider = (HairAsset.LODClusters)_settingsBasic_kLODClustersProvider.enumValueIndex;
-					var clustersProviderExpanded = false;
-
-					switch (clustersProvider)
+					var lodClustersExpanded = StructPropertyFieldsWithHeader(_settingsLODClusters, ValidationGUILODClusters, hairAsset);
+					if (lodClustersExpanded)
 					{
-						case HairAsset.LODClusters.Generated:
-							clustersProviderExpanded = StructPropertyFieldsWithHeader(_settingsLODGenerated, "Settings Clusters Generated", ValidationGUILODClusters, hairAsset);
-							break;
-
-						case HairAsset.LODClusters.UVMapped:
-							clustersProviderExpanded = StructPropertyFieldsWithHeader(_settingsLODUVMapped, "Settings Clusters UV Mapped", ValidationGUILODClusters, hairAsset);
-							break;
-					}
-
-					if (clustersProviderExpanded)
-					{
-						if (_settingsBasic_kLODClustersHighLOD.boolValue)
+						using (new EditorGUI.IndentLevelScope())
 						{
-							using (new EditorGUI.IndentLevelScope())
+							StructPropertyFields(_settingsLODClusters_baseLOD);
+
+							switch (hairAsset.settingsLODClusters.baseLOD.baseLOD)
 							{
-								StructPropertyFields(_settingsLODPyramid);
+								case HairAsset.SettingsLODClusters.BaseLODMode.Generated:
+									StructPropertyFields(_settingsLODClusters_baseLODParamsGenerated);
+									break;
+
+								case HairAsset.SettingsLODClusters.BaseLODMode.UVMapped:
+									StructPropertyFields(_settingsLODClusters_baseLODParamsUVMapped);
+									break;
+							}
+
+							StructPropertyFields(_settingsLODClusters_highLOD);
+
+							using (new EditorGUI.DisabledScope(hairAsset.settingsLODClusters.highLOD.highLOD == false))
+							{
+								switch (hairAsset.settingsLODClusters.highLOD.highLODMode)
+								{
+									case HairAsset.SettingsLODClusters.HighLODMode.Automatic:
+										StructPropertyFields(_settingsLODClusters_highLODParamsAutomatic);
+										break;
+
+									case HairAsset.SettingsLODClusters.HighLODMode.Manual:
+										StructPropertyFields(_settingsLODClusters_highLODParamsManual);
+										break;
+								}
 							}
 						}
 					}
@@ -316,7 +314,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				EditorGUIUtility.labelWidth = GUI.skin.label.CalcSize(new GUIContent("Auto")).x;
 
-				var buildNow = GUILayout.Button("Build strand groups"); GUILayout.Space(.0f);
+				var buildNow = GUILayout.Button("Build strand groups"); GUILayout.Space(2.0f);
 				var buildAuto = EditorGUILayout.ToggleLeft("Auto", _strandGroupsAutoBuild.boolValue, GUILayout.ExpandHeight(true), GUILayout.Width(EditorGUIUtility.labelWidth + 16.0f));
 
 				EditorGUIUtility.labelWidth = 0;
@@ -330,7 +328,8 @@ namespace Unity.DemoTeam.Hair
 					serializedObject.ApplyModifiedPropertiesWithoutUndo();
 				}
 
-				if (buildNow || (buildAuto && settingsChanged))
+				var buildNowAuto = buildAuto && settingsChanged;
+				if (buildNowAuto || buildNow)
 				{
 					HairAssetBuilder.BuildHairAsset(hairAsset);
 					serializedObject.Update();

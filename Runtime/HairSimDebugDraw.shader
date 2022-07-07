@@ -120,14 +120,13 @@
 		float3 worldPosHi = _ParticlePosition[strandParticleBeginHi + strandParticleStride * (vertexID >> 1)].xyz;
 		float3 worldPos = lerp(worldPosLo, worldPosHi, _LODBlendFraction);
 
-		float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODIndexLo]);
-		float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODIndexHi]);
+		float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODCount - 1]);
+		float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODCount - 1]);
 		float3 color = lerp(colorLo, colorHi, _LODBlendFraction);
 
 		if (vertexID & 1)
 		{
 			worldPos = _ParticlePosition[i].xyz;
-			//color = ColorCycle(instanceID, _StrandCount);
 		}
 
 		DebugVaryings output;

@@ -1000,6 +1000,7 @@ namespace Unity.DemoTeam.Hair
 			// derive constants
 			var clampedLODIndex = (uint)Mathf.Clamp(lodIndex, 0, solverData.lodThreshold.Length);
 			{
+				cbuffer._LODCount = (uint)solverData.lodGuideCountCPU.Length;
 				cbuffer._LODIndexLo = clampedLODIndex;
 				cbuffer._LODIndexHi = clampedLODIndex;
 				cbuffer._LODBlendFraction = 0.0f;
@@ -1016,32 +1017,36 @@ namespace Unity.DemoTeam.Hair
 			ref var cbuffer = ref solverData.cbuffer;
 
 			// derive constants
+			var lodCount = solverData.lodGuideCountCPU.Length;
 			var lodIndexHi = solverData.lodThreshold.BinarySearch(lodValue);
 			var lodIndexLo = lodIndexHi;
-			var lodBlendFrac = 0.0f;
+			var lodBlend = 0.0f;
 
 			if (lodIndexHi < 0)
 			{
 				lodIndexHi = ~lodIndexHi;
 				lodIndexLo = Mathf.Max(0, lodIndexHi - 1);
+				lodIndexHi = Mathf.Min(lodIndexHi, lodCount - 1);
 
 				var lodValueLo = solverData.lodThreshold[lodIndexLo];
 				var lodValueHi = solverData.lodThreshold[lodIndexHi];
 				{
-					lodBlendFrac = (lodValueLo != lodValueHi) ? Mathf.Clamp01((lodValue - lodValueLo) / (lodValueHi - lodValueLo)) : 0.0f;
+					lodBlend = (lodValueLo != lodValueHi) ? Mathf.Clamp01((lodValue - lodValueLo) / (lodValueHi - lodValueLo)) : 0.0f;
 				}
 			}
 
 			if (lodBlending)
 			{
+				cbuffer._LODCount = (uint)lodCount;
 				cbuffer._LODIndexLo = (uint)lodIndexLo;
 				cbuffer._LODIndexHi = (uint)lodIndexHi;
-				cbuffer._LODBlendFraction = lodBlendFrac;
+				cbuffer._LODBlendFraction = lodBlend;
 				//Debug.Log("LOD: " + cbuffer._LODIndexLo + " -> " + cbuffer._LODIndexHi + " (" + cbuffer._LODBlendFraction + ")");
 			}
 			else
 			{
-				cbuffer._LODIndexLo = (uint)((lodBlendFrac > 0.5f) ? lodIndexHi : lodIndexLo);
+				cbuffer._LODCount = (uint)lodCount;
+				cbuffer._LODIndexLo = (uint)((lodBlend > 0.5f) ? lodIndexHi : lodIndexLo);
 				cbuffer._LODIndexHi = cbuffer._LODIndexLo;
 				cbuffer._LODBlendFraction = 0.0f;
 				//Debug.Log("LOD: " + cbuffer._LODIndexLo + " (no blend)");

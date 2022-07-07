@@ -2,7 +2,7 @@
 #define CLEAR_ALL_SUBASSETS
 
 #define LOD_INDEX_INCREASING
-//#define USE_DERIVED_CACHE
+#define USE_DERIVED_CACHE
 
 using System;
 using UnityEngine;
@@ -171,7 +171,7 @@ namespace Unity.DemoTeam.Hair
 				hairAsset.strandGroups = new HairAsset.StrandGroup[curveSets.Length];
 
 				// build strand groups
-				for (int i = 0, curveSetIndex = 0; i != hairAsset.strandGroups.Length; i++)
+				for (int i = 0, curveSetIndex = 0; i != curveSets.Length; i++)
 				{
 					if (curveSetIndex < curveSets.Length)
 					{
@@ -278,13 +278,15 @@ namespace Unity.DemoTeam.Hair
 
 		public static unsafe void BuildStrandGroupAlembic(ref HairAsset.StrandGroup strandGroup, in HairAsset hairAsset, AlembicCurves[] curveSets, ref int curveSetIndex)
 		{
-			var settings = hairAsset.settingsAlembic;
+			ref readonly var settings = ref hairAsset.settingsAlembic;
 
 			// gather data from curve sets
 			var combinedCurveCount = 0;
 			var combinedCurveVertexCount = 0;
 			var combinedCurveVertexOffset = new UnsafeList<int>(0, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 			var combinedVertexDataPosition = new UnsafeList<Vector3>(0, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+
+			using (var longOperation = new LongOperationScope("Gathering curves"))
 			{
 				var combinedCurveVertexCountMin = 0;
 				var combinedCurveVertexCountMax = 0;
@@ -391,6 +393,8 @@ namespace Unity.DemoTeam.Hair
 
 								for (int i = 0; i != combinedCurveCount; i++)
 								{
+									longOperation.UpdateStatus("Resampling", i, combinedCurveCount);
+
 									var srcCount = srcVertexCountPtr[i];
 									var srcOffset = srcVertexOffsetPtr[i];
 
@@ -448,24 +452,29 @@ namespace Unity.DemoTeam.Hair
 					case HairAsset.SettingsAlembic.RootUV.ResolveFromMesh:
 						if (settings.rootUVMesh != null)
 						{
-#if USE_DERIVED_CACHE
-							var meshQueries = DerivedCache.GetOrCreate(settings.rootUVMesh,
-								meshArg =>
-								{
-									using (var meshData = Mesh.AcquireReadOnlyMeshData(meshArg))
-									{
-										return new TriMeshQueries(meshData[0], Allocator.Persistent);
-									}
-								}
-							);
-#else
-							using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.rootUVMesh))
-							using (var meshQueries = new TriMeshQueries(meshData[0], Allocator.Temp))
-#endif
+							using (var longOperation = new LongOperationScope("Resolving UVs"))
 							{
-								for (int i = 0; i != combinedCurveCount; i++)
+#if USE_DERIVED_CACHE
+								var meshQueries = DerivedCache.GetOrCreate(settings.rootUVMesh,
+									meshArg =>
+									{
+										using (var meshData = Mesh.AcquireReadOnlyMeshData(meshArg))
+										{
+											return new TriMeshQueries(meshData[0], Allocator.Persistent);
+										}
+									}
+								);
+#else
+								using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.rootUVMesh))
+								using (var meshQueries = new TriMeshQueries(meshData[0], Allocator.Temp))
+#endif
 								{
-									strandGroup.rootUV[i] = meshQueries.FindClosestTriangleUV(strandGroup.rootPosition[i]);
+									for (int i = 0; i != combinedCurveCount; i++)
+									{
+										longOperation.UpdateStatus("Resolving", i, combinedCurveCount);
+
+										strandGroup.rootUV[i] = meshQueries.FindClosestTriangleUV(strandGroup.rootPosition[i]);
+									}
 								}
 							}
 						}
@@ -519,7 +528,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void BuildStrandGroupProcedural(ref HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
-			var settings = hairAsset.settingsProcedural;
+			ref readonly var settings = ref hairAsset.settingsProcedural;
 
 			// get target counts
 			var generatedStrandCount = settings.strandCount;
@@ -579,6 +588,7 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			// finalize strand properties
+			using (var longOperation = new LongOperationScope("Finalizing strands"))
 			using (var strandLengths = new NativeArray<float>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
 				unsafe
@@ -590,7 +600,9 @@ namespace Unity.DemoTeam.Hair
 					{
 						var accuLength = 0.0f;
 
-						HairAssetUtility.DeclareStrandIterator(strandGroup.particleMemoryLayout, i, strandCount, strandParticleCount, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+						longOperation.UpdateStatus("Measuring", i, strandCount);
+
+						HairAssetUtility.DeclareStrandIterator(strandGroup, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
 
 						for (int j = strandParticleBegin + strandParticleStride; j != strandParticleEnd; j += strandParticleStride)
 						{
@@ -630,6 +642,8 @@ namespace Unity.DemoTeam.Hair
 
 						for (int i = 1; i != strandGroup.particlePosition.Length; i++)
 						{
+							longOperation.UpdateStatus("Computing bounds", i, strandGroup.particlePosition.Length);
+
 							boundsMin = Vector3.Min(boundsMin, strandGroup.particlePosition[i]);
 							boundsMax = Vector3.Max(boundsMax, strandGroup.particlePosition[i]);
 						}
@@ -647,39 +661,87 @@ namespace Unity.DemoTeam.Hair
 			BuildLODClusters(ref strandGroup, hairAsset);
 
 			// build mesh assets
-			unsafe
+			using (var longOperation = new LongOperationScope("Preparing mesh assets"))
 			{
+				unsafe
+				{
 #if VISIBLE_SUBASSETS
-				var hideFlags = HideFlags.None;
+					var hideFlags = HideFlags.None;
 #else
-				var hideFlags = HideFlags.HideInHierarchy;
+					var hideFlags = HideFlags.HideInHierarchy;
 #endif
 
-				strandGroup.meshAssetRoots = HairInstanceBuilder.CreateMeshRoots(
-					hideFlags,
-					strandGroup.strandCount,
-					strandGroup.rootPosition,
-					strandGroup.rootDirection);
+					strandGroup.meshAssetRoots = HairInstanceBuilder.CreateMeshRoots(
+						hideFlags,
+						strandGroup.strandCount,
+						strandGroup.rootPosition,
+						strandGroup.rootDirection);
 
-				strandGroup.meshAssetLines = HairInstanceBuilder.CreateMeshLines(
-					hideFlags,
-					strandGroup.particleMemoryLayout,
-					strandGroup.strandCount,
-					strandGroup.strandParticleCount,
-					strandGroup.bounds);
+					strandGroup.meshAssetLines = HairInstanceBuilder.CreateMeshLines(
+						hideFlags,
+						strandGroup.particleMemoryLayout,
+						strandGroup.strandCount,
+						strandGroup.strandParticleCount,
+						strandGroup.bounds);
 
-				strandGroup.meshAssetStrips = HairInstanceBuilder.CreateMeshStrips(
-					hideFlags,
-					strandGroup.particleMemoryLayout,
-					strandGroup.strandCount,
-					strandGroup.strandParticleCount,
-					strandGroup.bounds);
+					strandGroup.meshAssetStrips = HairInstanceBuilder.CreateMeshStrips(
+						hideFlags,
+						strandGroup.particleMemoryLayout,
+						strandGroup.strandCount,
+						strandGroup.strandParticleCount,
+						strandGroup.bounds);
+				}
 			}
 
 			// append version
 			strandGroup.version = HairAsset.StrandGroup.VERSION;
 		}
 
+		// STRATEGY 1: solve base lod first, and then split towards high lod <--- EQ. divisive aproach
+		//	PROS:
+		//		- fully informed base lod 
+		//		- also splits can be locally refined
+		//	CONS:
+		//		- costly to refine every split
+		//		- splitting might be complicated
+		//	SPLIT:
+		//		a. sort clusters by number of strands descending
+		//		b. split largest cluster in two
+		//		c. refine the split
+		//
+		// ------ ------
+		//
+		// STRATEGY 2: merge towards base lod
+		//	PROS:
+		//		- only high lod needs to be refined
+		//	CONS: 
+		//		- only high lod can be refined
+		//		- base lod not fully informed
+		//	MERGE:
+		//		a. sort clusters by number of strands ascending
+		//		b. merge smallest cluster to one with nD closest mean
+		//		c. recompute closest mean
+		//
+		// ------ ------
+		//
+		// INITIALIZE (3D):
+		//	1. guess N root cluster centers
+		//		a. sample volume
+		//		b. sample mesh
+		//		c. mis?
+		//	2. build initial clusters by root distance
+		//
+		// REFINE (nD):
+		//	3. k-means iteration in higher dimensional space
+		//		a. translate cluster set into nD
+		//		b. then cluster by kmeans in nD
+		//
+		// SPLIT (3D):
+		//	4. sort clusters by number of strands
+		//	5. split largest cluster
+		//		a. longest axis / pca?
+		//		b. 
+		//
 		static void BuildLODClusters(ref HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
 			var strandCount = strandGroup.strandCount;
@@ -687,34 +749,46 @@ namespace Unity.DemoTeam.Hair
 
 			// prepare lod chain
 			var lodCapacity = 1;
-			var lodChain = new LODChain(lodCapacity, strandCount, Allocator.Temp);
+			var lodChain = new LODChain(lodCapacity, strandGroup, hairAsset.settingsBasic.kLODClustersClustering, hairAsset.settingsLODClusters.clusterVoid, Allocator.Temp);
 
-			// build lod clusters
-			if (hairAsset.settingsBasic.kLODClusters)
+			// build lod chain
+			using (StrandClusterUtility.BindStrandData(ref lodChain.clusterSet, strandGroup, Allocator.Temp))
 			{
-				switch (hairAsset.settingsBasic.kLODClustersProvider)
+				if (hairAsset.settingsBasic.kLODClusters)
 				{
-					case HairAsset.LODClusters.Generated:
-						BuildLODChainGenerated(ref lodChain, strandGroup, hairAsset);
-						break;
+					switch (hairAsset.settingsLODClusters.baseLOD.baseLOD)
+					{
+						case HairAsset.SettingsLODClusters.BaseLODMode.Generated:
+							BuildBaseLODGenerated(ref lodChain, strandGroup, hairAsset);
+							break;
 
-					case HairAsset.LODClusters.UVMapped:
-						BuildLODChainUVMapped(ref lodChain, strandGroup, hairAsset);
-						break;
+						case HairAsset.SettingsLODClusters.BaseLODMode.UVMapped:
+							BuildBaseLODUVMapped(ref lodChain, strandGroup, hairAsset);
+							break;
+					}
+
+					if (hairAsset.settingsLODClusters.highLOD.highLOD)
+					{
+						switch (hairAsset.settingsLODClusters.highLOD.highLODMode)
+						{
+							case HairAsset.SettingsLODClusters.HighLODMode.Automatic:
+								BuildHighLODAutomatic(ref lodChain, strandGroup, hairAsset);
+								break;
+
+							case HairAsset.SettingsLODClusters.HighLODMode.Manual:
+								BuildHighLODManual(ref lodChain, strandGroup, hairAsset);
+								break;
+						}
+					}
 				}
 
-				if (hairAsset.settingsBasic.kLODClustersHighLOD)
+				if (lodChain.lodCount == 0)
 				{
-					BuildLODChainSubdivided(ref lodChain, strandGroup, hairAsset);
+					BuildHighLODAllStrands(ref lodChain, strandGroup, hairAsset);
 				}
 			}
 
-			if (lodChain.lodCount == 0)
-			{
-				BuildLODChainAllStrands(ref lodChain, strandGroup, hairAsset);
-			}
-
-			// export lod chain
+			// export lod clusters
 			strandGroup.lodCount = lodChain.lodCount;
 #if LOD_INDEX_INCREASING
 			strandGroup.lodGuideCount = lodChain.lodGuideCount.ToArray();
@@ -761,33 +835,17 @@ namespace Unity.DemoTeam.Hair
 			// export lod thresholds
 			strandGroup.lodThreshold = new float[strandGroup.lodCount];
 			{
-#if LOD_INDEX_INCREASING
-				var maxLOD = strandGroup.lodCount - 1;
-				var maxLODGuideCount = strandGroup.lodGuideCount[maxLOD];
-
-				strandGroup.lodThreshold[maxLOD] = 1.0f;
-
-				float Ramp(float x) => 2.0f * x - x * x;//TODO remove or adjust
-
-				for (int i = 0; i != maxLOD; i++)
+				for (int i = 0; i != strandGroup.lodCount; i++)
 				{
-					strandGroup.lodThreshold[i] = Ramp(strandGroup.lodGuideCount[i] / (float)maxLODGuideCount);
+					strandGroup.lodThreshold[i] = strandGroup.lodGuideCount[i] / (float)strandGroup.strandCount;
 				}
-#else
-				strandGroup.lodThreshold[0] = 1.0f;
-
-				for (int i = 1; i != strandGroup.lodCount; i++)
-				{
-					strandGroup.lodThreshold[i] = strandGroup.lodGuideCount[i] / (float)strandGroup.lodGuideCount[0];
-				}
-#endif
 			}
 
 			// build remapping tables from final cluster set
-			var remappingRequired = (lodChain.lodCount > 1 || lodChain.clusterSet.clusterCount < strandCount);
+			var remappingRequired = (lodChain.lodCount > 1 || lodChain.clusterSet.dataDesc.clusterCount < strandCount);
 			if (remappingRequired)
 			{
-				using (var remapping = new ClusterRemapping(lodChain.clusterSet, Allocator.Temp))
+				using (var remapping = new StrandClusterRemapping(lodChain.clusterSet, Allocator.Temp))
 				{
 					// apply to strands
 					remapping.ApplyShuffle(strandGroup.rootUV, 0, 1, strandCount);
@@ -833,18 +891,33 @@ namespace Unity.DemoTeam.Hair
 			lodChain.Dispose();
 		}
 
-		static unsafe void BuildLODChainGenerated(ref LODChain lodData, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
+		static unsafe void BuildBaseLODGenerated(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
-			//TODO procedural lod chain
-			Debug.LogError("TODO procedural lod chain");
+			ref readonly var settingsClusters = ref hairAsset.settingsLODClusters;
+			ref readonly var settings = ref settingsClusters.baseLODParamsGenerated;
+
+			var clusterCount = Mathf.RoundToInt(strandGroup.strandCount * settings.baseLODClusterQuantity);
+			if (clusterCount > strandGroup.strandCount)
+				clusterCount = strandGroup.strandCount;
+			if (clusterCount < 1)
+				clusterCount = 1;
+
+			if (lodChain.clusterSet.ExpandProcedural(clusterCount, settingsClusters.clusterAllocation, settingsClusters.clusterAllocationOrder, settingsClusters.clusterRefinement ? settingsClusters.clusterRefinementIterations : 0))
+			{
+				lodChain.clusterSet.Commit();
+				lodChain.Increment();
+			}
 		}
 
-		static unsafe void BuildLODChainUVMapped(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
+		static unsafe void BuildBaseLODUVMapped(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
+			ref readonly var settingsClusters = ref hairAsset.settingsLODClusters;
+			ref readonly var settings = ref hairAsset.settingsLODClusters.baseLODParamsUVMapped;
+
 			var strandCount = strandGroup.strandCount;
 
 			// early out if no readable cluster maps
-			var clusterMaps = hairAsset.settingsLODUVMapped.baseLODClusterMapChain;
+			var clusterMaps = settings.baseLODClusterMaps;
 			var clusterMapsReadable = 0;
 			{
 				if (clusterMaps != null)
@@ -863,9 +936,9 @@ namespace Unity.DemoTeam.Hair
 			// add levels from cluster maps
 			using (var clusterLookupColor = new UnsafeHashMap<Color, int>(strandCount, Allocator.Temp))
 			using (var clusterLookupLabel = new UnsafeHashMap<uint, int>(strandCount, Allocator.Temp))
-			using (var strandCluster = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var strandCluster = new UnsafeList<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
-				var strandClusterPtr = (int*)strandCluster.GetUnsafePtr();
+				var strandClusterPtr = strandCluster.Ptr;
 
 				foreach (var clusterMap in clusterMaps)
 				{
@@ -875,9 +948,9 @@ namespace Unity.DemoTeam.Hair
 					// build strand->cluster
 					var clusterCount = 0;
 
-					switch (hairAsset.settingsLODUVMapped.baseLODClusterMapFormat)
+					switch (settings.baseLODClusterFormat)
 					{
-						case HairAsset.SettingsLODUVMapped.ClusterMapFormat.OneClusterPerColor:
+						case HairAsset.SettingsLODClusters.BaseLODClusterMapFormat.OneClusterPerColor:
 							{
 								clusterLookupColor.Clear();
 
@@ -898,7 +971,7 @@ namespace Unity.DemoTeam.Hair
 							}
 							break;
 
-						case HairAsset.SettingsLODUVMapped.ClusterMapFormat.OneClusterPerVisualCluster:
+						case HairAsset.SettingsLODClusters.BaseLODClusterMapFormat.OneClusterPerVisualCluster:
 							{
 								clusterLookupLabel.Clear();
 
@@ -932,81 +1005,101 @@ namespace Unity.DemoTeam.Hair
 							break;
 					}
 
-					// build cluster set
-					var clusterSet = new ClusterSet(clusterCount, strandCount, Allocator.Temp);
+					// expand existing set
+					if (lodChain.clusterSet.ExpandPreassigned(clusterCount, strandCluster))
 					{
-						clusterSet.InitializeFromStrandCluster(strandGroup, strandCluster, lodChain.lodCount);
-
-						if (hairAsset.settingsLODUVMapped.refinement)
+						if (settingsClusters.clusterRefinement)
 						{
-							clusterSet.RefineClusters(strandGroup, hairAsset.settingsLODUVMapped.refinementMaxIterations, ClusterSet.EmptyClusterStrategy.Preserve);
+							lodChain.clusterSet.Refine(settingsClusters.clusterRefinementIterations);
 						}
-					}
 
-					// append to chain
-					if (lodChain.TryAppend(clusterSet) == false)
-					{
-						Debug.LogWarningFormat("Skipped '{0}' while building LOD chain.", clusterMap.name, clusterMap);
+						lodChain.clusterSet.Commit();
+						lodChain.Increment();
 					}
 				}
 			}
 		}
 
-		static unsafe void BuildLODChainSubdivided(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
+		static unsafe void BuildHighLODAutomatic(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
-			if (lodChain.clusterSet.clusterCount == 0)
+			ref readonly var settingsClusters = ref hairAsset.settingsLODClusters;
+			ref readonly var settings = ref hairAsset.settingsLODClusters.highLODParamsAutomatic;
+
+			var clusterCountMin = lodChain.clusterSet.dataDesc.clusterCount;
+			if (clusterCountMin == 0)
 				return;
 
-			var clusterCountMin = lodChain.clusterSet.clusterCount;
-			var clusterCountMax = lodChain.strandCount;
+			var clusterCountMax = Mathf.RoundToInt(settings.highLODClusterQuantity * strandGroup.strandCount);
+			if (clusterCountMax > strandGroup.strandCount)
+				clusterCountMax = strandGroup.strandCount;
+			if (clusterCountMax < 1)
+				clusterCountMax = 1;
 
-			var subdivisionCount = hairAsset.settingsLODPyramid.highLODIntermediateLevels + 1;
-			if (subdivisionCount > 0)
+			var logS = Mathf.Log(settings.highLODClusterExpansion);
+			var logR = Mathf.Log((float)clusterCountMax / (float)clusterCountMin);
+			var step = logR / logS;
+
+			var incrementCount = Mathf.CeilToInt(step);
+			if (incrementCount > 0)
 			{
-				var tmin = 0.0f;
-				var tmax = hairAsset.settingsLODPyramid.highLODClusterQuantity;
-
-				for (int i = 0; i != subdivisionCount; i++)
+				for (int i = 0; i != incrementCount; i++)
 				{
 					//     .---steps---.
 					// 0---A---B---C---1
 					// min           max
 
-					var t = Mathf.Lerp(tmin, tmax, (i + 1.0f) / subdivisionCount);
-					var s = Mathf.Lerp(clusterCountMin, clusterCountMax, t * t);//TODO try also 2t-t^2
-
+					var t = (i + 1) / (float)incrementCount;
+					var s = clusterCountMin * Mathf.Pow(settings.highLODClusterExpansion, t * step);
+					
 					var clusterCount = Mathf.RoundToInt(s);
-					if (clusterCount > lodChain.clusterSet.clusterCount)
+					if (clusterCount < lodChain.strandCount)
 					{
-						if (clusterCount < lodChain.strandCount)
+						if (lodChain.clusterSet.ExpandProcedural(clusterCount, settingsClusters.clusterAllocation, settingsClusters.clusterAllocationOrder, settingsClusters.clusterRefinement ? settingsClusters.clusterRefinementIterations : 0))
 						{
-							//TODO not implemented
-							Debug.LogError("TODO procedural lod chain");
+							lodChain.clusterSet.Commit();
+							lodChain.Increment();
 						}
-						else
-						{
-							BuildLODChainAllStrands(ref lodChain, strandGroup, hairAsset);
-							break;
-						}
+					}
+					else
+					{
+						BuildHighLODAllStrands(ref lodChain, strandGroup, hairAsset);
+						break;
 					}
 				}
 			}
 		}
 
-		static unsafe void BuildLODChainAllStrands(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
+		static unsafe void BuildHighLODManual(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
 		{
-			var clusterCount = strandGroup.strandCount;
-			var clusterSet = new ClusterSet(clusterCount, strandGroup.strandCount, Allocator.Temp);
+			ref readonly var settingsClusters = ref hairAsset.settingsLODClusters;
+			ref readonly var settings = ref settingsClusters.highLODParamsManual;
 
-			for (int i = 0; i != clusterCount; i++)
+			for (int i = 0; i != settings.highLODClusterQuantities.Length; i++)
 			{
-				clusterSet.clusterDepthPtr[i] = lodChain.lodCount;
-				clusterSet.clusterGuidePtr[i] = i;
-				clusterSet.clusterCarryPtr[i] = 1.0f;
-				clusterSet.strandClusterPtr[i] = i;
-			}
+				var clusterCount = Mathf.RoundToInt(strandGroup.strandCount * settings.highLODClusterQuantities[i]);
+				if (clusterCount > strandGroup.strandCount)
+					clusterCount = strandGroup.strandCount;
+				if (clusterCount < 1)
+					clusterCount = 1;
 
-			lodChain.TryAppend(clusterSet);
+				if (lodChain.clusterSet.ExpandProcedural(clusterCount, settingsClusters.clusterAllocation, settingsClusters.clusterAllocationOrder, settingsClusters.clusterRefinement ? settingsClusters.clusterRefinementIterations : 0))
+				{
+					lodChain.clusterSet.Commit();
+					lodChain.Increment();
+				}
+			}
+		}
+
+		static unsafe void BuildHighLODAllStrands(ref LODChain lodChain, in HairAsset.StrandGroup strandGroup, HairAsset hairAsset)
+		{
+			using (var strandIndices = StrandClusterContext.AllocateRange(0, strandGroup.strandCount, Allocator.Temp))
+			{
+				if (lodChain.clusterSet.ExpandPreassigned(strandGroup.strandCount, strandIndices))
+				{
+					lodChain.clusterSet.Commit();
+					lodChain.Increment();
+				}
+			}
 		}
 
 		static unsafe bool GenerateRoots(in HairAssetProvider.GeneratedRoots roots, in HairAsset.SettingsProcedural settings)
@@ -1227,79 +1320,84 @@ namespace Unity.DemoTeam.Hair
 			var randSeqCurlRadius = new Unity.Mathematics.Random(709);
 			var randSeqCurlSlope = new Unity.Mathematics.Random(1171);
 
-			for (int i = 0; i != settings.strandCount; i++)
+			using (var longOperation = new LongOperationScope("Generating strands"))
 			{
-				var step = rootVar[i].normalizedStrandLength * particleInterval * Mathf.Lerp(1.0f, randSeqParticleInterval.NextFloat(), particleIntervalVariation);
-
-				var curPos = rootPos[i];
-				var curDir = rootDir[i];
-
-				HairAssetUtility.DeclareStrandIterator(memoryLayout, i, settings.strandCount, settings.strandParticleCount, out var strandParticleBegin, out var strandParticleStride, out var strandParticleEnd);
-
-				if (settings.curl)
+				for (int i = 0; i != settings.strandCount; i++)
 				{
-					Vector3 NextVectorInPlane(ref Mathematics.Random randSeq, in Vector3 n)
+					longOperation.UpdateStatus("Strand", i, settings.strandCount);
+
+					var step = rootVar[i].normalizedStrandLength * particleInterval * Mathf.Lerp(1.0f, randSeqParticleInterval.NextFloat(), particleIntervalVariation);
+
+					var curPos = rootPos[i];
+					var curDir = rootDir[i];
+
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, settings.strandCount, settings.strandParticleCount, i, out var strandParticleBegin, out var strandParticleStride, out var strandParticleEnd);
+
+					if (settings.curl)
 					{
-						Vector3 r;
+						Vector3 NextVectorInPlane(ref Mathematics.Random randSeq, in Vector3 n)
 						{
-							do r = Vector3.ProjectOnPlane(randSeq.NextFloat3Direction(), n);
-							while (Vector3.SqrMagnitude(r) < 1e-5f);
+							Vector3 r;
+							{
+								do r = Vector3.ProjectOnPlane(randSeq.NextFloat3Direction(), n);
+								while (Vector3.SqrMagnitude(r) < 1e-5f);
+							}
+							return r;
+						};
+
+						var curPlaneU = Vector3.Normalize(NextVectorInPlane(ref randSeqCurlPlaneUV, curDir));
+						var curPlaneV = Vector3.Cross(curPlaneU, curDir);
+
+						var targetRadius = rootVar[i].normalizedCurlRadius * settings.curlRadius * 0.01f * Mathf.Lerp(1.0f, randSeqCurlRadius.NextFloat(), curlRadiusVariation);
+						var targetSlope = rootVar[i].normalizedCurlSlope * settings.curlSlope * Mathf.Lerp(1.0f, randSeqCurlSlope.NextFloat(), curlSlopeVariation);
+
+						var stepPlane = step * Mathf.Cos(0.5f * Mathf.PI * targetSlope);
+						if (stepPlane > 1.0f * targetRadius)
+							stepPlane = 1.0f * targetRadius;
+
+						var stepSlope = 0.0f;
+						{
+							switch (settings.curlSamplingStrategy)
+							{
+								// maintain slope
+								case HairAsset.SettingsProcedural.CurlSamplingStrategy.RelaxStrandLength:
+									stepSlope = step * Mathf.Sin(0.5f * Mathf.PI * targetSlope);
+									break;
+
+								// maintain strand length
+								case HairAsset.SettingsProcedural.CurlSamplingStrategy.RelaxCurlSlope:
+									stepSlope = Mathf.Sqrt(step * step - stepPlane * stepPlane);
+									break;
+							}
 						}
-						return r;
-					};
 
-					var curPlaneU = Vector3.Normalize(NextVectorInPlane(ref randSeqCurlPlaneUV, curDir));
-					var curPlaneV = Vector3.Cross(curPlaneU, curDir);
+						var a = (stepPlane > 0.0f) ? 2.0f * Mathf.Asin(stepPlane / (2.0f * targetRadius)) : 0.0f;
+						var t = 0;
 
-					var targetRadius = rootVar[i].normalizedCurlRadius * settings.curlRadius * 0.01f * Mathf.Lerp(1.0f, randSeqCurlRadius.NextFloat(), curlRadiusVariation);
-					var targetSlope = rootVar[i].normalizedCurlSlope * settings.curlSlope * Mathf.Lerp(1.0f, randSeqCurlSlope.NextFloat(), curlSlopeVariation);
+						curPos -= curPlaneU * targetRadius;
 
-					var stepPlane = step * Mathf.Cos(0.5f * Mathf.PI * targetSlope);
-					if (stepPlane > 1.0f * targetRadius)
-						stepPlane = 1.0f * targetRadius;
-
-					var stepSlope = 0.0f;
-					{
-						switch (settings.curlSamplingStrategy)
+						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
 						{
-							// maintain slope
-							case HairAsset.SettingsProcedural.CurlSamplingStrategy.RelaxStrandLength:
-								stepSlope = step * Mathf.Sin(0.5f * Mathf.PI * targetSlope);
-								break;
+							var du = targetRadius * Mathf.Cos(t * a);
+							var dv = targetRadius * Mathf.Sin(t * a);
+							var dn = stepSlope * t;
 
-							// maintain strand length
-							case HairAsset.SettingsProcedural.CurlSamplingStrategy.RelaxCurlSlope:
-								stepSlope = Mathf.Sqrt(step * step - stepPlane * stepPlane);
-								break;
+							pos[j] =
+								curPos +
+								du * curPlaneU +
+								dv * curPlaneV +
+								dn * curDir;
+
+							t++;
 						}
 					}
-
-					var a = (stepPlane > 0.0f) ? 2.0f * Mathf.Asin(stepPlane / (2.0f * targetRadius)) : 0.0f;
-					var t = 0;
-
-					curPos -= curPlaneU * targetRadius;
-
-					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+					else
 					{
-						var du = targetRadius * Mathf.Cos(t * a);
-						var dv = targetRadius * Mathf.Sin(t * a);
-						var dn = stepSlope * t;
-
-						pos[j] =
-							curPos +
-							du * curPlaneU +
-							dv * curPlaneV +
-							dn * curDir;
-
-						t++;
-					}
-				}
-				else
-				{
-					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
-					{
-						pos[j] = curPos;
-						curPos += step * curDir;
+						for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+						{
+							pos[j] = curPos;
+							curPos += step * curDir;
+						}
 					}
 				}
 			}
@@ -1390,7 +1488,9 @@ namespace Unity.DemoTeam.Hair
 
 		unsafe struct LODChain : IDisposable
 		{
-			public ClusterSet clusterSet;
+			public LongOperationScope longOperation;
+
+			public UnsafeClusterSet clusterSet;
 
 			public int lodCount;
 			public NativeList<int> lodGuideCount;
@@ -1403,35 +1503,71 @@ namespace Unity.DemoTeam.Hair
 			public int* strandGuidePtr;
 			public float* strandCarryPtr;
 
-			public LODChain(int lodCapacity, int strandCount, Allocator allocator)
+			public LODChain(int lodCapacity, in HairAsset.StrandGroup strandGroup, HairAsset.StrandClusterMode strandClusterMode, ClusterVoid clusterVoid, Allocator allocator)
 			{
-				this.clusterSet = new ClusterSet(0, strandCount, allocator);
+				this.longOperation = new LongOperationScope("Building clusters");
+				this.longOperation.UpdateStatus("Level 1 / ?", 0.0f);
+
+				this.clusterSet = StrandClusterUtility.CreateEmptySet(0, clusterVoid, strandGroup, strandClusterMode, Allocator.Temp);
 
 				this.lodCount = 0;
 				this.lodGuideCount = new NativeList<int>(lodCapacity, allocator);
-				this.lodGuideIndex = new NativeList<int>(lodCapacity * strandCount, allocator);
-				this.lodGuideCarry = new NativeList<float>(lodCapacity * strandCount, allocator);
+				this.lodGuideIndex = new NativeList<int>(lodCapacity * strandGroup.strandCount, allocator);
+				this.lodGuideCarry = new NativeList<float>(lodCapacity * strandGroup.strandCount, allocator);
 
-				this.strandCount = strandCount;
-				this.strandGuide = new NativeArray<int>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.strandCount = strandGroup.strandCount;
+				this.strandGuide = new NativeArray<int>(strandGroup.strandCount, allocator, NativeArrayOptions.UninitializedMemory);
 				this.strandGuidePtr = (int*)strandGuide.GetUnsafePtr();
-				this.strandCarry = new NativeArray<float>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.strandCarry = new NativeArray<float>(strandGroup.strandCount, allocator, NativeArrayOptions.UninitializedMemory);
 				this.strandCarryPtr = (float*)strandCarry.GetUnsafePtr();
 			}
 
 			public void Dispose()
 			{
+				longOperation.Dispose();
+
 				clusterSet.Dispose();
+
 				lodGuideCount.Dispose();
 				lodGuideIndex.Dispose();
 				lodGuideCarry.Dispose();
+
 				strandGuide.Dispose();
 				strandCarry.Dispose();
 			}
 
+			public bool Increment()
+			{
+				var clusterCountPrev = (lodCount == 0) ? 0 : lodGuideCount[lodGuideCount.Length - 1];
+				if (clusterCountPrev < clusterSet.dataDesc.clusterCount)
+				{
+					for (int i = 0; i != strandCount; i++)
+					{
+						int k = clusterSet.dataDesc.sampleClusterPtr[i];
+						{
+							strandGuidePtr[i] = clusterSet.dataDesc.clusterGuidePtr[k];
+							strandCarryPtr[i] = clusterSet.dataDesc.clusterCarryPtr[k];
+						}
+					}
+
+					lodCount++;
+					lodGuideCount.Add(clusterSet.dataDesc.clusterCount);
+					lodGuideIndex.AddRange(strandGuidePtr, strandCount);
+					lodGuideCarry.AddRange(strandCarryPtr, strandCount);
+
+					longOperation.UpdateStatus("Level " + lodCount + " / ?", 0.0f);
+					return true;
+				}
+				else
+				{
+					return false;
+				}
+			}
+
+			/* old preassigned method, kept for reference
 			public bool TryAppend(ClusterSet nextClusters)
 			{
-				if (nextClusters.clusterCount > clusterSet.clusterCount)
+				if (nextClusters.dataDesc.clusterCount > clusterSet.dataDesc.clusterCount)
 				{
 					// inject guides from previous set in chain
 					if (nextClusters.InjectGuidesFrom(clusterSet))
@@ -1443,15 +1579,15 @@ namespace Unity.DemoTeam.Hair
 						// update lod guide index
 						for (int i = 0; i != strandCount; i++)
 						{
-							int cluster = clusterSet.strandClusterPtr[i];
+							int k = clusterSet.dataDesc.sampleClusterPtr[i];
 							{
-								strandGuidePtr[i] = clusterSet.clusterGuidePtr[cluster];
-								strandCarryPtr[i] = clusterSet.clusterCarryPtr[cluster];
+								strandGuidePtr[i] = clusterSet.dataDesc.clusterGuidePtr[k];
+								strandCarryPtr[i] = clusterSet.dataDesc.clusterCarryPtr[k];
 							}
 						}
 
 						lodCount++;
-						lodGuideCount.Add(clusterSet.clusterCount);
+						lodGuideCount.Add(clusterSet.dataDesc.clusterCount);
 						lodGuideIndex.AddRange(strandGuidePtr, strandCount);
 						lodGuideCarry.AddRange(strandCarryPtr, strandCount);
 
@@ -1471,703 +1607,126 @@ namespace Unity.DemoTeam.Hair
 				// failed to append
 				return false;
 			}
+			*/
 		}
 
-		unsafe struct ClusterSet : IDisposable
+		public unsafe struct StrandClusterUtility
 		{
-			public int clusterCount;
-			public NativeArray<int> clusterDepth;
-			public NativeArray<int> clusterGuide;
-			public NativeArray<float> clusterCarry;
-
-			public int strandCount;
-			public NativeArray<int> strandCluster;
-
-			public int* clusterDepthPtr;
-			public int* clusterGuidePtr;
-			public float* clusterCarryPtr;
-			public int* strandClusterPtr;
-
-			public ClusterSet(int clusterCount, int strandCount, Allocator allocator)
+			public static UnsafeClusterSet CreateEmptySet(int clusterCapacity, ClusterVoid clusterEmpty, in HairAsset.StrandGroup strandGroup, HairAsset.StrandClusterMode strandClusterMode, Allocator allocator)
 			{
-				this.clusterCount = clusterCount;
-				this.clusterDepth = new NativeArray<int>(clusterCount, allocator, NativeArrayOptions.UninitializedMemory);
-				this.clusterGuide = new NativeArray<int>(clusterCount, allocator, NativeArrayOptions.UninitializedMemory);
-				this.clusterCarry = new NativeArray<float>(clusterCount, allocator, NativeArrayOptions.UninitializedMemory);
+				HairAssetUtility.DeclareParticleStride(strandGroup, out var strandParticleOffset, out var strandParticleStride);
 
-				this.strandCount = strandCount;
-				this.strandCluster = new NativeArray<int>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				var sampleCount = strandGroup.strandCount;
+				var samplePositionOffset = strandParticleOffset;
+				var samplePositionStride = strandParticleStride;
+				var samplePositionCount = strandGroup.strandParticleCount;
+				{
+					switch (strandClusterMode)
+					{
+						case HairAsset.StrandClusterMode.Roots: samplePositionCount = 1; break;
+						case HairAsset.StrandClusterMode.Strands: break;
+						case HairAsset.StrandClusterMode.Strands3pt: samplePositionStride *= (samplePositionCount / 2); samplePositionCount = 3; break;
+					}
+				}
 
-				this.clusterDepthPtr = (int*)clusterDepth.GetUnsafePtr();
-				this.clusterGuidePtr = (int*)clusterGuide.GetUnsafePtr();
-				this.clusterCarryPtr = (float*)clusterCarry.GetUnsafePtr();
-				this.strandClusterPtr = (int*)strandCluster.GetUnsafePtr();
+				return new UnsafeClusterSet(clusterCapacity, clusterEmpty, sampleCount, samplePositionOffset, samplePositionStride, samplePositionCount, allocator);
+			}
+
+			public static StrandClusterContext BindStrandData(ref UnsafeClusterSet clusterSet, in HairAsset.StrandGroup strandGroup, Allocator allocator)
+			{
+				return new StrandClusterContext(ref clusterSet, strandGroup, allocator);
+			}
+		}
+
+		public unsafe struct StrandClusterContext : IDisposable
+		{
+			UnsafeList<int> sampleIndices;
+			ulong gchSamplePosition;
+			ulong gchSampleWeight;
+
+			public StrandClusterContext(ref UnsafeClusterSet clusterSet, in HairAsset.StrandGroup strandGroup, Allocator allocator)
+			{
+				this.sampleIndices = AllocateRange(0, strandGroup.strandCount, Allocator.Temp);
+				clusterSet.dataDesc.samplePositionPtr = (Vector3*)UnsafeUtility.PinGCArrayAndGetDataAddress(strandGroup.particlePosition, out this.gchSamplePosition);
+				clusterSet.dataDesc.sampleResolvePtr = sampleIndices.Ptr;
+				clusterSet.dataDesc.sampleWeightPtr = (float*)UnsafeUtility.PinGCArrayAndGetDataAddress(strandGroup.rootScale, out this.gchSampleWeight);
 			}
 
 			public void Dispose()
 			{
-				clusterDepth.Dispose();
-				clusterGuide.Dispose();
-				clusterCarry.Dispose();
-				strandCluster.Dispose();
+				sampleIndices.Dispose();
+				UnsafeUtility.ReleaseGCObject(gchSamplePosition);
+				UnsafeUtility.ReleaseGCObject(gchSampleWeight);
 			}
 
-			public void InitializeFromStrandCluster(in HairAsset.StrandGroup strandGroup, in NativeArray<int> strandCluster, int strandClusterDepth)
+			public static UnsafeList<int> AllocateRange(int offset, int length, Allocator allocator)
 			{
-				this.strandCluster.CopyFrom(strandCluster);
-
-				using (var clusterCenter = new NativeArray<Vector3>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var clusterWeight = new NativeArray<float>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var clusterScore = new NativeArray<float>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				var range = new UnsafeList<int>(length, allocator);
+				var rangePtr = range.Ptr;
 				{
-					var clusterCenterPtr = (Vector3*)clusterCenter.GetUnsafePtr();
-					var clusterWeightPtr = (float*)clusterWeight.GetUnsafePtr();
-					var clusterScorePtr = (float*)clusterScore.GetUnsafePtr();
-
-					// find weighted cluster centers
-					for (int i = 0; i != clusterCount; i++)
+					for (int i = 0; i != length; i++)
 					{
-						clusterCenterPtr[i] = Vector3.zero;
-						clusterWeightPtr[i] = 0.0f;
-					}
-
-					for (int i = 0; i != strandCount; i++)
-					{
-						var cluster = strandClusterPtr[i];
-						{
-							clusterCenterPtr[cluster] += strandGroup.rootScale[i] * strandGroup.rootPosition[i];
-							clusterWeightPtr[cluster] += strandGroup.rootScale[i];
-						}
-					}
-
-					for (int i = 0; i != clusterCount; i++)
-					{
-						clusterCenterPtr[i] /= clusterWeightPtr[i];
-					}
-
-					// select one guide per cluster based on distance to weighted centers
-					for (int i = 0; i != clusterCount; i++)
-					{
-						clusterScorePtr[i] = float.PositiveInfinity;
-						clusterDepthPtr[i] = strandClusterDepth;
-						clusterGuidePtr[i] = -1;
-					}
-
-					for (int i = 0; i != strandCount; i++)
-					{
-						var cluster = strandClusterPtr[i];
-						{
-							var strandLength = strandGroup.maxParticleInterval * strandGroup.rootScale[i];
-							var strandOffset = Vector3.Distance(clusterCenterPtr[cluster], strandGroup.rootPosition[i]);
-
-							//TODO better scoring
-							var strandScore = strandOffset / strandLength;// smaller score is better
-							if (strandScore < clusterScorePtr[cluster])
-							{
-								clusterGuidePtr[cluster] = i;
-								clusterScorePtr[cluster] = strandScore;
-							}
-						}
-					}
-
-					// find cluster carry (weight of all strands in cluster relative to weight of guide)
-					for (int i = 0; i != clusterCount; i++)
-					{
-						clusterCarryPtr[i] = clusterWeightPtr[i] / strandGroup.rootScale[clusterGuidePtr[i]];
+						rangePtr[i] = i + offset;
 					}
 				}
-			}
-
-			static void PsClearA(Vector3* pointsA, int strideA, Vector3 value, int count)
-			{
-				for (int i = 0; i != count; i++)
-				{
-					pointsA[i * strideA] = value;
-				}
-			}
-
-			static void PsCopyA(Vector3* pointsA, int strideA, Vector3* pointsB, int strideB, int count)
-			{
-				for (int i = 0; i != count; i++)
-				{
-					pointsA[i * strideA] = pointsB[i * strideB];
-				}
-			}
-
-			static void PsAddA(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
-			{
-				for (int i = 0; i != count; i++)
-				{
-					pointsA[i * strideA] += pointsB[i * strideB];
-				}
-			}
-
-			static void PsSubA(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
-			{
-				for (int i = 0; i != count; i++)
-				{
-					pointsA[i * strideA] -= pointsB[i * strideB];
-				}
-			}
-
-			static void PsMulA(Vector3* pointsA, int strideA, float scalarB, int count)
-			{
-				for (int i = 0; i != count; i++)
-				{
-					pointsA[i * strideA] *= scalarB;
-				}
-			}
-
-			static void PsMulAddA(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, float scalarC, int count)
-			{
-				for (int i = 0; i != count; i++)
-				{
-					pointsA[i * strideA] += pointsB[i * strideB] * scalarC;
-				}
-			}
-
-			static float PsDot(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
-			{
-				var sum = 0.0f;
-				for (int i = 0; i != count; i++)
-				{
-					ref readonly var a = ref pointsA[i * strideA];
-					ref readonly var b = ref pointsB[i * strideB];
-					sum += (a.x * b.x);
-					sum += (a.y * b.y);
-					sum += (a.z * b.z);
-				}
-				return sum;
-			}
-
-			static float PsNorm(Vector3* pointsA, int strideA, int count) => Mathf.Sqrt(PsNormSq(pointsA, strideA, count));
-			static float PsNormSq(Vector3* pointsA, int strideA, int count)
-			{
-				var sum = 0.0f;
-				for (int i = 0; i != count; i++)
-				{
-					ref readonly var a = ref pointsA[i * strideA];
-					sum += (a.x * a.x);
-					sum += (a.y * a.y);
-					sum += (a.z * a.z);
-				}
-				return sum;
-			}
-
-			static float PsNormL1(Vector3* pointsA, int strideA, int count)
-			{
-				var sum = 0.0f;
-				for (int i = 0; i != count; i++)
-				{
-					ref readonly var a = ref pointsA[i * strideA];
-					sum += Mathf.Abs(a.x);
-					sum += Mathf.Abs(a.y);
-					sum += Mathf.Abs(a.z);
-				}
-				return sum;
-			}
-
-			static float PsDistance(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count) => Mathf.Sqrt(PsDistanceSq(pointsA, pointsB, strideA, strideB, count));
-			static float PsDistanceSq(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
-			{
-				var sum = 0.0f;
-				for (int i = 0; i != count; i++)
-				{
-					ref readonly var a = ref pointsA[i * strideA];
-					ref readonly var b = ref pointsB[i * strideB];
-					var dx = a.x - b.x;
-					var dy = a.y - b.y;
-					var dz = a.z - b.z;
-					sum += (dx * dx);
-					sum += (dy * dy);
-					sum += (dz * dz);
-				}
-				return sum;
-			}
-
-			static float PsDistanceL1(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
-			{
-				var sum = 0.0f;
-				for (int i = 0; i != count; i++)
-				{
-					ref readonly var a = ref pointsA[i * strideA];
-					ref readonly var b = ref pointsB[i * strideB];
-					var dx = a.x - b.x;
-					var dy = a.y - b.y;
-					var dz = a.z - b.z;
-					sum += Mathf.Abs(dx);
-					sum += Mathf.Abs(dy);
-					sum += Mathf.Abs(dz);
-				}
-				return sum;
-			}
-
-			static float PsCosineSimilarity(Vector3* pointsA, Vector3* pointsB, int strideA, int strideB, int count)
-			{
-				var dotAB = PsDot(pointsA, pointsB, strideA, strideB, count);
-				var normA = PsNorm(pointsA, strideA, count);
-				var normB = PsNorm(pointsB, strideB, count);
-				return dotAB / (normA * normB);
-			}
-
-			//CONSIDERATIONS:
-			//
-			// k-means:
-			//	1) per cluster: calc mean
-			//	2) per strand: find closest mean, select that cluster
-			//	3) goto 1
-			//
-			// closest mean:
-			//	L1 distance		: abs(dx) + abs(dy) + ...
-			//	L2 distance		: distance(a, b)
-			//	cos similarity	: dot(a, b) / ||a|| * ||b||
-			//
-			// outliers:
-			//	classify A		: distance > percentile within cluster
-			//	classify B		: distance > fraction of cluster with at root
-			//	after k-means	: identify and split into sep. guides
-			//	during k-means	: ?
-			//
-
-			struct RefineClustersData
-			{
-				[NativeDisableUnsafePtrRestriction] public Vector3* particlePositionPtr;
-
-				[NativeDisableUnsafePtrRestriction] public int* strandClusterPtr;
-				public int strandParticleOffset;
-				public int strandParticleStride;
-
-				[NativeDisableUnsafePtrRestriction] public Vector3* clusterPositionPtr;
-				[NativeDisableUnsafePtrRestriction] public float* clusterWeightPtr;
-				[NativeDisableUnsafePtrRestriction] public float* clusterScorePtr;
-				[NativeDisableUnsafePtrRestriction] public bool* clusterLivePtr;
-
-				public int clusterCount;
-				public int clusterPositionCount;
-				public int clusterPositionOffset;
-				public int clusterPositionStride;
-			}
-
-			[BurstCompile]
-			struct RefineClustersAssignClustersJob : IJobParallelFor
-			{
-				public RefineClustersData jobData;
-
-				[NativeDisableUnsafePtrRestriction]
-				public int* reassignedCountPtr;
-
-				public void Execute(int i)
-				{
-					var bestCluster = jobData.strandClusterPtr[i];
-					var bestDistance = float.PositiveInfinity;
-
-					for (int j = 0; j != jobData.clusterCount; j++)
-					{
-						var distance = PsDistanceSq(
-							pointsA: jobData.clusterPositionPtr + jobData.clusterPositionOffset * j,
-							pointsB: jobData.particlePositionPtr + jobData.strandParticleOffset * i,
-							strideA: jobData.clusterPositionStride,
-							strideB: jobData.strandParticleStride,
-							count: jobData.clusterPositionCount);
-
-						if (distance < bestDistance)
-						{
-							bestDistance = distance;
-							bestCluster = j;
-						}
-					}
-
-					if (jobData.strandClusterPtr[i] != bestCluster)
-					{
-						jobData.strandClusterPtr[i] = bestCluster;
-						System.Threading.Interlocked.Add(ref *reassignedCountPtr, 1);
-					}
-
-					jobData.clusterLivePtr[bestCluster] = true;
-				}
-			}
-
-			public enum EmptyClusterStrategy
-			{
-				Remove,
-				Preserve,
-				//Reallocate,
-			}
-
-			public void RefineClusters(in HairAsset.StrandGroup strandGroup, int maxIterations, EmptyClusterStrategy emptyClusterStrategy)
-			{
-				HairAssetUtility.DeclareParticleStride(strandGroup.particleMemoryLayout, strandGroup.strandCount, strandGroup.strandParticleCount,
-					out var strandParticleOffset,
-					out var strandParticleStride);
-
-				var clusterPositionCount = strandGroup.strandParticleCount;
-				var clusterPositionOffset = clusterPositionCount;
-				var clusterPositionStride = 1;
-
-				using (var clusterPosition = new NativeArray<Vector3>(clusterCount * clusterPositionCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var clusterWeight = new NativeArray<float>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var clusterScore = new NativeArray<float>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				using (var clusterLive = new NativeArray<bool>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-				{
-					var clusterPositionPtr = (Vector3*)clusterPosition.GetUnsafePtr();
-					var clusterWeightPtr = (float*)clusterWeight.GetUnsafePtr();
-					var clusterScorePtr = (float*)clusterScore.GetUnsafePtr();
-					var clusterLivePtr = (bool*)clusterLive.GetUnsafePtr();
-
-					// assume at this point that all clusters are non-empty (i.e. that each cluster is referenced by at least one strand)
-					for (int i = 0; i != clusterCount; i++)
-					{
-						clusterLivePtr[i] = true;
-					}
-
-					fixed (Vector3* particlePositionPtr = strandGroup.particlePosition)
-					{
-						var jobData = new RefineClustersData
-						{
-							particlePositionPtr = particlePositionPtr,
-							strandClusterPtr = strandClusterPtr,
-							strandParticleOffset = strandParticleOffset,
-							strandParticleStride = strandParticleStride,
-							clusterPositionPtr = clusterPositionPtr,
-							clusterWeightPtr = clusterWeightPtr,
-							clusterScorePtr = clusterScorePtr,
-							clusterLivePtr = clusterLivePtr,
-							clusterCount = clusterCount,
-							clusterPositionCount = clusterPositionCount,
-							clusterPositionOffset = clusterPositionOffset,
-							clusterPositionStride = clusterPositionStride,
-						};
-
-						// k-means
-						var validMeans = false;
-						var validMeansClusterIteration = 0;
-
-						while (validMeans == false)
-						{
-							// find weighted cluster means
-							for (int i = 0; i != clusterCount; i++)
-							{
-								if (clusterLivePtr[i])
-								{
-									PsClearA(
-										pointsA: clusterPositionPtr + clusterPositionOffset * i,
-										strideA: clusterPositionStride,
-										value: Vector3.zero,
-										count: clusterPositionCount);
-
-									clusterWeightPtr[i] = 0.0f;
-								}
-							}
-
-							for (int i = 0; i != strandCount; i++)
-							{
-								var cluster = strandClusterPtr[i];
-								{
-									var weight = strandGroup.rootScale[i];
-									{
-										PsMulAddA(
-											pointsA: clusterPositionPtr + clusterPositionOffset * cluster,
-											pointsB: particlePositionPtr + strandParticleOffset * i,
-											strideA: clusterPositionStride,
-											strideB: strandParticleStride,
-											scalarC: weight,
-											count: clusterPositionCount);
-
-										clusterWeightPtr[cluster] += weight;
-									}
-								}
-							}
-
-							for (int i = 0; i != clusterCount; i++)
-							{
-								if (clusterLivePtr[i])
-								{
-									PsMulA(
-										pointsA: clusterPositionPtr + clusterPositionOffset * i,
-										strideA: clusterPositionStride,
-										scalarB: 1.0f / clusterWeightPtr[i],
-										count: clusterPositionCount);
-								}
-							}
-
-							validMeans = true;
-
-							// assign strands to clusters based on closest mean
-							if (++validMeansClusterIteration <= maxIterations)
-							{
-								var reassignedCount = 0;
-								{
-									UnsafeUtility.MemClear(clusterLivePtr, sizeof(bool) * clusterCount);
-
-									var sw = System.Diagnostics.Stopwatch.StartNew();
-#if true
-									var job = new RefineClustersAssignClustersJob
-									{
-										jobData = jobData,
-										reassignedCountPtr = &reassignedCount
-									};
-
-									var jobHandle = job.Schedule(strandCount, 64);
-									{
-										JobHandle.ScheduleBatchedJobs();
-										jobHandle.Complete();
-									}
-#else
-									for (int i = 0; i != strandCount; i++)
-									{
-										var bestCluster = strandClusterPtr[i];
-										var bestDistance = float.PositiveInfinity;
-
-										for (int j = 0; j != clusterCount; j++)
-										{
-											var distance = PsDistanceSq(
-												pointsA: clusterPositionPtr + clusterPositionOffset * j,
-												pointsB: particlePositionPtr + strandParticleOffset * i,
-												strideA: clusterPositionStride,
-												strideB: strandParticleStride,
-												count: clusterPositionCount);
-
-											if (distance < bestDistance)
-											{
-												bestDistance = distance;
-												bestCluster = j;
-											}
-										}
-
-										if (strandClusterPtr[i] != bestCluster)
-										{
-											strandClusterPtr[i] = bestCluster;
-											reassignedStrandCount++;
-										}
-
-										clusterLivePtr[bestCluster] = true;
-									}
-#endif
-									sw.Stop();
-
-									Debug.Log("iteration " + validMeansClusterIteration + " took " + sw.Elapsed.Milliseconds + " ms ... strands reassigned: " + reassignedCount);
-								}
-
-								if (reassignedCount > 0)
-								{
-									validMeans = false;
-								}
-
-								// handle empty clusters between iterations
-								switch (emptyClusterStrategy)
-								{
-									case EmptyClusterStrategy.Remove:
-										{
-											for (int i = 0; i != clusterCount; i++)
-											{
-												if (clusterLivePtr[i] == false)
-												{
-													PsClearA(
-														pointsA: clusterPositionPtr + clusterPositionOffset * i,
-														strideA: clusterPositionStride,
-														value: Vector3.positiveInfinity,
-														count: clusterPositionCount);
-												}
-											}
-										}
-										break;
-
-									case EmptyClusterStrategy.Preserve:
-										{
-											// nothing needs to be done here
-										}
-										break;
-								}
-							}
-						}
-
-						// remove any remaining empty clusters once all iterations have completed
-						var emptyClusterCount = 0;
-						{
-							for (int i = 0; i != clusterCount; i++)
-							{
-								if (clusterLivePtr[i] == false)
-								{
-									emptyClusterCount++;
-								}
-							}
-
-							Debug.Log("found " + emptyClusterCount + " empty clusters (out of " + clusterCount + ")");
-						}
-
-						if (emptyClusterCount > 0)
-						{
-							using (var clusterLiveIndex = new NativeArray<int>(clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-							{
-								var clusterLiveIndexPtr = (int*)clusterLiveIndex.GetUnsafePtr();
-
-								for (int i = 0, writeIndex = 0; i != clusterCount; i++)
-								{
-									if (clusterLivePtr[i])
-									{
-										clusterLiveIndexPtr[i] = writeIndex;
-
-										if (i != writeIndex)
-										{
-											PsCopyA(
-												clusterPositionPtr + clusterPositionOffset * writeIndex,
-												clusterPositionStride,
-												clusterPositionPtr + clusterPositionOffset * i,
-												clusterPositionStride,
-												clusterPositionCount);
-										}
-
-										writeIndex++;
-									}
-									else
-									{
-										clusterLiveIndexPtr[i] = -1;
-									}
-								}
-
-								// update strand cluster map
-								for (int i = 0; i != strandCount; i++)
-								{
-									strandClusterPtr[i] = clusterLiveIndexPtr[strandClusterPtr[i]];
-								}
-
-								clusterCount -= emptyClusterCount;
-							}
-						}
-
-						// select one guide per cluster based on distance to mean
-						for (int i = 0; i != clusterCount; i++)
-						{
-							clusterScorePtr[i] = float.PositiveInfinity;
-							clusterGuidePtr[i] = -1;
-						}
-
-						for (int i = 0; i != strandCount; i++)
-						{
-							var cluster = strandClusterPtr[i];
-							{
-								var strandLength = strandGroup.maxParticleInterval * strandGroup.rootScale[i];
-								var strandOffset = PsDistance(
-									pointsA: clusterPositionPtr + clusterPositionOffset * cluster,
-									pointsB: particlePositionPtr + strandParticleOffset * i,
-									strideA: clusterPositionStride,
-									strideB: strandParticleStride,
-									count: clusterPositionCount);
-
-								var strandScore = strandOffset / strandLength;// smaller score is better
-								if (strandScore < clusterScorePtr[cluster])
-								{
-									clusterScorePtr[cluster] = strandScore;
-									clusterGuidePtr[cluster] = i;
-								}
-							}
-						}
-
-						// find cluster carry (weight of all strands in cluster relative to weight of guide)
-						for (int i = 0; i != clusterCount; i++)
-						{
-							var guide = clusterGuidePtr[i];
-							if (guide != -1)
-							{
-								clusterCarryPtr[i] = clusterWeightPtr[i] / strandGroup.rootScale[clusterGuidePtr[i]];
-							}
-						}
-					}
-					// fixed (...)
-				}
-				// using (...)
-			}
-
-			public bool InjectGuidesFrom(in ClusterSet existingClusters)
-			{
-				using (var clusterUpdated = new NativeArray<bool>(clusterCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				{
-					var clusterUpdatedPtr = (bool*)clusterUpdated.GetUnsafePtr();
-					var clusterUpdatedCount = 0;
-
-					// loop over existing clusters
-					for (int i = 0; i != existingClusters.clusterCount; i++)
-					{
-						// get existing guide and depth
-						var existingGuide = existingClusters.clusterGuidePtr[i];
-						var existingDepth = existingClusters.clusterDepthPtr[i];
-
-						// get current cluster for existing guide
-						var cluster = strandClusterPtr[existingGuide];
-
-						// update current cluster if not already updated
-						if (clusterUpdatedPtr[cluster] == false)
-						{
-							// transfer guide and depth so we can sort clusters by depth first and guide second
-							clusterGuidePtr[cluster] = existingGuide;
-							clusterDepthPtr[cluster] = existingDepth;
-
-							// mark as updated
-							clusterUpdatedPtr[cluster] = true;
-							clusterUpdatedCount++;
-						}
-					}
-
-					// success if all existing clusters were transferred
-					return (clusterUpdatedCount == existingClusters.clusterCount);
-				}
+				return range;
 			}
 		}
 
-		unsafe struct ClusterRemapping : IDisposable
+		unsafe struct StrandClusterRemapping : IDisposable
 		{
-			public NativeArray<int> strandRemapSrc;// maps final strand index -> old strand index
-			public NativeArray<int> strandRemapDst;// maps old strand index -> final strand index
+			public UnsafeList<int> strandRemapSrc;// maps final strand index -> old strand index
+			public UnsafeList<int> strandRemapDst;// maps old strand index -> final strand index
 
 			public int* strandRemapSrcPtr;
 			public int* strandRemapDstPtr;
 
-			public ClusterRemapping(in ClusterSet clusters, Allocator allocator)
+			public StrandClusterRemapping(in UnsafeClusterSet clusterSet, Allocator allocator)
 			{
-				strandRemapSrc = new NativeArray<int>(clusters.strandCount, allocator, NativeArrayOptions.UninitializedMemory);
-				strandRemapDst = new NativeArray<int>(clusters.strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				strandRemapSrc = new UnsafeList<int>(clusterSet.dataDesc.sampleCount, allocator, NativeArrayOptions.UninitializedMemory);
+				strandRemapDst = new UnsafeList<int>(clusterSet.dataDesc.sampleCount, allocator, NativeArrayOptions.UninitializedMemory);
 
-				strandRemapSrcPtr = (int*)strandRemapSrc.GetUnsafePtr();
-				strandRemapDstPtr = (int*)strandRemapDst.GetUnsafePtr();
+				strandRemapSrcPtr = strandRemapSrc.Ptr;
+				strandRemapDstPtr = strandRemapDst.Ptr;
 
 				// sort clusters by depth first and guide second
-				using (var sortedClusters = new NativeArray<ulong>(clusters.clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+				using (var sortedClusters = new UnsafeList<ulong>(clusterSet.dataDesc.clusterCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 				{
-					var sortedClustersPtr = (ulong*)sortedClusters.GetUnsafePtr();
+					var sortedClustersPtr = sortedClusters.Ptr;
 
-					for (int i = 0; i != clusters.clusterCount; i++)
+					for (int k = 0; k != clusterSet.dataDesc.clusterCount; k++)
 					{
-						var sortDepth = (ulong)clusters.clusterDepthPtr[i] << 32;
-						var sortGuide = (ulong)clusters.clusterGuidePtr[i];
+						var sortDepth = (ulong)clusterSet.dataDesc.clusterDepthPtr[k] << 32;
+						var sortGuide = (ulong)clusterSet.dataDesc.clusterGuidePtr[k];
 						{
-							sortedClustersPtr[i] = sortDepth | sortGuide;
+							sortedClustersPtr[k] = sortDepth | sortGuide;
 						}
 					}
 
-					sortedClusters.Sort();
+					NativeSortExtension.Sort(sortedClustersPtr, clusterSet.dataDesc.clusterCount);
 
 					// write remapping table for guides from sorted clusters
-					for (int i = 0; i != clusters.clusterCount; i++)
+					for (int k = 0; k != clusterSet.dataDesc.clusterCount; k++)
 					{
-						var guide = (int)(sortedClustersPtr[i] & 0xffffffffuL);
+						var guide = (int)(sortedClustersPtr[k] & 0xffffffffuL);
 						{
-							strandRemapSrcPtr[i] = guide;
-							strandRemapDstPtr[guide] = i;
+							strandRemapSrcPtr[k] = guide;
+							strandRemapDstPtr[guide] = k;
 						}
 					}
 				}
 
-				var remainingCount = clusters.strandCount - clusters.clusterCount;
+				var remainingCount = clusterSet.dataDesc.sampleCount - clusterSet.dataDesc.clusterCount;
 				if (remainingCount > 0)
 				{
 					// sort remaining (non-guide) strands by remapped guide first and index second
-					using (var sortedRemaining = new NativeArray<ulong>(remainingCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+					using (var sortedRemaining = new UnsafeList<ulong>(remainingCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 					{
-						var sortedRemainingPtr = (ulong*)sortedRemaining.GetUnsafePtr();
+						var sortedRemainingPtr = sortedRemaining.Ptr;
 
-						for (int i = 0, j = 0; i != clusters.strandCount; i++)
+						for (int i = 0, j = 0; i != clusterSet.dataDesc.sampleCount; i++)
 						{
-							var guide = clusters.clusterGuidePtr[clusters.strandClusterPtr[i]];
+							var guide = clusterSet.dataDesc.clusterGuidePtr[clusterSet.dataDesc.sampleClusterPtr[i]];
 							if (guide != i)
 							{
 								var sortGuide = (ulong)strandRemapDstPtr[guide] << 32;
@@ -2179,10 +1738,10 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						//TODO maybe make it configurable whether/how to sort this data?
-						sortedRemaining.Sort();
+						NativeSortExtension.Sort(sortedRemainingPtr, remainingCount);
 
 						// write remapping table for remaining (non-guide) strands
-						for (int i = 0, j = clusters.clusterCount; i != remainingCount; i++, j++)
+						for (int i = 0, j = clusterSet.dataDesc.clusterCount; i != remainingCount; i++, j++)
 						{
 							var index = (int)(sortedRemainingPtr[i] & 0xffffffffuL);
 							{
@@ -2245,13 +1804,14 @@ namespace Unity.DemoTeam.Hair
 						attrSize,       // size
 						attrCount);     // count
 
-					// copy back equiv.
-					//for (int i = 0; i != attrCount; i++)
-					//{
-					//	var attrDstPtr = attrPtr + attrStride * i;
-					//	var attrSrcPtr = bufferPtr + attrSize * i;
-					//	UnsafeUtility.MemCpy(attrDstPtr, attrSrcPtr, attrSize);
-					//}
+					// copy back reference
+					//
+					//	for (int i = 0; i != attrCount; i++)
+					//	{
+					//		var attrDstPtr = attrPtr + attrStride * i;
+					//		var attrSrcPtr = bufferPtr + attrSize * i;
+					//		UnsafeUtility.MemCpy(attrDstPtr, attrSrcPtr, attrSize);
+					//	}
 				}
 			}
 

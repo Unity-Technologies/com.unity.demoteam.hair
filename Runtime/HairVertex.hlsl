@@ -138,7 +138,15 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 		v.strandUV = vertexUV * float2(1.0, _RootScale[strandIndex]);
 		v.strandIndex = strandIndex;
 		v.strandNormalTS = GetHairNormalTangentSpace(vertexUV);
-		v.debugColor = ColorCycle(strandIndex, _StrandCount);
+
+		uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
+		uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
+
+		float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODCount - 1]);
+		float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODCount - 1]);
+		float3 color = lerp(colorLo, colorHi, _LODBlendFraction);
+
+		v.debugColor = color;
 	}
 	return v;
 }

@@ -11,9 +11,6 @@ using Unity.Collections.LowLevel.Unsafe;
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 using Unity.DemoTeam.DigitalHuman;
 #endif
-#if HAS_PACKAGE_UNITY_VFXGRAPH
-using UnityEngine.VFX;
-#endif
 
 namespace Unity.DemoTeam.Hair
 {
@@ -139,11 +136,9 @@ namespace Unity.DemoTeam.Hair
 
 			public enum StrandRenderer
 			{
+				Disabled,
 				BuiltinLines,
 				BuiltinStrips,
-#if HAS_PACKAGE_UNITY_VFXGRAPH
-				VFXGraph,//TODO
-#endif
 			}
 
 			public enum SimulationRate
@@ -176,10 +171,6 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Renderer")]
 
 			public StrandRenderer strandRenderer;
-#if HAS_PACKAGE_UNITY_VFXGRAPH
-			[VisibleIf(nameof(strandRenderer), StrandRenderer.VFXGraph)]
-			public VisualEffect strandOutputGraph;
-#endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
 			public int strandLayers;
@@ -478,7 +469,7 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0, readIndexChecksum = 0; i != strandGroupProviders.Length; i++)
 			{
 				var hairAsset = strandGroupProviders[i].hairAsset;
-				if (hairAsset == null || hairAsset.checksum == string.Empty)
+				if (hairAsset == null || hairAsset.checksum == "")
 					continue;
 
 				if (readIndexChecksum < strandGroupChecksumCount)
@@ -904,6 +895,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				switch (settingsSystem.strandRenderer)
 				{
+					case SettingsSystem.StrandRenderer.Disabled:
 					case SettingsSystem.StrandRenderer.BuiltinLines:
 					case SettingsSystem.StrandRenderer.BuiltinStrips:
 						{
@@ -940,6 +932,12 @@ namespace Unity.DemoTeam.Hair
 
 			switch (settingsSystem.strandRenderer)
 			{
+				case SettingsSystem.StrandRenderer.Disabled:
+					{
+						meshFilter.sharedMesh = null;
+					}
+					break;
+
 				case SettingsSystem.StrandRenderer.BuiltinLines:
 					{
 						if (subdivisionCount == 0)

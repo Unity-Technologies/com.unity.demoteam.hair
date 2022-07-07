@@ -6,10 +6,10 @@
         "GUID:2665a8d13d1b3f18800f46e256720795",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:d8b63aba1907145bea998dd612889d6b",
-        "GUID:22f31b74491fb45d5b598e0b935deb31",
         "GUID:df380645f10b7bc4b97d4f5eb6303d95",
         "GUID:78bd2ddd6e276394a9615c203e574844",
-        "GUID:c579267770062bf448e75eb160330b7f"
+        "GUID:c579267770062bf448e75eb160330b7f",
+        "GUID:22f31b74491fb45d5b598e0b935deb31"
     ],
     "includePlatforms": [
         "Editor"
@@ -22,11 +22,6 @@
     "defineConstraints": [],
     "versionDefines": [
         {
-            "name": "com.unity.formats.alembic",
-            "expression": "2.2.2",
-            "define": "HAS_PACKAGE_UNITY_ALEMBIC"
-        },
-        {
             "name": "com.unity.render-pipelines.high-definition",
             "expression": "10.2.2",
             "define": "HAS_PACKAGE_UNITY_HDRP"
@@ -37,9 +32,9 @@
             "define": "HAS_PACKAGE_UNITY_URP"
         },
         {
-            "name": "com.unity.visualeffectgraph",
-            "expression": "10.2.2",
-            "define": "HAS_PACKAGE_UNITY_VFXGRAPH"
+            "name": "com.unity.formats.alembic",
+            "expression": "2.2.2",
+            "define": "HAS_PACKAGE_UNITY_ALEMBIC"
         },
         {
             "name": "com.unity.demoteam.digital-human",

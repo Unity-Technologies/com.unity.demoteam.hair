@@ -23,10 +23,11 @@ namespace Unity.DemoTeam.Hair
 			Sequential,
 		}
 
-		public enum LODClusters
+		public enum StrandClusterMode
 		{
-			Generated,
-			UVMapped,
+			Roots,
+			Strands,
+			Strands3pt,
 		}
 
 		[Serializable]
@@ -36,20 +37,17 @@ namespace Unity.DemoTeam.Hair
 			public Type type;
 			[Tooltip("Memory layout for the generated strands")]
 			public MemoryLayout memoryLayout;
-			[ToggleGroup, Tooltip("Build LOD clusters for the generated strands (to optionally reduce cost of rendering and simulation)")]
+			[ToggleGroup, Tooltip("Build LOD clusters for the generated strands (allows optionally reducing cost of rendering and/or simulation)")]
 			public bool kLODClusters;
-			[ToggleGroupItem, Tooltip("Choose how to build base level clusters")]
-			public LODClusters kLODClustersProvider;
-			[ToggleGroupItem(withLabel = true), Tooltip("Enable subdivision of base level clusters (to generate upper LODs)")]
-			public bool kLODClustersHighLOD;
+			[ToggleGroupItem(withLabel = true), Tooltip("Choose how the generated strands are clustered (where Roots == by 3-D root positions, Strands == by n-D strand positions, Strands 3pt == by 9-D quantized strand positions)")]
+			public StrandClusterMode kLODClustersClustering;
 
 			public static readonly SettingsBasic defaults = new SettingsBasic()
 			{
 				type = Type.Procedural,
 				memoryLayout = MemoryLayout.Interleaved,
 				kLODClusters = false,
-				kLODClustersProvider = LODClusters.Generated,
-				kLODClustersHighLOD = false,
+				kLODClustersClustering = StrandClusterMode.Strands,
 			};
 		}
 
@@ -172,7 +170,7 @@ namespace Unity.DemoTeam.Hair
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Obtain normalized strand parameters from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)"), FormerlySerializedAs("paintedParameters")]
 			public Texture2D mappedParameters;
 
-			//[ToggleGroup, Tooltip("Randomization seed")]
+			//[ToggleGroup, Tooltip("Initial seed")]
 			//public bool seed;
 			//[ToggleGroupItem, Min(1)]
 			//public uint seedValue;
@@ -238,85 +236,142 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
-		public struct SettingsLODGenerated
+		public struct SettingsLODClusters
 		{
-			public enum ClusterSelection
+			[LineHeader("Clustering")]
+
+			//[Min(1), Tooltip("Initial seed (evolved with set)")]
+			//public int initialSeed;
+			[Tooltip("Cluster policy to apply to empty clusters")]
+			public ClusterVoid clusterVoid;
+			[Tooltip("Cluster allocation policy (where Global == allocate and iterate within full set, Split Global == allocate within select cluster but iterate within full set, and Split Branching == allocate and iterate solely within split cluster)")]
+			public ClusterAllocationPolicy clusterAllocation;
+			[VisibleIf(nameof(clusterAllocation), CompareOp.Neq, ClusterAllocationPolicy.Global), Tooltip("Cluster allocation order for split-type policies (decides the order in which existing clusters are selected to be split into smaller clusters)")]
+			public ClusterAllocationOrder clusterAllocationOrder;
+			[ToggleGroup, Tooltip("Enable refinement by k-means cluster iteration")]
+			public bool clusterRefinement;
+			[ToggleGroupItem, Range(1, 200), Tooltip("Number of k-means iterations (upper bound)")]
+			public int clusterRefinementIterations;
+
+			public enum BaseLODMode
 			{
-				RandomPointsOnMesh,
-				RandomPointsInVolume,
+				Generated,
+				UVMapped,
 			}
 
-			[LineHeader("Base LOD")]
-
-			[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands")]
-			public float baseLODClusterQuantity;
-			[Tooltip("Cluster initialization method")]
-			public ClusterSelection baseLODClusterInitialization;
-			[VisibleIf(nameof(baseLODClusterInitialization), ClusterSelection.RandomPointsOnMesh), Tooltip("Cluster initialization mesh")]
-			public Mesh baseLODClusterInitializationMesh;
-			[Tooltip("Cluster initialization seed")]
-			public uint baseLODClusterInitializationSeed;
-			[Tooltip("Number of k-means iterations to apply to initial set of clusters")]
-			public int baseLODClusterIterations;
-
-			public static readonly SettingsLODGenerated defaults = new SettingsLODGenerated()
-			{
-				baseLODClusterQuantity = 0.1f,
-				baseLODClusterInitialization = ClusterSelection.RandomPointsInVolume,
-				baseLODClusterInitializationMesh = null,
-				baseLODClusterInitializationSeed = 7,
-				baseLODClusterIterations = 1,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsLODUVMapped
-		{
-			public enum ClusterMapFormat
+			public enum BaseLODClusterMapFormat
 			{
 				OneClusterPerColor,
 				OneClusterPerVisualCluster,
 			}
 
-			[LineHeader("Base LOD")]
-
-			[Tooltip("Cluster map format (controls how specified cluster maps are interpreted)")]
-			public ClusterMapFormat baseLODClusterMapFormat;
-			//[VisibleIf(nameof(baseLODClusterMapFormat), ClusterMapFormat.OneClusterPerColor)]
-			//public ClusterMapEncoding baseLODClusterMapEncoding;
-			[NonReorderable, Tooltip("Cluster map chain (higher indices must provide increasing levels of detail)")]
-			public Texture2D[] baseLODClusterMapChain;
-
-			public static readonly SettingsLODUVMapped defaults = new SettingsLODUVMapped()
+			[Serializable]
+			public struct BaseLOD
 			{
-				baseLODClusterMapFormat = ClusterMapFormat.OneClusterPerColor,
-				baseLODClusterMapChain = null,
+				[LineHeader("Base LOD")]
 
-				refinement = true,
-				refinementMaxIterations = 100,
-			};
+				[Tooltip("Choose how to build lower level clusters")]
+				public BaseLODMode baseLOD;
+			}
 
-			[LineHeader("Base LOD Refinement")]
-
-			public bool refinement;
-			[Range(1, 200)]
-			public int refinementMaxIterations;
-		}
-
-		[Serializable]
-		public struct SettingsLODPyramid
-		{
-			[LineHeader("High LOD")]
-
-			[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands counting from highest base LOD")]
-			public float highLODClusterQuantity;
-			[Range(0, 10), Tooltip("Number of intermediate levels that will be generated between highest base LOD and high LOD")]
-			public int highLODIntermediateLevels;
-
-			public static readonly SettingsLODPyramid defaults = new SettingsLODPyramid()
+			[Serializable]
+			public struct BaseLODParamsGenerated
 			{
-				highLODClusterQuantity = 1.0f,
-				highLODIntermediateLevels = 0,
+				[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands")]
+				public float baseLODClusterQuantity;
+			}
+
+			[Serializable]
+			public struct BaseLODParamsUVMapped
+			{
+				[Tooltip("Cluster map format (controls how specified cluster maps are interpreted)")]
+				public BaseLODClusterMapFormat baseLODClusterFormat;
+				[NonReorderable, Tooltip("Cluster map chain (higher indices must provide increasing level of detail)")]
+				public Texture2D[] baseLODClusterMaps;
+			}
+
+			public enum HighLODMode
+			{
+				Automatic,
+				Manual,
+			}
+
+			[Serializable]
+			public struct HighLOD
+			{
+				[LineHeader("High LOD")]
+
+				[ToggleGroup, Tooltip("Enable high level clusters (generated from lower level clusters)")]
+				public bool highLOD;
+				[ToggleGroupItem]
+				public HighLODMode highLODMode;
+			}
+
+			[Serializable]
+			public struct HighLODParamsAutomatic
+			{
+				[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands")]
+				public float highLODClusterQuantity;
+				[Range(1.1f, 8.0f), Tooltip("Upper bound for multiplier acting on number of clusters per level incremenent")]
+				public float highLODClusterExpansion;
+			}
+
+			[Serializable]
+			public struct HighLODParamsManual
+			{
+				[Range(0.0f, 1.0f), NonReorderable, Tooltip("Numbers of clusters as fractions of all strands")]
+				public float[] highLODClusterQuantities;
+			}
+
+			[VisibleIf(false)] public BaseLOD baseLOD;
+			[VisibleIf(false)] public BaseLODParamsGenerated baseLODParamsGenerated;
+			[VisibleIf(false)] public BaseLODParamsUVMapped baseLODParamsUVMapped;
+
+			[VisibleIf(false)] public HighLOD highLOD;
+			[VisibleIf(false)] public HighLODParamsAutomatic highLODParamsAutomatic;
+			[VisibleIf(false)] public HighLODParamsManual highLODParamsManual;
+
+			public static readonly SettingsLODClusters defaults = new SettingsLODClusters()
+			{
+				//initialSeed = 7,
+				clusterAllocation = ClusterAllocationPolicy.SplitBranching,
+				clusterAllocationOrder = ClusterAllocationOrder.ByHighestError,
+				clusterRefinement = true,
+				clusterRefinementIterations = 100,
+				clusterVoid = ClusterVoid.Preserve,
+
+				baseLOD = new BaseLOD
+				{
+					baseLOD = BaseLODMode.Generated,
+				},
+				baseLODParamsGenerated = new BaseLODParamsGenerated
+				{
+					baseLODClusterQuantity = 0.125f,
+				},
+				baseLODParamsUVMapped = new BaseLODParamsUVMapped
+				{
+					baseLODClusterFormat = BaseLODClusterMapFormat.OneClusterPerColor,
+				},
+
+				highLOD = new HighLOD
+				{
+					highLOD = true,
+				},
+				highLODParamsAutomatic = new HighLODParamsAutomatic
+				{
+					highLODClusterQuantity = 1.0f,
+					highLODClusterExpansion = 2.0f,
+				},
+				highLODParamsManual = new HighLODParamsManual
+				{
+					highLODClusterQuantities = new float[]
+					{
+						0.25f,
+						0.5f,
+						0.75f,
+						1.0f,
+					},
+				},
 			};
 		}
 
@@ -358,9 +413,7 @@ namespace Unity.DemoTeam.Hair
 		public SettingsBasic settingsBasic = SettingsBasic.defaults;
 		public SettingsAlembic settingsAlembic = SettingsAlembic.defaults;
 		public SettingsProcedural settingsProcedural = SettingsProcedural.defaults;
-		public SettingsLODGenerated settingsLODGenerated = SettingsLODGenerated.defaults;
-		public SettingsLODUVMapped settingsLODUVMapped = SettingsLODUVMapped.defaults;
-		public SettingsLODPyramid settingsLODPyramid = SettingsLODPyramid.defaults;
+		public SettingsLODClusters settingsLODClusters = SettingsLODClusters.defaults;
 
 		public StrandGroup[] strandGroups;
 		public bool strandGroupsAutoBuild;
@@ -423,7 +476,7 @@ namespace Unity.DemoTeam.Hair
 
 	public static class HairAssetUtility
 	{
-		public static void DeclareStrandIterator(HairAsset.MemoryLayout memoryLayout, int strandIndex, int strandCount, int strandParticleCount,
+		public static void DeclareStrandIterator(HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, int strandIndex,
 			out int strandParticleBegin,
 			out int strandParticleStride,
 			out int strandParticleEnd)
@@ -445,6 +498,17 @@ namespace Unity.DemoTeam.Hair
 			strandParticleEnd = strandParticleBegin + strandParticleStride * strandParticleCount;
 		}
 
+		public static void DeclareStrandIterator(in HairAsset.StrandGroup strandGroup, int strandIndex,
+			out int strandParticleBegin,
+			out int strandParticleStride,
+			out int strandParticleEnd)
+		{
+			DeclareStrandIterator(strandGroup.particleMemoryLayout, strandGroup.strandCount, strandGroup.strandParticleCount, strandIndex,
+				out strandParticleBegin,
+				out strandParticleStride,
+				out strandParticleEnd);
+		}
+
 		public static void DeclareParticleStride(HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount,
 			out int strandParticleOffset,
 			out int strandParticleStride)
@@ -462,6 +526,13 @@ namespace Unity.DemoTeam.Hair
 					strandParticleStride = strandCount;
 					break;
 			}
+		}
+
+		public static void DeclareParticleStride(in HairAsset.StrandGroup strandGroup, out int strandParticleOffset, out int strandParticleStride)
+		{
+			DeclareParticleStride(strandGroup.particleMemoryLayout, strandGroup.strandCount, strandGroup.strandParticleCount,
+				out strandParticleOffset,
+				out strandParticleStride);
 		}
 	}
 }
