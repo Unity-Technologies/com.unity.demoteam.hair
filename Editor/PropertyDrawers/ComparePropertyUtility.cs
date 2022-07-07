@@ -67,6 +67,10 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 			}
+			else if (attrib.cmpType == TypeCode.Boolean)
+			{
+				result = (bool)attrib.cmpValue;
+			}
 			return result;
 		}
 
