@@ -529,8 +529,16 @@ namespace Unity.DemoTeam.Hair
 						{
 							UnsafeUtility.MemCpyStride(stagingData.GetUnsafePtr(), sizeof(Vector4), sourcePtr, sizeof(Vector3), sizeof(Vector3), stagingData.Length);
 						}
+
 						previewData[i].particlePosition.SetData(stagingData);
 					}
+
+					previewData[i].lodGuideCount.SetData(strandGroup.lodGuideCount);
+					previewData[i].lodGuideIndex.SetData(strandGroup.lodGuideIndex);
+					previewData[i].lodGuideCarry.SetData(strandGroup.lodGuideCarry);
+					previewData[i].cbuffer._LODCount = (uint)strandGroup.lodCount;
+					previewData[i].cbuffer._LODIndexLo = previewData[i].cbuffer._LODCount - 1;
+					previewData[i].cbuffer._LODIndexHi = previewData[i].cbuffer._LODCount - 1;
 				}
 
 				var cmd = CommandBufferPool.Get();
