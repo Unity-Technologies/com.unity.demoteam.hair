@@ -63,10 +63,24 @@ float3 LoadPositionPrev(uint i)
 #endif
 }
 
+struct HairVertexWS
+{
+	float3 positionWS;
+	float3 positionWSPrev;
+	float3 normalWS;
+	float3 tangentWS;
+	float3 bitangentWS;
+	float2 rootUV;
+	float2 strandUV;
+	uint strandIndex;
+	float3 strandNormalTS;
+	float3 strandDebugColor;
+};
+
 struct HairVertex
 {
 	float3 positionOS;
-	float3 motionOS;
+	float3 positionOSPrev;
 	float3 normalOS;
 	float3 tangentOS;
 	float3 bitangentOS;
@@ -74,19 +88,30 @@ struct HairVertex
 	float2 strandUV;
 	uint strandIndex;
 	float3 strandNormalTS;
-	float3 debugColor;
+	float3 strandDebugColor;
 };
 
-float3 GetHairNormalTangentSpace(in float2 uv)
+float3 GetStrandNormalTangentSpace(in float2 strandVertexUV)
 {
-	float3 normalTS;
-	normalTS.x = 2.0 * saturate(uv.x) - 1.0;
-	normalTS.y = 0.0;
-	normalTS.z = sqrt(max(1e-5, 1.0 - normalTS.x * normalTS.x));
-	return normalTS;
+	float3 strandNormalTS;
+	{
+		strandNormalTS.x = 2.0 * saturate(strandVertexUV.x) - 1.0;
+		strandNormalTS.y = 0.0;
+		strandNormalTS.z = sqrt(max(1e-5, 1.0 - strandNormalTS.x * strandNormalTS.x));
+	}
+	return strandNormalTS;
 }
 
-HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
+float3 GetStrandDebugColor(in int strandIndex)
+{
+	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
+	uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
+	float3 strandColorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODCount - 1]);
+	float3 strandColorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODCount - 1]);
+	return lerp(strandColorLo, strandColorHi, _LODBlendFraction);
+}
+
+HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 {
 #if HAIR_VERTEX_ID_STRIPS
 	uint linearParticleIndex = vertexID >> 1;
@@ -121,32 +146,40 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 #else
 	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
 #endif
-
 	float3 vertexPositionWS = curvePositionRWS + vertexOffsetWS;
 	float3 vertexPositionWSPrev = curvePositionRWSPrev + vertexOffsetWS;
-	float3 vertexPositionOS = mul(UNITY_MATRIX_I_M, float4(vertexPositionWS, 1.0)).xyz;
-	float3 vertexPositionOSPrev = mul(UNITY_PREV_MATRIX_I_M, float4(vertexPositionWSPrev, 1.0)).xyz;
 
+	HairVertexWS x;
+	{
+		x.positionWS = vertexPositionWS;
+		x.positionWSPrev = vertexPositionWSPrev;
+		x.normalWS = vertexNormalWS;
+		x.tangentWS = vertexTangentWS;
+		x.bitangentWS = vertexBitangentWS;
+		x.rootUV = _RootUV[strandIndex];
+		x.strandUV = vertexUV * float2(1.0, _RootScale[strandIndex]);
+		x.strandIndex = strandIndex;
+		x.strandNormalTS = GetStrandNormalTangentSpace(vertexUV);
+		x.strandDebugColor = GetStrandDebugColor(strandIndex);
+	}
+	return x;
+}
+
+HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
+{
+	HairVertexWS x = GetHairVertexWS_Live(vertexID, vertexUV);
 	HairVertex v;
 	{
-		v.positionOS = vertexPositionOS;
-		v.motionOS = vertexPositionOS - vertexPositionOSPrev;
-		v.normalOS = TransformWorldToObjectNormal(vertexNormalWS);
-		v.tangentOS = TransformWorldToObjectNormal(vertexTangentWS);
-		v.bitangentOS = TransformWorldToObjectNormal(vertexBitangentWS);
-		v.rootUV = _RootUV[strandIndex];
-		v.strandUV = vertexUV * float2(1.0, _RootScale[strandIndex]);
-		v.strandIndex = strandIndex;
-		v.strandNormalTS = GetHairNormalTangentSpace(vertexUV);
-
-		uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
-		uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
-
-		float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODCount - 1]);
-		float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODCount - 1]);
-		float3 color = lerp(colorLo, colorHi, _LODBlendFraction);
-
-		v.debugColor = color;
+		v.positionOS = mul(UNITY_MATRIX_I_M, float4(x.positionWS, 1.0)).xyz;
+		v.positionOSPrev = mul(UNITY_PREV_MATRIX_I_M, float4(x.positionWSPrev, 1.0)).xyz;
+		v.normalOS = TransformWorldToObjectNormal(x.normalWS);
+		v.tangentOS = TransformWorldToObjectNormal(x.tangentWS);
+		v.bitangentOS = TransformWorldToObjectNormal(x.bitangentWS);
+		v.rootUV = x.rootUV;
+		v.strandUV = x.strandUV;
+		v.strandIndex = x.strandIndex;
+		v.strandNormalTS = x.strandNormalTS;
+		v.strandDebugColor = x.strandDebugColor;
 	}
 	return v;
 }
@@ -156,7 +189,7 @@ HairVertex GetHairVertex_Static(in float3 positionOS, in float3 normalOS, in flo
 	HairVertex v;
 	{
 		v.positionOS = positionOS;
-		v.motionOS = float3(0.0, 0.0, 0.0);
+		v.positionOSPrev = positionOS;
 		v.normalOS = normalOS;
 		v.tangentOS = tangentOS;
 		v.bitangentOS = normalize(cross(normalOS, tangentOS));
@@ -164,7 +197,7 @@ HairVertex GetHairVertex_Static(in float3 positionOS, in float3 normalOS, in flo
 		v.strandUV = float2(0.0, 0.0);
 		v.strandIndex = 0;
 		v.strandNormalTS = float3(0.0, 0.0, 1.0);
-		v.debugColor = float3(0.5, 0.5, 0.5);
+		v.strandDebugColor = float3(0.5, 0.5, 0.5);
 	}
 	return v;
 }
@@ -198,12 +231,12 @@ void HairVertex_float(
 	out float2 out_strandUV,
 	out uint out_strandIndex,
 	out float3 out_strandNormalTS,
-	out float3 out_debugColor)
+	out float3 out_strandDebugColor)
 {
 	HairVertex v = GetHairVertex(in_vertexID, in_vertexUV, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 	{
 		out_positionOS = v.positionOS;
-		out_motionOS = v.motionOS;
+		out_motionOS = v.positionOS - v.positionOSPrev;
 		out_normalOS = v.normalOS;
 		out_tangentOS = v.tangentOS;
 		out_bitangentOS = v.bitangentOS;
@@ -211,7 +244,7 @@ void HairVertex_float(
 		out_strandUV = v.strandUV;
 		out_strandIndex = v.strandIndex;
 		out_strandNormalTS = v.strandNormalTS;
-		out_debugColor = v.debugColor;
+		out_strandDebugColor = v.strandDebugColor;
 	}
 }
 

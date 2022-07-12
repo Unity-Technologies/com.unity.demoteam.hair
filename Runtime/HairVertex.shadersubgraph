@@ -354,7 +354,7 @@
             "m_Id": "181234521dc5453da262da540d05f1f8"
         },
         {
-            "m_Id": "408bb5c4bdea4990811e3d7a230a810f"
+            "m_Id": "0e8e08da07034845bc75c5f8d9a241a7"
         }
     ],
     "synonyms": [],
@@ -364,6 +364,29 @@
         "m_SerializableColors": []
     },
     "IsFirstSlotValid": true
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
+    "m_ObjectId": "0ad7927044d9423d927742156b16c5cc",
+    "m_Id": 17,
+    "m_DisplayName": "motionOS",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "motionOS",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_Labels": []
 }
 
 {
@@ -392,12 +415,12 @@
 {
     "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
-    "m_ObjectId": "138295b955a34e2199ee51f3bf097396",
-    "m_Id": 15,
-    "m_DisplayName": "staticTangent",
+    "m_ObjectId": "0e8e08da07034845bc75c5f8d9a241a7",
+    "m_Id": 7,
+    "m_DisplayName": "strandDebugColor",
     "m_SlotType": 0,
     "m_Hidden": false,
-    "m_ShaderOutputName": "staticTangent",
+    "m_ShaderOutputName": "strandDebugColor",
     "m_StageCapability": 3,
     "m_Value": {
         "x": 0.0,
@@ -415,12 +438,12 @@
 {
     "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
-    "m_ObjectId": "1547f3bbc4004d3b833333dc5cff6992",
-    "m_Id": 17,
-    "m_DisplayName": "motionOS",
-    "m_SlotType": 1,
+    "m_ObjectId": "138295b955a34e2199ee51f3bf097396",
+    "m_Id": 15,
+    "m_DisplayName": "staticTangent",
+    "m_SlotType": 0,
     "m_Hidden": false,
-    "m_ShaderOutputName": "motionOS",
+    "m_ShaderOutputName": "staticTangent",
     "m_StageCapability": 3,
     "m_Value": {
         "x": 0.0,
@@ -542,7 +565,7 @@
             "m_Id": "4963c9469232450581857b5d2717352b"
         },
         {
-            "m_Id": "1547f3bbc4004d3b833333dc5cff6992"
+            "m_Id": "0ad7927044d9423d927742156b16c5cc"
         },
         {
             "m_Id": "8b275a63fc60431d92917ab2733afbf4"
@@ -566,7 +589,7 @@
             "m_Id": "1942cbd6ef8f40d28e8a2e897ad2a545"
         },
         {
-            "m_Id": "f7286579a024417aac008d76821af96d"
+            "m_Id": "cba913fcf6094a09a5ee8678c45aa306"
         }
     ],
     "synonyms": [],
@@ -692,29 +715,6 @@
         "y": 0.0,
         "z": 0.0,
         "w": 0.0
-    },
-    "m_Labels": []
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
-    "m_ObjectId": "408bb5c4bdea4990811e3d7a230a810f",
-    "m_Id": 7,
-    "m_DisplayName": "debugColor",
-    "m_SlotType": 0,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "debugColor",
-    "m_StageCapability": 3,
-    "m_Value": {
-        "x": 0.0,
-        "y": 0.0,
-        "z": 0.0
-    },
-    "m_DefaultValue": {
-        "x": 0.0,
-        "y": 0.0,
-        "z": 0.0
     },
     "m_Labels": []
 }
@@ -1194,6 +1194,29 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
+    "m_ObjectId": "cba913fcf6094a09a5ee8678c45aa306",
+    "m_Id": 9,
+    "m_DisplayName": "strandDebugColor",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "strandDebugColor",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector2MaterialSlot",
     "m_ObjectId": "cfdd09ee92b64c52a444c6dbfbfab079",
     "m_Id": 5,
@@ -1296,29 +1319,6 @@
         "m_SerializableColors": []
     },
     "m_Space": 0
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
-    "m_ObjectId": "f7286579a024417aac008d76821af96d",
-    "m_Id": 9,
-    "m_DisplayName": "debugColor",
-    "m_SlotType": 1,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "debugColor",
-    "m_StageCapability": 3,
-    "m_Value": {
-        "x": 0.0,
-        "y": 0.0,
-        "z": 0.0
-    },
-    "m_DefaultValue": {
-        "x": 0.0,
-        "y": 0.0,
-        "z": 0.0
-    },
-    "m_Labels": []
 }
 
 {

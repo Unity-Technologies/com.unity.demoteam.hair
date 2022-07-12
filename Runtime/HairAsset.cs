@@ -244,13 +244,13 @@ namespace Unity.DemoTeam.Hair
 			//public int initialSeed;
 			[Tooltip("Cluster policy to apply to empty clusters")]
 			public ClusterVoid clusterVoid;
-			[Tooltip("Cluster allocation policy (where Global == allocate and iterate within full set, Split Global == allocate within select cluster but iterate within full set, and Split Branching == allocate and iterate solely within split cluster)")]
+			[Tooltip("Cluster allocation policy (where Global == Allocate and iterate within full set, Split Global == Allocate within select cluster but iterate within full set, Split Branching == Allocate and iterate solely within split cluster)")]
 			public ClusterAllocationPolicy clusterAllocation;
 			[VisibleIf(nameof(clusterAllocation), CompareOp.Neq, ClusterAllocationPolicy.Global), Tooltip("Cluster allocation order for split-type policies (decides the order in which existing clusters are selected to be split into smaller clusters)")]
 			public ClusterAllocationOrder clusterAllocationOrder;
-			[ToggleGroup, Tooltip("Enable refinement by k-means cluster iteration")]
+			[ToggleGroup, Tooltip("Enable cluster refinement by k-means iteration")]
 			public bool clusterRefinement;
-			[ToggleGroupItem, Range(1, 200), Tooltip("Number of k-means iterations (upper bound)")]
+			[ToggleGroupItem, Range(1, 200), Tooltip("Number of k-means iterations (upper bound, may finish earlier)")]
 			public int clusterRefinementIterations;
 
 			public enum BaseLODMode
@@ -270,7 +270,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				[LineHeader("Base LOD")]
 
-				[Tooltip("Choose how to build lower level clusters")]
+				[Tooltip("Choose build path for the lower level clusters (where Generated == Intialize witk k-means++, UV Mapped == Import from cluster maps")]
 				public BaseLODMode baseLOD;
 			}
 
@@ -301,9 +301,9 @@ namespace Unity.DemoTeam.Hair
 			{
 				[LineHeader("High LOD")]
 
-				[ToggleGroup, Tooltip("Enable high level clusters (generated from lower level clusters)")]
+				[ToggleGroup, Tooltip("Enable upper level clusters (will be built using lower level clusters as basis)")]
 				public bool highLOD;
-				[ToggleGroupItem]
+				[ToggleGroupItem, Tooltip("Choose build path for the upper level clusters")]
 				public HighLODMode highLODMode;
 			}
 
@@ -312,7 +312,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands")]
 				public float highLODClusterQuantity;
-				[Range(1.1f, 8.0f), Tooltip("Upper bound for multiplier acting on number of clusters per level incremenent")]
+				[Range(1.2f, 8.0f), Tooltip("Upper bound on multiplier for number of clusters per level incremenent")]
 				public float highLODClusterExpansion;
 			}
 
@@ -334,11 +334,11 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SettingsLODClusters defaults = new SettingsLODClusters()
 			{
 				//initialSeed = 7,
+				clusterVoid = ClusterVoid.Preserve,
 				clusterAllocation = ClusterAllocationPolicy.SplitBranching,
 				clusterAllocationOrder = ClusterAllocationOrder.ByHighestError,
 				clusterRefinement = true,
 				clusterRefinementIterations = 100,
-				clusterVoid = ClusterVoid.Preserve,
 
 				baseLOD = new BaseLOD
 				{
@@ -346,7 +346,7 @@ namespace Unity.DemoTeam.Hair
 				},
 				baseLODParamsGenerated = new BaseLODParamsGenerated
 				{
-					baseLODClusterQuantity = 0.125f,
+					baseLODClusterQuantity = 0.0f,
 				},
 				baseLODParamsUVMapped = new BaseLODParamsUVMapped
 				{
@@ -443,8 +443,8 @@ namespace Unity.DemoTeam.Hair
 								strandGroup.lodGuideIndex[i] = i;
 							}
 
-							strandGroup.version = 1;
 						}
+						strandGroup.version = 1;
 						return true;
 
 					// 1->2: add LOD guide carry
@@ -456,9 +456,8 @@ namespace Unity.DemoTeam.Hair
 							{
 								strandGroup.lodGuideCarry[i] = 1.0f;
 							}
-
-							strandGroup.version = 2;
 						}
+						strandGroup.version = 2;
 						return true;
 
 					// done

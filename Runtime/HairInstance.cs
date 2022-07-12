@@ -122,16 +122,16 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsSystem
 		{
+			public enum BoundsMode
+			{
+				Automatic,
+				Fixed,
+			}
+
 			public enum LODSelection
 			{
 				Automatic,//TODO
 				Fixed,
-			}
-
-			public enum BoundsMode
-			{
-				Automatic,
-				Fixed,//TODO
 			}
 
 			public enum StrandRenderer
@@ -139,6 +139,7 @@ namespace Unity.DemoTeam.Hair
 				Disabled,
 				BuiltinLines,
 				BuiltinStrips,
+				//HDRPHairRenderer,
 			}
 
 			public enum SimulationRate
@@ -148,13 +149,6 @@ namespace Unity.DemoTeam.Hair
 				Fixed120Hz,
 				CustomTimeStep,
 			}
-
-			[LineHeader("LOD")]
-
-			public LODSelection kLODSearch;
-			[Range(0.0f, 1.0f)]
-			public float kLODSearchValue;
-			public bool kLODBlending;
 
 			[LineHeader("Bounds")]
 
@@ -167,6 +161,13 @@ namespace Unity.DemoTeam.Hair
 			public bool boundsScale;
 			[ToggleGroupItem, Range(0.0f, 2.0f)]
 			public float boundsScaleValue;
+
+			[LineHeader("LOD")]
+
+			public LODSelection kLODSearch;
+			[Range(0.0f, 1.0f)]
+			public float kLODSearchValue;
+			public bool kLODBlending;
 
 			[LineHeader("Renderer")]
 
@@ -197,15 +198,15 @@ namespace Unity.DemoTeam.Hair
 
 			public static readonly SettingsSystem defaults = new SettingsSystem()
 			{
-				kLODSearch = LODSelection.Fixed,
-				kLODSearchValue = 1.0f,
-				kLODBlending = false,
-
 				boundsMode = BoundsMode.Automatic,
 				boundsCenter = new Vector3(0.0f, 0.0f, 0.0f),
 				boundsExtent = new Vector3(1.0f, 1.0f, 1.0f),
 				boundsScale = false,
 				boundsScaleValue = 1.25f,
+
+				kLODSearch = LODSelection.Fixed,
+				kLODSearchValue = 1.0f,
+				kLODBlending = false,
 
 				strandRenderer = StrandRenderer.BuiltinLines,
 				strandShadows = ShadowCastingMode.On,
@@ -333,11 +334,11 @@ namespace Unity.DemoTeam.Hair
 		public GroupSettings[] strandGroupSettings;
 		public GroupSettings strandGroupDefaults = GroupSettings.defaults;
 
-		public SettingsSystem settingsSystem = SettingsSystem.defaults;                 // per instance
+		public SettingsSystem settingsSystem = SettingsSystem.defaults;					// per instance
 		[FormerlySerializedAs("volumeSettings")]
-		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults; // per instance
+		public HairSim.VolumeSettings settingsVolume = HairSim.VolumeSettings.defaults;	// per instance
 		[FormerlySerializedAs("debugSettings")]
-		public HairSim.DebugSettings settingsDebug = HairSim.DebugSettings.defaults;    // per instance
+		public HairSim.DebugSettings settingsDebug = HairSim.DebugSettings.defaults;	// per instance
 
 		[NonSerialized] public HairSim.SolverData[] solverData; // per group
 		[NonSerialized] public HairSim.VolumeData volumeData;	// per instance
@@ -971,7 +972,7 @@ namespace Unity.DemoTeam.Hair
 					break;
 			}
 
-			//TODO tighten renderer bounds
+			//TODO trim renderer bounds
 			//meshFilter.sharedMesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
 			if (meshFilter.sharedMesh != null)
 				meshFilter.sharedMesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);

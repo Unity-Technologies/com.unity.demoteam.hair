@@ -1137,10 +1137,10 @@
     "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
     "m_ObjectId": "e4ebd0e8a36f4b0280e0fec77482b074",
     "m_Id": 7,
-    "m_DisplayName": "debugColor",
+    "m_DisplayName": "strandDebugColor",
     "m_SlotType": 1,
     "m_Hidden": false,
-    "m_ShaderOutputName": "debugColor",
+    "m_ShaderOutputName": "strandDebugColor",
     "m_StageCapability": 3,
     "m_Value": {
         "x": 0.0,

@@ -60,7 +60,7 @@ Shader "Hair/Default/HairMaterialDefaultUnlit"
 				{
 					StrandVaryings OUT;
 					OUT.positionCS = TransformObjectToHClip(hair.positionOS);
-					OUT.strandColor = ColorCycle(hair.strandIndex, _StrandCount);
+					OUT.strandColor = hair.strandDebugColor;
 					OUT.strandUV = hair.strandUV;
 					return OUT;
 				}

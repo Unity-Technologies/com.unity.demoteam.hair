@@ -125,13 +125,13 @@ float3 GetVolumeImpulse(float3 x0, float3 v0)
 	float3 volumeUVW = VolumeWorldToUVW(x0);
 	float3 volumeImpulse = 0.0;
 
-	// apply cell pressure
+	// add cell pressure
 	if (_CellPressure > 0.0)
 	{
 		volumeImpulse += _CellPressure * -VolumeSampleVector(_VolumePressureGrad, volumeUVW);
 	}
 
-	// apply cell velocity
+	// add cell velocity
 	if (_CellVelocity > 0.0)
 	{
 #if SPLAT_TRILINEAR

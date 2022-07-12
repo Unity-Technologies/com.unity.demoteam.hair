@@ -76,7 +76,7 @@ Shader "Hair/Default/HairMaterialDefaultLitBuiltin"
 
 				UNITY_INITIALIZE_OUTPUT(Input, o);
 				o.strandTangentWS = TransformObjectToWorldNormal(hair.tangentOS);
-				o.strandColor = hair.debugColor;
+				o.strandColor = hair.strandDebugColor;
 				o.strandUV = hair.strandUV;
 			}
 #else
@@ -89,7 +89,7 @@ Shader "Hair/Default/HairMaterialDefaultLitBuiltin"
 		void StrandSurf(Input IN, inout SurfaceOutput o)
 		{
 #ifdef SHADER_API_D3D11
-			float3 normalTS = GetHairNormalTangentSpace(IN.strandUV);
+			float3 normalTS = GetStrandNormalTangentSpace(IN.strandUV);
 #else
 			float3 normalTS = float3(0.0, 0.0, 1.0);
 #endif
