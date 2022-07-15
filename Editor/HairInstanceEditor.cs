@@ -112,6 +112,15 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUISystem(object userData)
 		{
+			//TODO remove when automatic LOD selection is implemented
+			var hairInstance = userData as HairInstance;
+			{
+				if (hairInstance.settingsSystem.kLODSearch == HairInstance.SettingsSystem.LODSelection.Automatic)
+				{
+					EditorGUILayout.HelpBox("Configuration warning: Automatic LOD selection not yet implemented.", MessageType.Warning, wide: true);
+				}
+			}
+
 			return StructValidation.Pass;
 		}
 

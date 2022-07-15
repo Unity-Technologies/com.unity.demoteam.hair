@@ -273,7 +273,7 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Proportions")]
 
 			public StrandScale strandScale;
-			[Range(0.070f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
+			[Range(0.01f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
 			public float strandDiameter;
 			[Range(0.0f, 100.0f), Tooltip("Strand margin (in millimeters)")]
 			public float strandMargin;

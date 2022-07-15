@@ -400,7 +400,7 @@ namespace Unity.DemoTeam.Hair
 			[NonReorderable] public int[] lodGuideCount;	// n: lod index -> num. guides
 			[HideInInspector] public int[] lodGuideIndex;	// i: lod index * strand count + strand index -> guide index
 			[HideInInspector] public float[] lodGuideCarry;	// f: lod index * strand count + strand index -> guide carry
-			[HideInInspector] public float[] lodThreshold;	// f: lod index -> relative guide count [0..1] (to maximum lod in group)
+			[HideInInspector] public float[] lodThreshold;	// f: lod index -> relative guide count [0..1]
 
 			[HideInInspector] public Mesh meshAssetRoots;
 			[HideInInspector] public Mesh meshAssetLines;

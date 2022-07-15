@@ -47,10 +47,10 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer lodGuideCarry;			// f: lod index * strand count + strand index -> guide carry
 
 			public NativeArray<int> lodGuideCountCPU;	// n: lod index -> num. guides
-			public NativeArray<float> lodThreshold;		// f: lod index -> relative guide count [0..1] (to maximum lod in group)
+			public NativeArray<float> lodThreshold;		// f: lod index -> relative guide count [0..1]
 
 			public ComputeBuffer stagingPosition;		// xy: encoded position | xyz: position
-			public ComputeBuffer stagingPositionPrev;   // ...
+			public ComputeBuffer stagingPositionPrev;	// ...
 
 			public HairAsset.MemoryLayout memoryLayout;
 		}
