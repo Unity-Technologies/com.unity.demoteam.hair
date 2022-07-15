@@ -1195,6 +1195,10 @@ namespace Unity.DemoTeam.Hair
 										//TODO intuitively, the reduced error can be expressed as the approximate half-radius of one of the smaller clusters
 										//TODO find the approximate radius of the smaller clusters
 										approxError /= (2 + (uint)splitCountPtr[k]);
+										if (c <= 2)
+										{
+											approxError = 0;// zero sort key (to effectively push to back) if this is the last free sample
+										}
 									}
 
 									splitKeysPtr[0] &= 0xffffffffuL;
@@ -1235,6 +1239,10 @@ namespace Unity.DemoTeam.Hair
 									var approxTally = (uint)dataDesc.clusterTallyPtr[k];
 									{
 										approxTally /= (2 + (uint)splitCountPtr[k]);
+										if (c <= 2)
+										{
+											approxTally = 0;// zero sort key (to effectively push to back) if this is the last free sample
+										}
 									}
 
 									splitKeysPtr[0] &= 0xffffffffuL;
