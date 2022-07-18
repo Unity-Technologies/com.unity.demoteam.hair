@@ -900,7 +900,7 @@ namespace Unity.DemoTeam.Hair
 					if (attachment == null)
 					{
 						var container = strandGroupInstance.sceneObjects.rootMeshContainer;
-						if (container != null)
+						if (container != null && container.TryGetComponent(out attachment) == false)
 						{
 							attachment = strandGroupInstances[i].sceneObjects.rootMeshAttachment = HairInstanceBuilder.CreateComponent<SkinAttachment>(container, container.hideFlags);
 							attachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
@@ -1124,7 +1124,7 @@ namespace Unity.DemoTeam.Hair
 				if (meshRendererHDRP == null)
 				{
 					var container = strandGroupInstance.sceneObjects.strandMeshContainer;
-					if (container != null)
+					if (container != null && container.TryGetComponent(out meshRendererHDRP) == false)
 					{
 						meshRendererHDRP = strandGroupInstance.sceneObjects.strandMeshRendererHDRP = HairInstanceBuilder.CreateComponent<HairRenderer>(container, container.hideFlags);
 					}
