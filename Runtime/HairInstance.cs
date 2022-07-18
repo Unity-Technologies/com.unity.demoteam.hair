@@ -432,14 +432,87 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		private HashSet<SkinAttachmentTarget> preqGPUAttachmentTargets = new HashSet<SkinAttachmentTarget>();
+		private Hash128 preqGPUAttachmentTargetsHash = new Hash128();
+		private int preqCountdown = 1;
+
+		void UpdatePrerequisite()
+		{
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2
+			var hash = new Hash128();
+			{
+				for (int i = 0; i != strandGroupInstances.Length; i++)
+				{
+					ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
+					if (settingsSkinning.rootsAttach)
+					{
+						var attachmentTarget = settingsSkinning.rootsAttachTarget;
+						if (attachmentTarget != null && attachmentTarget.isActiveAndEnabled && attachmentTarget.executeOnGPU)
+						{
+							hash.Append(attachmentTarget.GetInstanceID());
+						}
+					}
+				}
+			}
+
+			if (hash != preqGPUAttachmentTargetsHash)
+			{
+				foreach (var preq in preqGPUAttachmentTargets)
+				{
+					preq.afterGPUAttachmentWorkCommitted -= HandlePrerequisite;
+				}
+
+				preqGPUAttachmentTargets.Clear();
+				preqGPUAttachmentTargetsHash = hash;
+
+				for (int i = 0; i != strandGroupInstances.Length; i++)
+				{
+					ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
+					if (settingsSkinning.rootsAttach)
+					{
+						var attachmentTarget = settingsSkinning.rootsAttachTarget;
+						if (attachmentTarget != null && attachmentTarget.isActiveAndEnabled && attachmentTarget.executeOnGPU)
+						{
+							preqGPUAttachmentTargets.Add(attachmentTarget);
+						}
+					}
+				}
+
+				foreach (var preq in preqGPUAttachmentTargets)
+				{
+					preq.afterGPUAttachmentWorkCommitted += HandlePrerequisite;
+				}
+			}
+#else
+			preqGPUAttachmentTargets.Clear();
+			preqGPUAttachmentTargetsHash = new Hash128();
+#endif
+
+			preqCountdown = preqGPUAttachmentTargets.Count + 1;
+		}
+
+		void HandlePrerequisite()
+		{
+			if (--preqCountdown == 0)
+			{
+				LateUpdateInternal();
+			}
+		}
+
 		void Update()
 		{
 			UpdateStrandGroupInstances();
 			UpdateStrandGroupSettings();
 			UpdateAttachedState();
+			UpdatePrerequisite();
 		}
 
 		void LateUpdate()
+		{
+			HandlePrerequisite();
+		}
+
+		void LateUpdateInternal()
 		{
 			var cmd = CommandBufferPool.Get();
 			{
