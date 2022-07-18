@@ -531,7 +531,7 @@ void KUpdateRoots(
 
 #if 1// perturb the initial frame
 	float3 rootDirInitial = QMul(_InitialRootFrame[strandIndex], float3(0.0, 1.0, 0.0));
-	float3 rootDirCurrent = attribs.normalOS;
+	float3 rootDirCurrent = normalOS;
 	float4 rootDirPerturb = MakeQuaternionFromTo(rootDirInitial, rootDirCurrent);
 	_RootFrame[strandIndex] = normalize(QMul(_WorldRotation, QMul(rootDirPerturb, _InitialRootFrame[strandIndex])));
 #else
