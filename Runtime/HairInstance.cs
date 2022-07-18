@@ -10,6 +10,10 @@ using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
+#if HAS_PACKAGE_UNITY_HDRP
+using UnityEngine.Rendering.HighDefinition;
+#endif
+
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 using Unity.DemoTeam.DigitalHuman;
 #endif
@@ -76,6 +80,9 @@ namespace Unity.DemoTeam.Hair
 				public GameObject strandMeshContainer;
 				public MeshFilter strandMeshFilter;
 				public MeshRenderer strandMeshRenderer;
+#if HAS_PACKAGE_UNITY_HDRP_15
+				public HairRenderer strandMeshRendererHDRP;
+#endif
 
 				[NonSerialized] public Material materialInstance;
 				[NonSerialized] public Mesh meshInstanceLines;
@@ -141,7 +148,7 @@ namespace Unity.DemoTeam.Hair
 				Disabled,
 				BuiltinLines,
 				BuiltinStrips,
-				//HDRPHairRenderer,
+				HDRPHairRenderer,
 			}
 
 			public enum SimulationRate
@@ -174,6 +181,10 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Renderer")]
 
 			public StrandRenderer strandRenderer;
+#if HAS_PACKAGE_UNITY_HDRP_15
+			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHairRenderer)]
+			public HairRasterizationMode strandRendererMode;
+#endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
 			public int strandLayers;
@@ -237,7 +248,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem]
 			public SkinAttachmentTarget rootsAttachTarget;
 			[HideInInspector]
-			public PrimarySkinningBone rootsAttachTargetBone;//TODO move to StrandGroupInstance?
+			public PrimarySkinningBone rootsAttachTargetBone;
 #endif
 
 			public static readonly SettingsSkinning defaults = new SettingsSkinning()
@@ -443,15 +454,18 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2
 			var hash = new Hash128();
 			{
-				for (int i = 0; i != strandGroupInstances.Length; i++)
+				if (strandGroupInstances != null)
 				{
-					ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
-					if (settingsSkinning.rootsAttach)
+					for (int i = 0; i != strandGroupInstances.Length; i++)
 					{
-						var attachmentTarget = settingsSkinning.rootsAttachTarget;
-						if (attachmentTarget != null && attachmentTarget.isActiveAndEnabled && attachmentTarget.executeOnGPU)
+						ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
+						if (settingsSkinning.rootsAttach)
 						{
-							hash.Append(attachmentTarget.GetInstanceID());
+							var attachmentTarget = settingsSkinning.rootsAttachTarget;
+							if (attachmentTarget != null && attachmentTarget.isActiveAndEnabled && attachmentTarget.executeOnGPU)
+							{
+								hash.Append(attachmentTarget.GetInstanceID());
+							}
 						}
 					}
 				}
@@ -467,15 +481,18 @@ namespace Unity.DemoTeam.Hair
 				preqGPUAttachmentTargets.Clear();
 				preqGPUAttachmentTargetsHash = hash;
 
-				for (int i = 0; i != strandGroupInstances.Length; i++)
+				if (strandGroupInstances != null)
 				{
-					ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
-					if (settingsSkinning.rootsAttach)
+					for (int i = 0; i != strandGroupInstances.Length; i++)
 					{
-						var attachmentTarget = settingsSkinning.rootsAttachTarget;
-						if (attachmentTarget != null && attachmentTarget.isActiveAndEnabled && attachmentTarget.executeOnGPU)
+						ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
+						if (settingsSkinning.rootsAttach)
 						{
-							preqGPUAttachmentTargets.Add(attachmentTarget);
+							var attachmentTarget = settingsSkinning.rootsAttachTarget;
+							if (attachmentTarget != null && attachmentTarget.isActiveAndEnabled && attachmentTarget.executeOnGPU)
+							{
+								preqGPUAttachmentTargets.Add(attachmentTarget);
+							}
 						}
 					}
 				}
@@ -871,6 +888,17 @@ namespace Unity.DemoTeam.Hair
 					ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstance);
 
 					var attachment = strandGroupInstance.sceneObjects.rootMeshAttachment;
+					if (attachment == null)
+					{
+						var container = strandGroupInstance.sceneObjects.rootMeshContainer;
+						if (container != null)
+						{
+							attachment = strandGroupInstances[i].sceneObjects.rootMeshAttachment = HairInstanceBuilder.CreateComponent<SkinAttachment>(container, container.hideFlags);
+							attachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
+							attachment.forceRecalculateBounds = true;
+						}
+					}
+
 					if (attachment != null && (attachment.target != settingsSkinning.rootsAttachTarget || attachment.attached != settingsSkinning.rootsAttach))
 					{
 						attachment.target = settingsSkinning.rootsAttachTarget;
@@ -969,16 +997,7 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				switch (settingsSystem.strandRenderer)
-				{
-					case SettingsSystem.StrandRenderer.Disabled:
-					case SettingsSystem.StrandRenderer.BuiltinLines:
-					case SettingsSystem.StrandRenderer.BuiltinStrips:
-						{
-							UpdateRendererStateBuiltin(ref strandGroupInstances[i], solverData[i]);
-						}
-						break;
-				}
+				UpdateRendererState(ref strandGroupInstances[i], solverData[i]);
 			}
 
 			// fire event
@@ -986,114 +1005,170 @@ namespace Unity.DemoTeam.Hair
 				onRenderingStateChanged(cmd);
 		}
 
-		void UpdateRendererStateBuiltin(ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData)
+		void UpdateRendererState(ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData)
 		{
 			ref readonly var settingsStrands = ref GetSettingsStrands(strandGroupInstance);
 
-			ref var meshFilter = ref strandGroupInstance.sceneObjects.strandMeshFilter;
-			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandMeshRenderer;
-
+			// update material instance
 			ref var materialInstance = ref strandGroupInstance.sceneObjects.materialInstance;
-			ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
-			ref var meshInstanceStrips = ref strandGroupInstance.sceneObjects.meshInstanceStrips;
-
-			var subdivisionCount = solverData.cbuffer._StagingSubdivision;
-			if (subdivisionCount != strandGroupInstance.sceneObjects.meshInstanceSubdivisionCount)
 			{
-				strandGroupInstance.sceneObjects.meshInstanceSubdivisionCount = subdivisionCount;
-
-				CoreUtils.Destroy(meshInstanceLines);
-				CoreUtils.Destroy(meshInstanceStrips);
-			}
-
-			switch (settingsSystem.strandRenderer)
-			{
-				case SettingsSystem.StrandRenderer.Disabled:
-					{
-						meshFilter.sharedMesh = null;
-					}
-					break;
-
-				case SettingsSystem.StrandRenderer.BuiltinLines:
-					{
-						if (subdivisionCount == 0)
-						{
-							HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroupInstance.groupAssetReference.Resolve().meshAssetLines, HideFlags.HideAndDontSave);
-						}
-						else
-						{
-							HairInstanceBuilder.CreateMeshLinesIfNull(ref meshInstanceLines, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
-						}
-
-						if (meshFilter.sharedMesh != meshInstanceLines)
-							meshFilter.sharedMesh = meshInstanceLines;
-					}
-					break;
-
-				case SettingsSystem.StrandRenderer.BuiltinStrips:
-					{
-						if (subdivisionCount == 0)
-						{
-							HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, strandGroupInstance.groupAssetReference.Resolve().meshAssetStrips, HideFlags.HideAndDontSave);
-						}
-						else
-						{
-							HairInstanceBuilder.CreateMeshStripsIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
-						}
-
-						if (meshFilter.sharedMesh != meshInstanceStrips)
-							meshFilter.sharedMesh = meshInstanceStrips;
-					}
-					break;
-			}
-
-			//TODO trim renderer bounds
-			//meshFilter.sharedMesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
-			if (meshFilter.sharedMesh != null)
-				meshFilter.sharedMesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
-
-			var materialAsset = GetStrandMaterial(strandGroupInstance);
-			if (materialAsset != null)
-			{
-				if (materialInstance == null)
+				var materialAsset = GetStrandMaterial(strandGroupInstance);
+				if (materialAsset != null)
 				{
-					materialInstance = new Material(materialAsset);
-					materialInstance.name += "(Instance)";
-					materialInstance.hideFlags = HideFlags.HideAndDontSave;
+					if (materialInstance == null)
+					{
+						materialInstance = new Material(materialAsset);
+						materialInstance.name += "(Instance)";
+						materialInstance.hideFlags = HideFlags.HideAndDontSave;
+					}
+					else
+					{
+						if (materialInstance.shader != materialAsset.shader)
+							materialInstance.shader = materialAsset.shader;
+
+						materialInstance.CopyPropertiesFromMaterial(materialAsset);
+					}
 				}
-				else
-				{
-					if (materialInstance.shader != materialAsset.shader)
-						materialInstance.shader = materialAsset.shader;
 
-					materialInstance.CopyPropertiesFromMaterial(materialAsset);
+				if (materialInstance != null)
+				{
+					HairSim.BindSolverData(materialInstance, solverData);
+					HairSim.BindVolumeData(materialInstance, volumeData);
+
+					materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
+					materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
+					materialInstance.SetTexture("_UntypedVolumeStrandCountProbe", volumeData.volumeStrandCountProbe);
+
+					CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines || settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHairRenderer);
+					CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
+
+					CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
+					CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
 				}
 			}
 
-			if (materialInstance != null)
+			// update mesh instance
+			var meshInstance = null as Mesh;
 			{
-				meshRenderer.enabled = true;
-				meshRenderer.sharedMaterial = materialInstance;
-				meshRenderer.shadowCastingMode = settingsSystem.strandShadows;
-				meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
-				meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
+				ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
+				ref var meshInstanceStrips = ref strandGroupInstance.sceneObjects.meshInstanceStrips;
 
-				HairSim.BindSolverData(materialInstance, solverData);
-				HairSim.BindVolumeData(materialInstance, volumeData);
+				var subdivisionCount = solverData.cbuffer._StagingSubdivision;
+				if (subdivisionCount != strandGroupInstance.sceneObjects.meshInstanceSubdivisionCount)
+				{
+					strandGroupInstance.sceneObjects.meshInstanceSubdivisionCount = subdivisionCount;
 
-				materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
-				materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
-				materialInstance.SetTexture("_UntypedVolumeStrandCountProbe", volumeData.volumeStrandCountProbe);
+					CoreUtils.Destroy(meshInstanceLines);
+					CoreUtils.Destroy(meshInstanceStrips);
+				}
 
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines);
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
+				switch (settingsSystem.strandRenderer)
+				{
+					case SettingsSystem.StrandRenderer.Disabled:
+						{
+							meshInstance = null;
+						}
+						break;
 
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
-				CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
+					case SettingsSystem.StrandRenderer.HDRPHairRenderer:
+					case SettingsSystem.StrandRenderer.BuiltinLines:
+						{
+							if (subdivisionCount == 0)
+								HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroupInstance.groupAssetReference.Resolve().meshAssetLines, HideFlags.HideAndDontSave);
+							else
+								HairInstanceBuilder.CreateMeshLinesIfNull(ref meshInstanceLines, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+
+							meshInstance = meshInstanceLines;
+						}
+						break;
+
+					case SettingsSystem.StrandRenderer.BuiltinStrips:
+						{
+							if (subdivisionCount == 0)
+								HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, strandGroupInstance.groupAssetReference.Resolve().meshAssetStrips, HideFlags.HideAndDontSave);
+							else
+								HairInstanceBuilder.CreateMeshStripsIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+
+							meshInstance = meshInstanceStrips;
+						}
+						break;
+				}
 			}
-			else
+
+			// update mesh filter
+			ref var meshFilter = ref strandGroupInstance.sceneObjects.strandMeshFilter;
 			{
-				meshRenderer.enabled = false;
+				if (meshFilter.sharedMesh != meshInstance)
+					meshFilter.sharedMesh = meshInstance;
+
+				//TODO better renderer bounds
+				//meshFilter.sharedMesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
+				if (meshFilter.sharedMesh != null)
+					meshFilter.sharedMesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
+			}
+
+			// update mesh renderer
+			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandMeshRenderer;
+#if HAS_PACKAGE_UNITY_HDRP_15
+			ref var meshRendererHDRP = ref strandGroupInstance.sceneObjects.strandMeshRendererHDRP;
+			{
+				if (meshRendererHDRP == null)
+				{
+					var container = strandGroupInstance.sceneObjects.strandMeshContainer;
+					if (container != null)
+					{
+						meshRendererHDRP = strandGroupInstance.sceneObjects.strandMeshRendererHDRP = HairInstanceBuilder.CreateComponent<HairRenderer>(container, container.hideFlags);
+					}
+				}
+			}
+#endif
+			{
+				var meshRendererEnabled = false;
+#if HAS_PACKAGE_UNITY_HDRP_15
+				var meshRendererHDRPEnabled = false;
+#endif
+
+				switch (settingsSystem.strandRenderer)
+				{
+#if !HAS_PACKAGE_UNITY_HDRP_15
+					case SettingsSystem.StrandRenderer.HDRPHairRenderer:
+#endif
+					case SettingsSystem.StrandRenderer.BuiltinLines:
+					case SettingsSystem.StrandRenderer.BuiltinStrips:
+						{
+							meshRenderer.enabled = meshRendererEnabled = true;
+							meshRenderer.sharedMaterial = materialInstance;
+							meshRenderer.shadowCastingMode = settingsSystem.strandShadows;
+							meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
+							meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
+						}
+						break;
+
+#if HAS_PACKAGE_UNITY_HDRP_15
+					case SettingsSystem.StrandRenderer.HDRPHairRenderer:
+						{
+							meshRendererHDRP.enabled = meshRendererHDRPEnabled = true;
+							meshRendererHDRP.mesh = meshInstance;
+							meshRendererHDRP.material = materialInstance;
+							meshRendererHDRP.rasterMode = settingsSystem.strandRendererMode;
+							meshRendererHDRP.shadowCastingMode = settingsSystem.strandShadows;
+							meshRendererHDRP.renderingLayerMask = (uint)settingsSystem.strandLayers;
+							meshRendererHDRP.motionVectorMode = settingsSystem.motionVectors;
+						}
+						break;
+#endif
+				}
+
+				if (meshRendererEnabled == false)
+					meshRenderer.enabled = false;
+
+#if HAS_PACKAGE_UNITY_HDRP_15
+				if (meshRendererHDRPEnabled == false)
+				{
+					meshRendererHDRP.enabled = false;
+					meshRendererHDRP.shadowCastingMode = ShadowCastingMode.Off;
+				}
+#endif
 			}
 		}
 

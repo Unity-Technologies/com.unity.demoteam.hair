@@ -119,6 +119,20 @@ namespace Unity.DemoTeam.Hair
 				{
 					EditorGUILayout.HelpBox("Configuration warning: Automatic LOD selection not yet implemented.", MessageType.Warning, wide: true);
 				}
+
+				if (hairInstance.settingsSystem.strandRenderer == HairInstance.SettingsSystem.StrandRenderer.HDRPHairRenderer)
+				{
+#if HAS_PACKAGE_UNITY_HDRP_15
+					var strandGroupInstances = hairInstance.strandGroupInstances;
+					if (strandGroupInstances != null)
+					{
+						//TODO warn when at least one assigned material is not a valid hair material
+						//see HairRenderer.IsHairMaterial(...)
+					}
+#else
+					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' requires package: 'com.unity.render-pipelines.high-definition >= 15.0.0'. Using '{1}' as fallback.", HairInstance.SettingsSystem.StrandRenderer.HDRPHairRenderer, HairInstance.SettingsSystem.StrandRenderer.BuiltinLines), MessageType.Warning, wide: true);
+#endif
+				}
 			}
 
 			return StructValidation.Pass;

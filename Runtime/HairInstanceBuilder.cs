@@ -114,6 +114,10 @@ namespace Unity.DemoTeam.Hair
 					{
 						strandGroupInstance.sceneObjects.strandMeshFilter = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
 						strandGroupInstance.sceneObjects.strandMeshRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
+
+#if HAS_PACKAGE_UNITY_HDRP_15
+						strandGroupInstance.sceneObjects.strandMeshRendererHDRP = CreateComponent<HairRenderer>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
+#endif
 					}
 				}
 

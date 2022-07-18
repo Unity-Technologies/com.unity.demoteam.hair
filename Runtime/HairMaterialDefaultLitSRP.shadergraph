@@ -1129,7 +1129,8 @@
             "m_Id": "a65a91b0a3464c22bdfbe06bc87c17a8"
         }
     ],
-    "m_CustomEditorGUI": ""
+    "m_CustomEditorGUI": "",
+    "m_SupportHair": true
 }
 
 {

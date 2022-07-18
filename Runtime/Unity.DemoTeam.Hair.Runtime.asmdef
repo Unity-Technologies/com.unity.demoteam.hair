@@ -25,6 +25,11 @@
             "define": "HAS_PACKAGE_UNITY_HDRP"
         },
         {
+            "name": "com.unity.render-pipelines.high-definition",
+            "expression": "15.0.0",
+            "define": "HAS_PACKAGE_UNITY_HDRP_15"
+        },
+        {
             "name": "com.unity.render-pipelines.universal",
             "expression": "10.2.2",
             "define": "HAS_PACKAGE_UNITY_URP"
