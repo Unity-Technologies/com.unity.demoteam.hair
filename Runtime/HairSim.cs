@@ -1207,7 +1207,10 @@ namespace Unity.DemoTeam.Hair
 					w += solverData[i].initialTotalLength;
 				}
 
-				cbuffer._StrandCountDiameter = (d / w) * (1.0f / Mathf.Max(1e-7f, volumeSettings.strandCountBias));
+				if (w > 0.0f)
+				{
+					cbuffer._StrandCountDiameter = (d / w) * (1.0f / Mathf.Max(1e-7f, volumeSettings.strandCountBias));
+				}
 			}
 
 			// derive keywords
