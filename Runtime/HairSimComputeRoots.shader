@@ -36,7 +36,15 @@
 	{
 		_UpdatedRootPosition[i].xyz = mul(_LocalToWorld, float4(attribs.positionOS, 1.0)).xyz;
 		_UpdatedRootDirection[i].xyz = normalize(mul(_LocalToWorldInvT, float4(attribs.normalOS, 0.0)).xyz);
-		_UpdatedRootFrame[i] = normalize(QMul(_WorldRotation, _InitialRootFrame[i]));
+
+#if 1// perturb the initial frame
+		float3 rootDirInitial = QMul(_InitialRootFrame[i], float3(0.0, 1.0, 0.0));
+		float3 rootDirCurrent = attribs.normalOS;
+		float4 rootDirPerturb = MakeQuaternionFromTo(rootDirInitial, rootDirCurrent);
+		_UpdatedRootFrame[i] = normalize(QMul(_WorldRotation, QMul(rootDirPerturb, _InitialRootFrame[i])));
+#else
+		_UpdatedRootFrame[i] = normalize(QMul(_WorldRotation, MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), attribs.normalOS)));
+#endif
 
 		RootVaryings v;
 		v.positionCS = float4(0, 0, 1, 0);// clip

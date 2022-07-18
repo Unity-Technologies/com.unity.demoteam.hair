@@ -1,4 +1,6 @@
-﻿#define REMOVE_AFTER_CONTENT_UPGRADE
+﻿#pragma warning disable 0414 // some fields are unused in case of disabled optional features
+
+#define REMOVE_AFTER_CONTENT_UPGRADE
 
 using System;
 using System.Collections.Generic;
