@@ -40,6 +40,11 @@
             "define": "HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN"
         },
         {
+            "name": "com.unity.demoteam.digital-human",
+            "expression": "0.2.0-preview",
+            "define": "HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2"
+        },
+        {
             "name": "com.unity.demoteam.mesh-to-sdf",
             "expression": "1.0.0",
             "define": "HAS_PACKAGE_DEMOTEAM_MESHTOSDF"
