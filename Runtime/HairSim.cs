@@ -1104,7 +1104,7 @@ namespace Unity.DemoTeam.Hair
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferPositionOffset, positionOffset);
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferPositionStride, positionStride);
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferNormalOffset, normalOffset);
-					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferNormalOffset, normalStride);
+					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferNormalStride, normalStride);
 
 					BindSolverData(cmd, s_solverCS, SolverKernels.KUpdateRoots, solverData);
 					cmd.DispatchCompute(s_solverCS, SolverKernels.KUpdateRoots, numX, numY, numZ);
