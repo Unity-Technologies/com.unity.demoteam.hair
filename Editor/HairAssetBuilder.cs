@@ -1257,20 +1257,42 @@ namespace Unity.DemoTeam.Hair
 				// apply painted direction
 				if (IsTextureReadable(settings.mappedDirection))
 				{
-					for (int i = 0; i != settings.strandCount; i++)
+					switch (settings.mappedDirection.format)
 					{
-						// assume dxt5nm
-						Vector4 packed = settings.mappedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
-						{
-							packed.x *= packed.w;
-						}
-						Vector3 n;
-						{
-							n.x = packed.x * 2.0f - 1.0f;
-							n.y = packed.y * 2.0f - 1.0f;
-							n.z = Mathf.Sqrt(1.0f - Mathf.Clamp01(n.x * n.x + n.y * n.y));
-						}
-						rootDir[i] = Vector3.Normalize(n);
+						case TextureFormat.DXT5:
+							{
+								for (int i = 0; i != settings.strandCount; i++)
+								{
+									Vector4 dxt5nm = settings.mappedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
+									{
+										dxt5nm.x *= dxt5nm.w;
+									}
+									Vector3 n;
+									{
+										n.x = dxt5nm.x * 2.0f - 1.0f;
+										n.y = dxt5nm.y * 2.0f - 1.0f;
+										n.z = Mathf.Sqrt(1.0f - Mathf.Clamp01(n.x * n.x + n.y * n.y));
+									}
+									rootDir[i] = Vector3.Normalize(n);
+								}
+							}
+							break;
+
+						default:
+							{
+								for (int i = 0; i != settings.strandCount; i++)
+								{
+									Vector4 xyz = settings.mappedDirection.GetPixelBilinear(rootUV0[i].x, rootUV0[i].y, mipLevel: 0);
+									Vector3 n;
+									{
+										n.x = 2.0f * xyz.x - 1.0f;
+										n.y = 2.0f * xyz.y - 1.0f;
+										n.z = 2.0f * xyz.z - 1.0f;
+									}
+									rootDir[i] = Vector3.Normalize(n);
+								}
+							}
+							break;
 					}
 				}
 				else
