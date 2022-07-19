@@ -18,6 +18,15 @@ namespace Unity.DemoTeam.Hair
 			var evClick = (ev.type == EventType.MouseDown) || (ev.type == EventType.MouseUp);
 			var evClickRight = evClick && (ev.button == 1);
 
+			var groupVisible = fieldInfo.GetCustomAttribute<VisibleIfAttribute>();
+			if (groupVisible != null)
+			{
+				if (ComparePropertyUtility.Evaluate(groupVisible, property) == false)
+				{
+					return;
+				}
+			}
+
 			EditorGUILayout.BeginHorizontal();
 
 			var groupLabelPrefix = label.text + " ";
@@ -80,6 +89,7 @@ namespace Unity.DemoTeam.Hair
 					var fieldHasRange = false;
 					var fieldHasRangeMin = 0.0f;
 					var fieldHasRangeMax = 0.0f;
+					var fieldHasRenderingLayerMask = false;
 
 					switch (property.propertyType)
 					{
@@ -88,12 +98,16 @@ namespace Unity.DemoTeam.Hair
 							reserveField = widthSpacing + widthToggle + (groupItem.withLabel ? -3.0f : 0.0f);
 							break;
 
-						case SerializedPropertyType.Float:
 						case SerializedPropertyType.Integer:
+						case SerializedPropertyType.Float:
 							if (TryGetRangeAttribute(field, out fieldHasRangeMin, out fieldHasRangeMax))
 							{
 								fieldHasRange = true;
 								reserveExtra = widthSpacing + widthSlider;
+							}
+							else if (TryGetRenderingLayerMaskAttribute(field))
+							{
+								fieldHasRenderingLayerMask = true;
 							}
 							break;
 					}
@@ -186,6 +200,8 @@ namespace Unity.DemoTeam.Hair
 										{
 											if (fieldHasRange)
 												value = EditorGUI.IntSlider(position, label, value, (int)fieldHasRangeMin, (int)fieldHasRangeMax);
+											else if (fieldHasRenderingLayerMask)
+												value = HairGUI.RenderingLayerMask(position, label, value);
 											else
 												value = EditorGUI.IntField(position, label, value);
 										}

@@ -182,8 +182,12 @@ namespace Unity.DemoTeam.Hair
 
 			public StrandRenderer strandRenderer;
 #if HAS_PACKAGE_UNITY_HDRP_15
-			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHairRenderer)]
-			public HairRasterizationMode strandRendererMode;
+			//[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHairRenderer)]
+			//public HairRasterizationMode strandRendererMode;
+			[ToggleGroup, VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHairRenderer)]
+			public bool strandRendererGrouping;
+			[ToggleGroupItem]
+			public HairRendererGroup strandRendererGroupingValue;
 #endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
@@ -222,6 +226,11 @@ namespace Unity.DemoTeam.Hair
 				kLODBlending = false,
 
 				strandRenderer = StrandRenderer.BuiltinLines,
+#if HAS_PACKAGE_UNITY_HDRP_15
+				//strandRendererMode = HairRasterizationMode.Performance,
+				strandRendererGrouping = false,
+				strandRendererGroupingValue = HairRendererGroup.Group0,
+#endif
 				strandShadows = ShadowCastingMode.On,
 				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
 				motionVectors = MotionVectorGenerationMode.Camera,
@@ -1150,10 +1159,12 @@ namespace Unity.DemoTeam.Hair
 							meshRendererHDRP.enabled = meshRendererHDRPEnabled = true;
 							meshRendererHDRP.mesh = meshInstance;
 							meshRendererHDRP.material = materialInstance;
-							meshRendererHDRP.rasterMode = settingsSystem.strandRendererMode;
+							//meshRendererHDRP.rasterMode = settingsSystem.strandRendererMode;
 							meshRendererHDRP.shadowCastingMode = settingsSystem.strandShadows;
 							meshRendererHDRP.renderingLayerMask = (uint)settingsSystem.strandLayers;
 							meshRendererHDRP.motionVectorMode = settingsSystem.motionVectors;
+							meshRendererHDRP.groupMerging = settingsSystem.strandRendererGrouping;
+							meshRendererHDRP.rendererGroup = settingsSystem.strandRendererGroupingValue;
 						}
 						break;
 #endif
