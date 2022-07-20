@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &5395932464596670446
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 5127100956968223908, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.9070465
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.13464461
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.39459655
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.05857508
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 16.887
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 47.021
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770968, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7494141127162770975, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
+      propertyPath: m_Name
+      value: Camera_URP
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f6205044afc2bf74888d8020858b4c5b, type: 3}
