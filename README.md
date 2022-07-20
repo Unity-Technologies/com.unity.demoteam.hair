@@ -1,6 +1,8 @@
 
 # Package: com.unity.demoteam.hair
 
+![Header](Documentation~/Images/header_crop.png)
+
 <div align="justify">An integrated solution for authoring / importing / simulating / rendering strand-based hair in Unity. Built from the ground up with Unity users in mind, and evolved and hardened during the production of 'Enemies', the hair system is applicable not only to realistic digital humans, but also to more stylized content and games. It allows users to easily create 'Hair Assets', either from grooms from external DCC tools (through the alembic file format for curve data), or through simple built-in procedural generation tools (e.g. scatter x amount of hairs on a mesh or other primitive, or using a custom generator). Using a fast and flexible GPU-based solver that works on both strand- and volume-information, the system enables users to interactively set up ‘Hair Instances’ within scenes, and then see and interact with those instances as they are simulated and rendered in real time.</div>
 
 
