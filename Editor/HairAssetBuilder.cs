@@ -454,6 +454,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (var longOperation = new LongOperationScope("Resolving UVs"))
 							{
+								longOperation.UpdateStatus("Preparing BVH", 0.0f);
 #if USE_DERIVED_CACHE
 								var meshQueries = DerivedCache.GetOrCreate(settings.rootUVMesh,
 									meshArg =>
@@ -471,7 +472,7 @@ namespace Unity.DemoTeam.Hair
 								{
 									for (int i = 0; i != combinedCurveCount; i++)
 									{
-										longOperation.UpdateStatus("Resolving", i, combinedCurveCount);
+										longOperation.UpdateStatus("Resolving UVs", i, combinedCurveCount);
 
 										strandGroup.rootUV[i] = meshQueries.FindClosestTriangleUV(strandGroup.rootPosition[i]);
 									}
@@ -1498,7 +1499,11 @@ namespace Unity.DemoTeam.Hair
 					var aa = Vector3.SqrMagnitude(dstPosPrev - p);
 					var bb = dstSpacingSq - aa;
 
-					dstPos[dstIndex] = p + n * Mathf.Sqrt(bb);
+					if (bb > float.Epsilon)
+						dstPos[dstIndex] = p + n * Mathf.Sqrt(bb);
+					else
+						dstPos[dstIndex] = p;
+
 					dstPosPrev = dstPos[dstIndex++];
 				}
 				else
