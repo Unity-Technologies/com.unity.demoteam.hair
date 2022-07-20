@@ -46,6 +46,7 @@ namespace Unity.DemoTeam.Hair
 			previewZoom = 0.0f;
 
 			previewRenderer = new PreviewRenderUtility();
+			previewRenderer.camera.clearFlags = CameraClearFlags.SolidColor;
 			previewRenderer.camera.backgroundColor = Color.black;// Color.Lerp(Color.black, Color.grey, 0.5f);
 			previewRenderer.camera.nearClipPlane = 0.001f;
 			previewRenderer.camera.farClipPlane = 50.0f;
