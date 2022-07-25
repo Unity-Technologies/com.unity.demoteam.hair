@@ -175,4 +175,23 @@ float4 MakeQuaternionLookAt(float3 forward, float3 up)
 	return QMul(rotForwardTwist, rotForward);
 }
 
+float4 QDecomposeTwist(float4 q, float3 axis)
+{
+	// see: "Component of a quaternion rotation around an axis"
+	// https://stackoverflow.com/a/22401169
+
+	float3 v = float3(q.x, q.y, q.z);
+	float dn = dot(v, axis);
+	float3 p = dn * axis;
+	float4 r = float4(p.x, p.y, p.z, q.w);
+
+	if (dot(r, r) < 1e-5)
+		return MakeQuaternionIdentity();
+
+	if (dn < 0.0)
+		return normalize(-r);
+	else
+		return normalize(r);
+}
+
 #endif//__HAIRSIMCOMPUTEQUATERNION_HLSL__

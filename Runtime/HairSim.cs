@@ -905,7 +905,7 @@ namespace Unity.DemoTeam.Hair
 			target.BindKeyword("VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 		}
 
-		public static void PushSolverParams(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, in Quaternion strandRotation, float strandDiameter, float strandMargin, float strandScale, float dt)
+		public static void PushSolverParams(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, in Quaternion rootSkinningRotation, float strandDiameter, float strandMargin, float strandScale, float dt)
 		{
 			float IntervalToSeconds(SolverSettings.TimeInterval interval)
 			{
@@ -923,9 +923,15 @@ namespace Unity.DemoTeam.Hair
 			ref var keywords = ref solverData.keywords;
 
 			// derive constants
-			cbuffer._LocalToWorld = rootTransform;
-			cbuffer._LocalToWorldInvT = Matrix4x4.Transpose(Matrix4x4.Inverse(rootTransform));
-			cbuffer._WorldRotation = new Vector4(strandRotation.x, strandRotation.y, strandRotation.z, strandRotation.w);
+			var rootRotation = rootTransform.rotation;
+			var rootRotationInv = Quaternion.Inverse(rootRotation);
+			{
+				cbuffer._RootTransform = rootTransform;
+				cbuffer._RootRotation = rootRotation.ToVector4();
+				cbuffer._RootRotationInv = rootRotationInv.ToVector4();
+			}
+
+			cbuffer._WorldRotation = rootSkinningRotation.ToVector4();
 			cbuffer._WorldGravity = Quaternion.Euler(solverSettings.gravityRotation) * (Physics.gravity * solverSettings.gravity);
 
 			cbuffer._GroupScale = strandScale;

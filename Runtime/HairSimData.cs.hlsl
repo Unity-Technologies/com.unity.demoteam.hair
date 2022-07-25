@@ -23,8 +23,9 @@
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer
 // PackingRules = Exact
 CBUFFER_START(SolverCBuffer)
-    float4x4 _LocalToWorld;
-    float4x4 _LocalToWorldInvT;
+    float4x4 _RootTransform;
+    float4 _RootRotation;
+    float4 _RootRotationInv;
     float4 _WorldRotation;
     float4 _WorldGravity;
     float4 _StagingOriginExtent;

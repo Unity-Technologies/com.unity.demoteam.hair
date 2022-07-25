@@ -35,6 +35,20 @@ namespace Unity.DemoTeam.Hair
 		}
 	}
 
+	public static class QuaternionExtensions
+	{
+		public static Vector4 ToVector4(this Quaternion value)
+		{
+			return new Vector4
+			{
+				x = value.x,
+				y = value.y,
+				z = value.z,
+				w = value.w,
+			};
+		}
+	}
+
 	public static class BoundsExtensions
 	{
 		public static Bounds WithTransform(this Bounds bounds, Matrix4x4 transform)

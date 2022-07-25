@@ -393,32 +393,36 @@ void KInitialize(
 {
 	DECLARE_STRAND(worldIdx.x);
 
-	// store initial pose
-	//TODO move things around here
-
-	float3 rootPos0 = _ParticlePosition[strandParticleBegin].xyz;
-	float3 rootPosWorld = _RootPosition[strandIndex].xyz;
-	
-	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
-	{
-		float3 particleOffset0 = _ParticlePosition[i].xyz - rootPos0;
-		float3 particleOffsetWorld = QMul(_WorldRotation, particleOffset0 * _GroupScale);
-
-		_InitialParticleOffset[i].xyz = particleOffset0;
-
-		_ParticlePosition[i].xyz = (rootPosWorld + particleOffsetWorld);
-		_ParticlePositionPrev[i].xyz = (rootPosWorld + particleOffsetWorld);
-		_ParticlePositionPrevPrev[i].xyz = (rootPosWorld + particleOffsetWorld);
-		_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _GroupMaxParticleInterval * _RootScale[strandIndex]);
-		_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _GroupMaxParticleInterval * _RootScale[strandIndex]);
-	}
+	float3 worldRootPos = _RootPosition[strandIndex].xyz;
+	float3 worldRootDir = _RootDirection[strandIndex].xyz;
 
 	// calc initial strand root material frame
+	float3 localRootDir = QMul(_RootRotationInv, worldRootDir);
+	float3 localRootDirForward = float3(0.0, 1.0, 0.0);
+	float4 localRootFrame = MakeQuaternionFromTo(localRootDirForward, localRootDir);
+	float4 localRootFrameInv = QInverse(localRootFrame);
 	{
-		float3 rootDir0 = normalize(_InitialParticleOffset[strandParticleBegin + strandParticleStride].xyz);
-		float3 rootDirMaterialFrame = float3(0.0, 1.0, 0.0);
+		_InitialRootFrame[strandIndex] = localRootFrame;// transforms 0,1,0 to initial local dir
+	}
 
-		_InitialRootFrame[strandIndex] = MakeQuaternionFromTo(rootDirMaterialFrame, rootDir0);
+	// calc initial particle offsets from strand root + initial world pose
+	float3 localRootPos = _ParticlePosition[strandParticleBegin].xyz;
+
+	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
+	{
+		float3 localParticleOffset = _ParticlePosition[i].xyz - localRootPos;
+		{
+			_InitialParticleOffset[i].xyz = QMul(localRootFrameInv, localParticleOffset);
+		}
+
+		float3 worldParticleOffset = QMul(_RootRotation, localParticleOffset * _GroupScale);//TODO correct to assume no deformation on initialization?
+		{
+			_ParticlePosition[i].xyz = (worldRootPos + worldParticleOffset);
+			_ParticlePositionPrev[i].xyz = (worldRootPos + worldParticleOffset);
+			_ParticlePositionPrevPrev[i].xyz = (worldRootPos + worldParticleOffset);
+			_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _GroupMaxParticleInterval * _RootScale[strandIndex]);
+			_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _GroupMaxParticleInterval * _RootScale[strandIndex]);
+		}
 	}
 
 	// calc initial particle material frame deltas
@@ -432,7 +436,7 @@ void KInitialize(
 		// root+1
 		float3 r0 = -float3(0.0, 1.0, 0.0);
 		float3 r1 = 0.0;
-		float3 r2 = QMul(rootFrameInv, _InitialParticleOffset[strandParticleBegin + strandParticleStride].xyz);
+		float3 r2 = _InitialParticleOffset[strandParticleBegin + strandParticleStride].xyz;
 		{
 			_InitialParticleFrameDelta[strandParticleBegin + strandParticleStride] = NextQuaternionFromBend(r0, r1, r2, MakeQuaternionIdentity());
 		}
@@ -442,7 +446,7 @@ void KInitialize(
 		{
 			r0 = r1;
 			r1 = r2;
-			r2 = QMul(rootFrameInv, _InitialParticleOffset[i].xyz);
+			r2 = _InitialParticleOffset[i].xyz;
 
 			_InitialParticleFrameDelta[i] = NextQuaternionFromBend(r0, r1, r2, _InitialParticleFrameDelta[i - strandParticleStride]);
 		}
@@ -526,17 +530,31 @@ void KUpdateRoots(
 	float3 positionOS = asfloat(_VertexBufferPosition.Load3(addressPosition));
 	float3 normalOS = asfloat(_VertexBufferNormal.Load3(addressNormal));
 
-	_RootPosition[strandIndex].xyz = mul(_LocalToWorld, float4(positionOS, 1.0)).xyz;
-	_RootDirection[strandIndex].xyz = normalize(mul(_LocalToWorldInvT, float4(normalOS, 0.0)).xyz);
+	_RootPosition[strandIndex].xyz = mul(_RootTransform, float4(positionOS, 1.0)).xyz;
+	_RootDirection[strandIndex].xyz = normalize(QMul(_RootRotation, normalOS));
 
-#if 1// perturb the initial frame
-	float3 rootDirInitial = QMul(_InitialRootFrame[strandIndex], float3(0.0, 1.0, 0.0));
-	float3 rootDirCurrent = normalOS;
-	float4 rootDirPerturb = MakeQuaternionFromTo(rootDirInitial, rootDirCurrent);
-	_RootFrame[strandIndex] = normalize(QMul(_WorldRotation, QMul(rootDirPerturb, _InitialRootFrame[strandIndex])));
-#else
-	_RootFrame[strandIndex] = normalize(QMul(_WorldRotation, MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), normalOS)));
-#endif
+	// update material frame
+	{
+	#if 1
+		// perturb initial local frame
+		float3 localRootReference = QMul(_InitialRootFrame[strandIndex], float3(0.0, 1.0, 0.0));
+		float4 localRootPerturb = MakeQuaternionFromTo(localRootReference, normalOS);
+		float4 localRootFrame = QMul(localRootPerturb, _InitialRootFrame[strandIndex]);
+	#else
+		// construct new local frame
+		float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), normalOS);
+	#endif
+
+	#if 1
+		// add twist from skinning delta
+		float4 skinningBoneLocalDelta = QMul(_RootRotationInv, _WorldRotation);
+		float4 skinningBoneLocalTwist = QDecomposeTwist(skinningBoneLocalDelta, normalOS);
+		localRootFrame = QMul(skinningBoneLocalTwist, localRootFrame);
+	#endif
+
+		// done
+		_RootFrame[strandIndex] = normalize(QMul(_RootRotation, localRootFrame));
+	}
 }
 
 #endif//F_INPUT
@@ -648,12 +666,14 @@ void KSolveConstraints_GaussSeidelReference(
 	// apply global position constraints
 	if (ENABLE_POSE_GLOBAL_POSITION)
 	{
+		float4 rootFrame = _RootFrame[strandIndex];
+
 		float3 p0 = _ParticlePosition[strandParticleBegin].xyz;
 
 		for (uint i = strandParticleBegin + strandParticleStride, k = 1; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
 			float3 r0 = _ParticlePosition[i].xyz - p0;
-			float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _GroupScale);
+			float3 r1 = QMul(rootFrame, _InitialParticleOffset[i].xyz * _GroupScale);
 
 			_ParticlePosition[i].xyz = p0 + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, k));
 		}
@@ -1092,6 +1112,7 @@ void KSolveConstraints_GaussSeidel(
 	}
 
 	// update positions
+	const float4 rootFrame = _RootFrame[strandIndex];
 	const float3 rootPos = _RootPosition[strandIndex].xyz;
 	{
 		// root
@@ -1116,7 +1137,7 @@ void KSolveConstraints_GaussSeidel(
 				if (ENABLE_POSE_GLOBAL_POSITION)
 				{
 					const float3 r0 = x1_pre - rootPos;
-					const float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _GroupScale);
+					const float3 r1 = QMul(rootFrame, _InitialParticleOffset[i].xyz * _GroupScale);
 
 					x1_pre = rootPos + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, k));
 				}
@@ -1128,7 +1149,6 @@ void KSolveConstraints_GaussSeidel(
 
 	// solve constraints by Gauss-Seidel iteration
 	{
-		const float4 rootFrame = _RootFrame[strandIndex];
 		const float3 rootVec = GetParticleInterval(strandIndex) * QMul(rootFrame, float3(0, 1, 0));
 
 		for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
@@ -1247,8 +1267,8 @@ void KSolveConstraints_Jacobi(
 	// update positions
 	const float3 x0 = _ParticlePositionPrev[i].xyz;
 	{
-		const float3 rootPos = _RootPosition[strandIndex].xyz;
 		const float4 rootFrame = _RootFrame[strandIndex];
+		const float3 rootPos = _RootPosition[strandIndex].xyz;
 
 		// [threads: root]
 		if (threadIdx == 0)
@@ -1277,7 +1297,7 @@ void KSolveConstraints_Jacobi(
 				if (ENABLE_POSE_GLOBAL_POSITION)
 				{
 					const float3 r0 = x1_pre - rootPos;
-					const float3 r1 = QMul(_WorldRotation, _InitialParticleOffset[i].xyz * _GroupScale);
+					const float3 r1 = QMul(rootFrame, _InitialParticleOffset[i].xyz * _GroupScale);
 
 					x1_pre = rootPos + lerp(r0, r1, GetGlobalPositionInfluence(strandIndex, threadIdx));
 				}
@@ -1562,17 +1582,18 @@ void KInterpolate(
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 	float strandContribHi = _RootScale[strandIndex] / _RootScale[strandIndexHi];
 
+	float4 rootFrame = _RootFrame[strandIndex];
+	float3 rootPosition = _RootPosition[strandIndex].xyz;
 	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
 	float3 rootPositionHi = _RootPosition[strandIndexHi].xyz;
-	float3 rootPosition = _RootPosition[strandIndex].xyz;
 
 	StoreInterpolatedPosition(strandParticleBegin, rootPosition);
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride, iHi = strandParticleBeginHi + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
 	{
-		float3 initialOffsetLo = QMul(_WorldRotation, _InitialParticleOffset[iLo].xyz) * _GroupScale;
-		float3 initialOffsetHi = QMul(_WorldRotation, _InitialParticleOffset[iHi].xyz) * _GroupScale;
-		float3 initialOffset = QMul(_WorldRotation, _InitialParticleOffset[i].xyz) * _GroupScale;
+		float3 initialOffset = QMul(rootFrame, _InitialParticleOffset[i].xyz) * _GroupScale;
+		float3 initialOffsetLo = QMul(rootFrame, _InitialParticleOffset[iLo].xyz) * _GroupScale;
+		float3 initialOffsetHi = QMul(rootFrame, _InitialParticleOffset[iHi].xyz) * _GroupScale;
 
 		float3 currentOffsetLo = _ParticlePosition[iLo].xyz - rootPositionLo;
 		float3 currentOffsetHi = _ParticlePosition[iHi].xyz - rootPositionHi;
@@ -1600,20 +1621,21 @@ void KInterpolateNearest(
 	DECLARE_STRAND(worldIdx.x + _SolverStrandCount);
 
 	const uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
-	
+
 	const uint strandParticleBeginLo = strandIndexLo * _StrandParticleOffset;
 
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 
-	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
+	float4 rootFrame = _RootFrame[strandIndex];
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
+	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
 
 	StoreInterpolatedPosition(strandParticleBegin, rootPosition);
 
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride)
 	{
-		float3 initialOffsetLo = QMul(_WorldRotation, _InitialParticleOffset[iLo].xyz) * _GroupScale;
-		float3 initialOffset = QMul(_WorldRotation, _InitialParticleOffset[i].xyz) * _GroupScale;
+		float3 initialOffset = QMul(rootFrame, _InitialParticleOffset[i].xyz) * _GroupScale;
+		float3 initialOffsetLo = QMul(rootFrame, _InitialParticleOffset[iLo].xyz) * _GroupScale;
 
 		float3 currentOffsetLo = _ParticlePosition[iLo].xyz - rootPositionLo;
 

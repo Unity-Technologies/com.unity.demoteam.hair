@@ -1192,7 +1192,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public Quaternion GetRootRotation(in GroupInstance strandGroupInstance)
+		public Quaternion GetRootSkinningRotation(in GroupInstance strandGroupInstance)
 		{
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 			ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstance);
@@ -1400,13 +1400,13 @@ namespace Unity.DemoTeam.Hair
 			{
 				var rootMesh = strandGroupInstances[i].sceneObjects.rootMeshFilter.sharedMesh;
 				var rootTransform = strandGroupInstances[i].sceneObjects.rootMeshFilter.transform.localToWorldMatrix;
+				var rootSkinningRotation = GetRootSkinningRotation(strandGroupInstances[i]);
 
-				var strandRotation = GetRootRotation(strandGroupInstances[i]);
 				var strandDiameter = GetStrandDiameter(strandGroupInstances[i]);
 				var strandMargin = GetStrandMargin(strandGroupInstances[i]);
 				var strandScale = GetStrandScale(strandGroupInstances[i]);
 
-				HairSim.PushSolverParams(cmd, ref solverData[i], GetSettingsSolver(strandGroupInstances[i]), rootTransform, strandRotation, strandDiameter, strandMargin, strandScale, stepDT);
+				HairSim.PushSolverParams(cmd, ref solverData[i], GetSettingsSolver(strandGroupInstances[i]), rootTransform, rootSkinningRotation, strandDiameter, strandMargin, strandScale, stepDT);
 				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
 			}
 
@@ -1559,14 +1559,14 @@ namespace Unity.DemoTeam.Hair
 
 				var rootMesh = strandGroupInstances[i].sceneObjects.rootMeshFilter.sharedMesh;
 				var rootTransform = strandGroupInstances[i].sceneObjects.rootMeshFilter.transform.localToWorldMatrix;
+				var rootSkinningRotation = GetRootSkinningRotation(strandGroupInstances[i]);
 
-				var strandRotation = GetRootRotation(strandGroupInstances[i]);
 				var strandDiameter = GetStrandDiameter(strandGroupInstances[i]);
 				var strandMargin = GetStrandMargin(strandGroupInstances[i]);
 				var strandScale = GetStrandScale(strandGroupInstances[i]);
 
 				HairSim.PushSolverLOD(cmd, ref solverData[i], strandGroupAsset.lodCount - 1);//TODO will need to move this around to generate rest density per LOD, to support target density initial pose in particles
-				HairSim.PushSolverParams(cmd, ref solverData[i], GetSettingsSolver(strandGroupInstances[i]), rootTransform, strandRotation, strandDiameter, strandMargin, strandScale, 1.0f);
+				HairSim.PushSolverParams(cmd, ref solverData[i], GetSettingsSolver(strandGroupInstances[i]), rootTransform, rootSkinningRotation, strandDiameter, strandMargin, strandScale, 1.0f);
 				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
 				{
 					HairSim.InitSolverData(cmd, solverData[i]);

@@ -32,19 +32,33 @@
 #endif
 	};
 
-	RootVaryings RootVert(RootAttribs attribs, uint i : SV_VertexID)
+	RootVaryings RootVert(RootAttribs attribs, uint strandIndex : SV_VertexID)
 	{
-		_UpdatedRootPosition[i].xyz = mul(_LocalToWorld, float4(attribs.positionOS, 1.0)).xyz;
-		_UpdatedRootDirection[i].xyz = normalize(mul(_LocalToWorldInvT, float4(attribs.normalOS, 0.0)).xyz);
+		_UpdatedRootPosition[strandIndex].xyz = mul(_RootTransform, float4(attribs.positionOS, 1.0)).xyz;
+		_UpdatedRootDirection[strandIndex].xyz = normalize(QMul(_RootRotation, attribs.normalOS));
 
-#if 1// perturb the initial frame
-		float3 rootDirInitial = QMul(_InitialRootFrame[i], float3(0.0, 1.0, 0.0));
-		float3 rootDirCurrent = attribs.normalOS;
-		float4 rootDirPerturb = MakeQuaternionFromTo(rootDirInitial, rootDirCurrent);
-		_UpdatedRootFrame[i] = normalize(QMul(_WorldRotation, QMul(rootDirPerturb, _InitialRootFrame[i])));
-#else
-		_UpdatedRootFrame[i] = normalize(QMul(_WorldRotation, MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), attribs.normalOS)));
-#endif
+		// update material frame
+		{
+		#if 1
+			// perturb initial local frame
+			float3 localRootReference = QMul(_InitialRootFrame[strandIndex], float3(0.0, 1.0, 0.0));
+			float4 localRootPerturb = MakeQuaternionFromTo(localRootReference, attribs.normalOS);
+			float4 localRootFrame = QMul(localRootPerturb, _InitialRootFrame[strandIndex]);
+		#else
+			// construct new local frame
+			float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), attribs.normalOS);
+		#endif
+
+		#if 1
+			// add twist from skinning delta
+			float4 skinningBoneLocalDelta = QMul(_RootRotationInv, _WorldRotation);
+			float4 skinningBoneLocalTwist = QDecomposeTwist(skinningBoneLocalDelta, attribs.normalOS);
+			localRootFrame = QMul(skinningBoneLocalTwist, localRootFrame);
+		#endif
+
+			// done
+			_UpdatedRootFrame[strandIndex] = normalize(QMul(_RootRotation, localRootFrame));
+		}
 
 		RootVaryings v;
 		v.positionCS = float4(0, 0, 1, 0);// clip

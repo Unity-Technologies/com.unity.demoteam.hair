@@ -79,37 +79,27 @@ namespace Unity.DemoTeam.Hair
 			public bool LIVE_POSITIONS_2;
 			public bool LIVE_POSITIONS_1;
 			public bool LIVE_ROTATIONS_2;
-			/*
-			public bool ENABLE_BOUNDARY;
-			public bool ENABLE_BOUNDARY_FRICTION;
-			public bool ENABLE_DISTANCE;
-			public bool ENABLE_DISTANCE_LRA;
-			public bool ENABLE_DISTANCE_FTL;
-			public bool ENABLE_CURVATURE_EQ;
-			public bool ENABLE_CURVATURE_GEQ;
-			public bool ENABLE_CURVATURE_LEQ;
-			public bool ENABLE_POSE_LOCAL_SHAPE;
-			public bool ENABLE_POSE_GLOBAL_POSITION;
-			public bool ENABLE_POSE_GLOBAL_ROTATION;
-			*/
 			public bool STAGING_COMPRESSION;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
 		public struct SolverCBuffer
 		{
-			// 0
-			public Matrix4x4 _LocalToWorld;				// root mesh vertex transform
-			public Matrix4x4 _LocalToWorldInvT;			// ...
+			// NOTE: explicit padding to 16 byte boundary required on some platforms, please update counts if modifying
 
-			// 32
+			// 0
+			public Matrix4x4 _RootTransform;			// root mesh transform (local to world)
+			public Vector4 _RootRotation;				// quat(xyz,w): root mesh rotation
+			public Vector4 _RootRotationInv;			// quat(xyz,w): root mesh rotation inverse
+
+			// 24
 			public Vector4 _WorldRotation;				// quat(xyz,w): primary skinning bone rotation
 			public Vector4 _WorldGravity;				// xyz: gravity vector, w: -
 
 			public Vector4 _StagingOriginExtent;		// xyz: origin, w: scale
 			public Vector4 _StagingOriginExtentPrev;	// ...
 
-			// 48
+			// 40
 			public uint _StrandCount;					// number of strands
 			public uint _StrandParticleCount;			// number of particles per strand
 			public uint _StrandParticleOffset;			// offset in particles to reach the ith strand
@@ -132,7 +122,7 @@ namespace Unity.DemoTeam.Hair
 			public uint _StagingVertexCount;			// staging strand vertex count
 			public uint _StagingVertexOffset;			// staging strand vertex offset
 
-			// 65
+			// 57
 			public float _DT;
 			public uint _Substeps;
 			public uint _Iterations;
@@ -152,18 +142,16 @@ namespace Unity.DemoTeam.Hair
 			public float _LocalShape;
 			public float _LocalShapeBias;
 
-			// 81
+			// 73
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
 
-			// 86 --> 88 (16 byte alignment)
+			// 78 --> 80 (pad to 16 byte boundary)
 			public float _scbpad1;
 			public float _scbpad2;
-
-			// NOTE: explicit padding to 16 byte alignment required on some platforms, please update if modifying
 		}
 
 		/*
@@ -252,6 +240,8 @@ namespace Unity.DemoTeam.Hair
 				_VolumeWorldMax = Q
 			*/
 
+			// NOTE: explicit padding to 16 byte boundary required on some platforms, please update counts if modifying
+
 			// 0
 			public Vector4 _VolumeCells;
 			public Vector4 _VolumeWorldMin;
@@ -279,11 +269,9 @@ namespace Unity.DemoTeam.Hair
 			public uint _StrandCountSubstep;
 			public float _StrandCountDiameter;
 
-			// 26 --> 28 (16 byte alignment)
+			// 26 --> 28 (pad to 16 byte boundary)
 			public float _vcbpad1;
 			public float _vcbpad2;
-
-			// NOTE: explicit padding to 16 byte alignment required on some platforms, please update if modifying
 		}
 	}
 }

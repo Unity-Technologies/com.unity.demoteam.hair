@@ -38,7 +38,7 @@ float EstimateStrandCount(float3 P, float3 L)
 	const float stepLength = length(VolumeWorldSize() * trace.uvwStep);
 	const float stepVolume = stepLength * stepLength * stepLength;
 
-	return rho_sum * min(0.0, stepLength / _StrandCountDiameter);
+	return rho_sum * max(0.0, stepLength / _StrandCountDiameter);
 }
 
 #define HALF_SQRT_INV_PI    0.5 * 0.56418958354775628694 
