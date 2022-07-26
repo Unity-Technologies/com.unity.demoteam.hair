@@ -42,11 +42,9 @@
 		#if 1
 			// perturb initial local frame
 			float3 localRootReference = QMul(_InitialRootFrame[strandIndex], float3(0.0, 1.0, 0.0));
-			float4 localRootPerturb = MakeQuaternionFromTo(localRootReference, attribs.normalOS);
-			float4 localRootFrame = QMul(localRootPerturb, _InitialRootFrame[strandIndex]);
+			float4 localRootFrame = MakeQuaternionFromTo(localRootReference, attribs.normalOS);
 		#else
-			// construct new local frame
-			float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), attribs.normalOS);
+			float4 localRootFrame = MakeQuaternionIdentity();
 		#endif
 
 		#if 1

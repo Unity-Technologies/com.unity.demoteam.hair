@@ -27,7 +27,7 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer substepRootDirection;	// ...
 			public ComputeBuffer substepRootFrame;		// ...
 
-			public ComputeBuffer initialRootFrame;			// quat(xyz,w): initial strand root material frame
+			public ComputeBuffer initialRootFrame;			// quat(xyz,w): initial strand root local frame
 			public ComputeBuffer initialParticleOffset;		// xyz: initial particle offset from strand root, w: -
 			public ComputeBuffer initialParticleFrameDelta; // quat(xyz,w): initial particle material frame delta
 

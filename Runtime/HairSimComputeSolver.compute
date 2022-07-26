@@ -396,26 +396,23 @@ void KInitialize(
 	float3 worldRootPos = _RootPosition[strandIndex].xyz;
 	float3 worldRootDir = _RootDirection[strandIndex].xyz;
 
-	// calc initial strand root material frame
+	// calc initial strand root local frame
+	float3 localRootPos = _ParticlePosition[strandParticleBegin].xyz;
 	float3 localRootDir = QMul(_RootRotationInv, worldRootDir);
-	float3 localRootDirForward = float3(0.0, 1.0, 0.0);
-	float4 localRootFrame = MakeQuaternionFromTo(localRootDirForward, localRootDir);
-	float4 localRootFrameInv = QInverse(localRootFrame);
+	float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), localRootDir);
 	{
 		_InitialRootFrame[strandIndex] = localRootFrame;// transforms 0,1,0 to initial local dir
 	}
 
-	// calc initial particle offsets from strand root + initial world pose
-	float3 localRootPos = _ParticlePosition[strandParticleBegin].xyz;
-
+	// calc initial particle offsets from strand root + set up initial world pose
 	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 	{
 		float3 localParticleOffset = _ParticlePosition[i].xyz - localRootPos;
 		{
-			_InitialParticleOffset[i].xyz = QMul(localRootFrameInv, localParticleOffset);
+			_InitialParticleOffset[i].xyz = localParticleOffset;
 		}
 
-		float3 worldParticleOffset = QMul(_RootRotation, localParticleOffset * _GroupScale);//TODO correct to assume no deformation on initialization?
+		float3 worldParticleOffset = QMul(_RootRotation, localParticleOffset * _GroupScale);//TODO verify if correct to assume no deformation on initialization?
 		{
 			_ParticlePosition[i].xyz = (worldRootPos + worldParticleOffset);
 			_ParticlePositionPrev[i].xyz = (worldRootPos + worldParticleOffset);
@@ -427,14 +424,11 @@ void KInitialize(
 
 	// calc initial particle material frame deltas
 	{
-		float4 rootFrame = _InitialRootFrame[strandIndex];
-		float4 rootFrameInv = QInverse(rootFrame);
-
 		// root
 		_InitialParticleFrameDelta[strandParticleBegin] = MakeQuaternionIdentity();//TODO might as well store root frame here?
 	
 		// root+1
-		float3 r0 = -float3(0.0, 1.0, 0.0);
+		float3 r0 = -localRootDir;
 		float3 r1 = 0.0;
 		float3 r2 = _InitialParticleOffset[strandParticleBegin + strandParticleStride].xyz;
 		{
@@ -538,11 +532,9 @@ void KUpdateRoots(
 	#if 1
 		// perturb initial local frame
 		float3 localRootReference = QMul(_InitialRootFrame[strandIndex], float3(0.0, 1.0, 0.0));
-		float4 localRootPerturb = MakeQuaternionFromTo(localRootReference, normalOS);
-		float4 localRootFrame = QMul(localRootPerturb, _InitialRootFrame[strandIndex]);
+		float4 localRootFrame = MakeQuaternionFromTo(localRootReference, normalOS);
 	#else
-		// construct new local frame
-		float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), normalOS);
+		float4 localRootFrame = MakeQuaternionIdentity();
 	#endif
 
 	#if 1
