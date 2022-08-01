@@ -570,16 +570,17 @@ namespace Unity.DemoTeam.Hair
 					s_volumeCS = resources.computeVolume;
 					s_volumeRasterMat = CoreUtils.CreateEngineMaterial(resources.computeVolumeRaster);
 
+					s_debugDrawCube = resources.debugDrawCube;
+					s_debugDrawMat = CoreUtils.CreateEngineMaterial(resources.debugDraw);
+					s_debugDrawPB = new MaterialPropertyBlock();
+
 					var pointSizeEnabled = s_runtimeFlags.HasFlag(RuntimeFlags.PointRasterizationRequiresPointSize);
 					var pointSizeKeyword = "POINT_RASTERIZATION_NEEDS_PSIZE";
 					{
 						CoreUtils.SetKeyword(s_solverRootsMat, pointSizeKeyword, pointSizeEnabled);
 						CoreUtils.SetKeyword(s_volumeRasterMat, pointSizeKeyword, pointSizeEnabled);
+						CoreUtils.SetKeyword(s_debugDrawMat, pointSizeKeyword, pointSizeEnabled);
 					}
-
-					s_debugDrawCube = resources.debugDrawCube;
-					s_debugDrawMat = CoreUtils.CreateEngineMaterial(resources.debugDraw);
-					s_debugDrawPB = new MaterialPropertyBlock();
 				}
 
 				InitializeStaticFields(typeof(MarkersCPU), (string s) => new ProfilerMarker("HairSim." + s.Replace('_', '.')));

@@ -8,6 +8,10 @@
 	// 0 == uniform target density
 	// 1 == non uniform target density
 
+	#pragma multi_compile __ POINT_RASTERIZATION_NEEDS_PSIZE
+	// 0 == when platform does not require explicit psize
+	// 1 == when platform requires explicit psize
+
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
@@ -30,6 +34,9 @@
 	struct DebugVaryings
 	{
 		float4 positionCS : SV_POSITION;
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		float pointSize : PSIZE;
+#endif
 		float4 color : TEXCOORD0;
 	};
 
@@ -69,6 +76,9 @@
 
 		DebugVaryings output;
 		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		output.color = float4(ColorCycle(instanceID, _StrandCount), 1.0);
 		return output;
 	}
@@ -98,6 +108,9 @@
 
 		DebugVaryings output;
 		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		output.color = float4(0.0, vertexID & 1, vertexID & 2, 1.0);
 		return output;
 
@@ -131,6 +144,9 @@
 
 		DebugVaryings output;
 		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		output.color = float4(color, 1.0);
 		return output;
 	}
@@ -153,6 +169,9 @@
 
 		DebugVaryings output;
 		output.positionCS = WorldToClip(worldPos1);
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		output.color = float4(0.5 * (ndc1 - ndc0), 0, 0);
 		return output;
 	}
@@ -166,6 +185,9 @@
 
 		DebugVaryings output;
 		output.positionCS = WorldToClip(worldPos);
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		output.color = float4(ColorDensity(volumeDensity), 1.0);
 		return output;
 	}
@@ -183,6 +205,9 @@
 
 		DebugVaryings output;
 		output.positionCS = WorldToClip(worldPos);
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		output.color = float4(ColorGradient(volumeGradient), 1.0);
 		return output;
 	}
@@ -197,6 +222,9 @@
 
 		DebugVaryings output;
 		output.positionCS = WorldToClip(worldPos);
+#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.pointSize = 1.0;
+#endif
 		output.color = float4(uvw, 1);
 		return output;
 	}
