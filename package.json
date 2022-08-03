@@ -16,7 +16,7 @@
     {
       "displayName": "Minimal Hair Sample",
       "description": "Interactive scene featuring a simple hair setup. Contains variants for all current rendering pipelines: HDRP, URP, and Built-in.",
-      "path": "Samples/HairSample"
+      "path": "Samples~/HairSample"
     }
   ]
 }
