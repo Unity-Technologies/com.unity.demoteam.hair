@@ -150,17 +150,6 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUIStrands(object userData)
 		{
-			//TODO make aware of multiple settings groups
-			//
-			//var hairInstance = userData as HairInstance;
-			//{
-			//	var material = hairInstance.GetStrandMaterial();
-			//	if (material == null)
-			//	{
-			//		EditorGUILayout.HelpBox("Configuration warning: No active material.", MessageType.Info, wide: true);
-			//	}
-			//}
-
 			return StructValidation.Pass;
 		}
 

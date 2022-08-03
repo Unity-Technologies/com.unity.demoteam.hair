@@ -454,8 +454,10 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2
 		private HashSet<SkinAttachmentTarget> preqGPUAttachmentTargets = new HashSet<SkinAttachmentTarget>();
 		private Hash128 preqGPUAttachmentTargetsHash = new Hash128();
+#endif
 		private int preqCountdown = 1;
 
 		void UpdatePrerequisite()
@@ -511,12 +513,11 @@ namespace Unity.DemoTeam.Hair
 					preq.afterGPUAttachmentWorkCommitted += HandlePrerequisite;
 				}
 			}
-#else
-			preqGPUAttachmentTargets.Clear();
-			preqGPUAttachmentTargetsHash = new Hash128();
-#endif
 
-			preqCountdown = preqGPUAttachmentTargets.Count + 1;
+			preqCountdown = 1 + preqGPUAttachmentTargets.Count;
+#else
+			preqCountdown = 1;
+#endif
 		}
 
 		void HandlePrerequisite()
