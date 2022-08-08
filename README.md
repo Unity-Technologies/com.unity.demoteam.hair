@@ -22,22 +22,22 @@
 		- Shape strands using simple parameters like length and curl
 		- Plug in your own generators for custom placement
 	+ Clustering / Level of detail
-		- Build LOD chain from list of region maps
-		- Build LOD chain procedurally
-
+		- Build clusters and LOD chain automatically from spatial relationships
+		- Can also assign artist-provided clump maps + optionally refine them
+		- Supports root-, strand-, and simplified strand-level clusters
 * Skinning
 	+ Easily attach strand roots to skinned geometry in a scene
 	[ *depends on **com.unity.demoteam.digital-human >= 0.1.1-preview*** ]
 
 * Simulation
 	+ Strand-based solver supporting tens of thousands of individual strands
-	+ Solver adds volume-based quantities such as density and pressure
+	+ Solver also adds volume-based quantities such as density and pressure
 		- Uses physical strand diameter, physical strand margin
 		- Applies pressure to preserve the volume of a groom
 			- Allows targeting uniform density
 			- Allows targeting initial pose density
 		- Applies pressure to soften strand-strand collisions
-		- Encodes directional strand count to support physical shading model in HDRP
+		- Exposes directional opacity to HDRP physical shading model
 	+ Fully configurable set of constraints
 		- Boundary collision w/ friction
 		- Particle-particle distance (soft, hard)
@@ -47,18 +47,20 @@
 		- Global position
 		- Global rotation
 	+ Level of detail support
-		- Allows simulating partial set of strands (e.g. at a distance)
+		- Allows simulating partial set of strands (e.g. at a distance, or for art reasons)
 		- Volume-based effects also work for partial set of strands
-
+		- Seamless LOD blending while simulation is running
+		
 * Rendering
-	+ Supports all existing rendering pipelines
+	+ Supports all current rendering pipelines
 		- Built-in RP
 		- HDRP
 		- URP
 	+ Easily build your own hair materials
 		- Add the ‘HairVertex’ node to any Shader Graph to read the simulation data
-		- (**planned**) Optionally, use generic materials at the cost of copying the data
-		[ *depends on **Unity >= 2021.2** for vertex buffer access* ]
+		- Add the 'HairVolume' node to access simulation volume data like density
+		- (**Planned**) Optionally, assign generic materials as the cost of serializing strands to generic mesh
+		[ *will depend on **Unity >= 2021.2** for vertex buffer access* ]
 	+ Multiple modes of rendering
 		- Render strands as simple line primitives
 		- Render strands as view facing triangle strips w/ tangent space normals
@@ -66,9 +68,13 @@
 		[ *depends on **Unity >= 2023.1*** ]
 
 
-## Usage
+## Installation
 
-Declare the package as a git dependency in `Packages/manifest.json`:
+Use [*Add package from git URL*](https://docs.unity3d.com/Manual/upm-ui-giturl.html) (in the Package Manager): 
+
+```https://github.com/Unity-Technologies/com.unity.demoteam.hair.git```
+
+... or declare the package as a git dependency in `Packages/manifest.json`:
 
 ```
 "dependencies": {
@@ -78,16 +84,30 @@ Declare the package as a git dependency in `Packages/manifest.json`:
 ```
 
 
-## See also
-
-https://github.com/Unity-Technologies/com.unity.demoteam.digital-human
-
-
 ## Related links
 
-Video: [Enemies – real-time cinematic teaser](https://www.youtube.com/watch?v=eXYUNrgqWUU)
+- Video: [Enemies – real-time cinematic teaser](https://www.youtube.com/watch?v=eXYUNrgqWUU)
 
 
 ## References
 
-[list of papers]
+- [Bender et al. 2015] Position-Based Simulation Methods in Computer Graphics
+- [Bridson and Müller-Fischer 2007] Fluid Simulation SIGGRAPH 2007 Course Notes
+- [Gibou et al. 2002] A Second Order Accurate Symmetric Discretization of the Poisson Equation on Irregular Domains	
+- [Harris 2004] Fast Fluid Dynamics Simulation on the GPU
+- [Kelager et al. 2010] A Triangle Bending Constraint Model for Position-Based Dynamics
+- [Kim et al. 2012] Long Range Attachments - A Method to Simulate Inextensible Clothing in Computer Games
+- [Kugelstadt and Schömer 2016] Position and Orientation Based Cosserat Rods
+- [Losasso et al. 2008] Two-Way Coupled SPH and Particle Level Set Fluid Simulation
+- [Macklin et al. 2014] Unified particle physics for real-time application
+- [Macklin et al. 2019] Small Steps in Physics Simulation
+- [McAdams et al. 2009] Detail Preserving Continuum Simulation of Straight Hair
+- [Müller et al. 2006] Position Based Dynamics
+- [Müller et al. 2012] Fast Simulation of Inextensible Hair and Fur
+- [Petrovic et al. 2005] Volumetric Methods for Simulation and Rendering of Hair
+- [Zhu and Bridson 2005] Animating Sand as a Fluid
+
+
+## See also
+
+https://github.com/Unity-Technologies/com.unity.demoteam.digital-human
