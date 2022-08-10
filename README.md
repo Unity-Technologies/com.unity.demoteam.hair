@@ -87,6 +87,7 @@ Use [*Add package from git URL*](https://docs.unity3d.com/Manual/upm-ui-giturl.h
 ## Related links
 
 - Video: [Enemies – real-time cinematic teaser](https://www.youtube.com/watch?v=eXYUNrgqWUU)
+- Video: [Lion: A glimpse of the future with Unity Art Tools](https://www.youtube.com/watch?v=KpPx_lvthBQ)
 
 
 ## References
