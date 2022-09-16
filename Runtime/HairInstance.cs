@@ -80,7 +80,7 @@ namespace Unity.DemoTeam.Hair
 				public GameObject strandMeshContainer;
 				public MeshFilter strandMeshFilter;
 				public MeshRenderer strandMeshRenderer;
-#if HAS_PACKAGE_UNITY_HDRP_15
+#if HAS_HAIRRENDERER
 				public HairRenderer strandMeshRendererHDRP;
 #endif
 
@@ -181,7 +181,7 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Renderer")]
 
 			public StrandRenderer strandRenderer;
-#if HAS_PACKAGE_UNITY_HDRP_15
+#if HAS_HAIRRENDERER
 			//[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHairRenderer)]
 			//public HairRasterizationMode strandRendererMode;
 			[ToggleGroup, VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHairRenderer)]
@@ -226,7 +226,7 @@ namespace Unity.DemoTeam.Hair
 				kLODBlending = false,
 
 				strandRenderer = StrandRenderer.BuiltinLines,
-#if HAS_PACKAGE_UNITY_HDRP_15
+#if HAS_HAIRRENDERER
 				//strandRendererMode = HairRasterizationMode.Performance,
 				strandRendererGrouping = false,
 				strandRendererGroupingValue = HairRendererGroup.Group0,
@@ -1119,7 +1119,7 @@ namespace Unity.DemoTeam.Hair
 
 			// update mesh renderer
 			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandMeshRenderer;
-#if HAS_PACKAGE_UNITY_HDRP_15
+#if HAS_HAIRRENDERER
 			ref var meshRendererHDRP = ref strandGroupInstance.sceneObjects.strandMeshRendererHDRP;
 			{
 				if (meshRendererHDRP == null)
@@ -1134,13 +1134,13 @@ namespace Unity.DemoTeam.Hair
 #endif
 			{
 				var meshRendererEnabled = false;
-#if HAS_PACKAGE_UNITY_HDRP_15
+#if HAS_HAIRRENDERER
 				var meshRendererHDRPEnabled = false;
 #endif
 
 				switch (settingsSystem.strandRenderer)
 				{
-#if !HAS_PACKAGE_UNITY_HDRP_15
+#if !HAS_HAIRRENDERER
 					case SettingsSystem.StrandRenderer.HDRPHairRenderer:
 #endif
 					case SettingsSystem.StrandRenderer.BuiltinLines:
@@ -1154,7 +1154,7 @@ namespace Unity.DemoTeam.Hair
 						}
 						break;
 
-#if HAS_PACKAGE_UNITY_HDRP_15
+#if HAS_HAIRRENDERER
 					case SettingsSystem.StrandRenderer.HDRPHairRenderer:
 						{
 							meshRendererHDRP.enabled = meshRendererHDRPEnabled = true;
@@ -1174,7 +1174,7 @@ namespace Unity.DemoTeam.Hair
 				if (meshRendererEnabled == false)
 					meshRenderer.enabled = false;
 
-#if HAS_PACKAGE_UNITY_HDRP_15
+#if HAS_HAIRRENDERER
 				if (meshRendererHDRPEnabled == false)
 				{
 					meshRendererHDRP.enabled = false;

@@ -122,7 +122,7 @@ namespace Unity.DemoTeam.Hair
 
 				if (hairInstance.settingsSystem.strandRenderer == HairInstance.SettingsSystem.StrandRenderer.HDRPHairRenderer)
 				{
-#if HAS_PACKAGE_UNITY_HDRP_15
+#if HAS_HAIRRENDERER
 					var strandGroupInstances = hairInstance.strandGroupInstances;
 					if (strandGroupInstances != null)
 					{
