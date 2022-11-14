@@ -3,7 +3,9 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-
+#if HAS_PACKAGE_UNITY_HDRP
+using UnityEngine.Rendering.HighDefinition;
+#endif
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
 using Unity.DemoTeam.DigitalHuman;
 #endif
@@ -116,7 +118,7 @@ namespace Unity.DemoTeam.Hair
 						strandGroupInstance.sceneObjects.strandMeshRenderer = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
 
 #if HAS_HAIRRENDERER
-						strandGroupInstance.sceneObjects.strandMeshRendererHDRP = CreateComponent<HairRenderer>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
+						strandGroupInstance.sceneObjects.strandMeshRendererHDRP = CreateComponent<HDAdditionalMeshRendererSettings>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
 #endif
 					}
 				}
@@ -292,13 +294,13 @@ namespace Unity.DemoTeam.Hair
 						//  :  .   :
 						//  |,     |
 						//  4------5
-						//  |    ,´|
-						//  |  ,´  |      etc.
-						//  |,´    |    
+						//  |    ,Â´|
+						//  |  ,Â´  |      etc.
+						//  |,Â´    |    
 						//  2------3    12----13
-						//  |    ,´|    |    ,´|
-						//  |  ,´  |    |  ,´  |
-						//  |,´    |    |,´    |
+						//  |    ,Â´|    |    ,Â´|
+						//  |  ,Â´  |    |  ,Â´  |
+						//  |,Â´    |    |,Â´    |
 						//  0------1    10----11
 						//  .
 						//  |
