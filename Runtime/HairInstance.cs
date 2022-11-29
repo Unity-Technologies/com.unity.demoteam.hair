@@ -80,8 +80,8 @@ namespace Unity.DemoTeam.Hair
 				public GameObject strandMeshContainer;
 				public MeshFilter strandMeshFilter;
 				public MeshRenderer strandMeshRenderer;
-#if HAS_HAIRRENDERER
-				public HDAdditionalMeshRendererSettings  strandMeshRendererHDRP;
+#if HAS_PACKAGE_UNITY_HDRP_15_0_2
+				public HDAdditionalMeshRendererSettings strandMeshRendererHDRP;
 #endif
 
 				[NonSerialized] public Material materialInstance;
@@ -148,7 +148,7 @@ namespace Unity.DemoTeam.Hair
 				Disabled,
 				BuiltinLines,
 				BuiltinStrips,
-				HDRPHighQualityLines
+				HDRPHighQualityLines,
 			}
 
 			public enum SimulationRate
@@ -181,9 +181,9 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Renderer")]
 
 			public StrandRenderer strandRenderer;
-#if HAS_HAIRRENDERER
-			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines)]
-			public LineRendering.RendererGroup strandRendererGroupingValue;
+#if HAS_PACKAGE_UNITY_HDRP_15_0_2
+			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines), FormerlySerializedAs("strandRendererGroupingValue")]
+			public LineRendering.RendererGroup strandRendererGroup;
 #endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
@@ -222,8 +222,8 @@ namespace Unity.DemoTeam.Hair
 				kLODBlending = false,
 
 				strandRenderer = StrandRenderer.BuiltinLines,
-#if HAS_HAIRRENDERER
-				strandRendererGroupingValue = LineRendering.RendererGroup.None,
+#if HAS_PACKAGE_UNITY_HDRP_15_0_2
+				strandRendererGroup = LineRendering.RendererGroup.None,
 #endif
 				strandShadows = ShadowCastingMode.On,
 				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
@@ -759,7 +759,11 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
+#if HAS_PACKAGE_UNITY_COLLECTIONS_1_3_0
+				using (var groupAssetKeys = new UnsafeParallelHashSet<ulong>(groupAssetKeyCapacity, Allocator.Temp))
+#else
 				using (var groupAssetKeys = new UnsafeHashSet<ulong>(groupAssetKeyCapacity, Allocator.Temp))
+#endif
 				{
 					for (int i = 0; i != strandGroupSettings.Length; i++)
 					{
@@ -783,7 +787,11 @@ namespace Unity.DemoTeam.Hair
 
 			// map settings to group instances
 #if true
+#if HAS_PACKAGE_UNITY_COLLECTIONS_1_3_0
+			using (var groupAssetInstancesMap = new UnsafeParallelMultiHashMap<ulong, int>(strandGroupInstances.Length, Allocator.Temp))
+#else
 			using (var groupAssetInstancesMap = new UnsafeMultiHashMap<ulong, int>(strandGroupInstances.Length, Allocator.Temp))
+#endif
 			{
 				for (int i = 0; i != strandGroupInstances.Length; i++)
 				{
@@ -1113,35 +1121,31 @@ namespace Unity.DemoTeam.Hair
 
 			// update mesh renderer
 			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandMeshRenderer;
-#if HAS_HAIRRENDERER
-			ref var meshRendererHDRP = ref strandGroupInstance.sceneObjects.strandMeshRendererHDRP;
 			{
-				if (meshRendererHDRP == null)
-				{
-					var container = strandGroupInstance.sceneObjects.strandMeshContainer;
-					if (container != null && container.TryGetComponent(out meshRendererHDRP) == false)
-					{
-						meshRendererHDRP = strandGroupInstance.sceneObjects.strandMeshRendererHDRP = HairInstanceBuilder.CreateComponent<HDAdditionalMeshRendererSettings>(container, container.hideFlags);
-					}
-				}
-			}
-#endif
-			{
-				meshRenderer.enabled = settingsSystem.strandRenderer != SettingsSystem.StrandRenderer.Disabled;
+				meshRenderer.enabled = (settingsSystem.strandRenderer != SettingsSystem.StrandRenderer.Disabled);
 				meshRenderer.sharedMaterial = materialInstance;
 				meshRenderer.shadowCastingMode = settingsSystem.strandShadows;
 				meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
 				meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
-				
-#if HAS_HAIRRENDERER
-				meshRendererHDRP.enabled = settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines;
-				meshRendererHDRP.rendererGroup = settingsSystem.strandRendererGroupingValue;
-				meshRendererHDRP.enableHighQualityLineRendering = settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines;
+
+#if HAS_PACKAGE_UNITY_HDRP_15_0_2
+				ref var meshRendererHDRP = ref strandGroupInstance.sceneObjects.strandMeshRendererHDRP;
+				{
+					if (meshRendererHDRP == null)
+					{
+						var container = strandGroupInstance.sceneObjects.strandMeshContainer;
+						if (container != null && container.TryGetComponent(out meshRendererHDRP) == false)
+						{
+							meshRendererHDRP = strandGroupInstance.sceneObjects.strandMeshRendererHDRP = HairInstanceBuilder.CreateComponent<HDAdditionalMeshRendererSettings>(container, container.hideFlags);
+						}
+					}
+
+					meshRendererHDRP.enabled = true;
+					meshRendererHDRP.rendererGroup = settingsSystem.strandRendererGroup;
+					meshRendererHDRP.enableHighQualityLineRendering = (settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
+				}
 #endif
 			}
-
-
-			meshRenderer.enabled = (settingsSystem.strandRenderer != SettingsSystem.StrandRenderer.Disabled);
 		}
 
 		public static Bounds GetRootBounds(in GroupInstance strandGroupInstance, Matrix4x4? worldTransform = null)

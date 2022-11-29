@@ -64,8 +64,8 @@
 	+ Multiple modes of rendering
 		- Render strands as simple line primitives
 		- Render strands as view facing triangle strips w/ tangent space normals
-		- Render high quality strands using the upcoming compute-based HDRP hair renderer
-		[ *depends on **Unity >= 2023.1*** ]
+		- Render high quality strands using the upcoming compute-based HDRP line renderer
+		[ *depends on **Unity >= 2023.1.0a21*** ]
 
 
 ## Installation

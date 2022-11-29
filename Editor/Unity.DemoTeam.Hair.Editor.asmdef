@@ -28,8 +28,8 @@
         },
         {
             "name": "com.unity.render-pipelines.high-definition",
-            "expression": "15.0.0",
-            "define": "HAS_PACKAGE_UNITY_HDRP_15"
+            "expression": "15.0.2",
+            "define": "HAS_PACKAGE_UNITY_HDRP_15_0_2"
         },
         {
             "name": "com.unity.render-pipelines.universal",
@@ -47,9 +47,24 @@
             "define": "HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN"
         },
         {
+            "name": "com.unity.demoteam.digital-human",
+            "expression": "0.2.0-preview",
+            "define": "HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2"
+        },
+        {
             "name": "com.unity.demoteam.mesh-to-sdf",
             "expression": "1.0.0",
             "define": "HAS_PACKAGE_DEMOTEAM_MESHTOSDF"
+        },
+        {
+            "name": "com.unity.collections",
+            "expression": "1.0.0-pre.5",
+            "define": "HAS_PACKAGE_UNITY_COLLECTIONS_1_0_0_PRE_5"
+        },
+        {
+            "name": "com.unity.collections",
+            "expression": "1.3.0",
+            "define": "HAS_PACKAGE_UNITY_COLLECTIONS_1_3_0"
         }
     ],
     "noEngineReferences": false

@@ -8,12 +8,17 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Unity.DemoTeam.Hair
 {
+#if !HAS_PACKAGE_UNITY_COLLECTIONS_1_0_0_PRE_5
+	using FixedString128Bytes = FixedString128;
+	using FixedString4096Bytes = FixedString4096;
+#endif
+
 	using Stack = UnsafeList<LongOperationDesc>;
 
 	public struct LongOperationDesc
 	{
-		public FixedString128 operationTitle;
-		public FixedString128 operationStatus;
+		public FixedString128Bytes operationTitle;
+		public FixedString128Bytes operationStatus;
 		public float operationProgress;
 		public int operationLastTick;
 	}
@@ -22,10 +27,10 @@ namespace Unity.DemoTeam.Hair
 	{
 		public LongOperationDesc desc;
 
-		public LongOperationScope(in FixedString128 operationTitle)
+		public LongOperationScope(in FixedString128Bytes operationTitle)
 		{
 			desc.operationTitle = operationTitle;
-			desc.operationStatus = new FixedString128();
+			desc.operationStatus = new FixedString128Bytes();
 			desc.operationProgress = 0.0f;
 
 			unchecked
@@ -60,7 +65,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public void UpdateStatus(in FixedString128 operationStatus, float operationProgress)
+		public void UpdateStatus(in FixedString128Bytes operationStatus, float operationProgress)
 		{
 #if ENABLED
 			if (WaitForTime())
@@ -74,7 +79,7 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
-		public void UpdateStatus(in FixedString128 operationStatus, int operationProgressIndex, int operationProgressCount)
+		public void UpdateStatus(in FixedString128Bytes operationStatus, int operationProgressIndex, int operationProgressCount)
 		{
 #if ENABLED
 			if (WaitForTime())
@@ -129,8 +134,8 @@ namespace Unity.DemoTeam.Hair
 			if (s_stack.IsEmpty)
 				return;
 
-			var concatTitle = new FixedString4096();
-			var concatStatus = new FixedString4096();
+			var concatTitle = new FixedString4096Bytes();
+			var concatStatus = new FixedString4096Bytes();
 			var concatProgress = 0.0f;
 			{
 				var concatTitleHead = -1;
@@ -142,7 +147,7 @@ namespace Unity.DemoTeam.Hair
 				var concatStatusDefault = false;
 
 				void ConditionalCopy(bool cond, ref int limit, int input, ref int output) => output = (cond && limit-- > 0) ? input : output;
-				void ConditionalAppend(bool cond, in FixedString128 input, ref FixedString4096 concat)
+				void ConditionalAppend(bool cond, in FixedString128Bytes input, ref FixedString4096Bytes concat)
 				{
 					if (cond && input.Length > 0)
 					{
@@ -195,7 +200,7 @@ namespace Unity.DemoTeam.Hair
 			EditorUtility.DisplayProgressBar(concatTitle.Value, concatStatus.Value, concatProgress);
 #else
 			{
-				var concatProgressSymbols = new FixedString128();
+				var concatProgressSymbols = new FixedString128Bytes();
 				var concatProgressSymbolsMax = concatProgressSymbols.Capacity / 4 - 2;
 				var concatProgressSymbolsLit = Mathf.RoundToInt(concatProgress * concatProgressSymbolsMax);
 

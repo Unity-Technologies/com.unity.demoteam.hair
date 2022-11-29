@@ -103,7 +103,7 @@ namespace Unity.DemoTeam.Hair
 					DrawVolumeSettingsGUI();
 				}
 				EditorGUILayout.EndVertical();
- 
+
 				//EditorGUILayout.Space();
 				//EditorGUILayout.LabelField(hairInstance.strandGroupInstancesChecksum, EditorStyles.centeredGreyMiniLabel);
 			}
@@ -122,7 +122,7 @@ namespace Unity.DemoTeam.Hair
 
 				if (hairInstance.settingsSystem.strandRenderer == HairInstance.SettingsSystem.StrandRenderer.HDRPHighQualityLines)
 				{
-#if HAS_HAIRRENDERER
+#if HAS_PACKAGE_UNITY_HDRP_15_0_2
 					var strandGroupInstances = hairInstance.strandGroupInstances;
 					if (strandGroupInstances != null)
 					{
@@ -130,7 +130,7 @@ namespace Unity.DemoTeam.Hair
 						//see HairRenderer.IsHairMaterial(...)
 					}
 #else
-					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' requires package: 'com.unity.render-pipelines.high-definition >= 15.0.0'. Using '{1}' as fallback.", HairInstance.SettingsSystem.StrandRenderer.HDRPHighQualityLines, HairInstance.SettingsSystem.StrandRenderer.BuiltinLines), MessageType.Warning, wide: true);
+					EditorGUILayout.HelpBox(string.Format("Configuration warning: '{0}' requires package: 'com.unity.render-pipelines.high-definition >= 15.0.2'. Using '{1}' as fallback.", HairInstance.SettingsSystem.StrandRenderer.HDRPHighQualityLines, HairInstance.SettingsSystem.StrandRenderer.BuiltinLines), MessageType.Warning, wide: true);
 #endif
 				}
 			}

@@ -9,8 +9,6 @@ using UnityEngine;
 using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Burst;
-using Unity.Jobs;
 
 #if HAS_PACKAGE_UNITY_ALEMBIC
 using UnityEngine.Formats.Alembic.Importer;
@@ -935,8 +933,13 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// add levels from cluster maps
+#if HAS_PACKAGE_UNITY_COLLECTIONS_1_3_0
+			using (var clusterLookupColor = new UnsafeParallelHashMap<Color, int>(strandCount, Allocator.Temp))
+			using (var clusterLookupLabel = new UnsafeParallelHashMap<uint, int>(strandCount, Allocator.Temp))
+#else
 			using (var clusterLookupColor = new UnsafeHashMap<Color, int>(strandCount, Allocator.Temp))
 			using (var clusterLookupLabel = new UnsafeHashMap<uint, int>(strandCount, Allocator.Temp))
+#endif
 			using (var strandCluster = new UnsafeList<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
 				var strandClusterPtr = strandCluster.Ptr;
