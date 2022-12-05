@@ -1130,7 +1130,7 @@
         }
     ],
     "m_CustomEditorGUI": "",
-    "m_SupportHair": true
+    "m_SupportLineRendering": true
 }
 
 {

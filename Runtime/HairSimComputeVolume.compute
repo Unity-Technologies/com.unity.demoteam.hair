@@ -80,6 +80,8 @@
 //---------
 // include
 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
 #define HAIRSIM_WRITEABLE_VOLUMEACCU (F_CLEAR || F_SPLAT)
 #define HAIRSIM_WRITEABLE_VOLUMEDATA (F_RESOLVE || F_DIVERGENCE || F_PRESSURE)
 #define HAIRSIM_WRITEABLE_VOLUMEPROBE (F_PROBE)

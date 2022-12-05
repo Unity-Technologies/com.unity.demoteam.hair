@@ -85,6 +85,8 @@
 //----------
 // includes
 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
 #define HAIRSIM_WRITEABLE_SOLVERINPUT (F_INPUT)
 #define HAIRSIM_WRITEABLE_SOLVERDATA (F_INIT || F_SUBSTEP || F_SOLVE || F_INTERPOLATE || F_STAGING)
 

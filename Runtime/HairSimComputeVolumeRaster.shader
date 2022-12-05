@@ -8,6 +8,8 @@
 	// 0 == when platform does not require explicit psize
 	// 1 == when platform requires explicit psize
 
+	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
 	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"

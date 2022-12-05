@@ -7,6 +7,16 @@
 // 1 == staging data compressed
 */
 
+#ifndef HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR
+#define HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(x) GetWorldSpaceNormalizeViewDir(x)
+#endif
+#ifndef HAIR_VERTEX_IMPL_WS_POS_TO_RWS
+#define HAIR_VERTEX_IMPL_WS_POS_TO_RWS(x) GetCameraRelativePositionWS(x)
+#endif
+#ifndef HAIR_VERTEX_IMPL_WS_VEC_TO_OS
+#define HAIR_VERTEX_IMPL_WS_VEC_TO_OS(v) TransformWorldToObjectNormal(v)
+#endif
+
 #ifndef HAIR_VERTEX_ID_LINES
 #define HAIR_VERTEX_ID_LINES 0
 #endif
@@ -23,6 +33,11 @@
 #include "HairSimData.hlsl"
 #include "HairSimDebugDrawUtility.hlsl"
 
+#ifndef UNITY_PREV_MATRIX_I_M// not defined by e.g. URP graphs prior to 2021.2.x
+#define UNITY_PREV_MATRIX_I_M UNITY_MATRIX_I_M
+#endif
+
+/* UNITY_VERSION < 202120
 #ifndef UNITY_SHADER_VARIABLES_INCLUDED
 float4x4 unity_MatrixPreviousMI;
 #endif
@@ -30,6 +45,7 @@ float4x4 unity_MatrixPreviousMI;
 #ifndef UNITY_PREV_MATRIX_I_M
 #define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
 #endif
+*/
 
 #if HAIR_VERTEX_SRC_STAGING
 #define STRAND_PARTICLE_COUNT	_StagingVertexCount
@@ -134,11 +150,11 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 		? r0
 		: LoadPosition(i_next) - p;
 
-	float3 curvePositionRWS = GetCameraRelativePositionWS(p);
-	float3 curvePositionRWSPrev = GetCameraRelativePositionWS(LoadPositionPrev(i));
+	float3 curvePositionRWS = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(p);
+	float3 curvePositionRWSPrev = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(LoadPositionPrev(i));
 
 	float3 vertexBitangentWS = r0 + r1;
-	float3 vertexTangentWS = normalize(cross(vertexBitangentWS, GetWorldSpaceNormalizeViewDir(curvePositionRWS)));
+	float3 vertexTangentWS = normalize(cross(vertexBitangentWS, HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS)));
 	float3 vertexNormalWS = cross(vertexTangentWS, vertexBitangentWS);
 
 #if HAIR_VERTEX_ID_STRIPS
@@ -172,9 +188,9 @@ HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
 	{
 		v.positionOS = mul(UNITY_MATRIX_I_M, float4(x.positionWS, 1.0)).xyz;
 		v.positionOSPrev = mul(UNITY_PREV_MATRIX_I_M, float4(x.positionWSPrev, 1.0)).xyz;
-		v.normalOS = TransformWorldToObjectNormal(x.normalWS);
-		v.tangentOS = TransformWorldToObjectNormal(x.tangentWS);
-		v.bitangentOS = TransformWorldToObjectNormal(x.bitangentWS);
+		v.normalOS = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(x.normalWS);
+		v.tangentOS = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(x.tangentWS);
+		v.bitangentOS = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(x.bitangentWS);
 		v.rootUV = x.rootUV;
 		v.strandUV = x.strandUV;
 		v.strandIndex = x.strandIndex;

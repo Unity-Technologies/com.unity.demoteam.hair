@@ -4,26 +4,32 @@ Shader "Hair/Default/HairMaterialDefaultLitBuiltin"
 
 	#pragma target 5.0
 
-	#ifndef UNITY_COMMON_INCLUDED
+	#pragma multi_compile __ STAGING_COMPRESSION
+	// 0 == staging data full precision
+	// 1 == staging data compressed
+
+	#pragma multi_compile HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
+	// *_LINES == render as line segments
+	// *_STRIPS == render as view facing strips
+
+	#pragma multi_compile HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
+	// *_SOLVER == source vertex from solver data
+	// *_STAGING == source vertex data from staging data
+
 	#define UNITY_COMMON_INCLUDED
-	#endif
 
-	#ifndef UNITY_MATRIX_I_M
-	#define UNITY_MATRIX_I_M unity_WorldToObject
-	#endif
-	#ifndef UNITY_PREV_MATRIX_M
-	#define UNITY_PREV_MATRIX_M unity_MatrixPreviousM
-	#endif
-	#ifndef UNITY_PREV_MATRIX_I_M
-	#define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
-	#endif
-
+	#ifndef real
 	#define real float
+	#endif
+	#ifndef real3
 	#define real3 float3
+	#endif
+	#ifndef real3x3
 	#define real3x3 float3x3
+	#endif
+	#ifndef SafeNormalize
 	#define SafeNormalize(v) (normalize(v))
-	float4x4 unity_MatrixPreviousM;
-	float4x4 unity_MatrixPreviousMI;
+	#endif
 
 	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderConfig.cs.hlsl"
 	#ifdef SHADEROPTIONS_CAMERA_RELATIVE_RENDERING
@@ -31,19 +37,25 @@ Shader "Hair/Default/HairMaterialDefaultLitBuiltin"
 	#define SHADEROPTIONS_CAMERA_RELATIVE_RENDERING (0)
 	#endif
 
+	#ifndef UNITY_MATRIX_M
+	#define UNITY_MATRIX_M unity_ObjectToWorld
+	#endif
+	#ifndef UNITY_MATRIX_I_M
+	#define UNITY_MATRIX_I_M unity_WorldToObject
+	#endif
+	#ifndef UNITY_PREV_MATRIX_M
+	#define UNITY_PREV_MATRIX_M UNITY_MATRIX_M
+	#endif
+	#ifndef UNITY_PREV_MATRIX_I_M
+	#define UNITY_PREV_MATRIX_I_M UNITY_MATRIX_I_M
+	#endif
+
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
 	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariablesFunctions.hlsl"
 
-	#pragma multi_compile __ HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
-	#pragma multi_compile __ HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
-
-	#pragma multi_compile __ STAGING_COMPRESSION
-	// 0 == staging data full precision
-	// 1 == staging data compressed
-
 #ifdef SHADER_API_D3D11
-	#include "HairVertex.hlsl"
+	#include "Packages/com.unity.demoteam.hair/Runtime/HairVertex.hlsl"
 #endif
 
 	ENDCG

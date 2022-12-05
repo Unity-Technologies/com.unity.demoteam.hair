@@ -11,7 +11,6 @@
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 	#include "HairSimData.hlsl"
-	#include "HairSimData.cs.hlsl"
 	#include "HairSimComputeSolverQuaternion.hlsl"
 
 	RWStructuredBuffer<float4> _UpdatedRootPosition : register(u1);
