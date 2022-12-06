@@ -21,8 +21,9 @@
 	#include "HairSimComputeSolverBoundaries.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
 	#include "HairSimComputeStrandCountProbe.hlsl"
+	#include "HairSimDebugDrawConfig.hlsl"
 	#include "HairSimDebugDrawUtility.hlsl"
-	
+
 	int _DebugCluster;
 	uint _DebugSliceAxis;
 	float _DebugSliceOffset;
