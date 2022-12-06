@@ -5,6 +5,14 @@
 #pragma multi_compile __ STAGING_COMPRESSION
 // 0 == staging data full precision
 // 1 == staging data compressed
+
+#pragma multi_compile HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
+// *_LINES == render as line segments
+// *_STRIPS == render as view facing strips
+
+#pragma multi_compile HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
+// *_SOLVER == source vertex from solver data
+// *_STAGING == source vertex data from staging data
 */
 
 #ifndef HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR
@@ -15,6 +23,10 @@
 #endif
 #ifndef HAIR_VERTEX_IMPL_WS_VEC_TO_OS
 #define HAIR_VERTEX_IMPL_WS_VEC_TO_OS(v) TransformWorldToObjectNormal(v)
+#endif
+
+#ifndef normalize_safe
+#define normalize_safe(x) (x * rsqrt(max(1e-7, dot(x, x))))
 #endif
 
 #ifndef HAIR_VERTEX_ID_LINES
@@ -153,8 +165,8 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 	float3 curvePositionRWS = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(p);
 	float3 curvePositionRWSPrev = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(LoadPositionPrev(i));
 
-	float3 vertexBitangentWS = r0 + r1;
-	float3 vertexTangentWS = normalize(cross(vertexBitangentWS, HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS)));
+	float3 vertexBitangentWS = (r0 + r1);// approx tangent to curve
+	float3 vertexTangentWS = normalize_safe(cross(vertexBitangentWS, HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS)));
 	float3 vertexNormalWS = cross(vertexTangentWS, vertexBitangentWS);
 
 #if HAIR_VERTEX_ID_STRIPS
