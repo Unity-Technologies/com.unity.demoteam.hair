@@ -49,11 +49,9 @@ namespace Unity.DemoTeam.Hair
 		public bool HasFrameBounds()
 		{
 			var hairInstance = target as HairInstance;
-			if (hairInstance == null || hairInstance.strandGroupInstances == null)
-				return false;
-			else
-				return true;
-		}
+
+            return hairInstance != null && hairInstance.strandGroupInstances != null;
+        }
 
 		public Bounds OnGetFrameBounds()
 		{
@@ -583,7 +581,7 @@ namespace Unity.DemoTeam.Hair
 						rect1.width = (rect.width) * dividerFrac;
 						rect1.x += rect0.width;
 
-						string DividerLabel(int index)
+                        static string DividerLabel(int index)
 						{
 							switch (index)
 							{

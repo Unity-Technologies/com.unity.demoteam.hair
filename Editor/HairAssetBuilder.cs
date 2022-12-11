@@ -1220,7 +1220,7 @@ namespace Unity.DemoTeam.Hair
 			using (var meshData = Mesh.AcquireReadOnlyMeshData(settings.placementMesh))
 			using (var meshSampler = new TriMeshSampler(meshData[0], 0, Allocator.Temp, (uint)settings.placementMeshGroups))
 			{
-				bool IsTextureReadable(Texture2D texture)
+                static bool IsTextureReadable(Texture2D texture)
 				{
 					return (texture != null && texture.isReadable);
 				}
@@ -1361,7 +1361,7 @@ namespace Unity.DemoTeam.Hair
 
 					if (settings.curl)
 					{
-						Vector3 NextVectorInPlane(ref Mathematics.Random randSeq, in Vector3 n)
+                        static Vector3 NextVectorInPlane(ref Mathematics.Random randSeq, in Vector3 n)
 						{
 							Vector3 r;
 							{

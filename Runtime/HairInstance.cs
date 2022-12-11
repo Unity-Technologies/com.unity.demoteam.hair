@@ -566,7 +566,7 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0, readIndexChecksum = 0; i != strandGroupProviders.Length; i++)
 			{
 				var hairAsset = strandGroupProviders[i].hairAsset;
-				if (hairAsset == null || hairAsset.checksum == "")
+				if (hairAsset == null || hairAsset.checksum.Length == 0)
 					continue;
 
 				if (readIndexChecksum < strandGroupChecksumCount)

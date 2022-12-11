@@ -19,8 +19,7 @@ namespace Unity.DemoTeam.Hair
 			this.skinningBoneBindPoseInverse = Matrix4x4.identity;
 
 			// search for skinning bone
-			var smr = transform.GetComponent<SkinnedMeshRenderer>();
-			if (smr != null)
+			if (transform.TryGetComponent<SkinnedMeshRenderer>(out var smr))
 			{
 				var skinningBoneIndex = -1;
 				var skinningBoneWeight = 0.0f;

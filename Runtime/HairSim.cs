@@ -908,7 +908,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void PushSolverParams(CommandBuffer cmd, ref SolverData solverData, in SolverSettings solverSettings, in Matrix4x4 rootTransform, in Quaternion rootSkinningRotation, float strandDiameter, float strandMargin, float strandScale, float dt)
 		{
-			float IntervalToSeconds(SolverSettings.TimeInterval interval)
+            static float IntervalToSeconds(SolverSettings.TimeInterval interval)
 			{
 				switch (interval)
 				{
@@ -1461,7 +1461,7 @@ namespace Unity.DemoTeam.Hair
 					break;
 			}
 
-			SolverData WithSubstepData(in SolverData data, bool dataSubstep)
+            static SolverData WithSubstepData(in SolverData data, bool dataSubstep)
 			{
 				var dataCopy = data;
 				if (dataSubstep)
