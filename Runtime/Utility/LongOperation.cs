@@ -48,7 +48,7 @@ namespace Unity.DemoTeam.Hair
 
 		bool WaitForTime()
 		{
-			const int WAIT_TICKS = 66;
+			const int WAIT_TICKS = 100;
 			unchecked
 			{
 				var tick = Environment.TickCount;
@@ -131,7 +131,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static void Show()
 		{
-			if (s_stack.IsEmpty)
+			if (s_stack.IsEmpty || LongOperationOutput.s_enable == false)
 				return;
 
 			var concatTitle = new FixedString4096Bytes();
@@ -193,42 +193,32 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
+				/*
+				var j = s_stack.Length - 1;
+				if (j > 0)
+				{
+					var progressBase = s_stack.ElementAt(j - 1).operationProgress;
+					var progressHead = s_stack.ElementAt(j).operationProgress;
+					concatProgress = progressBase + (1.0f - progressBase) * progressHead;
+				}
+				else
+				{
+					concatProgress = s_stack.ElementAt(j).operationProgress;
+				}
+				*/
+
 				ConditionalAppend(concatStatusDefault, "...", ref concatStatus);
 			}
 
-#if UNITY_EDITOR
-			EditorUtility.DisplayProgressBar(concatTitle.Value, concatStatus.Value, concatProgress);
-#else
-			{
-				var concatProgressSymbols = new FixedString128Bytes();
-				var concatProgressSymbolsMax = concatProgressSymbols.Capacity / 4 - 2;
-				var concatProgressSymbolsLit = Mathf.RoundToInt(concatProgress * concatProgressSymbolsMax);
-
-				concatProgressSymbols.Append('[');
-				{
-					for (int i = 0; i != concatProgressSymbolsLit; i++)
-						concatProgressSymbols.Append('#');
-					for (int i = concatProgressSymbolsLit; i != concatProgressSymbolsMax; i++)
-						concatProgressSymbols.Append(' ');
-				}
-				concatProgressSymbols.Append(']');
-
-				Debug.LogFormat("{0} --- {1} --- {2}", concatTitle.Value, concatStatus.Value, concatProgressSymbols.Value);
-			}
-#endif
+			LongOperationOutput.s_output.show(concatTitle.Value, concatStatus.Value, concatProgress);
 		}
 
 		public static void Hide()
 		{
-#if UNITY_EDITOR
-			EditorUtility.ClearProgressBar();
+			if (LongOperationOutput.s_enable == false)
+				return;
 
-			//TODO find a way to reset hotcontrol if a mouse-hold-drag initiated the operation and the hold was released in the meantime
-			//if (s_stack.IsEmpty)
-			//{
-			//	EditorGUIUtility.hotControl = 0;
-			//}
-#endif
+			LongOperationOutput.s_output.hide();
 		}
 
 		public static void Pop()
@@ -242,6 +232,86 @@ namespace Unity.DemoTeam.Hair
 				Hide();
 			else
 				Show();
+		}
+
+		public static bool IsEmpty()
+		{
+			return s_stack.IsEmpty;
+		}
+	}
+
+	public struct LongOperationOutput : IDisposable
+	{
+		public struct Impl
+		{
+			public delegate void FnShow(string title, string status, float progress);
+			public delegate void FnHide();
+
+			public FnShow show;
+			public FnHide hide;
+		}
+
+#if UNITY_EDITOR
+		public static readonly Impl defaultImplEditor = new Impl
+		{
+			show = EditorUtility.DisplayProgressBar,
+			hide = EditorUtility.ClearProgressBar,
+
+			//TODO find a way to reset hotcontrol if a mouse-hold-drag initiated the operation and the hold was released in the meantime
+			//if (s_stack.IsEmpty)
+			//{
+			//	EditorGUIUtility.hotControl = 0;
+			//}
+		};
+#endif
+
+		public static readonly Impl defaultImplPlayer = new Impl
+		{
+			show = (title, status, progress) =>
+			{
+				var concatProgressSymbols = new FixedString128Bytes();
+				var concatProgressSymbolsMax = concatProgressSymbols.Capacity / 4 - 2;
+				var concatProgressSymbolsLit = Mathf.RoundToInt(progress * concatProgressSymbolsMax);
+
+				concatProgressSymbols.Append('[');
+				{
+					for (int i = 0; i != concatProgressSymbolsLit; i++)
+						concatProgressSymbols.Append('#');
+					for (int i = concatProgressSymbolsLit; i != concatProgressSymbolsMax; i++)
+						concatProgressSymbols.Append(' ');
+				}
+				concatProgressSymbols.Append(']');
+
+				Debug.LogFormat("{0} --- {1} --- {2}", title, status, concatProgressSymbols.Value);
+			},
+			hide = () => { },
+		};
+
+		public static bool s_enable = false;
+#if UNITY_EDITOR
+		public static Impl s_output = defaultImplEditor;
+#else
+		public static Impl s_output = defaultImplPlayer;
+#endif
+
+		private static bool s_enablePrev;
+		private static Impl s_outputPrev;
+
+		public LongOperationOutput(bool enable) : this(enable, s_output) { }
+		public LongOperationOutput(Impl output) : this(s_enable, output) { }
+		public LongOperationOutput(bool enable, Impl output)
+		{
+			s_enablePrev = s_enable;
+			s_outputPrev = s_output;
+
+			s_enable = enable;
+			s_output = output;
+		}
+
+		public void Dispose()
+		{
+			s_enable = s_enablePrev;
+			s_output = s_outputPrev;
 		}
 	}
 }
