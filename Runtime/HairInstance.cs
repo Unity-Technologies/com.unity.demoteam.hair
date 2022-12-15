@@ -1,6 +1,6 @@
 ﻿#pragma warning disable 0414 // some fields are unused in case of disabled optional features
 
-#define REMOVE_AFTER_CONTENT_UPGRADE
+#define SUPPORT_CONTENT_UPGRADE
 
 using System;
 using System.Collections.Generic;
@@ -90,7 +90,7 @@ namespace Unity.DemoTeam.Hair
 				[NonSerialized] public uint meshInstanceSubdivisionCount;
 			}
 
-#if REMOVE_AFTER_CONTENT_UPGRADE
+#if SUPPORT_CONTENT_UPGRADE
 			[FormerlySerializedAs("container")] public GameObject OLD__container;
 #endif
 
@@ -317,25 +317,25 @@ namespace Unity.DemoTeam.Hair
 				stagingPrecision = StagingPrecision.Half,
 			};
 
-#if REMOVE_AFTER_CONTENT_UPGRADE
-			[HideInInspector] public float kLODSearchValue;
-			[HideInInspector] public bool kLODBlending;
-			[HideInInspector] public SettingsSystem.StrandRenderer strandRenderer;
-			[HideInInspector] public ShadowCastingMode strandShadows;
-			[HideInInspector] public int strandLayers;
-			[HideInInspector] public MotionVectorGenerationMode motionVectors;
-			[HideInInspector] public bool simulation;
-			[HideInInspector] public SettingsSystem.SimulationRate simulationRate;
-			[HideInInspector] public bool simulationInEditor;
-			[HideInInspector] public float simulationTimeStep;
-			[HideInInspector] public bool stepsMin;
-			[HideInInspector] public int stepsMinValue;
-			[HideInInspector] public bool stepsMax;
-			[HideInInspector] public int stepsMaxValue;
+#if SUPPORT_CONTENT_UPGRADE
+			[HideInInspector, FormerlySerializedAs("kLODSearchValue")] public float OLD__kLODSearchValue;
+			[HideInInspector, FormerlySerializedAs("kLODBlending")] public bool OLD__kLODBlending;
+			[HideInInspector, FormerlySerializedAs("strandRenderer")] public SettingsSystem.StrandRenderer OLD__strandRenderer;
+			[HideInInspector, FormerlySerializedAs("strandShadows")] public ShadowCastingMode OLD__strandShadows;
+			[HideInInspector, FormerlySerializedAs("strandLayers")] public int OLD__strandLayers;
+			[HideInInspector, FormerlySerializedAs("motionVectors")] public MotionVectorGenerationMode OLD__motionVectors;
+			[HideInInspector, FormerlySerializedAs("simulation")] public bool OLD__simulation;
+			[HideInInspector, FormerlySerializedAs("simulationRate")] public SettingsSystem.SimulationRate OLD__simulationRate;
+			[HideInInspector, FormerlySerializedAs("simulationInEditor")] public bool OLD__simulationInEditor;
+			[HideInInspector, FormerlySerializedAs("simulationTimeStep")] public float OLD__simulationTimeStep;
+			[HideInInspector, FormerlySerializedAs("stepsMin")] public bool OLD__stepsMin;
+			[HideInInspector, FormerlySerializedAs("stepsMinValue")] public int OLD__stepsMinValue;
+			[HideInInspector, FormerlySerializedAs("stepsMax")] public bool OLD__stepsMax;
+			[HideInInspector, FormerlySerializedAs("stepsMaxValue")] public int OLD__stepsMaxValue;
 #endif
 		}
 
-#if REMOVE_AFTER_CONTENT_UPGRADE
+#if SUPPORT_CONTENT_UPGRADE
 		[SerializeField, HideInInspector, FormerlySerializedAs("hairAsset")] private HairAsset OLD__hairAsset;
 		[SerializeField, HideInInspector, FormerlySerializedAs("hairAssetQuickEdit")] private bool OLD__hairAssetQuickEdit;
 		[SerializeField, HideInInspector, FormerlySerializedAs("settingsRoots")] public SettingsSkinning OLD__settingsRoots = SettingsSkinning.defaults;
@@ -602,7 +602,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			var status = CheckStrandGroupInstances();
 
-#if REMOVE_AFTER_CONTENT_UPGRADE
+#if SUPPORT_CONTENT_UPGRADE
 			if (OLD__hairAsset != null)
 			{
 				status = StrandGroupInstancesStatus.RequireRebuild;
@@ -672,23 +672,23 @@ namespace Unity.DemoTeam.Hair
 			}
 #endif
 
-#if REMOVE_AFTER_CONTENT_UPGRADE
+#if SUPPORT_CONTENT_UPGRADE
 			if (OLD__hairAsset != null)
 			{
-				settingsSystem.kLODSearchValue = OLD__settingsStrands.kLODSearchValue;
-				settingsSystem.kLODBlending = OLD__settingsStrands.kLODBlending;
-				settingsSystem.strandRenderer = OLD__settingsStrands.strandRenderer;
-				settingsSystem.strandShadows = OLD__settingsStrands.strandShadows;
-				settingsSystem.strandLayers = OLD__settingsStrands.strandLayers;
-				settingsSystem.motionVectors = OLD__settingsStrands.motionVectors;
-				settingsSystem.simulation = OLD__settingsStrands.simulation;
-				settingsSystem.simulationRate = OLD__settingsStrands.simulationRate;
-				settingsSystem.simulationInEditor = OLD__settingsStrands.simulationInEditor;
-				settingsSystem.simulationTimeStep = OLD__settingsStrands.simulationTimeStep;
-				settingsSystem.stepsMin = OLD__settingsStrands.stepsMin;
-				settingsSystem.stepsMinValue = OLD__settingsStrands.stepsMinValue;
-				settingsSystem.stepsMax = OLD__settingsStrands.stepsMax;
-				settingsSystem.stepsMaxValue = OLD__settingsStrands.stepsMaxValue;
+				settingsSystem.kLODSearchValue = OLD__settingsStrands.OLD__kLODSearchValue;
+				settingsSystem.kLODBlending = OLD__settingsStrands.OLD__kLODBlending;
+				settingsSystem.strandRenderer = OLD__settingsStrands.OLD__strandRenderer;
+				settingsSystem.strandShadows = OLD__settingsStrands.OLD__strandShadows;
+				settingsSystem.strandLayers = OLD__settingsStrands.OLD__strandLayers;
+				settingsSystem.motionVectors = OLD__settingsStrands.OLD__motionVectors;
+				settingsSystem.simulation = OLD__settingsStrands.OLD__simulation;
+				settingsSystem.simulationRate = OLD__settingsStrands.OLD__simulationRate;
+				settingsSystem.simulationInEditor = OLD__settingsStrands.OLD__simulationInEditor;
+				settingsSystem.simulationTimeStep = OLD__settingsStrands.OLD__simulationTimeStep;
+				settingsSystem.stepsMin = OLD__settingsStrands.OLD__stepsMin;
+				settingsSystem.stepsMinValue = OLD__settingsStrands.OLD__stepsMinValue;
+				settingsSystem.stepsMax = OLD__settingsStrands.OLD__stepsMax;
+				settingsSystem.stepsMaxValue = OLD__settingsStrands.OLD__stepsMaxValue;
 
 				CoreUtils.Destroy(strandGroupInstances?[0].OLD__container);
 

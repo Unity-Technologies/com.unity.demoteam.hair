@@ -19,7 +19,7 @@ namespace Unity.DemoTeam.Hair
 			var propertyIt = property.Copy();
 			var propertyEnd = property.Copy();
 
-			propertyEnd.Next(enterChildren: false);
+			propertyEnd.NextVisible(enterChildren: false);
 
 			for (int i = 0; propertyIt.NextVisible(enterChildren: i == 0); i++)
 			{

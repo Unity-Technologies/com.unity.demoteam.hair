@@ -15,10 +15,14 @@ namespace Unity.DemoTeam.Hair
 	[CustomEditor(typeof(HairAsset))]
 	public class HairAssetEditor : Editor
 	{
-		Editor rootGeneratorEditor;
+		Editor editorCustomData;
+		Editor editorCustomPlacement;
 
 		SerializedProperty _settingsBasic;
+		SerializedProperty _settingsCustom;
+		SerializedProperty _settingsCustom_settingsResolve;
 		SerializedProperty _settingsAlembic;
+		SerializedProperty _settingsAlembic_settingsResolve;
 		SerializedProperty _settingsProcedural;
 		SerializedProperty _settingsLODClusters;
 		SerializedProperty _settingsLODClusters_baseLOD;
@@ -64,7 +68,10 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			_settingsBasic = serializedObject.FindProperty(nameof(HairAsset.settingsBasic));
+			_settingsCustom = serializedObject.FindProperty(nameof(HairAsset.settingsCustom));
+			_settingsCustom_settingsResolve = _settingsCustom.FindPropertyRelative(nameof(HairAsset.SettingsCustom.settingsResolve));
 			_settingsAlembic = serializedObject.FindProperty(nameof(HairAsset.settingsAlembic));
+			_settingsAlembic_settingsResolve = _settingsAlembic.FindPropertyRelative(nameof(HairAsset.SettingsAlembic.settingsResolve));
 			_settingsProcedural = serializedObject.FindProperty(nameof(HairAsset.settingsProcedural));
 			_settingsLODClusters = serializedObject.FindProperty(nameof(HairAsset.settingsLODClusters));
 			_settingsLODClusters_baseLOD = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLOD));
@@ -80,9 +87,14 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDisable()
 		{
-			if (rootGeneratorEditor)
+			if (editorCustomData)
 			{
-				DestroyImmediate(rootGeneratorEditor);
+				DestroyImmediate(editorCustomData);
+			}
+
+			if (editorCustomPlacement)
+			{
+				DestroyImmediate(editorCustomPlacement);
 			}
 
 			ReleasePreviewData();
@@ -155,6 +167,27 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		static StructValidation ValidationGUIProcedural(object userData)
+		{
+			var hairAsset = userData as HairAsset;
+			if (hairAsset != null)
+			{
+				if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
+				{
+					WarnIfNotAssigned(hairAsset.settingsProcedural.placementMesh, LabelName(nameof(HairAsset.SettingsProcedural.placementMesh)));
+					WarnIfNotReadable(hairAsset.settingsProcedural.mappedDensity, LabelName(nameof(HairAsset.SettingsProcedural.mappedDensity)));
+					WarnIfNotReadable(hairAsset.settingsProcedural.mappedDirection, LabelName(nameof(HairAsset.SettingsProcedural.mappedDirection)));
+					WarnIfNotReadable(hairAsset.settingsProcedural.mappedParameters, LabelName(nameof(HairAsset.SettingsProcedural.mappedParameters)));
+				}
+
+				if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom)
+				{
+					WarnIfNotAssigned(hairAsset.settingsProcedural.placementProvider, LabelName(nameof(HairAsset.SettingsProcedural.placementProvider)));
+				}
+			}
+			return StructValidation.Pass;
+		}
+
 		static StructValidation ValidationGUIAlembic(object userData)
 		{
 #if HAS_PACKAGE_UNITY_ALEMBIC
@@ -168,12 +201,12 @@ namespace Unity.DemoTeam.Hair
 				}
 				else
 				{
-					WarnIfNotAssigned(alembicAsset, LabelName(nameof(hairAsset.settingsAlembic.alembicAsset)));
+					WarnIfNotAssigned(alembicAsset, LabelName(nameof(HairAsset.SettingsAlembic.alembicAsset)));
 				}
 
-				if (hairAsset.settingsAlembic.rootUV == HairAsset.SettingsAlembic.RootUV.ResolveFromMesh)
+				if (hairAsset.settingsAlembic.settingsResolve.rootUV == HairAsset.SettingsResolve.RootUV.ResolveFromMesh)
 				{
-					WarnIfNotAssigned(hairAsset.settingsAlembic.rootUVMesh, LabelName(nameof(hairAsset.settingsAlembic.rootUVMesh)));
+					WarnIfNotAssigned(hairAsset.settingsAlembic.settingsResolve.rootUVMesh, LabelName(nameof(HairAsset.SettingsResolve.rootUVMesh)));
 				}
 			}
 			return StructValidation.Pass;
@@ -183,22 +216,18 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
-		static StructValidation ValidationGUIProcedural(object userData)
+		static StructValidation ValidationGUICustom(object userData)
 		{
 			var hairAsset = userData as HairAsset;
-			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
+			if (hairAsset != null)
 			{
-				WarnIfNotAssigned(hairAsset.settingsProcedural.placementMesh, LabelName(nameof(hairAsset.settingsProcedural.placementMesh)));
-				WarnIfNotReadable(hairAsset.settingsProcedural.mappedDensity, LabelName(nameof(hairAsset.settingsProcedural.mappedDensity)));
-				WarnIfNotReadable(hairAsset.settingsProcedural.mappedDirection, LabelName(nameof(hairAsset.settingsProcedural.mappedDirection)));
-				WarnIfNotReadable(hairAsset.settingsProcedural.mappedParameters, LabelName(nameof(hairAsset.settingsProcedural.mappedParameters)));
-			}
+				WarnIfNotAssigned(hairAsset.settingsCustom.dataProvider, LabelName(nameof(HairAsset.SettingsCustom.dataProvider)));
 
-			if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom)
-			{
-				WarnIfNotAssigned(hairAsset.settingsProcedural.placementProvider, LabelName(nameof(hairAsset.settingsProcedural.placementProvider)));
+				if (hairAsset.settingsCustom.settingsResolve.rootUV == HairAsset.SettingsResolve.RootUV.ResolveFromMesh)
+				{
+					WarnIfNotAssigned(hairAsset.settingsCustom.settingsResolve.rootUVMesh, LabelName(nameof(HairAsset.SettingsResolve.rootUVMesh)));
+				}
 			}
-
 			return StructValidation.Pass;
 		}
 
@@ -219,14 +248,13 @@ namespace Unity.DemoTeam.Hair
 							{
 								for (int i = 0; i != clusterMaps.Length; i++)
 								{
-									WarnIfNotReadable(clusterMaps[i], string.Format("{0}[{1}]", LabelName(nameof(hairAsset.settingsLODClusters.baseLODParamsUVMapped.baseLODClusterMaps)), i));
+									WarnIfNotReadable(clusterMaps[i], string.Format("{0}[{1}]", LabelName(nameof(HairAsset.SettingsLODClusters.BaseLODParamsUVMapped.baseLODClusterMaps)), i));
 								}
 							}
 						}
 						break;
 				}
 			}
-
 			return StructValidation.Pass;
 		}
 
@@ -244,23 +272,64 @@ namespace Unity.DemoTeam.Hair
 
 				switch (hairAsset.settingsBasic.type)
 				{
-					case HairAsset.Type.Alembic:
-						StructPropertyFieldsWithHeader(_settingsAlembic, ValidationGUIAlembic, hairAsset);
+					case HairAsset.Type.Procedural:
+						{
+							StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
+
+							var placementType = hairAsset.settingsProcedural.placement;
+							if (placementType == HairAsset.SettingsProcedural.PlacementType.Custom)
+							{
+								var placementProvider = hairAsset.settingsProcedural.placementProvider;
+								if (placementProvider != null)
+								{
+									EditorGUILayout.Space();
+									if (StructHeader("Settings Custom Placement"))
+									{
+										using (new EditorGUI.IndentLevelScope())
+										{
+											CreateCachedEditor(placementProvider, editorType: null, ref editorCustomPlacement);
+											editorCustomPlacement.OnInspectorGUI();
+										}
+									}
+								}
+							}
+						}
 						break;
 
-					case HairAsset.Type.Procedural:
-						StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
+					case HairAsset.Type.Alembic:
 						{
-							var placementType = hairAsset.settingsProcedural.placement;
-							if (placementType == HairAsset.SettingsProcedural.PlacementType.Custom && hairAsset.settingsProcedural.placementProvider is HairAssetProvider)
+							var alembicExpanded = StructPropertyFieldsWithHeader(_settingsAlembic, ValidationGUIAlembic, hairAsset);
+							if (alembicExpanded)
+							{
+								using (new EditorGUI.IndentLevelScope())
+								{
+									StructPropertyFields(_settingsAlembic_settingsResolve);
+								}
+							}
+						}
+						break;
+
+					case HairAsset.Type.Custom:
+						{
+							var customExpanded = StructPropertyFieldsWithHeader(_settingsCustom, ValidationGUICustom, hairAsset);
+							if (customExpanded)
+							{
+								using (new EditorGUI.IndentLevelScope())
+								{
+									StructPropertyFields(_settingsCustom_settingsResolve);
+								}
+							}
+
+							var dataProvider = hairAsset.settingsCustom.dataProvider;
+							if (dataProvider != null)
 							{
 								EditorGUILayout.Space();
-								if (StructHeader("Settings Custom Placement"))
+								if (StructHeader("Settings Custom Data"))
 								{
 									using (new EditorGUI.IndentLevelScope())
 									{
-										CreateCachedEditor(hairAsset.settingsProcedural.placementProvider, editorType: null, ref rootGeneratorEditor);
-										rootGeneratorEditor.OnInspectorGUI();
+										CreateCachedEditor(dataProvider, editorType: null, ref editorCustomData);
+										editorCustomData.OnInspectorGUI();
 									}
 								}
 							}

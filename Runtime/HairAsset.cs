@@ -1,6 +1,10 @@
-﻿using System;
+﻿#define SUPPORT_CONTENT_UPGRADE
+
+using System;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 #if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
 using UnityEngine.Formats.Alembic.Importer;
@@ -15,6 +19,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			Procedural,
 			Alembic,
+			Custom,
 		}
 
 		public enum MemoryLayout
@@ -48,69 +53,6 @@ namespace Unity.DemoTeam.Hair
 				memoryLayout = MemoryLayout.Interleaved,
 				kLODClusters = false,
 				kLODClustersClustering = StrandClusterMode.Strands,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsAlembic
-		{
-			public enum Groups
-			{
-				Combine,
-				Preserve,
-			}
-
-			public enum RootUV
-			{
-				Uniform,
-				ResolveFromMesh,
-				//ResolveFromCurveUV,
-				//ResolveFromCurveAttribute,
-			}
-
-			[LineHeader("Curves")]
-
-#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
-			[Tooltip("Alembic asset containing at least one set of curves")]
-			public AlembicStreamPlayer alembicAsset;
-#endif
-			[Tooltip("Whether to combine or preserve subsequent sets of curves with same vertex count")]
-			public Groups alembicAssetGroups;
-
-			[LineHeader("UV Resolve")]
-
-			public RootUV rootUV;
-			[VisibleIf(nameof(rootUV), RootUV.Uniform)]
-			public Vector2 rootUVConstant;
-			[VisibleIf(nameof(rootUV), RootUV.ResolveFromMesh)]
-			public Mesh rootUVMesh;
-			//[VisibleIf(nameof(rootUV), RootUV.ResolveFromCurveAttribute)]
-			//public string rootUVAttribute;
-
-			[LineHeader("Processing")]
-
-			[Tooltip("Resample curves to ensure a specific number of equidistant particles along each strand")]
-			public bool resampleCurves;
-
-			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of equidistant particles along each strand")]
-			public int resampleParticleCount;
-			[Range(1, 5), Tooltip("Number of resampling iterations")]
-			public int resampleQuality;
-
-			public static readonly SettingsAlembic defaults = new SettingsAlembic()
-			{
-#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
-				alembicAsset = null,
-#endif
-				alembicAssetGroups = Groups.Combine,
-
-				rootUV = RootUV.Uniform,
-				rootUVConstant = Vector2.zero,
-				rootUVMesh = null,
-
-				resampleCurves = true,
-				resampleParticleCount = 16,
-				resampleQuality = 1,
 			};
 		}
 
@@ -158,7 +100,7 @@ namespace Unity.DemoTeam.Hair
 			[VisibleIf(nameof(placement), PlacementType.Primitive), Tooltip("Place strands using builtin primitive generator")]
 			public PrimitiveType placementPrimitive;
 			[VisibleIf(nameof(placement), PlacementType.Custom), Tooltip("Place strands using specified custom generator"), FormerlySerializedAs("placementGenerator")]
-			public HairAssetProvider placementProvider;
+			public HairAssetCustomPlacement placementProvider;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on specified triangle mesh")]
 			public Mesh placementMesh;
 			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Included submesh indices"), FormerlySerializedAs("placementMeshInclude")]
@@ -232,6 +174,103 @@ namespace Unity.DemoTeam.Hair
 				curlVariationRadius = 0.1f,
 				curlVariationSlope = 0.3f,
 				curlSamplingStrategy = CurlSamplingStrategy.RelaxStrandLength,
+			};
+		}
+
+		[Serializable]
+		public struct SettingsAlembic
+		{
+			public enum Groups
+			{
+				Combine,
+				Preserve,
+			}
+
+			[LineHeader("Curves")]
+
+#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
+			[Tooltip("Alembic asset containing at least one set of curves")]
+			public AlembicStreamPlayer alembicAsset;
+#endif
+			[Tooltip("Whether to combine or preserve subsequent sets of curves with same vertex count")]
+			public Groups alembicAssetGroups;
+
+			[VisibleIf(false)] public SettingsResolve settingsResolve;
+
+			public static readonly SettingsAlembic defaults = new SettingsAlembic()
+			{
+#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
+				alembicAsset = null,
+#endif
+				alembicAssetGroups = Groups.Combine,
+
+				settingsResolve = SettingsResolve.defaults,
+			};
+
+#if SUPPORT_CONTENT_UPGRADE
+			[HideInInspector, FormerlySerializedAs("rootUV")] public SettingsResolve.RootUV OLD__rootUV;
+			[HideInInspector, FormerlySerializedAs("rootUVConstant")] public Vector2 OLD__rootUVConstant;
+			[HideInInspector, FormerlySerializedAs("rootUVMesh")] public Mesh OLD__rootUVMesh;
+			[HideInInspector, FormerlySerializedAs("resampleCurves")] public bool OLD__resampleCurves;
+			[HideInInspector, FormerlySerializedAs("resampleParticleCount")] public int OLD__resampleParticleCount;
+			[HideInInspector, FormerlySerializedAs("resampleQuality")] public int OLD__resampleQuality;
+			[HideInInspector] public bool OLD__transferred;
+#endif
+		}
+
+		[Serializable]
+		public struct SettingsCustom
+		{
+			[LineHeader("Curves")]
+
+			public HairAssetCustomData dataProvider;
+
+			[VisibleIf(false)] public SettingsResolve settingsResolve;
+
+			public static readonly SettingsCustom defaults = new SettingsCustom()
+			{
+				dataProvider = null,
+
+				settingsResolve = SettingsResolve.defaults,
+			};
+		}
+
+		[Serializable]
+		public struct SettingsResolve
+		{
+			public enum RootUV
+			{
+				Uniform,
+				ResolveFromMesh,
+				ResolveFromCurveUV,
+			}
+
+			[LineHeader("UV Resolve")]
+
+			public RootUV rootUV;
+			[VisibleIf(nameof(rootUV), RootUV.Uniform)]
+			public Vector2 rootUVConstant;
+			[VisibleIf(nameof(rootUV), RootUV.ResolveFromMesh)]
+			public Mesh rootUVMesh;
+
+			[LineHeader("Processing")]
+
+			[Tooltip("Resample curves to ensure a specific number of equidistant particles along each strand")]
+			public bool resampleCurves;
+			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of equidistant particles along each strand")]
+			public int resampleParticleCount;
+			[Range(1, 5), Tooltip("Number of resampling iterations")]
+			public int resampleQuality;
+
+			public static readonly SettingsResolve defaults = new SettingsResolve()
+			{
+				rootUV = RootUV.Uniform,
+				rootUVConstant = Vector2.zero,
+				rootUVMesh = null,
+
+				resampleCurves = true,
+				resampleParticleCount = 16,
+				resampleQuality = 1,
 			};
 		}
 
@@ -411,6 +450,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		public SettingsBasic settingsBasic = SettingsBasic.defaults;
+		public SettingsCustom settingsCustom = SettingsCustom.defaults;
 		public SettingsAlembic settingsAlembic = SettingsAlembic.defaults;
 		public SettingsProcedural settingsProcedural = SettingsProcedural.defaults;
 		public SettingsLODClusters settingsLODClusters = SettingsLODClusters.defaults;
@@ -423,6 +463,19 @@ namespace Unity.DemoTeam.Hair
 		void ISerializationCallbackReceiver.OnBeforeSerialize() { }
 		void ISerializationCallbackReceiver.OnAfterDeserialize()
 		{
+#if SUPPORT_CONTENT_UPGRADE
+			if (settingsAlembic.OLD__transferred == false)
+			{
+				settingsAlembic.settingsResolve.rootUV = settingsAlembic.OLD__rootUV;
+				settingsAlembic.settingsResolve.rootUVConstant = settingsAlembic.OLD__rootUVConstant;
+				settingsAlembic.settingsResolve.rootUVMesh = settingsAlembic.OLD__rootUVMesh;
+				settingsAlembic.settingsResolve.resampleCurves = settingsAlembic.OLD__resampleCurves;
+				settingsAlembic.settingsResolve.resampleParticleCount = settingsAlembic.OLD__resampleParticleCount;
+				settingsAlembic.settingsResolve.resampleQuality = settingsAlembic.OLD__resampleQuality;
+				settingsAlembic.OLD__transferred = true;
+			}
+#endif
+
 			if (strandGroups == null)
 				return;
 
@@ -469,6 +522,167 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0; i != strandGroups.Length; i++)
 			{
 				while (PerformVersionBump(ref strandGroups[i])) { };
+			}
+		}
+	}
+
+	public static class HairAssetProvisional
+	{
+		public struct ProceduralRoots : IDisposable
+		{
+			public struct RootParameters
+			{
+				public float normalizedStrandLength;
+				public float normalizedStrandDiameter;
+				public float normalizedCurlRadius;
+				public float normalizedCurlSlope;
+
+				public static readonly RootParameters defaults = new RootParameters()
+				{
+					normalizedStrandLength = 1.0f,
+					normalizedStrandDiameter = 1.0f,
+					normalizedCurlRadius = 1.0f,
+					normalizedCurlSlope = 1.0f,
+				};
+			}
+
+			public int strandCount;
+			public NativeArray<Vector2> rootUV;
+			public NativeArray<Vector3> rootPosition;
+			public NativeArray<Vector3> rootDirection;
+			public NativeArray<RootParameters> rootParameters;// R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope
+
+			public ProceduralRoots(int strandCount, Allocator allocator = Allocator.Temp)
+			{
+				this.strandCount = strandCount;
+				this.rootUV = new NativeArray<Vector2>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.rootPosition = new NativeArray<Vector3>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.rootDirection = new NativeArray<Vector3>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+				this.rootParameters = new NativeArray<RootParameters>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
+			}
+
+			public unsafe void GetUnsafePtrs(out Vector3* rootPositionPtr, out Vector3* rootDirectionPtr, out Vector2* rootUVPtr, out RootParameters* rootParametersPtr)
+			{
+				rootUVPtr = (Vector2*)rootUV.GetUnsafePtr();
+				rootPositionPtr = (Vector3*)rootPosition.GetUnsafePtr();
+				rootDirectionPtr = (Vector3*)rootDirection.GetUnsafePtr();
+				rootParametersPtr = (RootParameters*)rootParameters.GetUnsafePtr();
+			}
+
+			public void Dispose()
+			{
+				rootUV.Dispose();
+				rootPosition.Dispose();
+				rootDirection.Dispose();
+				rootParameters.Dispose();
+			}
+		}
+
+		public struct ProceduralStrands : IDisposable
+		{
+			public int strandCount;
+			public int strandParticleCount;
+			public NativeArray<Vector3> particlePosition;
+
+			public ProceduralStrands(int strandCount, int strandParticleCount, Allocator allocator = Allocator.Temp)
+			{
+				this.strandCount = strandCount;
+				this.strandParticleCount = strandParticleCount;
+				this.particlePosition = new NativeArray<Vector3>(strandCount * strandParticleCount, allocator, NativeArrayOptions.UninitializedMemory);
+			}
+
+			public unsafe void GetUnsafePtrs(out Vector3* particlePositionPtr)
+			{
+				particlePositionPtr = (Vector3*)particlePosition.GetUnsafePtr();
+			}
+
+			public void Dispose()
+			{
+				particlePosition.Dispose();
+			}
+		}
+
+		public struct CurveSet : IDisposable
+		{
+			[Flags]
+			public enum VertexFeatures
+			{
+				Position = 1 << 0,
+				TexCoord = 1 << 1,
+				Diameter = 1 << 2,
+			}
+
+			public int curveCount;							// number of curves in set
+			public UnsafeList<int> curveVertexCount;		// i: curve index -> number of vertices in curve
+			public UnsafeList<Vector3> vertexDataPosition;	// j: vertex index -> curve vertex position
+			public UnsafeList<Vector2> vertexDataTexCoord;	// j: vertex index -> curve vertex texcoord
+			public UnsafeList<float> vertexDataDiameter;	// j: vertex index -> curve vertex diameter
+			public VertexFeatures vertexFeatures;			// m: vertex feature flags
+
+			// vertex data must laid out sequentially, e.g. for two curves a and b:
+			//		curveVertexCount	[ 4 2 ]
+			//		vertexData*			[ a a a a b b ]
+			//
+			// vertex data offset for the i'th curve is then given by:
+			//		j <- sum( curveVertexCount, 0..i-1 )
+			//
+			// vertex feature flags are used during processing:
+			//		- position is expected (required, not tested)
+			//		- texcoord is optional (if not specified, the "resolve from curve uv" setting will show a warning)
+			//		- diameter is optional (if not specified, the strand diameter will default to a sensible non-zero value)
+
+			public CurveSet(Allocator allocator) : this(0, 0, allocator) { }
+			public CurveSet(int initialCurveCapacity, int initialVertexCapacity, Allocator allocator)
+			{
+				this.curveCount = 0;
+				this.curveVertexCount = new UnsafeList<int>(initialCurveCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.vertexDataPosition = new UnsafeList<Vector3>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.vertexDataTexCoord = new UnsafeList<Vector2>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.vertexDataDiameter = new UnsafeList<float>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.vertexFeatures = VertexFeatures.Position;
+			}
+
+			public void Dispose()
+			{
+				curveVertexCount.Dispose();
+				vertexDataPosition.Dispose();
+				vertexDataTexCoord.Dispose();
+				vertexDataDiameter.Dispose();
+			}
+		}
+
+		public struct CurveSetInfo
+		{
+			public int minVertexCount;
+			public int maxVertexCount;
+			public int sumVertexCount;
+
+			public CurveSetInfo(in CurveSet curveSet)
+			{
+				if (curveSet.curveCount > 0)
+				{
+					unsafe
+					{
+						var curveVertexCountPtr = (int*)curveSet.curveVertexCount.Ptr;
+
+						minVertexCount = curveVertexCountPtr[0];
+						maxVertexCount = curveVertexCountPtr[0];
+						sumVertexCount = curveVertexCountPtr[0];
+
+						for (int i = 1; i != curveSet.curveCount; i++)
+						{
+							minVertexCount = Mathf.Min(minVertexCount, curveVertexCountPtr[i]);
+							maxVertexCount = Mathf.Max(maxVertexCount, curveVertexCountPtr[i]);
+							sumVertexCount += curveVertexCountPtr[i];
+						}
+					}
+				}
+				else
+				{
+					minVertexCount = 0;
+					maxVertexCount = 0;
+					sumVertexCount = 0;
+				}
 			}
 		}
 	}

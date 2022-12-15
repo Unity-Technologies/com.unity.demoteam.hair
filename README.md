@@ -25,6 +25,10 @@
 		- Build clusters and LOD chain automatically from spatial relationships
 		- Can also assign artist-provided clump maps + optionally refine them
 		- Supports root-, strand-, and simplified strand-level clusters
+	+ Need to inject curves from a different system?
+		- Plug in your own providers for custom curve data
+		- Custom data also benefits from built-in processing pipeline
+		
 * Skinning
 	+ Easily attach strand roots to skinned geometry in a scene
 	[ *depends on **com.unity.demoteam.digital-human >= 0.1.1-preview*** ]
