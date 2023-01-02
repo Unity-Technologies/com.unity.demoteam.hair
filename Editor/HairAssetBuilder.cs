@@ -299,11 +299,19 @@ namespace Unity.DemoTeam.Hair
 
 			var curveSetInfo = new HairAssetProvisional.CurveSetInfo(curveSet);
 			{
-				if ((curveSetInfo.sumVertexCount > curveSet.vertexDataPosition.Length) ||
-					(curveSetInfo.sumVertexCount > curveSet.vertexDataTexCoord.Length && curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord)) ||
-					(curveSetInfo.sumVertexCount > curveSet.vertexDataDiameter.Length && curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter)))
+				var curveSetIncompleteReason = (HairAssetProvisional.CurveSet.VertexFeatures)0;
 				{
-					Debug.LogWarning("Discarding provided curve set due to incomplete (out of bounds) vertex data.");
+					if (curveSetInfo.sumVertexCount > curveSet.vertexDataPosition.Length)
+						curveSetIncompleteReason |= HairAssetProvisional.CurveSet.VertexFeatures.Position;
+					if (curveSetInfo.sumVertexCount > curveSet.vertexDataTexCoord.Length && curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
+						curveSetIncompleteReason |= HairAssetProvisional.CurveSet.VertexFeatures.TexCoord;
+					if (curveSetInfo.sumVertexCount > curveSet.vertexDataDiameter.Length && curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter))
+						curveSetIncompleteReason |= HairAssetProvisional.CurveSet.VertexFeatures.Diameter;
+				}
+
+				if (curveSetIncompleteReason != 0)
+				{
+					Debug.LogWarningFormat("Discarding provided curve set due to incomplete (out of bounds) vertex data. ({0})", curveSetIncompleteReason.ToString());
 					return;
 				}
 
@@ -487,7 +495,7 @@ namespace Unity.DemoTeam.Hair
 							}
 							else
 							{
-								Debug.LogWarning("Unable to resolve root UVs from curve UVs, since no curve UVs are provided. Using constant value as fallback.");
+								Debug.LogWarning("Unable to resolve root UVs from curve UVs, since no curve UVs were provided. Using constant value as fallback.");
 								goto case HairAsset.SettingsResolve.RootUV.Uniform;
 							}
 						}
@@ -577,6 +585,7 @@ namespace Unity.DemoTeam.Hair
 			public Vector3[] vertexDataPosition;
 			public Vector2[] vertexDataTexCoord;
 			public float[] vertexDataDiameter;
+			public HairAssetProvisional.CurveSet.VertexFeatures vertexFeatures;
 		}
 
 		static unsafe AlembicCurvesInfo PrepareAlembicCurvesInfo(AlembicCurves curveSet)
@@ -591,7 +600,14 @@ namespace Unity.DemoTeam.Hair
 				vertexDataPosition = curveSet.Positions,
 				vertexDataTexCoord = curveSet.UVs,
 				vertexDataDiameter = curveSet.Widths,
+				vertexFeatures = HairAssetProvisional.CurveSet.VertexFeatures.Position,
 			};
+
+			// find vertex features
+			if (info.vertexDataTexCoord != null && info.vertexDataTexCoord.Length > 0)
+				info.vertexFeatures |= HairAssetProvisional.CurveSet.VertexFeatures.TexCoord;
+			if (info.vertexDataDiameter != null && info.vertexDataDiameter.Length > 0)
+				info.vertexFeatures |= HairAssetProvisional.CurveSet.VertexFeatures.Diameter;
 
 			// find min-max vertex count
 			if (info.curveCount > 0)
@@ -620,16 +636,12 @@ namespace Unity.DemoTeam.Hair
 			ref readonly var settings = ref hairAsset.settingsAlembic;
 
 			var combinedCurveSet = new HairAssetProvisional.CurveSet(Allocator.Temp);
-			{
-				combinedCurveSet.vertexFeatures |= HairAssetProvisional.CurveSet.VertexFeatures.Position;
-				combinedCurveSet.vertexFeatures |= HairAssetProvisional.CurveSet.VertexFeatures.TexCoord;
-				combinedCurveSet.vertexFeatures |= HairAssetProvisional.CurveSet.VertexFeatures.Diameter;
-			};
 
 			using (var longOperation = new LongOperationScope("Gathering curves"))
 			{
 				var combinedCurveVertexCountMin = 0;
 				var combinedCurveVertexCountMax = 0;
+				var combinedCurveVertexFeatures = HairAssetProvisional.CurveSet.VertexFeatures.Position;
 
 				while (alembicCurveSetIndex < alembicCurveSets.Length)
 				{
@@ -637,15 +649,17 @@ namespace Unity.DemoTeam.Hair
 					var alembicCurveSetInfo = PrepareAlembicCurvesInfo(alembicCurveSets[alembicCurveSetIndex++]);
 					if (alembicCurveSetInfo.curveVertexCountMin >= 2)
 					{
-						// first valid set decides maximum vertex count
+						// first valid set decides feature flags and maximum vertex count and feature mask
 						if (combinedCurveSet.curveCount == 0)
 						{
 							combinedCurveVertexCountMin = alembicCurveSetInfo.curveVertexCountMin;
 							combinedCurveVertexCountMax = alembicCurveSetInfo.curveVertexCountMax;
+							combinedCurveVertexFeatures = alembicCurveSetInfo.vertexFeatures;
 						}
 
-						// secondary valid set (etc.) must conform to maximum vertex count
-						if (combinedCurveVertexCountMax != alembicCurveSetInfo.curveVertexCountMax)
+						// secondary valid set (etc.) must conform to maximum vertex count and feature mask
+						if (combinedCurveVertexCountMax != alembicCurveSetInfo.curveVertexCountMax ||
+							combinedCurveVertexFeatures != alembicCurveSetInfo.vertexFeatures)
 						{
 							alembicCurveSetIndex--;// decrementing to revisit when building next strand group
 							break;
@@ -677,6 +691,8 @@ namespace Unity.DemoTeam.Hair
 						Debug.LogWarningFormat("Skipping alembic curve set (index {0}) due to degenerate curves with less than two vertices.", alembicCurveSetIndex);
 					}
 				}
+
+				combinedCurveSet.vertexFeatures = combinedCurveVertexFeatures;
 			}
 
 			using (combinedCurveSet)
