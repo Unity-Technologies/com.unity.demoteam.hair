@@ -787,7 +787,7 @@ namespace Unity.DemoTeam.Hair
 
 			// map settings to group instances
 #if true
-#if HAS_PACKAGE_UNITY_COLLECTIONS_1_3_0
+#if HAS_PACKAGE_UNITY_COLLECTIONS_1_3_0 && !HAS_PACKAGE_UNITY_COLLECTIONS_2_0_0_UNTIL_2_2_0_PREVIEW_20
 			using (var groupAssetInstancesMap = new UnsafeParallelMultiHashMap<ulong, int>(strandGroupInstances.Length, Allocator.Temp))
 #else
 			using (var groupAssetInstancesMap = new UnsafeMultiHashMap<ulong, int>(strandGroupInstances.Length, Allocator.Temp))

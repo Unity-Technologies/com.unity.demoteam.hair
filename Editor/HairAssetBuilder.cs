@@ -9,6 +9,9 @@ using UnityEngine;
 using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+#if HAS_PACKAGE_UNITY_COLLECTIONS_1_0_0_PRE_3
+using Unity.Collections.NotBurstCompatible;
+#endif
 
 #if HAS_PACKAGE_UNITY_ALEMBIC
 using UnityEngine.Formats.Alembic.Importer;
@@ -916,9 +919,15 @@ namespace Unity.DemoTeam.Hair
 			// export lod clusters
 			strandGroup.lodCount = lodChain.lodCount;
 #if LOD_INDEX_INCREASING
+#if HAS_PACKAGE_UNITY_COLLECTIONS_1_0_0_PRE_3
+			strandGroup.lodGuideCount = lodChain.lodGuideCount.ToArrayNBC();
+			strandGroup.lodGuideIndex = lodChain.lodGuideIndex.ToArrayNBC();
+			strandGroup.lodGuideCarry = lodChain.lodGuideCarry.ToArrayNBC();
+#else
 			strandGroup.lodGuideCount = lodChain.lodGuideCount.ToArray();
 			strandGroup.lodGuideIndex = lodChain.lodGuideIndex.ToArray();
 			strandGroup.lodGuideCarry = lodChain.lodGuideCarry.ToArray();
+#endif
 #else
 			strandGroup.lodGuideCount = new int[lodChain.lodGuideCount.Length];
 			strandGroup.lodGuideIndex = new int[lodChain.lodGuideIndex.Length];
