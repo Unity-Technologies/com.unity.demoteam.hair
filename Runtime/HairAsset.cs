@@ -3,6 +3,9 @@
 using System;
 using UnityEngine;
 using UnityEngine.Serialization;
+#if UNITY_2021_2_OR_NEWER
+using UnityEngine.Search;
+#endif
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -190,6 +193,14 @@ namespace Unity.DemoTeam.Hair
 
 #if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
 			[Tooltip("Alembic asset containing at least one set of curves")]
+#if UNITY_2021_2_OR_NEWER
+			[SearchContext("p: ext:abc t:AlembicStreamPlayer", "asset",
+				SearchViewFlags.Borderless |
+				SearchViewFlags.CompactView |
+				SearchViewFlags.HideSearchBar |
+				SearchViewFlags.DisableInspectorPreview |
+				SearchViewFlags.DisableSavedSearchQuery)]
+#endif
 			public AlembicStreamPlayer alembicAsset;
 #endif
 			[Tooltip("Whether to combine or preserve subsequent sets of curves with same vertex count")]
