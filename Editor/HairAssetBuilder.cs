@@ -389,6 +389,7 @@ namespace Unity.DemoTeam.Hair
 						//TODO resampling needs to also deal with other attributes
 						//TODO for example by changing resampling to also return blend weights
 						//TODO ... for now, just copy the first uv to satisfy root resolve and ignore the rest
+						if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
 						{
 							srcVertexOffset = 0;
 							dstVertexOffset = 0;
