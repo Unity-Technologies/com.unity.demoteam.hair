@@ -195,7 +195,6 @@ namespace Unity.DemoTeam.Hair
 			[Tooltip("Alembic asset containing at least one set of curves")]
 #if UNITY_2021_2_OR_NEWER
 			[SearchContext("p: ext:abc t:AlembicStreamPlayer", "asset",
-				SearchViewFlags.Borderless |
 				SearchViewFlags.CompactView |
 				SearchViewFlags.HideSearchBar |
 				SearchViewFlags.DisableInspectorPreview |
