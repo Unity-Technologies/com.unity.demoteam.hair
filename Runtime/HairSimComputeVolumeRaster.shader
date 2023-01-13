@@ -14,7 +14,7 @@
 	#include "HairSimComputeConfig.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
 
-	struct Varyings
+	struct SliceVaryings
 	{
 		float4 volumePos : SV_POSITION;
 		uint volumeSlice : SV_RenderTargetArrayIndex;
@@ -25,9 +25,9 @@
 #endif
 	};
 
-	void MakeVertex(inout TriangleStream<Varyings> outStream, float2 pos, float4 value, float2 valuePos, uint slice)
+	SliceVaryings MakeVertex(float2 pos, float4 value, float2 valuePos, uint slice)
 	{
-		Varyings output;
+		SliceVaryings output;
 		output.volumePos = float4(pos, 0.0, 1.0);
 		output.volumeSlice = slice;
 		output.valuePos = valuePos;
@@ -35,16 +35,17 @@
 #if POINT_RASTERIZATION_NEEDS_PSIZE
 		output.pointSize = 1.0;
 #endif
-		outStream.Append(output);
+		return output;
 	}
 
-	uint Vert(uint vertexID : SV_VertexID) : TEXCOORD0
+#if !SHADER_API_METAL
+	uint SliceVert(uint vertexID : SV_VertexID) : TEXCOORD0
 	{
 		return vertexID;
 	}
 
 	[maxvertexcount(8)]
-	void Geom(point uint vertexID[1] : TEXCOORD0, inout TriangleStream<Varyings> outStream)
+	void SliceGeom(point uint vertexID[1] : TEXCOORD0, inout TriangleStream<SliceVaryings> outStream)
 	{
 		// generates 2 quads per particle
 		//
@@ -83,20 +84,21 @@
 		const float4 v = _ParticleVelocity[vertexID[0]];
 		const float4 value = float4((v.xyz * v.w), v.w);
 
-		MakeVertex(outStream, ndc0 + ndcH.zz, value * w0, localPos.xy, slice0);
-		MakeVertex(outStream, ndc0 + ndcH.xz, value * w0, localPos.xy, slice0);
-		MakeVertex(outStream, ndc0 + ndcH.zy, value * w0, localPos.xy, slice0);
-		MakeVertex(outStream, ndc0 + ndcH.xy, value * w0, localPos.xy, slice0);
+		outStream.Append(MakeVertex(ndc0 + ndcH.zz, value * w0, localPos.xy, slice0));
+		outStream.Append(MakeVertex(ndc0 + ndcH.xz, value * w0, localPos.xy, slice0));
+		outStream.Append(MakeVertex(ndc0 + ndcH.zy, value * w0, localPos.xy, slice0));
+		outStream.Append(MakeVertex(ndc0 + ndcH.xy, value * w0, localPos.xy, slice0));
 		outStream.RestartStrip();
 
-		MakeVertex(outStream, ndc0 + ndcH.zz, value * w1, localPos.xy, slice1);
-		MakeVertex(outStream, ndc0 + ndcH.xz, value * w1, localPos.xy, slice1);
-		MakeVertex(outStream, ndc0 + ndcH.zy, value * w1, localPos.xy, slice1);
-		MakeVertex(outStream, ndc0 + ndcH.xy, value * w1, localPos.xy, slice1);
+		outStream.Append(MakeVertex(ndc0 + ndcH.zz, value * w1, localPos.xy, slice1));
+		outStream.Append(MakeVertex(ndc0 + ndcH.xz, value * w1, localPos.xy, slice1));
+		outStream.Append(MakeVertex(ndc0 + ndcH.zy, value * w1, localPos.xy, slice1));
+		outStream.Append(MakeVertex(ndc0 + ndcH.xy, value * w1, localPos.xy, slice1));
 		outStream.RestartStrip();
 	}
+#endif
 
-	Varyings VertDirect(uint vertexID : SV_VertexID)
+	SliceVaryings SliceVertNoGS(uint vertexID : SV_VertexID)
 	{
 		// generates 2 quads per particle
 		// 
@@ -127,7 +129,7 @@
 
 		const float4 v = _ParticleVelocity[i];
 
-		Varyings output;
+		SliceVaryings output;
 		output.volumePos = float4(ndc0 + ndcH * uv, 0.0, 1.0);
 		output.volumeSlice = localPosFloor.z + j;
 		output.valuePos = localPos.xy;
@@ -138,7 +140,7 @@
 		return output;
 	}
 
-	float4 Frag(Varyings input) : SV_Target
+	float4 SliceFrag(SliceVaryings input) : SV_Target
 	{
 		float2 d = 1.0 - saturate(abs(input.valuePos - input.volumePos.xy + 0.5));
 		return d.x * d.y * input.value;
@@ -159,9 +161,11 @@
 		{
 			HLSLPROGRAM
 
-			#pragma vertex Vert
-			#pragma geometry Geom
-			#pragma fragment Frag
+#if !SHADER_API_METAL
+			#pragma vertex SliceVert
+			#pragma geometry SliceGeom
+			#pragma fragment SliceFrag
+#endif
 
 			ENDHLSL
 		}
@@ -170,10 +174,12 @@
 		{
 			HLSLPROGRAM
 
-			#pragma vertex VertDirect
-			#pragma fragment Frag
+			#pragma vertex SliceVertNoGS
+			#pragma fragment SliceFrag
 
 			ENDHLSL
 		}
 	}
+
+	Fallback Off
 }

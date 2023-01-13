@@ -505,7 +505,6 @@ namespace Unity.DemoTeam.Hair
 							{
 								strandGroup.lodGuideIndex[i] = i;
 							}
-
 						}
 						strandGroup.version = 1;
 						return true;

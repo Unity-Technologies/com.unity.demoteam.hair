@@ -1036,7 +1036,10 @@ namespace Unity.DemoTeam.Hair
 					else
 					{
 						if (materialInstance.shader != materialAsset.shader)
+						{
 							materialInstance.shader = materialAsset.shader;
+							materialInstance.name = materialAsset.name + "(Instance)";
+						}
 
 						materialInstance.CopyPropertiesFromMaterial(materialAsset);
 					}
@@ -1044,18 +1047,16 @@ namespace Unity.DemoTeam.Hair
 
 				if (materialInstance != null)
 				{
-					HairSim.BindSolverData(materialInstance, solverData);
-					HairSim.BindVolumeData(materialInstance, volumeData);
+					UpdateMaterialState(materialInstance, settingsSystem, settingsStrands, solverData, volumeData);
 
-					materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
-					materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
-					materialInstance.SetTexture("_UntypedVolumeStrandCountProbe", volumeData.volumeStrandCountProbe);
-
-					CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines || settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
-					CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
-
-					CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
-					CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
+#if UNITY_EDITOR
+					var materialInstancePendingPasses = HairMaterialUtility.TryCompileCountPassesPending(materialInstance);
+					if (materialInstancePendingPasses > 0)
+					{
+						materialInstance.shader = HairMaterialUtility.GetReplacementShader(HairMaterialUtility.ReplacementType.Async);
+						UpdateMaterialState(materialInstance, settingsSystem, settingsStrands, solverData, volumeData);
+					}
+#endif
 				}
 			}
 
@@ -1146,6 +1147,22 @@ namespace Unity.DemoTeam.Hair
 				}
 #endif
 			}
+		}
+
+		static void UpdateMaterialState(Material materialInstance, in SettingsSystem settingsSystem, in SettingsStrands settingsStrands, in HairSim.SolverData solverData, in HairSim.VolumeData volumeData)
+		{
+			HairSim.BindSolverData(materialInstance, solverData);
+			HairSim.BindVolumeData(materialInstance, volumeData);
+
+			materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
+			materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
+			materialInstance.SetTexture("_UntypedVolumeStrandCountProbe", volumeData.volumeStrandCountProbe);
+
+			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines || settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
+			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
+
+			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
+			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
 		}
 
 		public static Bounds GetRootBounds(in GroupInstance strandGroupInstance, Matrix4x4? worldTransform = null)

@@ -33,9 +33,10 @@ namespace Unity.DemoTeam.Hair
 		enum RuntimeFlags
 		{
 			None = 0,
-			SupportsTextureAtomics = 1 << 0,// NOTE: needs to be in sync with shader
-			SupportsVertexStageUAVWrites = 1 << 1,
-			PointRasterizationRequiresPointSize = 1 << 2,
+			SupportsGeometryStage = 1 << 0,
+			SupportsTextureAtomics = 1 << 1,// NOTE: needs to be in sync with shader
+			SupportsVertexStageUAVWrites = 1 << 2,
+			PointRasterizationRequiresPointSize = 1 << 3,
 		}
 
 		static class MarkersCPU
@@ -556,6 +557,7 @@ namespace Unity.DemoTeam.Hair
 							break;
 
 						default:
+							s_runtimeFlags |= RuntimeFlags.SupportsGeometryStage;
 							s_runtimeFlags |= RuntimeFlags.SupportsTextureAtomics;
 							s_runtimeFlags |= RuntimeFlags.SupportsVertexStageUAVWrites;
 							break;
@@ -1646,12 +1648,19 @@ namespace Unity.DemoTeam.Hair
 
 					case VolumeSettings.SplatMethod.Rasterization:
 						{
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_Rasterization))
+							if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsGeometryStage))
 							{
-								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
-								BindVolumeData(cmd, volumeData);
-								BindSolverData(cmd, solverData);
-								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, (int)splatParticleCount, 1);
+								using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_Rasterization))
+								{
+									CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
+									BindVolumeData(cmd, volumeData);
+									BindSolverData(cmd, solverData);
+									cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, (int)splatParticleCount, 1);
+								}
+							}
+							else
+							{
+								goto case VolumeSettings.SplatMethod.RasterizationNoGS;
 							}
 						}
 						break;

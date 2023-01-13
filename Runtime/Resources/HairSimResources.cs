@@ -33,5 +33,7 @@ namespace Unity.DemoTeam.Hair
 		public Shader defaultCustom;
 		public Shader defaultHDRP;
 		public Shader defaultURP;
+		public Shader replaceAsync;
+		public Shader replaceError;
 	}
 }

@@ -1,8 +1,9 @@
-Shader "Hair/Default/HairMaterialDefaultUnlit"
+Shader "Hair/Hidden/HairMaterialReplaceError"
 {
 	HLSLINCLUDE
 
 	#pragma target 5.0
+	#pragma editor_sync_compilation
 
 	#pragma multi_compile __ STAGING_COMPRESSION
 	// 0 == staging data full precision
@@ -31,7 +32,13 @@ Shader "Hair/Default/HairMaterialDefaultUnlit"
 			HLSLPROGRAM
 
 			#pragma vertex UnlitVert
-			#pragma fragment UnlitFrag
+			#pragma fragment UnlitFragError
+
+			float4 UnlitFragError(UnlitVaryings IN) : SV_Target
+			{
+				float3 errorColor = float3(1.0, 0.0, 1.0);
+				return float4(lerp(IN.strandColor, errorColor, 0.9), 1.0);
+			}
 
 			ENDHLSL
 		}

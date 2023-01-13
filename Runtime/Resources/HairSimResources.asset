@@ -22,3 +22,5 @@ MonoBehaviour:
   defaultCustom: {fileID: 4800000, guid: aa19c1d1ecbc28f43be51dc33a2ffa95, type: 3}
   defaultHDRP: {fileID: -6465566751694194690, guid: e28e8d02189f3d549a2682c06f7ab03d, type: 3}
   defaultURP: {fileID: -6465566751694194690, guid: e28e8d02189f3d549a2682c06f7ab03d, type: 3}
+  replaceAsync: {fileID: 4800000, guid: 924d5e6be0d55294e89ae9a03b93ef99, type: 3}
+  replaceError: {fileID: 4800000, guid: ce4b10c704251b44aa714a9480bf938a, type: 3}

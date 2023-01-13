@@ -93,5 +93,38 @@ namespace Unity.DemoTeam.Hair
 #endif
 			return false;
 		}
+
+		public static int TryCompileCountPassesPending(Material material)
+		{
+			var pendingCompilation = 0;
+#if UNITY_EDITOR
+			for (int i = 0; i != material.passCount; i++)
+			{
+				if (ShaderUtil.IsPassCompiled(material, i) == false)
+				{
+					ShaderUtil.CompilePass(material, i);
+					pendingCompilation++;
+				}
+			}
+#endif
+			return pendingCompilation;
+		}
+
+		public enum ReplacementType
+		{
+			Async,
+			Error,
+		}
+
+		public static Shader GetReplacementShader(ReplacementType type)
+		{
+			switch (type)
+			{
+				case ReplacementType.Async: return HairSimResources.Load().replaceAsync;
+				case ReplacementType.Error: return HairSimResources.Load().replaceError;
+			}
+
+			return null;
+		}
 	}
 }

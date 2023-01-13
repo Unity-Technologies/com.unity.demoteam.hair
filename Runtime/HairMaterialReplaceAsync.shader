@@ -1,8 +1,9 @@
-Shader "Hair/Default/HairMaterialDefaultUnlit"
+Shader "Hair/Hidden/HairMaterialReplaceAsync"
 {
 	HLSLINCLUDE
 
 	#pragma target 5.0
+	#pragma editor_sync_compilation
 
 	#pragma multi_compile __ STAGING_COMPRESSION
 	// 0 == staging data full precision
@@ -31,7 +32,13 @@ Shader "Hair/Default/HairMaterialDefaultUnlit"
 			HLSLPROGRAM
 
 			#pragma vertex UnlitVert
-			#pragma fragment UnlitFrag
+			#pragma fragment UnlitFragAsync
+
+			float4 UnlitFragAsync(UnlitVaryings IN) : SV_Target
+			{
+				float3 asyncColor = float3(0.0, 1.0, 1.0);
+				return float4(lerp(IN.strandColor, asyncColor, 0.9), 1.0);
+			}
 
 			ENDHLSL
 		}
