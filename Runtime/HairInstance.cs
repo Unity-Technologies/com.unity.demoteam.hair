@@ -394,15 +394,41 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 			// volume bounds
+			var volumeCenter = HairSim.GetVolumeCenter(volumeData);
+			var volumeExtent = HairSim.GetVolumeExtent(volumeData);
+
 			Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
-			Gizmos.DrawWireCube(HairSim.GetVolumeCenter(volumeData), 2.0f * HairSim.GetVolumeExtent(volumeData));
+			Gizmos.DrawWireCube(volumeCenter, 2.0f * volumeExtent);
 
 			// volume gravity
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				Gizmos.color = Color.cyan;
-				Gizmos.DrawRay(HairSim.GetVolumeCenter(volumeData), solverData[i].cbuffer._WorldGravity * 0.1f);
+				Gizmos.DrawRay(volumeCenter, solverData[i].cbuffer._WorldGravity * 0.1f);
 			}
+
+			/*
+#if UNITY_EDITOR
+			// volume boundaries
+			{
+				var boundaries = HairBoundaryUtility.Gather(settingsVolume.boundariesPriority, volumeSort: true, settingsVolume.boundariesCollect, GetSimulationBounds(), Quaternion.identity, settingsVolume.boundariesCollectMode == HairSim.VolumeSettings.CollectMode.IncludeColliders);
+
+				for (int i = 0; i != boundaries.Count; i++)
+				{
+					var boundaryData = boundaries[i];
+					var boundaryOrigin = boundaryData.xform.matrix.MultiplyPoint3x4(Vector3.zero);
+					var boundaryDistance = HairBoundaryUtility.SdBoundary(volumeCenter, boundaryData);
+					var boundaryColor = (i < HairSim.MAX_BOUNDARIES) ? Color.green : Color.red;
+
+					Gizmos.color = boundaryColor;
+					Gizmos.DrawLine(volumeCenter, boundaryOrigin);
+
+					UnityEditor.Handles.color = boundaryColor;
+					UnityEditor.Handles.Label(boundaryOrigin, "d[" + i + "]: " + boundaryDistance);
+				}
+			}
+#endif
+			*/
 		}
 
 		void OnDrawGizmosSelected()

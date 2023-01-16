@@ -18,7 +18,10 @@ namespace Unity.DemoTeam.Hair
 
 		static HashSet<int> s_gatherMask = new HashSet<int>();
 		static List<HairBoundary.RuntimeData> s_gatherList = new List<HairBoundary.RuntimeData>();
-		static List<HairBoundary.RuntimeData> s_gatherListCopy = new List<HairBoundary.RuntimeData>();
+		static List<HairBoundary.RuntimeData> s_gatherListVolume = new List<HairBoundary.RuntimeData>();
+
+		//-----------
+		// filtering
 
 		public static void FilterBoundary(HairBoundary boundary, HashSet<int> mask, List<HairBoundary.RuntimeData> list, ref HairBoundary.RuntimeData item)
 		{
@@ -56,6 +59,7 @@ namespace Unity.DemoTeam.Hair
 
 			s_gatherMask.Clear();
 			s_gatherList.Clear();
+			s_gatherListVolume.Clear();
 
 			// gather resident
 			if (resident != null)
@@ -80,7 +84,7 @@ namespace Unity.DemoTeam.Hair
 
 					foreach (var boundary in s_managedBoundaries)
 					{
-						FilterBoundary(boundary, s_gatherMask, s_gatherList, ref item);
+						FilterBoundary(boundary, s_gatherMask, s_gatherListVolume, ref item);
 					}
 				}
 
@@ -89,51 +93,48 @@ namespace Unity.DemoTeam.Hair
 				{
 					for (int i = 0; i != colliderCount; i++)
 					{
-						FilterCollider(colliderBuffer[i], s_gatherMask, s_gatherList, ref item);
+						FilterCollider(colliderBuffer[i], s_gatherMask, s_gatherListVolume, ref item);
 					}
 				}
-			}
 
-			// sort the data
-			unsafe
-			{
-				using (var sortedIndices = new NativeArray<ulong>(s_gatherList.Count, Allocator.Temp))
+				// sort and append
+				unsafe
 				{
-					var sortedIndicesPtr = (ulong*)sortedIndices.GetUnsafePtr();
-
-					var volumeOrigin = volumeBounds.center;
-					var volumeExtent = volumeBounds.extents.Abs().CMax();
-
-					for (int i = 0; i != s_gatherList.Count; i++)
+					using (var sortedIndices = new NativeArray<ulong>(s_gatherListVolume.Count, Allocator.Temp))
 					{
-						var volumeSortValue = 0u;
-						if (volumeSort)
+						var sortedIndicesPtr = (ulong*)sortedIndices.GetUnsafePtr();
+
+						var volumeOrigin = volumeBounds.center;
+						var volumeExtent = volumeBounds.extents.Abs().CMax();
+
+						for (int i = 0; i != s_gatherListVolume.Count; i++)
 						{
-							var sdClippedDoubleExtent = Mathf.Clamp(SdBoundary(volumeOrigin, s_gatherList[i]) / volumeExtent, -2.0f, 2.0f);
-							var udClippedDoubleExtent = Mathf.Clamp01(sdClippedDoubleExtent * 0.25f + 0.5f);
+							var volumeSortValue = 0u;
+							if (volumeSort)
 							{
-								volumeSortValue = (uint)udClippedDoubleExtent * UInt16.MaxValue;
+								var sdClippedDoubleExtent = Mathf.Clamp(SdBoundary(volumeOrigin, s_gatherListVolume[i]) / volumeExtent, -1.0f, 1.0f);
+								var udClippedDoubleExtent = Mathf.Clamp01(sdClippedDoubleExtent * 0.5f + 0.5f);
+								{
+									volumeSortValue = (uint)(udClippedDoubleExtent * UInt16.MaxValue);
+								}
+							}
+
+							var sortDistance = ((ulong)volumeSortValue) << 48;
+							var sortHandle = (((ulong)s_gatherListVolume[i].xform.handle) << 16) & 0xffffffff0000uL;
+							var sortIndex = ((ulong)i) & 0xffffuL;
+							{
+								sortedIndicesPtr[i] = sortDistance | sortHandle | sortIndex;
 							}
 						}
 
-						var sortDistance = ((ulong)volumeSortValue) << 48;
-						var sortHandle = ((ulong)s_gatherList[i].xform.handle) << 16;
-						var sortIndex = ((ulong)i) & 0xffffuL;
+						sortedIndices.Sort();
+
+						for (int i = 0; i != s_gatherListVolume.Count; i++)
 						{
-							sortedIndicesPtr[i] = sortDistance | sortHandle | sortIndex;
-						}
-					}
-
-					sortedIndices.Sort();
-
-					s_gatherListCopy.Clear();
-					s_gatherListCopy.AddRange(s_gatherList);
-
-					for (int i = 0; i != s_gatherList.Count; i++)
-					{
-						var index = (int)(sortedIndicesPtr[i] & 0xffffuL);
-						{
-							s_gatherList[i] = s_gatherListCopy[index];
+							var index = (int)(sortedIndicesPtr[i] & 0xffffuL);
+							{
+								s_gatherList.Add(s_gatherListVolume[index]);
+							}
 						}
 					}
 				}
