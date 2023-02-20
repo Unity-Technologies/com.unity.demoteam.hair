@@ -351,10 +351,12 @@ namespace Unity.DemoTeam.Hair
 			return meshRoots;
 		}
 
-		public static void CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		public static Mesh CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
 			if (meshRoots == null)
 				meshRoots = CreateMeshRoots(hideFlags, strandCount, rootPosition, rootDirection);
+
+			return meshRoots;
 		}
 
 		public static Mesh CreateMeshLines(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
@@ -368,10 +370,12 @@ namespace Unity.DemoTeam.Hair
 			return meshLines;
 		}
 
-		public static void CreateMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshLines == null)
 				meshLines = CreateMeshLines(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+
+			return meshLines;
 		}
 
 		public static Mesh CreateMeshStrips(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
@@ -385,10 +389,12 @@ namespace Unity.DemoTeam.Hair
 			return meshStrips;
 		}
 
-		public static void CreateMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshStrips == null)
 				meshStrips = CreateMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+
+			return meshStrips;
 		}
 
 		public static Mesh CreateMeshInstance(Mesh original, HideFlags hideFlags)
@@ -401,10 +407,12 @@ namespace Unity.DemoTeam.Hair
 			return instance;
 		}
 
-		public static void CreateMeshInstanceIfNull(ref Mesh instance, Mesh original, HideFlags hideFlags)
+		public static Mesh CreateMeshInstanceIfNull(ref Mesh instance, Mesh original, HideFlags hideFlags)
 		{
 			if (instance == null)
 				instance = CreateMeshInstance(original, hideFlags);
+
+			return instance;
 		}
 
 		//------------

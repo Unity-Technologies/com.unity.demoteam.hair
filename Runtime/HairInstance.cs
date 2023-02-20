@@ -85,9 +85,10 @@ namespace Unity.DemoTeam.Hair
 #endif
 
 				[NonSerialized] public Material materialInstance;
+
 				[NonSerialized] public Mesh meshInstanceLines;
 				[NonSerialized] public Mesh meshInstanceStrips;
-				[NonSerialized] public uint meshInstanceSubdivisionCount;
+				[NonSerialized] public uint meshInstanceSubdivision;
 			}
 
 #if SUPPORT_CONTENT_UPGRADE
@@ -1086,49 +1087,64 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			// update mesh instance
-			var meshInstance = null as Mesh;
+			// select mesh
+			var mesh = null as Mesh;
+			var meshShared = false;
 			{
 				ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
 				ref var meshInstanceStrips = ref strandGroupInstance.sceneObjects.meshInstanceStrips;
+				ref var meshInstanceSubdivision = ref strandGroupInstance.sceneObjects.meshInstanceSubdivision;
 
-				var subdivisionCount = solverData.cbuffer._StagingSubdivision;
-				if (subdivisionCount != strandGroupInstance.sceneObjects.meshInstanceSubdivisionCount)
+				var subdivision = solverData.cbuffer._StagingSubdivision;
+				if (subdivision != meshInstanceSubdivision)
 				{
-					strandGroupInstance.sceneObjects.meshInstanceSubdivisionCount = subdivisionCount;
-
 					CoreUtils.Destroy(meshInstanceLines);
 					CoreUtils.Destroy(meshInstanceStrips);
+					meshInstanceSubdivision = subdivision;
 				}
 
 				switch (settingsSystem.strandRenderer)
 				{
 					case SettingsSystem.StrandRenderer.Disabled:
 						{
-							meshInstance = null;
+							mesh = null;
 						}
 						break;
 
-					case SettingsSystem.StrandRenderer.HDRPHighQualityLines:
 					case SettingsSystem.StrandRenderer.BuiltinLines:
+					case SettingsSystem.StrandRenderer.HDRPHighQualityLines:
 						{
-							if (subdivisionCount == 0)
-								HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroupInstance.groupAssetReference.Resolve().meshAssetLines, HideFlags.HideAndDontSave);
+							if (subdivision > 0)
+							{
+								mesh = HairInstanceBuilder.CreateMeshLinesIfNull(ref meshInstanceLines, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+							}
 							else
-								HairInstanceBuilder.CreateMeshLinesIfNull(ref meshInstanceLines, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
-
-							meshInstance = meshInstanceLines;
+							{
+								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetLines;
+#if UNITY_2021_2_OR_NEWER
+								meshShared = true;
+#else
+								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, mesh, HideFlags.HideAndDontSave);
+#endif
+							}
 						}
 						break;
 
 					case SettingsSystem.StrandRenderer.BuiltinStrips:
 						{
-							if (subdivisionCount == 0)
-								HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, strandGroupInstance.groupAssetReference.Resolve().meshAssetStrips, HideFlags.HideAndDontSave);
+							if (subdivision > 0)
+							{
+								mesh = HairInstanceBuilder.CreateMeshStripsIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+							}
 							else
-								HairInstanceBuilder.CreateMeshStripsIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
-
-							meshInstance = meshInstanceStrips;
+							{
+								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetStrips;
+#if UNITY_2021_2_OR_NEWER
+								meshShared = true;
+#else
+								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, mesh, HideFlags.HideAndDontSave);
+#endif
+							}
 						}
 						break;
 				}
@@ -1137,13 +1153,8 @@ namespace Unity.DemoTeam.Hair
 			// update mesh filter
 			ref var meshFilter = ref strandGroupInstance.sceneObjects.strandMeshFilter;
 			{
-				if (meshFilter.sharedMesh != meshInstance)
-					meshFilter.sharedMesh = meshInstance;
-
-				//TODO better renderer bounds
-				//meshFilter.sharedMesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
-				if (meshFilter.sharedMesh != null)
-					meshFilter.sharedMesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
+				if (meshFilter.sharedMesh != mesh)
+					meshFilter.sharedMesh = mesh;
 			}
 
 			// update mesh renderer
@@ -1171,6 +1182,21 @@ namespace Unity.DemoTeam.Hair
 					meshRendererHDRP.rendererGroup = settingsSystem.strandRendererGroup;
 					meshRendererHDRP.enableHighQualityLineRendering = (settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
 				}
+#endif
+			}
+
+			// update renderer bounds
+			{
+#if UNITY_2021_2_OR_NEWER
+				// starting with 2021.2 we can override renderer bounds directly
+				meshRenderer.bounds = GetSimulationBounds();
+#else
+				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
+				if (mesh != null && meshShared == false)
+					mesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
+
+				//TODO provide better local bounds
+				//mesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
 #endif
 			}
 		}
