@@ -69,19 +69,6 @@
 #define ENABLE_POSE_GLOBAL_ROTATION		(LIVE_POSITIONS >= 2 && LIVE_ROTATIONS >= 2 && ENABLE(SOLVERFEATURES_POSE_GLOBAL_ROTATION))
 #define ENABLE_POSE_GLOBAL_POSITION		(ENABLE(SOLVERFEATURES_POSE_GLOBAL_POSITION))
 
-//-----------------------
-// features experimental
-
-#define SECOND_ORDER_UPDATE 0
-
-#if SECOND_ORDER_UPDATE
-#define SECOND_ORDER_POSITION 1
-#define SECOND_ORDER_VELOCITY 0
-#else
-#define SECOND_ORDER_POSITION 0
-#define SECOND_ORDER_VELOCITY 0
-#endif
-
 //----------
 // includes
 
@@ -99,6 +86,14 @@
 
 //--------
 // macros
+
+#if SECOND_ORDER_UPDATE
+#define SECOND_ORDER_POSITION 1
+#define SECOND_ORDER_VELOCITY 0
+#else
+#define SECOND_ORDER_POSITION 0
+#define SECOND_ORDER_VELOCITY 0
+#endif
 
 #define CHECK_STRAND(x)			\
 	if (x >= _StrandCount) return;
@@ -418,9 +413,14 @@ void KInitialize(
 		{
 			_ParticlePosition[i].xyz = (worldRootPos + worldParticleOffset);
 			_ParticlePositionPrev[i].xyz = (worldRootPos + worldParticleOffset);
+#if SECOND_ORDER_UPDATE
 			_ParticlePositionPrevPrev[i].xyz = (worldRootPos + worldParticleOffset);
+#endif
+
 			_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, _GroupMaxParticleInterval * _RootScale[strandIndex]);
+#if SECOND_ORDER_UPDATE
 			_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, _GroupMaxParticleInterval * _RootScale[strandIndex]);
+#endif
 		}
 	}
 
@@ -485,10 +485,9 @@ void KInitializePostVolume(
 
 		_ParticlePosition[i].w = accu_w;//TODO pack elsewhere?
 		_ParticlePositionPrev[i].w = accu_w;
+#if SECOND_ORDER_UPDATE
 		_ParticlePositionPrevPrev[i].w = accu_w;
-
-		// NOTE: deferred from pre-volume init to satisfy DX11 limit on active UAVs
-		_ParticlePositionCorr[i].xyz = 0.0;
+#endif
 	}
 }
 
@@ -634,7 +633,11 @@ void KSolveConstraints_GaussSeidelReference(
 		for (uint i = strandParticleBegin + strandParticleStride; i != strandParticleEnd; i += strandParticleStride)
 		{
 			const float3 x0 = _ParticlePositionPrev[i].xyz;
+#if SECOND_ORDER_UPDATE
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + GetVolumeImpulse(x0, _ParticleVelocityPrev[i].xyz);
+#else
+			const float3 v0 = _ParticleVelocity[i].xyz + GetVolumeImpulse(x0, _ParticleVelocity[i].xyz);
+#endif
 			const float3 a0 = _WorldGravity.xyz;
 			{
 #if SECOND_ORDER_POSITION
@@ -1116,7 +1119,11 @@ void KSolveConstraints_GaussSeidel(
 		for (uint i = strandParticleBegin + strandParticleStride, k = 1; i != strandParticleEnd; i += strandParticleStride, k++)
 		{
 			const float3 x0 = _ParticlePositionPrev[i].xyz;
+#if SECOND_ORDER_UPDATE
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + GetVolumeImpulse(x0, _ParticleVelocityPrev[i].xyz);
+#else
+			const float3 v0 = _ParticleVelocity[i].xyz + GetVolumeImpulse(x0, _ParticleVelocity[i].xyz);
+#endif
 			const float3 a0 = _WorldGravity.xyz;
 			{
 #if SECOND_ORDER_POSITION
@@ -1276,7 +1283,11 @@ void KSolveConstraints_Jacobi(
 		// [threads: root+1..]
 		else
 		{
+#if SECOND_ORDER_UPDATE
 			const float3 v0 = _ParticleVelocityPrev[i].xyz + GetVolumeImpulse(x0, _ParticleVelocityPrev[i].xyz);
+#else
+			const float3 v0 = _ParticleVelocity[i].xyz + GetVolumeImpulse(x0, _ParticleVelocity[i].xyz);
+#endif
 			const float3 a0 = _WorldGravity.xyz;
 			{
 #if SECOND_ORDER_POSITION
@@ -1533,7 +1544,8 @@ void StoreInterpolatedPosition(int particleIndex, float3 position)
 {
 	float3 positionPrev;
 	{
-		// locate previous interpolated position, taking into account buffer rotations from substeps
+#if SECOND_ORDER_UPDATE
+		// locate previous interpolated position (A), taking into account buffer rotations from substeps
 		// (s=1) A B C --> C *A* B
 		// (s=2) A B C --> C A B --> B C *A*
 		// (s=3) A B C --> C A B --> B C A --> *A* B C
@@ -1543,12 +1555,22 @@ void StoreInterpolatedPosition(int particleIndex, float3 position)
 		case 1: positionPrev = _ParticlePositionPrev[particleIndex].xyz; break;
 		case 2: positionPrev = _ParticlePositionPrevPrev[particleIndex].xyz; break;
 		}
+#else
+		// locate previous interpolated position (A), taking into account buffer rotations from substeps
+		// (s=1) A B --> B *A*
+		// (s=2) A B --> B A --> *A* B
+		switch (_Substeps % 2)
+		{
+		case 0: positionPrev = _ParticlePosition[particleIndex].xyz; break;
+		case 1: positionPrev = _ParticlePositionPrev[particleIndex].xyz; break;
+		}
+#endif
 	}
 
 	_ParticleVelocity[particleIndex].xyz = (position - positionPrev) / (_DT * _Substeps);
 	_ParticlePosition[particleIndex].xyz = position;
 
-#if SECOND_ORDER_POSITION || SECOND_ORDER_VELOCITY
+#if SECOND_ORDER_UPDATE
 	_ParticleVelocityPrev[particleIndex].xyz = 0;
 	_ParticlePositionPrev[particleIndex].xyz = position;
 #endif

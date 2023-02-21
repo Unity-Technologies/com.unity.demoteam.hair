@@ -556,7 +556,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							using (new ColorScope(Color.Lerp(Color.red, Color.yellow, 0.5f)))
 							{
-								EditorGUILayout.LabelField(countDiscarded + " discarded (due to limit of " + HairSim.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
+								EditorGUILayout.LabelField(countDiscarded + " discarded (due to limit of " + HairSim.Conf.MAX_BOUNDARIES + ")", HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
 							}
 						}
 					}

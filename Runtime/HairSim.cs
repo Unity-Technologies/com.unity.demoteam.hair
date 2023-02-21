@@ -1,4 +1,5 @@
-﻿#pragma warning disable 0649 // some fields are assigned via reflection
+﻿#pragma warning disable 0162 // some parts will be unreachable due to branching on configuration constants
+#pragma warning disable 0649 // some fields are assigned via reflection
 
 using System;
 using UnityEngine;
@@ -538,9 +539,10 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
+		//TODO move to conf
 		public const int PARTICLE_GROUP_SIZE = 64;
 
-		public const int MAX_BOUNDARIES = 8;
+		//TODO move to conf
 		public const int MAX_STRAND_COUNT = 64000;
 		public const int MAX_STRAND_PARTICLE_COUNT = 128;
 
@@ -612,7 +614,6 @@ namespace Unity.DemoTeam.Hair
 				bool changed = false;
 
 				int particleCount = strandCount * strandParticleCount;
-
 				int particleStrideIndex = sizeof(uint);
 				int particleStrideScalar = sizeof(float);
 				int particleStrideVector2 = sizeof(Vector2);
@@ -639,10 +640,9 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref solverData.particlePosition, "ParticlePosition_0", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particlePositionPrev, "ParticlePosition_1", particleCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverData.particlePositionPrevPrev, "ParticlePosition_2", particleCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.particlePositionPrevPrev, "ParticlePosition_2", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector4);
 
 				changed |= CreateBuffer(ref solverData.lodGuideCount, "LODGuideCount", Mathf.Max(1, lodCount), particleStrideIndex);
 				changed |= CreateBuffer(ref solverData.lodGuideIndex, "LODGuideIndex", Mathf.Max(1, lodCount) * strandCount, particleStrideIndex);
@@ -722,10 +722,10 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateVolume(ref volumeData.boundarySDF_undefined, "BoundarySDF_undefined", 1, RenderTextureFormat.RHalf);
 
-				changed |= CreateBuffer(ref volumeData.boundaryShape, "BoundaryShape", MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
-				changed |= CreateBuffer(ref volumeData.boundaryMatrix, "BoundaryMatrix", MAX_BOUNDARIES, sizeof(Matrix4x4));
-				changed |= CreateBuffer(ref volumeData.boundaryMatrixInv, "BoundaryMatrixInv", MAX_BOUNDARIES, sizeof(Matrix4x4));
-				changed |= CreateBuffer(ref volumeData.boundaryMatrixW2PrevW, "BoundaryMatrixW2PrevW", MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref volumeData.boundaryShape, "BoundaryShape", Conf.MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
+				changed |= CreateBuffer(ref volumeData.boundaryMatrix, "BoundaryMatrix", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref volumeData.boundaryMatrixInv, "BoundaryMatrixInv", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref volumeData.boundaryMatrixW2PrevW, "BoundaryMatrixW2PrevW", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
 
 				return changed;
 			}
@@ -991,6 +991,21 @@ namespace Unity.DemoTeam.Hair
 			}
 			cbuffer._SolverFeatures = (uint)features;
 
+			// derive feature-specific buffers
+			unsafe
+			{
+				var particleCount = (int)solverData.cbuffer._StrandCount * (int)solverData.cbuffer._StrandParticleCount;
+				var particleStrideVector4 = sizeof(Vector4);
+
+				var useParticlePositionCorr = true;
+				{
+					useParticlePositionCorr = useParticlePositionCorr && features.HasFlag(SolverFeatures.DistanceFTL);
+					useParticlePositionCorr = useParticlePositionCorr && (solverSettings.method != SolverSettings.Method.Jacobi);
+				}
+
+				CreateBuffer(ref solverData.particlePositionCorr, "ParticlePositionCorr", useParticlePositionCorr ? particleCount : 1, particleStrideVector4);
+			}
+
 			// derive keywords
 			keywords.LAYOUT_INTERLEAVED = (solverData.memoryLayout == HairAsset.MemoryLayout.Interleaved);
 			keywords.LIVE_POSITIONS_3 = ((features & (SolverFeatures.CurvatureEQ | SolverFeatures.CurvatureGEQ | SolverFeatures.CurvatureLEQ | SolverFeatures.PoseLocalShapeRWD)) != 0);
@@ -1237,16 +1252,16 @@ namespace Unity.DemoTeam.Hair
 			ref var cbuffer = ref volumeData.cbuffer;
 
 			// update boundary data
-			using (var bufShape = new NativeArray<HairBoundary.RuntimeShape.Data>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var bufXform = new NativeArray<HairBoundary.RuntimeTransform>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var bufMatrix = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var bufMatrixInv = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var bufMatrixW2PrevW = new NativeArray<Matrix4x4>(MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufShape = new NativeArray<HairBoundary.RuntimeShape.Data>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufXform = new NativeArray<HairBoundary.RuntimeTransform>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufMatrix = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufMatrixInv = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufMatrixW2PrevW = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
-				if (volumeData.boundaryPrevXform.IsCreated && volumeData.boundaryPrevXform.Length != MAX_BOUNDARIES)
+				if (volumeData.boundaryPrevXform.IsCreated && volumeData.boundaryPrevXform.Length != Conf.MAX_BOUNDARIES)
 					volumeData.boundaryPrevXform.Dispose();
 				if (volumeData.boundaryPrevXform.IsCreated == false)
-					volumeData.boundaryPrevXform = new NativeArray<HairBoundary.RuntimeTransform>(MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+					volumeData.boundaryPrevXform = new NativeArray<HairBoundary.RuntimeTransform>(Conf.MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
 				unsafe
 				{
@@ -1300,7 +1315,7 @@ namespace Unity.DemoTeam.Hair
 							boundaryCount++;
 						}
 
-						if (boundaryCount == MAX_BOUNDARIES)
+						if (boundaryCount == Conf.MAX_BOUNDARIES)
 							break;
 					}
 
@@ -1344,7 +1359,7 @@ namespace Unity.DemoTeam.Hair
 							}
 						}
 
-						if (writeCount == MAX_BOUNDARIES)
+						if (writeCount == Conf.MAX_BOUNDARIES)
 							break;
 					}
 
@@ -1503,9 +1518,16 @@ namespace Unity.DemoTeam.Hair
 
 					using (new ProfilingScope(cmd, MarkersGPU.Solver_SolveConstraints))
 					{
-						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);		// A B C -> b a c
-						CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);	// b a c -> C A B
-						CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
+						if (Conf.SECOND_ORDER_UPDATE != 0)
+						{
+							CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);		// A B C -> b a c
+							CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrevPrev);	// b a c -> C A B
+							CoreUtils.Swap(ref solverData.particleVelocity, ref solverData.particleVelocityPrev);
+						}
+						else
+						{
+							CoreUtils.Swap(ref solverData.particlePosition, ref solverData.particlePositionPrev);		// A B -> B A
+						}
 
 						BindVolumeData(cmd, s_solverCS, kernelSolveConstraints, volumeData);
 						BindSolverData(cmd, s_solverCS, kernelSolveConstraints, WithSubstepData(solverData, substepFrac < (1.0f - float.Epsilon)));
@@ -1805,7 +1827,10 @@ namespace Unity.DemoTeam.Hair
 				// strand velocities
 				if (debugSettings.drawStrandVelocities)
 				{
-					cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_VELOCITY, MeshTopology.Lines, vertexCount: 4 * (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawPB);
+					if (Conf.SECOND_ORDER_UPDATE != 0)
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_VELOCITY, MeshTopology.Lines, vertexCount: 4 * (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawPB);
+					else
+						cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_STRAND_VELOCITY, MeshTopology.Lines, vertexCount: 2 * (int)solverData.cbuffer._StrandParticleCount, (int)solverData.cbuffer._StrandCount, s_debugDrawPB);
 				}
 
 				// strand clusters

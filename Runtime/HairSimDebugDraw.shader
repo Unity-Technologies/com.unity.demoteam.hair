@@ -89,9 +89,14 @@
 		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
 		const uint strandParticleStride = _StrandParticleStride;
 
+#if SECOND_ORDER_UPDATE
 		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 2);
+#else
+		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 1);
+#endif
 		float3 worldPos = _ParticlePosition[i].xyz;
 
+#if SECOND_ORDER_UPDATE
 		if (vertexID & 2)
 		{
 			if (!(vertexID & 1))
@@ -100,6 +105,7 @@
 			}
 		}
 		else
+#endif
 		{
 			if (vertexID & 1)
 			{
