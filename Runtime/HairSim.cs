@@ -555,6 +555,10 @@ namespace Unity.DemoTeam.Hair
 						case GraphicsDeviceType.Metal:
 							s_runtimeFlags |= RuntimeFlags.PointRasterizationRequiresPointSize;
 							break;
+						
+						case GraphicsDeviceType.PlayStation5:
+							s_runtimeFlags |= RuntimeFlags.SupportsTextureAtomics;
+							break;
 
 						default:
 							s_runtimeFlags |= RuntimeFlags.SupportsGeometryStage;

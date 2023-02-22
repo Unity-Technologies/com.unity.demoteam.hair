@@ -150,7 +150,7 @@ namespace Unity.DemoTeam.Hair
 
 				// apply to mesh
 				var meshVertexCount = strandCount;
-				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				var meshUpdateFlags = MeshUpdateFlags.Default;
 				{
 					meshRoots.SetVertexBufferParams(meshVertexCount,
 						new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, dimension: 3, stream: 0),
@@ -222,7 +222,7 @@ namespace Unity.DemoTeam.Hair
 
 				// apply to mesh
 				var meshVertexCount = strandCount * perLineVertices;
-				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				var meshUpdateFlags = MeshUpdateFlags.Default;
 				{
 					meshLines.SetVertexBufferParams(meshVertexCount,
 						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
@@ -296,13 +296,13 @@ namespace Unity.DemoTeam.Hair
 						//  :  .   :
 						//  |,     |
 						//  4------5
-						//  |    ,´|
-						//  |  ,´  |      etc.
-						//  |,´    |    
+						//  |    ,ï¿½|
+						//  |  ,ï¿½  |      etc.
+						//  |,ï¿½    |    
 						//  2------3    12----13
-						//  |    ,´|    |    ,´|
-						//  |  ,´  |    |  ,´  |
-						//  |,´    |    |,´    |
+						//  |    ,ï¿½|    |    ,ï¿½|
+						//  |  ,ï¿½  |    |  ,ï¿½  |
+						//  |,ï¿½    |    |,ï¿½    |
 						//  0------1    10----11
 						//  .
 						//  |
@@ -322,7 +322,7 @@ namespace Unity.DemoTeam.Hair
 
 				// apply to mesh asset
 				var meshVertexCount = strandCount * perStripVertices;
-				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				var meshUpdateFlags = MeshUpdateFlags.Default;
 				{
 					meshStrips.SetVertexBufferParams(meshVertexCount,
 						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID

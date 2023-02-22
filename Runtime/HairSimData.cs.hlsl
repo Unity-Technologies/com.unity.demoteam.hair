@@ -1,5 +1,5 @@
 //
-// This file was automatically generated. Please don't edit by hand.
+// This file was automatically generated. Please don't edit by hand. Execute Editor command [ Edit > Rendering > Generate Shader Includes ] instead
 //
 
 #ifndef HAIRSIMDATA_CS_HLSL
@@ -19,6 +19,30 @@
 #define SOLVERFEATURES_POSE_LOCAL_SHAPE_RWD (512)
 #define SOLVERFEATURES_POSE_GLOBAL_POSITION (1024)
 #define SOLVERFEATURES_POSE_GLOBAL_ROTATION (2048)
+
+// Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer
+// PackingRules = Exact
+CBUFFER_START(VolumeCBuffer)
+    float4 _VolumeCells;
+    float4 _VolumeWorldMin;
+    float4 _VolumeWorldMax;
+    float _AllGroupsDebugWeight;
+    float _AllGroupsMaxParticleVolume;
+    float _TargetDensityFactor;
+    uint _BoundaryCountDiscrete;
+    uint _BoundaryCountCapsule;
+    uint _BoundaryCountSphere;
+    uint _BoundaryCountTorus;
+    uint _BoundaryCountCube;
+    float _BoundaryWorldEpsilon;
+    float _BoundaryWorldMargin;
+    uint _StrandCountPhi;
+    uint _StrandCountTheta;
+    uint _StrandCountSubstep;
+    float _StrandCountDiameter;
+    float _vcbpad1;
+    float _vcbpad2;
+CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer
 // PackingRules = Exact
@@ -70,30 +94,6 @@ CBUFFER_START(SolverCBuffer)
     float _GlobalFadeExtent;
     float _scbpad1;
     float _scbpad2;
-CBUFFER_END
-
-// Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer
-// PackingRules = Exact
-CBUFFER_START(VolumeCBuffer)
-    float4 _VolumeCells;
-    float4 _VolumeWorldMin;
-    float4 _VolumeWorldMax;
-    float _AllGroupsDebugWeight;
-    float _AllGroupsMaxParticleVolume;
-    float _TargetDensityFactor;
-    uint _BoundaryCountDiscrete;
-    uint _BoundaryCountCapsule;
-    uint _BoundaryCountSphere;
-    uint _BoundaryCountTorus;
-    uint _BoundaryCountCube;
-    float _BoundaryWorldEpsilon;
-    float _BoundaryWorldMargin;
-    uint _StrandCountPhi;
-    uint _StrandCountTheta;
-    uint _StrandCountSubstep;
-    float _StrandCountDiameter;
-    float _vcbpad1;
-    float _vcbpad2;
 CBUFFER_END
 
 

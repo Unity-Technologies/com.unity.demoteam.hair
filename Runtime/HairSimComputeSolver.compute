@@ -32,9 +32,9 @@
 //------------------
 // features derived
 
-#ifndef STAGING_COMPRESSION
-#define STAGING_COMPRESSION 1
-#endif
+// #ifndef STAGING_COMPRESSION
+// #define STAGING_COMPRESSION 1
+// #endif
 
 #ifndef LIVE_POSITIONS_3
 #define LIVE_POSITIONS_3 0
