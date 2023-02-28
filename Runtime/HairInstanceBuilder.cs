@@ -343,6 +343,107 @@ namespace Unity.DemoTeam.Hair
 
 		public static unsafe void BuildMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
+			const int numSides = 4;
+			
+			var perTubeVertices  = numSides * strandParticleCount;
+			var perTubeSegments  = strandParticleCount - 1;
+			var perTubeTriangles = 2 * numSides * perTubeSegments;
+			var perTubeIndices   = perTubeTriangles * 3;
+
+			using (var vertexID = new NativeArray<float>(strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var vertexUV = new NativeArray<uint> (strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var indices  = new NativeArray<int>  (strandCount * perTubeIndices,  Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			{
+				var vertexIDPtr = (float*)vertexID.GetUnsafePtr();
+				var vertexUVPtr = (uint*)vertexUV.GetUnsafePtr();
+				var indicesPtr  = (int*)indices.GetUnsafePtr();
+				
+				// write vertex ID
+				for (int i = 0, k = 0; i != strandCount; i++)
+				{
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+					{
+						// four vertices per particle
+						*(vertexIDPtr++) = k++;// vertexID
+						*(vertexIDPtr++) = k++;// ...
+						*(vertexIDPtr++) = k++;// ...
+						*(vertexIDPtr++) = k++;// ...
+					}
+				}
+				
+				// write indices
+				for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase += 4)
+				{
+					for (int j = 0; j != perTubeSegments; j++, segmentBase += 4)
+					{
+						// TODO: Support NumSides
+						
+						// side a
+						{
+							*(indicesPtr++) = segmentBase + 0;
+							*(indicesPtr++) = segmentBase + 1;
+							*(indicesPtr++) = segmentBase + 5;
+
+							*(indicesPtr++) = segmentBase + 0;
+							*(indicesPtr++) = segmentBase + 5;
+							*(indicesPtr++) = segmentBase + 4;
+						}
+
+						// side b
+						{
+							*(indicesPtr++) = segmentBase + 1;
+							*(indicesPtr++) = segmentBase + 2;
+							*(indicesPtr++) = segmentBase + 6;
+							
+							*(indicesPtr++) = segmentBase + 1;
+							*(indicesPtr++) = segmentBase + 6;
+							*(indicesPtr++) = segmentBase + 5;
+						}
+
+						// side c
+						{
+							*(indicesPtr++) = segmentBase + 2;
+							*(indicesPtr++) = segmentBase + 3;
+							*(indicesPtr++) = segmentBase + 7;
+						
+							*(indicesPtr++) = segmentBase + 2;
+							*(indicesPtr++) = segmentBase + 7;
+							*(indicesPtr++) = segmentBase + 6;
+						}
+						
+						// side d
+						{
+							*(indicesPtr++) = segmentBase + 3;
+							*(indicesPtr++) = segmentBase + 0;
+							*(indicesPtr++) = segmentBase + 4;
+						
+							*(indicesPtr++) = segmentBase + 3;
+							*(indicesPtr++) = segmentBase + 4;
+							*(indicesPtr++) = segmentBase + 7;
+						}
+					}
+				}
+				
+				// apply to mesh asset
+				var meshVertexCount = strandCount * perTubeVertices;
+				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				{
+					meshStrips.SetVertexBufferParams(meshVertexCount,
+						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
+						new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
+					);
+
+					meshStrips.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+					meshStrips.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+
+					meshStrips.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
+					meshStrips.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
+					meshStrips.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Triangles), meshUpdateFlags);
+					meshStrips.bounds = bounds;
+				}
+			}
 		}
 		
 		public static Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
@@ -408,7 +509,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				meshTubes.hideFlags = hideFlags;
 				meshTubes.name = "X-Tubes";
-				BuildMeshStrips(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
+				BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
 			}
 			return meshTubes;
 		}
