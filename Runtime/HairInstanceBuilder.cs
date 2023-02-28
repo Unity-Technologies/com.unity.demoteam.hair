@@ -34,6 +34,7 @@ namespace Unity.DemoTeam.Hair
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
 				}
 			}
 
@@ -296,13 +297,13 @@ namespace Unity.DemoTeam.Hair
 						//  :  .   :
 						//  |,     |
 						//  4------5
-						//  |    ,´|
-						//  |  ,´  |      etc.
-						//  |,´    |    
+						//  |    ,ï¿½|
+						//  |  ,ï¿½  |      etc.
+						//  |,ï¿½    |    
 						//  2------3    12----13
-						//  |    ,´|    |    ,´|
-						//  |  ,´  |    |  ,´  |
-						//  |,´    |    |,´    |
+						//  |    ,ï¿½|    |    ,ï¿½|
+						//  |  ,ï¿½  |    |  ,ï¿½  |
+						//  |,ï¿½    |    |,ï¿½    |
 						//  0------1    10----11
 						//  .
 						//  |
@@ -340,6 +341,10 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public static unsafe void BuildMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+		}
+		
 		public static Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
 			var meshRoots = new Mesh();
@@ -395,6 +400,25 @@ namespace Unity.DemoTeam.Hair
 				meshStrips = CreateMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshStrips;
+		}
+		
+		public static Mesh CreateMeshTubes(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			var meshTubes = new Mesh();
+			{
+				meshTubes.hideFlags = hideFlags;
+				meshTubes.name = "X-Tubes";
+				BuildMeshStrips(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
+			}
+			return meshTubes;
+		}
+
+		public static Mesh CreateMeshTubesIfNull(ref Mesh meshTubes, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			if (meshTubes == null)
+				meshTubes = CreateMeshTubes(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+
+			return meshTubes;
 		}
 
 		public static Mesh CreateMeshInstance(Mesh original, HideFlags hideFlags)

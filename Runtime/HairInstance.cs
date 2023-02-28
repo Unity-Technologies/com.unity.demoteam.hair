@@ -88,6 +88,7 @@ namespace Unity.DemoTeam.Hair
 
 				[NonSerialized] public Mesh meshInstanceLines;
 				[NonSerialized] public Mesh meshInstanceStrips;
+				[NonSerialized] public Mesh meshInstanceTubes;
 				[NonSerialized] public uint meshInstanceSubdivision;
 			}
 
@@ -149,6 +150,7 @@ namespace Unity.DemoTeam.Hair
 				Disabled,
 				BuiltinLines,
 				BuiltinStrips,
+				BuiltinTubes,
 				HDRPHighQualityLines,
 			}
 
@@ -1093,6 +1095,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
 				ref var meshInstanceStrips = ref strandGroupInstance.sceneObjects.meshInstanceStrips;
+				ref var meshInstanceTubes = ref strandGroupInstance.sceneObjects.meshInstanceTubes;
 				ref var meshInstanceSubdivision = ref strandGroupInstance.sceneObjects.meshInstanceSubdivision;
 
 				var subdivision = solverData.cbuffer._StagingSubdivision;
@@ -1100,6 +1103,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					CoreUtils.Destroy(meshInstanceLines);
 					CoreUtils.Destroy(meshInstanceStrips);
+					CoreUtils.Destroy(meshInstanceTubes);
 					meshInstanceSubdivision = subdivision;
 				}
 
@@ -1143,6 +1147,23 @@ namespace Unity.DemoTeam.Hair
 								meshShared = true;
 #else
 								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, mesh, HideFlags.HideAndDontSave);
+#endif
+							}
+						}
+						break;
+					case SettingsSystem.StrandRenderer.BuiltinTubes:
+						{
+							if (subdivision > 0)
+							{
+								mesh = HairInstanceBuilder.CreateMeshTubesIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+							}
+							else
+							{
+								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetTubes;
+#if UNITY_2021_2_OR_NEWER
+								meshShared = true;
+#else
+								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceTubes, mesh, HideFlags.HideAndDontSave);
 #endif
 							}
 						}
@@ -1212,6 +1233,7 @@ namespace Unity.DemoTeam.Hair
 
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines || settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
+			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_TUBES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinTubes);
 
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
@@ -1640,6 +1662,7 @@ namespace Unity.DemoTeam.Hair
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
 				}
 			}
 
