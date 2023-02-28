@@ -510,6 +510,7 @@ namespace Unity.DemoTeam.Hair
 
 									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_LINES", true);
 									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_STRIPS", false);
+									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_TUBES", false);
 									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_SOLVER", true);
 									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_STAGING", false);
 

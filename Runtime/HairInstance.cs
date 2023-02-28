@@ -1155,7 +1155,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							if (subdivision > 0)
 							{
-								mesh = HairInstanceBuilder.CreateMeshTubesIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+								mesh = HairInstanceBuilder.CreateMeshTubesIfNull(ref meshInstanceTubes, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
 							}
 							else
 							{

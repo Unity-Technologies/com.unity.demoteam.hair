@@ -6,9 +6,10 @@
 // 0 == staging data full precision
 // 1 == staging data compressed
 
-#pragma multi_compile HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
+#pragma multi_compile HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS HAIR_VERTEX_ID_TUBES
 // *_LINES == render as line segments
 // *_STRIPS == render as view facing strips
+// *_TUBES == render as tubes
 
 #pragma multi_compile HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
 // *_SOLVER == source vertex from solver data
@@ -34,6 +35,9 @@
 #endif
 #ifndef HAIR_VERTEX_ID_STRIPS
 #define HAIR_VERTEX_ID_STRIPS 0
+#endif
+#ifndef HAIR_VERTEX_ID_TUBES
+#define HAIR_VERTEX_ID_TUBES 0
 #endif
 #ifndef HAIR_VERTEX_SRC_SOLVER
 #define HAIR_VERTEX_SRC_SOLVER 0
@@ -143,6 +147,8 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 {
 #if HAIR_VERTEX_ID_STRIPS
 	uint linearParticleIndex = vertexID >> 1;
+#elif HAIR_VERTEX_ID_TUBES
+	uint linearParticleIndex = vertexID >> 2;
 #else
 	uint linearParticleIndex = vertexID;
 #endif
@@ -237,7 +243,7 @@ HairVertex GetHairVertex(
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS)
 {
-#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS)
+#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS || HAIR_VERTEX_ID_TUBES)
 	return GetHairVertex_Live(in_vertexID, in_vertexUV);
 #else
 	return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
