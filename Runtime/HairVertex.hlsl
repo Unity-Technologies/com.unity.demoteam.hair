@@ -172,11 +172,32 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 	float3 curvePositionRWSPrev = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(LoadPositionPrev(i));
 
 	float3 vertexBitangentWS = (r0 + r1);// approx tangent to curve
+#if HAIR_VERTEX_ID_TUBES
+	float3 vertexTangentWS = normalize_safe(cross(vertexBitangentWS, float3(0, 1, 0)));
+#else
 	float3 vertexTangentWS = normalize_safe(cross(vertexBitangentWS, HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS)));
+#endif
 	float3 vertexNormalWS = cross(vertexTangentWS, vertexBitangentWS);
 
 #if HAIR_VERTEX_ID_STRIPS
 	float3 vertexOffsetWS = vertexTangentWS * (_GroupMaxParticleDiameter * (vertexUV.x - 0.5));
+#elif HAIR_VERTEX_ID_TUBES
+	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
+
+	// TODO: Fix UVs to remove modulo / branch, this is just to quickly verify that the tube indices are constructed correctly.
+	{
+		int test = vertexID % 4;
+
+		if (test == 0) vertexOffsetWS += vertexTangentWS * (_GroupMaxParticleDiameter * (0.0 - 0.5));
+		if (test == 1) vertexOffsetWS += vertexTangentWS * (_GroupMaxParticleDiameter * (1.0 - 0.5));
+		if (test == 2) vertexOffsetWS += vertexTangentWS * (_GroupMaxParticleDiameter * (1.0 - 0.5));
+		if (test == 3) vertexOffsetWS += vertexTangentWS * (_GroupMaxParticleDiameter * (0.0 - 0.5));
+	
+		if (test == 0) vertexOffsetWS += normalize_safe(vertexNormalWS) * (_GroupMaxParticleDiameter * (1.0 - 0.5));
+		if (test == 1) vertexOffsetWS += normalize_safe(vertexNormalWS) * (_GroupMaxParticleDiameter * (1.0 - 0.5));
+		if (test == 2) vertexOffsetWS += normalize_safe(vertexNormalWS) * (_GroupMaxParticleDiameter * (0.0 - 0.5));
+		if (test == 3) vertexOffsetWS += normalize_safe(vertexNormalWS) * (_GroupMaxParticleDiameter * (0.0 - 0.5));
+	}
 #else
 	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
 #endif
