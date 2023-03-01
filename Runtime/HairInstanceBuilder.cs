@@ -347,7 +347,7 @@ namespace Unity.DemoTeam.Hair
 			
 			var perTubeVertices  = numSides * strandParticleCount;
 			var perTubeSegments  = strandParticleCount - 1;
-			var perTubeTriangles = 2 * numSides * perTubeSegments;
+			var perTubeTriangles = (2 * numSides * perTubeSegments) + 4;
 			var perTubeIndices   = perTubeTriangles * 3;
 
 			using (var vertexID = new NativeArray<float>(strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
@@ -376,6 +376,17 @@ namespace Unity.DemoTeam.Hair
 				// write indices
 				for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase += 4)
 				{
+					// end cap a
+					{
+						*(indicesPtr++) = segmentBase + 0;
+						*(indicesPtr++) = segmentBase + 2;
+						*(indicesPtr++) = segmentBase + 1;
+
+						*(indicesPtr++) = segmentBase + 0;
+						*(indicesPtr++) = segmentBase + 3;
+						*(indicesPtr++) = segmentBase + 2;
+					}
+					
 					for (int j = 0; j != perTubeSegments; j++, segmentBase += 4)
 					{
 						// TODO: Support NumSides
@@ -423,6 +434,17 @@ namespace Unity.DemoTeam.Hair
 							*(indicesPtr++) = segmentBase + 4;
 							*(indicesPtr++) = segmentBase + 7;
 						}
+					}
+					
+					// end cap b
+					{
+						*(indicesPtr++) = segmentBase + 1;
+						*(indicesPtr++) = segmentBase + 2;
+						*(indicesPtr++) = segmentBase + 0;
+
+						*(indicesPtr++) = segmentBase + 2;
+						*(indicesPtr++) = segmentBase + 3;
+						*(indicesPtr++) = segmentBase + 0;
 					}
 				}
 				
