@@ -349,6 +349,13 @@ namespace Unity.DemoTeam.Hair
 			var perTubeSegments  = strandParticleCount - 1;
 			var perTubeTriangles = (2 * numSides * perTubeSegments) + 4;
 			var perTubeIndices   = perTubeTriangles * 3;
+			
+			var unormU0 = (uint) (sbyte.MaxValue * 0.0f);
+			var unormU1 = (uint) (sbyte.MaxValue * 1.0f);
+			var unormV0 = (uint) (sbyte.MaxValue * 0.0f);
+			var unormV1 = (uint) (sbyte.MaxValue * 1.0f);
+			
+			var unormVs = UInt16.MaxValue / (float)perTubeSegments;
 
 			using (var vertexID = new NativeArray<float>(strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			using (var vertexUV = new NativeArray<uint> (strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
@@ -372,79 +379,84 @@ namespace Unity.DemoTeam.Hair
 						*(vertexIDPtr++) = k++;// ...
 					}
 				}
+ 
+				// write vertex UV
+				for (int i = 0; i != strandCount; i++)
+				{
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
+					{
+						var unormV = (uint)(unormVs * k);
+						{
+							// four vertices per particle
+							*(vertexUVPtr++) = (unormV << 16) | (unormU0 << 8) | (unormV1);// texCoord
+							*(vertexUVPtr++) = (unormV << 16) | (unormU1 << 8) | (unormV1);// ...
+							*(vertexUVPtr++) = (unormV << 16) | (unormU1 << 8) | (unormV0);// ...
+							*(vertexUVPtr++) = (unormV << 16) | (unormU0 << 8) | (unormV0);// ...
+						}
+					}
+				}
+
+				void CreateTriangle(int offset, int i0, int i1, int i2)
+				{
+					*(indicesPtr++) = offset + i0;
+					*(indicesPtr++) = offset + i1;
+					*(indicesPtr++) = offset + i2;
+				}
 				
 				// write indices
 				for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase += 4)
 				{
+					//           6 ---- 5  
+					//           |    ,´|  
+					//           |  ,´  |              
+					//  7 ---- 4 |,´    |   
+					//  |    ,´| 2 ---- 1   
+					//  |  ,´  |    
+					//  |,´    |    
+					//  3------0    
+					//  .
+					//  |
+					//  '--- segmentBase
+					
 					// end cap a
 					{
-						*(indicesPtr++) = segmentBase + 0;
-						*(indicesPtr++) = segmentBase + 2;
-						*(indicesPtr++) = segmentBase + 1;
-
-						*(indicesPtr++) = segmentBase + 0;
-						*(indicesPtr++) = segmentBase + 3;
-						*(indicesPtr++) = segmentBase + 2;
+						CreateTriangle(segmentBase, 0, 2, 1);
+						CreateTriangle(segmentBase, 0, 3, 2);
 					}
 					
 					for (int j = 0; j != perTubeSegments; j++, segmentBase += 4)
 					{
-						// TODO: Support NumSides
-						
 						// side a
 						{
-							*(indicesPtr++) = segmentBase + 0;
-							*(indicesPtr++) = segmentBase + 1;
-							*(indicesPtr++) = segmentBase + 5;
-
-							*(indicesPtr++) = segmentBase + 0;
-							*(indicesPtr++) = segmentBase + 5;
-							*(indicesPtr++) = segmentBase + 4;
+							CreateTriangle(segmentBase, 0, 1, 5);
+							CreateTriangle(segmentBase, 0, 5, 4);
 						}
 
 						// side b
 						{
-							*(indicesPtr++) = segmentBase + 1;
-							*(indicesPtr++) = segmentBase + 2;
-							*(indicesPtr++) = segmentBase + 6;
-							
-							*(indicesPtr++) = segmentBase + 1;
-							*(indicesPtr++) = segmentBase + 6;
-							*(indicesPtr++) = segmentBase + 5;
+							CreateTriangle(segmentBase, 1, 2, 6);
+							CreateTriangle(segmentBase, 1, 6, 5);
 						}
 
 						// side c
 						{
-							*(indicesPtr++) = segmentBase + 2;
-							*(indicesPtr++) = segmentBase + 3;
-							*(indicesPtr++) = segmentBase + 7;
-						
-							*(indicesPtr++) = segmentBase + 2;
-							*(indicesPtr++) = segmentBase + 7;
-							*(indicesPtr++) = segmentBase + 6;
+							CreateTriangle(segmentBase, 2, 3, 7);
+							CreateTriangle(segmentBase, 2, 7, 6);
 						}
 						
 						// side d
 						{
-							*(indicesPtr++) = segmentBase + 3;
-							*(indicesPtr++) = segmentBase + 0;
-							*(indicesPtr++) = segmentBase + 4;
-						
-							*(indicesPtr++) = segmentBase + 3;
-							*(indicesPtr++) = segmentBase + 4;
-							*(indicesPtr++) = segmentBase + 7;
+							CreateTriangle(segmentBase, 3, 0, 4);
+							CreateTriangle(segmentBase, 3, 4, 7);
 						}
 					}
 					
 					// end cap b
 					{
-						*(indicesPtr++) = segmentBase + 1;
-						*(indicesPtr++) = segmentBase + 2;
-						*(indicesPtr++) = segmentBase + 0;
-
-						*(indicesPtr++) = segmentBase + 2;
-						*(indicesPtr++) = segmentBase + 3;
-						*(indicesPtr++) = segmentBase + 0;
+						CreateTriangle(segmentBase, 1, 2, 0);
+						CreateTriangle(segmentBase, 2, 3, 0);
 					}
 				}
 				
