@@ -1,0 +1,24 @@
+﻿#pragma kernel Main
+
+//----------
+// includes
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
+#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariablesFunctions.hlsl"
+
+#include "HairVertex.hlsl"
+
+[numthreads(64, 1, 1)]
+void Main(
+    uint3 groupIdx : SV_GroupID,
+    uint3 localIdx : SV_GroupThreadID,
+    uint3 worldIdx : SV_DispatchThreadID,
+    uint threadIdx : SV_GroupIndex)
+    // SV_GroupID           execution group coords
+    // SV_GroupThreadID     thread coords within execution group
+    // SV_DispatchThreadID  thread coords (global)
+    // SV_GroupIndex        thread offset within execution group)
+{
+    
+}

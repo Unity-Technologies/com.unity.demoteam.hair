@@ -1048,7 +1048,7 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				UpdateRendererState(ref strandGroupInstances[i], solverData[i]);
+				UpdateRendererState(ref strandGroupInstances[i], solverData[i], cmd);
 			}
 
 			// fire event
@@ -1056,7 +1056,7 @@ namespace Unity.DemoTeam.Hair
 				onRenderingStateChanged(cmd);
 		}
 
-		void UpdateRendererState(ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData)
+		void UpdateRendererState(ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData, in CommandBuffer cmd)
 		{
 			ref readonly var settingsStrands = ref GetSettingsStrands(strandGroupInstance);
 
@@ -1233,7 +1233,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 #if HAS_PACKAGE_UNITY_HDRP
-			UpdateRayTracingState(ref strandGroupInstance, ref materialInstance);
+			UpdateRayTracingState(ref strandGroupInstance, ref materialInstance, cmd);
 #endif			
 		}
 

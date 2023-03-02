@@ -38,6 +38,10 @@ namespace Unity.DemoTeam.Hair
 
     public partial class HairInstance
     {
+        static bool s_loadedRaytracingResources = false;
+
+        static ComputeShader s_updateMeshPositionsCS;
+        
         [Serializable]
         public struct RaytracingObjects
         {
@@ -45,14 +49,31 @@ namespace Unity.DemoTeam.Hair
             public MeshFilter   filter;
             public MeshRenderer renderer;
 
-            [NonSerialized] 
-            public Material material;
-            
-            [NonSerialized]
-            public Mesh mesh;
+            [NonSerialized] public Material material;
+            [NonSerialized] public Mesh mesh;
+            [NonSerialized] public GraphicsBuffer bufferP;
+            [NonSerialized] public GraphicsBuffer bufferUV;
         }
         
-        void UpdateRayTracingState(ref GroupInstance strandGroupInstance, ref Material materialInstance)
+#if UNITY_EDITOR
+        [UnityEditor.InitializeOnLoadMethod]
+#else
+		[RuntimeInitializeOnLoadMethod]
+#endif
+        static void LoadRaytracingResources()
+        {
+            if (s_loadedRaytracingResources)
+                return;
+            
+            var resources = HairRaytracingResources.Load();
+            {
+                s_updateMeshPositionsCS = resources.computeUpdateMeshVertices;
+            }
+
+            s_loadedRaytracingResources = true;
+        }
+        
+        void UpdateRayTracingState(ref GroupInstance strandGroupInstance, ref Material materialInstance, CommandBuffer cmd)
         {
             ref var rayTracingObjects = ref strandGroupInstance.sceneObjects.rayTracingObjects;
             
@@ -74,11 +95,42 @@ namespace Unity.DemoTeam.Hair
                 rayTracingMaterial.renderQueue = Int32.MaxValue; 
             }
 
-            // select mesh
+            // update mesh
             var mesh = null as Mesh;
             {
+                // todo: support subdivision staging
                 mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetRaytracedTubes;
-                
+
+                CoreUtils.SafeRelease(rayTracingObjects.bufferP);
+                CoreUtils.SafeRelease(rayTracingObjects.bufferUV);
+                {
+                    mesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
+
+                    var streamIndexP  = mesh.GetVertexAttributeStream(VertexAttribute.Position);
+                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord1);
+
+                    if (streamIndexP != -1 && streamIndexUV != -1)
+                    {
+                        rayTracingObjects.bufferP  = mesh.GetVertexBuffer(streamIndexP);
+                        rayTracingObjects.bufferUV = mesh.GetVertexBuffer(streamIndexUV);
+                    }
+                    else
+                    {
+                        Debug.LogError("Invalid hair ray tracing mesh.");
+                        return;
+                    }
+                }
+
+                // update mesh vertex positions in the acceleration structure
+                if (mesh.vertexCount > 0)
+                {
+                    const int kernelIndex = 0;
+                    
+                    cmd.SetComputeParamsFromMaterial(s_updateMeshPositionsCS, kernelIndex, rayTracingMaterial);
+                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferP",  rayTracingObjects.bufferP);
+                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferUV", rayTracingObjects.bufferUV);
+                    cmd.DispatchCompute(s_updateMeshPositionsCS, kernelIndex, (mesh.vertexCount + 64 - 1) / 64, 1, 1);
+                }
             }
 
             // update mesh 
