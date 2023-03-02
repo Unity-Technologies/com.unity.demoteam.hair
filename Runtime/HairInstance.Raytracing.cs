@@ -1,23 +1,38 @@
 ﻿using System;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
+using RayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode;
 
 namespace Unity.DemoTeam.Hair
 {
     public static partial class HairInstanceBuilder
     {
-        internal static void BuildRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance, int index, HideFlags hideFlags = HideFlags.NotEditable)
+        public static Mesh CreateMeshRaytracedTubes(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
         {
-            strandGroupInstance.sceneObjects.rayTracingObjects.rayTracingMeshContainer = CreateContainer("RaytracedStrands:" + index, strandGroupInstance.sceneObjects.groupContainer,        hideFlags);
-            strandGroupInstance.sceneObjects.rayTracingObjects.rayTracingMeshFilter    = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.rayTracingObjects.rayTracingMeshContainer,   hideFlags);
-            strandGroupInstance.sceneObjects.rayTracingObjects.rayTracingMeshRenderer  = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.rayTracingObjects.rayTracingMeshContainer, hideFlags);
+            var meshTubes = new Mesh();
+            {
+                meshTubes.hideFlags = hideFlags;
+                meshTubes.name = "X-RaytracedTubes";
+                BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds, buildForRaytracing: true);
+            }
+            return meshTubes;
+        }
+        
+        static void BuildRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance, int index, HideFlags hideFlags = HideFlags.NotEditable)
+        {
+            strandGroupInstance.sceneObjects.rayTracingObjects.container = CreateContainer("RaytracedStrands:" + index, strandGroupInstance.sceneObjects.groupContainer,        hideFlags);
+            strandGroupInstance.sceneObjects.rayTracingObjects.filter    = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.rayTracingObjects.container,   hideFlags);
+            strandGroupInstance.sceneObjects.rayTracingObjects.renderer  = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.rayTracingObjects.container, hideFlags);
         }
 
-        internal static void DestroyRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance)
+        static void DestroyRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance)
         {
-            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.rayTracingMeshContainer);
-            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.rayTracingMesh);
+            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.container);
+            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.material);
+            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.mesh);
         }
     }
 
@@ -26,25 +41,71 @@ namespace Unity.DemoTeam.Hair
         [Serializable]
         public struct RaytracingObjects
         {
-            public GameObject   rayTracingMeshContainer;
-            public MeshFilter   rayTracingMeshFilter;
-            public MeshRenderer rayTracingMeshRenderer;
+            public GameObject   container;
+            public MeshFilter   filter;
+            public MeshRenderer renderer;
+
+            [NonSerialized] 
+            public Material material;
             
             [NonSerialized]
-            public Mesh rayTracingMesh;
+            public Mesh mesh;
         }
         
-        void InitializeRayTracingData(ref GroupInstance strandGroupInstance)
+        void UpdateRayTracingState(ref GroupInstance strandGroupInstance, ref Material materialInstance)
         {
-        }
-        
-        void UpdateRayTracingState(ref GroupInstance strandGroupInstance)
-        {
+            ref var rayTracingObjects = ref strandGroupInstance.sceneObjects.rayTracingObjects;
+            
+            // update material instance
+            ref var rayTracingMaterial = ref rayTracingObjects.material;
+            {
+                if (rayTracingMaterial == null)
+                {
+                    rayTracingMaterial = new Material(materialInstance);
+                    rayTracingMaterial.name += "(Raytracing)";
+                    rayTracingMaterial.hideFlags = HideFlags.HideAndDontSave;
+                }
+
+                rayTracingMaterial.shader = materialInstance.shader;
+                rayTracingMaterial.CopyPropertiesFromMaterial(materialInstance);
+                
+                // this will force disable the renderer for all rendering passes but still cause it to be present 
+                // in the acceleration structure. it's a bit of a hack.
+                rayTracingMaterial.renderQueue = Int32.MaxValue; 
+            }
+
+            // select mesh
+            var mesh = null as Mesh;
+            {
+                mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetRaytracedTubes;
+                
+            }
+
+            // update mesh 
+            ref var meshFilter = ref rayTracingObjects.filter;
+            {
+                if (meshFilter.sharedMesh != mesh)
+                    meshFilter.sharedMesh = mesh;
+            }
+
+            // update mesh renderer
+            ref var meshRenderer = ref rayTracingObjects.renderer;
+            {
+                meshRenderer.enabled = (settingsSystem.strandRenderer != SettingsSystem.StrandRenderer.Disabled);
+                meshRenderer.sharedMaterial = rayTracingMaterial;
+                meshRenderer.shadowCastingMode = settingsSystem.strandShadows;
+                meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
+                meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
+                
+                // this flag is required for the acceleration structure to catch updates from the compute kernel.
+                meshRenderer.rayTracingMode = RayTracingMode.DynamicGeometry;
+            }
         }
 
         void ReleaseRayTracingData(ref GroupInstance strandGroupInstance)
         {
-            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.rayTracingMesh);
+            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.material);
+            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.mesh);
         }
     }
 }

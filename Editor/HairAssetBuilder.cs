@@ -828,6 +828,13 @@ namespace Unity.DemoTeam.Hair
 						strandGroup.strandCount,
 						strandGroup.strandParticleCount,
 						strandGroup.bounds);
+
+					strandGroup.meshAssetRaytracedTubes = HairInstanceBuilder.CreateMeshRaytracedTubes(
+						hideFlags,
+						strandGroup.particleMemoryLayout,
+						strandGroup.strandCount,
+						strandGroup.strandParticleCount,
+						strandGroup.bounds);
 				}
 			}
 

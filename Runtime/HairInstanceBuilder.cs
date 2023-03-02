@@ -349,7 +349,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static unsafe void BuildMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds, bool buildForRaytracing = false)
 		{
 			const int numSides = 4;
 			
@@ -365,9 +365,10 @@ namespace Unity.DemoTeam.Hair
 			
 			var unormVs = UInt16.MaxValue / (float)perTubeSegments;
 
-			using (var vertexID = new NativeArray<float>(strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-			using (var vertexUV = new NativeArray<uint> (strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-			using (var indices  = new NativeArray<int>  (strandCount * perTubeIndices,  Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var vertexP  = new NativeArray<Vector3>(strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var vertexID = new NativeArray<float>  (strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var vertexUV = new NativeArray<uint>   (strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var indices  = new NativeArray<int>    (strandCount * perTubeIndices,  Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
 				var vertexIDPtr = (float*)vertexID.GetUnsafePtr();
 				var vertexUVPtr = (uint*)vertexUV.GetUnsafePtr();
@@ -467,18 +468,32 @@ namespace Unity.DemoTeam.Hair
 						CreateTriangle(segmentBase, 2, 3, 0);
 					}
 				}
-				
 				// apply to mesh asset
 				var meshVertexCount = strandCount * perTubeVertices;
 				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
 				{
-					meshStrips.SetVertexBufferParams(meshVertexCount,
-						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
-						new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
-					);
+					if (!buildForRaytracing)
+					{
+						meshStrips.SetVertexBufferParams(meshVertexCount, attributes: new [] {
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
+						});
 
-					meshStrips.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
-					meshStrips.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+						meshStrips.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+						meshStrips.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+					}
+					else
+					{
+						meshStrips.SetVertexBufferParams(meshVertexCount, attributes: new [] {
+							new VertexAttributeDescriptor(VertexAttribute.Position,  VertexAttributeFormat.Float32, dimension: 3, stream: 0),
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 1),// vertexID
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 2) // vertexUV
+						});
+
+						meshStrips.SetVertexBufferData(vertexP,  dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+						meshStrips.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+						meshStrips.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
+					}
 
 					meshStrips.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
 					meshStrips.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);

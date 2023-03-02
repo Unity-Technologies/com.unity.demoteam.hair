@@ -9,6 +9,7 @@ using UnityEngine.Serialization;
 using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using RayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode;
 
 #if HAS_PACKAGE_UNITY_HDRP
 using UnityEngine.Rendering.HighDefinition;
@@ -1195,6 +1196,7 @@ namespace Unity.DemoTeam.Hair
 				meshRenderer.shadowCastingMode = settingsSystem.strandShadows;
 				meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
 				meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
+				meshRenderer.rayTracingMode = RayTracingMode.Off;
 
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
 				ref var meshRendererHDRP = ref strandGroupInstance.sceneObjects.strandMeshRendererHDRP;
@@ -1231,7 +1233,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 #if HAS_PACKAGE_UNITY_HDRP
-			UpdateRayTracingState(ref strandGroupInstance);
+			UpdateRayTracingState(ref strandGroupInstance, ref materialInstance);
 #endif			
 		}
 
@@ -1644,10 +1646,6 @@ namespace Unity.DemoTeam.Hair
 				//TODO clean this up (currently necessary for full initialization of root buffers)
 				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
 				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
-				
-#if HAS_PACKAGE_UNITY_HDRP
-				InitializeRayTracingData(ref strandGroupInstances[i]);
-#endif
 			}
 
 			// init volume data
