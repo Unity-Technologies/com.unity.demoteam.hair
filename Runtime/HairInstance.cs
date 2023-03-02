@@ -21,7 +21,7 @@ using Unity.DemoTeam.DigitalHuman;
 namespace Unity.DemoTeam.Hair
 {
 	[ExecuteAlways, SelectionBase]
-	public class HairInstance : MonoBehaviour
+	public partial class HairInstance : MonoBehaviour
 	{
 		public static HashSet<HairInstance> s_instances = new HashSet<HairInstance>();
 
@@ -90,6 +90,11 @@ namespace Unity.DemoTeam.Hair
 				[NonSerialized] public Mesh meshInstanceStrips;
 				[NonSerialized] public Mesh meshInstanceTubes;
 				[NonSerialized] public uint meshInstanceSubdivision;
+				
+#if HAS_PACKAGE_UNITY_HDRP
+				// Objects are created at runtime. 
+				public RaytracingObjects rayTracingObjects;
+#endif
 			}
 
 #if SUPPORT_CONTENT_UPGRADE
@@ -187,6 +192,10 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
 			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines), FormerlySerializedAs("strandRendererGroupingValue")]
 			public LineRendering.RendererGroup strandRendererGroup;
+#endif
+#if HAS_PACKAGE_UNITY_HDRP
+			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines)]
+			public bool supportsRaytracing;
 #endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
@@ -1220,6 +1229,10 @@ namespace Unity.DemoTeam.Hair
 				//mesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
 #endif
 			}
+
+#if HAS_PACKAGE_UNITY_HDRP
+			UpdateRayTracingState(ref strandGroupInstance);
+#endif			
 		}
 
 		static void UpdateMaterialState(Material materialInstance, in SettingsSystem settingsSystem, in SettingsStrands settingsStrands, in HairSim.SolverData solverData, in HairSim.VolumeData volumeData)
@@ -1631,6 +1644,10 @@ namespace Unity.DemoTeam.Hair
 				//TODO clean this up (currently necessary for full initialization of root buffers)
 				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
 				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
+				
+#if HAS_PACKAGE_UNITY_HDRP
+				InitializeRayTracingData(ref strandGroupInstances[i]);
+#endif
 			}
 
 			// init volume data
@@ -1663,6 +1680,10 @@ namespace Unity.DemoTeam.Hair
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
+					
+#if HAS_PACKAGE_UNITY_HDRP
+					ReleaseRayTracingData(ref strandGroupInstances[i]);
+#endif
 				}
 			}
 

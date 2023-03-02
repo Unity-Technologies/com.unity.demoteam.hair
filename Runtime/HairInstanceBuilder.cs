@@ -14,7 +14,7 @@ using Unity.DemoTeam.DigitalHuman;
 
 namespace Unity.DemoTeam.Hair
 {
-	public static class HairInstanceBuilder
+	public static partial class HairInstanceBuilder
 	{
 		public static void ClearHairInstance(HairInstance hairInstance)
 		{
@@ -35,6 +35,10 @@ namespace Unity.DemoTeam.Hair
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
+					
+#if HAS_PACKAGE_UNITY_HDRP
+					DestroyRayTracingObjects(ref strandGroupInstances[i]);
+#endif
 				}
 			}
 
@@ -124,6 +128,10 @@ namespace Unity.DemoTeam.Hair
 						strandGroupInstance.sceneObjects.strandMeshRendererHDRP = CreateComponent<HDAdditionalMeshRendererSettings>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
 #endif
 					}
+					
+#if HAS_PACKAGE_UNITY_HDRP
+					BuildRayTracingObjects(ref strandGroupInstance, flatIndex, hideFlags);
+#endif
 				}
 
 				hairInstance.strandGroupChecksums[writeIndexChecksum++] = hairAsset.checksum;
