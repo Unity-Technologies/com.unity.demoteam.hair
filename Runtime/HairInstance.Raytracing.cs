@@ -52,6 +52,7 @@ namespace Unity.DemoTeam.Hair
             [NonSerialized] public Material material;
             [NonSerialized] public Mesh mesh;
             [NonSerialized] public GraphicsBuffer bufferP;
+            [NonSerialized] public GraphicsBuffer bufferT;
             [NonSerialized] public GraphicsBuffer bufferUV;
         }
         
@@ -108,11 +109,13 @@ namespace Unity.DemoTeam.Hair
 
                     var streamIndexP  = mesh.GetVertexAttributeStream(VertexAttribute.Position);
                     var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord1);
+                    var streamIndexT  = mesh.GetVertexAttributeStream(VertexAttribute.Tangent);
 
                     if (streamIndexP != -1 && streamIndexUV != -1)
                     {
                         rayTracingObjects.bufferP  = mesh.GetVertexBuffer(streamIndexP);
                         rayTracingObjects.bufferUV = mesh.GetVertexBuffer(streamIndexUV);
+                        rayTracingObjects.bufferT  = mesh.GetVertexBuffer(streamIndexT);
                     }
                     else
                     {
@@ -140,6 +143,20 @@ namespace Unity.DemoTeam.Hair
                         if (keyword.isValid)
                             cmd.SetKeyword(s_updateMeshPositionsCS, keyword, true);
                     }
+
+                    // override whatever is being rasterized to use the tube geo representation. 
+                    {
+                        var vertexIDKeywords = new LocalKeyword[3]
+                        {
+                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_LINES"),
+                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_STRIPS"),
+                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_TUBES"),
+                        };
+
+                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[0], false);
+                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[1], false);
+                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[2], true);
+                    }
                     
                     // Also need to bind these matrices manually. (TODO: Is it cross-SRP safe?)
                     cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_ObjectToWorld", rayTracingObjects.container.transform.localToWorldMatrix);
@@ -147,8 +164,9 @@ namespace Unity.DemoTeam.Hair
                     
                     cmd.SetComputeParamsFromMaterial(s_updateMeshPositionsCS, kernelIndex, rayTracingMaterial);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferP",  rayTracingObjects.bufferP);
+                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferT", rayTracingObjects.bufferT);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferUV", rayTracingObjects.bufferUV);
-                    cmd.DispatchCompute(s_updateMeshPositionsCS, kernelIndex, (mesh.vertexCount + 64 - 1) / 64, 1, 1);
+                    cmd.DispatchCompute(s_updateMeshPositionsCS, kernelIndex, (mesh.vertexCount + 1024 - 1) / 1024, 1, 1);
                 }
             }
 
