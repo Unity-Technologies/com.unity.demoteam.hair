@@ -41,7 +41,7 @@ namespace Unity.DemoTeam.Hair
         static bool s_loadedRaytracingResources = false;
 
         static ComputeShader s_updateMeshPositionsCS;
-        
+
         [Serializable]
         public struct RaytracingObjects
         {
@@ -126,6 +126,25 @@ namespace Unity.DemoTeam.Hair
                 {
                     const int kernelIndex = 0;
                     
+                    // not the greatest way to do this, but not really possible to do any better unless it is done on the native side.
+                    foreach (var keywordName in s_updateMeshPositionsCS.enabledKeywords)
+                    {
+                        cmd.SetKeyword(s_updateMeshPositionsCS, keywordName, false);
+                    }
+                    
+                    // not the greatest way to do this, but not really possible to do any better unless it is done on the native side.
+                    foreach (var keywordName in rayTracingMaterial.shaderKeywords)
+                    {
+                        var keyword = s_updateMeshPositionsCS.keywordSpace.FindKeyword(keywordName);
+
+                        if (keyword.isValid)
+                            cmd.SetKeyword(s_updateMeshPositionsCS, keyword, true);
+                    }
+                    
+                    // Also need to bind these matrices manually. (TODO: Is it cross-SRP safe?)
+                    cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_ObjectToWorld", rayTracingObjects.container.transform.localToWorldMatrix);
+                    cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_WorldToObject", rayTracingObjects.container.transform.worldToLocalMatrix);
+                    
                     cmd.SetComputeParamsFromMaterial(s_updateMeshPositionsCS, kernelIndex, rayTracingMaterial);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferP",  rayTracingObjects.bufferP);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferUV", rayTracingObjects.bufferUV);
@@ -149,7 +168,7 @@ namespace Unity.DemoTeam.Hair
                 meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
                 meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
                 
-                // this flag is required for the acceleration structure to catch updates from the compute kernel.
+                // this flag is required for the acceleration structure to catch updates made by the compute kernel.
                 meshRenderer.rayTracingMode = RayTracingMode.DynamicGeometry;
             }
         }
