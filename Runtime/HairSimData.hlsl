@@ -22,17 +22,14 @@ HAIRSIM_SOLVERINPUT<float2> _RootUV;				// xy: strand root uv
 HAIRSIM_SOLVERINPUT<float> _RootScale;				// x: relative strand length [0..1] (to maximum within group)
 HAIRSIM_SOLVERINPUT<float4> _RootPosition;			// xyz: strand root position, w: -
 HAIRSIM_SOLVERINPUT<float4> _RootPositionPrev;		// ...
-HAIRSIM_SOLVERINPUT<float4> _RootDirection;			// xyz: strand root direction, w: -
-HAIRSIM_SOLVERINPUT<float4> _RootDirectionPrev;		// ...
-HAIRSIM_SOLVERINPUT<float4> _RootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
+HAIRSIM_SOLVERINPUT<float4> _RootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent to curve
 HAIRSIM_SOLVERINPUT<float4> _RootFramePrev;			// ...
 
 HAIRSIM_SOLVERDATA<float4> _SubstepRootPosition;	// substep data
-HAIRSIM_SOLVERDATA<float4> _SubstepRootDirection;	// ...
 HAIRSIM_SOLVERDATA<float4> _SubstepRootFrame;		// ...
 
-HAIRSIM_SOLVERDATA<float4> _InitialRootFrame;			// quat(xyz,w): initial strand root material frame
-HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
+HAIRSIM_SOLVERDATA<float4> _InitialRootDirection;		// xyz: initial local root direction, w: -
+HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;		// xyz: initial local particle offset from strand root, w: -
 HAIRSIM_SOLVERDATA<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 
 HAIRSIM_SOLVERDATA<float4> _ParticlePosition;		// xyz: position, w: initial local accumulated weight (gather)

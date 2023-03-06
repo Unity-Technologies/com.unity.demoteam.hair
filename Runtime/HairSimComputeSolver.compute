@@ -390,26 +390,24 @@ void KInitialize(
 {
 	DECLARE_STRAND(worldIdx.x);
 
-	float3 worldRootPos = _RootPosition[strandIndex].xyz;
-	float3 worldRootDir = _RootDirection[strandIndex].xyz;
-
-	// calc initial strand root local frame
+	// calc initial local root frame
 	float3 localRootPos = _ParticlePosition[strandParticleBegin].xyz;
-	float3 localRootDir = QMul(_RootRotationInv, worldRootDir);
-	float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), localRootDir);
-	{
-		_InitialRootFrame[strandIndex] = localRootFrame;// transforms 0,1,0 to initial local dir
-	}
+	float3 localRootDir = _InitialRootDirection[strandIndex].xyz;// normalize(_ParticlePosition[strandParticleBegin + strandParticleStride].xyz - localRootPos);
+	float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), localRootDir);// transforms 0,1,0 to initial local dir
+	float4 localRootFrameInv = QInverse(localRootFrame);
 
 	// calc initial particle offsets from strand root + set up initial world pose
+	float4 worldRootFrame = _RootFrame[strandIndex];
+	float3 worldRootPos = _RootPosition[strandIndex].xyz;
+
 	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 	{
-		float3 localParticleOffset = _ParticlePosition[i].xyz - localRootPos;
+		float3 localParticleOffset = QMul(localRootFrameInv, _ParticlePosition[i].xyz - localRootPos);
 		{
 			_InitialParticleOffset[i].xyz = localParticleOffset;
 		}
 
-		float3 worldParticleOffset = QMul(_RootRotation, localParticleOffset * _GroupScale);//TODO verify if correct to assume no deformation on initialization?
+		float3 worldParticleOffset = QMul(worldRootFrame, localParticleOffset * _GroupScale);
 		{
 			_ParticlePosition[i].xyz = (worldRootPos + worldParticleOffset);
 			_ParticlePositionPrev[i].xyz = (worldRootPos + worldParticleOffset);
@@ -427,10 +425,10 @@ void KInitialize(
 	// calc initial particle material frame deltas
 	{
 		// root
-		_InitialParticleFrameDelta[strandParticleBegin] = MakeQuaternionIdentity();//TODO might as well store root frame here?
+		_InitialParticleFrameDelta[strandParticleBegin] = MakeQuaternionIdentity();
 	
 		// root+1
-		float3 r0 = -localRootDir;
+		float3 r0 = -float3(0.0, 1.0, 0.0);
 		float3 r1 = 0.0;
 		float3 r2 = _InitialParticleOffset[strandParticleBegin + strandParticleStride].xyz;
 		{
@@ -523,29 +521,25 @@ void KUpdateRoots(
 	uint addressNormal = strandIndex * _VertexBufferNormalStride + _VertexBufferNormalOffset;
 
 	float3 positionOS = asfloat(_VertexBufferPosition.Load3(addressPosition));
-	float3 normalOS = asfloat(_VertexBufferNormal.Load3(addressNormal));
+	float3 normalOS = asfloat(_VertexBufferNormal.Load3(addressNormal));// contains the direction of the first segment
 
+	// update root position
 	_RootPosition[strandIndex].xyz = mul(_RootTransform, float4(positionOS, 1.0)).xyz;
-	_RootDirection[strandIndex].xyz = normalize(QMul(_RootRotation, normalOS));
 
-	// update material frame
+	// update root frame
 	{
-	#if 1
-		// perturb initial local frame
-		float3 localRootReference = QMul(_InitialRootFrame[strandIndex], float3(0.0, 1.0, 0.0));
-		float4 localRootFrame = MakeQuaternionFromTo(localRootReference, normalOS);
-	#else
-		float4 localRootFrame = MakeQuaternionIdentity();
-	#endif
+		// add direction
+		float3 localRootDir = normalOS;
+		float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), localRootDir);
 
 	#if 1
 		// add twist from skinning delta
 		float4 skinningBoneLocalDelta = QMul(_RootRotationInv, _WorldRotation);
-		float4 skinningBoneLocalTwist = QDecomposeTwist(skinningBoneLocalDelta, normalOS);
+		float4 skinningBoneLocalTwist = QDecomposeTwist(skinningBoneLocalDelta, localRootDir);
 		localRootFrame = QMul(skinningBoneLocalTwist, localRootFrame);
 	#endif
 
-		// done
+		// output world frame
 		_RootFrame[strandIndex] = normalize(QMul(_RootRotation, localRootFrame));
 	}
 }
@@ -593,11 +587,6 @@ void KSubstepRoots(
 	_SubstepRootPosition[strandIndex].xyz = BlendPosition(
 		_RootPositionPrev[strandIndex].xyz,
 		_RootPosition[strandIndex].xyz,
-		_SubstepFraction);
-
-	_SubstepRootDirection[strandIndex].xyz = BlendDirection(
-		_RootDirectionPrev[strandIndex].xyz,
-		_RootDirection[strandIndex].xyz,
 		_SubstepFraction);
 
 	_SubstepRootFrame[strandIndex] = BlendQuaternion(
@@ -833,7 +822,7 @@ void KSolveConstraints_GaussSeidelReference(
 		{
 			float4 rootFrame = _RootFrame[strandIndex];
 			float3 rootPos = _RootPosition[strandIndex].xyz;
-			float3 rootDir = QMul(rootFrame, float3(0, 1, 0));
+			float3 rootDir = QMul(rootFrame, float3(0.0, 1.0, 0.0));
 
 			// root
 			float3 p0 = rootPos - rootDir * GetParticleInterval(strandIndex) * 3.0;
@@ -858,8 +847,8 @@ void KSolveConstraints_GaussSeidelReference(
 				q2 = q3;// root frame
 				q3 = NextQuaternionFromBend(p1, p2, p3, q2);
 
-				ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], _LocalShape, 0.0f, 1.0f, q2, q3);
-				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 0.0f, 1.0f, 1.0f, p2, p3, q3);
+				ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], _LocalShape, 0.0, 1.0, q2, q3);
+				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 0.0, 1.0, 1.0, p2, p3, q3);
 			}
 
 			// root+2..
@@ -873,8 +862,8 @@ void KSolveConstraints_GaussSeidelReference(
 				q2 = q3;
 				q3 = NextQuaternionFromBend(p1, p2, p3, q2);
 
-				ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], _LocalShape, 1.0f - _LocalShapeBias, 1.0f, q2, q3);
-				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 1.0f, 1.0f, 1.0f, p2, p3, q3);
+				ApplyMaterialFrameBendTwistConstraint(_InitialParticleFrameDelta[i], _LocalShape, 1.0 - _LocalShapeBias, 1.0, q2, q3);
+				ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, 1.0, 1.0, 1.0, p2, p3, q3);
 
 				_ParticlePosition[i - strandParticleStride].xyz = p2;
 			}

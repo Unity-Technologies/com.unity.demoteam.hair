@@ -18,8 +18,6 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer rootScale;				// x: relative strand length [0..1] (to maximum in group)
 			public ComputeBuffer rootPosition;			// xyz: strand root position, w: -
 			public ComputeBuffer rootPositionPrev;		// ...
-			public ComputeBuffer rootDirection;			// xyz: strand root direction, w: -
-			public ComputeBuffer rootDirectionPrev;		// ...
 			public ComputeBuffer rootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
 			public ComputeBuffer rootFramePrev;			// ...
 
@@ -27,7 +25,7 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer substepRootDirection;	// ...
 			public ComputeBuffer substepRootFrame;		// ...
 
-			public ComputeBuffer initialRootFrame;			// quat(xyz,w): initial strand root local frame
+			public ComputeBuffer initialRootDirection;		// xyz: initial local root direction, w: -
 			public ComputeBuffer initialParticleOffset;		// xyz: initial particle offset from strand root, w: -
 			public ComputeBuffer initialParticleFrameDelta; // quat(xyz,w): initial particle material frame delta
 

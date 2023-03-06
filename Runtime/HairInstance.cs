@@ -1561,17 +1561,14 @@ namespace Unity.DemoTeam.Hair
 				*/
 				//DEBUG END
 
-				using (var alignedRootPosition = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var alignedRootDirection = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var alignedParticlePosition = new NativeArray<Vector4>(strandGroupParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
 					unsafe
 					{
-						fixed (void* rootPositionPtr = strandGroupAsset.rootPosition)
 						fixed (void* rootDirectionPtr = strandGroupAsset.rootDirection)
 						fixed (void* particlePositionPtr = strandGroupAsset.particlePosition)
 						{
-							UnsafeUtility.MemCpyStride(alignedRootPosition.GetUnsafePtr(), sizeof(Vector4), rootPositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupAsset.strandCount);
 							UnsafeUtility.MemCpyStride(alignedRootDirection.GetUnsafePtr(), sizeof(Vector4), rootDirectionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupAsset.strandCount);
 							UnsafeUtility.MemCpyStride(alignedParticlePosition.GetUnsafePtr(), sizeof(Vector4), particlePositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupParticleCount);
 						}
@@ -1579,8 +1576,9 @@ namespace Unity.DemoTeam.Hair
 
 					solverData[i].rootUV.SetData(strandGroupAsset.rootUV);
 					solverData[i].rootScale.SetData(strandGroupAsset.rootScale);
-					solverData[i].rootPosition.SetData(alignedRootPosition);
-					solverData[i].rootDirection.SetData(alignedRootDirection);
+
+					//TODO keeping this buffer for asset compatibility only -- remove when adding upgrade path
+					solverData[i].initialRootDirection.SetData(alignedRootDirection);
 
 					solverData[i].particlePosition.SetData(alignedParticlePosition);
 

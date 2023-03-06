@@ -14,8 +14,7 @@
 	#include "HairSimComputeSolverQuaternion.hlsl"
 
 	RWStructuredBuffer<float4> _UpdatedRootPosition : register(u1);
-	RWStructuredBuffer<float4> _UpdatedRootDirection : register(u2);
-	RWStructuredBuffer<float4> _UpdatedRootFrame : register(u3);
+	RWStructuredBuffer<float4> _UpdatedRootFrame : register(u2);
 
 	struct RootAttribs
 	{
@@ -33,27 +32,23 @@
 
 	RootVaryings RootVert(RootAttribs attribs, uint strandIndex : SV_VertexID)
 	{
+		// update root position
 		_UpdatedRootPosition[strandIndex].xyz = mul(_RootTransform, float4(attribs.positionOS, 1.0)).xyz;
-		_UpdatedRootDirection[strandIndex].xyz = normalize(QMul(_RootRotation, attribs.normalOS));
 
-		// update material frame
+		// update root frame
 		{
-		#if 1
-			// perturb initial local frame
-			float3 localRootReference = QMul(_InitialRootFrame[strandIndex], float3(0.0, 1.0, 0.0));
-			float4 localRootFrame = MakeQuaternionFromTo(localRootReference, attribs.normalOS);
-		#else
-			float4 localRootFrame = MakeQuaternionIdentity();
-		#endif
+			// add direction
+			float3 localRootDir = attribs.normalOS;
+			float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), localRootDir);
 
 		#if 1
 			// add twist from skinning delta
 			float4 skinningBoneLocalDelta = QMul(_RootRotationInv, _WorldRotation);
-			float4 skinningBoneLocalTwist = QDecomposeTwist(skinningBoneLocalDelta, attribs.normalOS);
+			float4 skinningBoneLocalTwist = QDecomposeTwist(skinningBoneLocalDelta, localRootDir);
 			localRootFrame = QMul(skinningBoneLocalTwist, localRootFrame);
 		#endif
 
-			// done
+			// output world frame
 			_UpdatedRootFrame[strandIndex] = normalize(QMul(_RootRotation, localRootFrame));
 		}
 
