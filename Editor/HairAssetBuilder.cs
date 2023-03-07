@@ -149,12 +149,14 @@ namespace Unity.DemoTeam.Hair
 						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetLines, hairAsset);
 						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetStrips, hairAsset);
 						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetTubes, hairAsset);
+						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetRaytracedTubes, hairAsset);
 					}
 
 					hairAsset.strandGroups[i].meshAssetRoots.name += (":" + i);
 					hairAsset.strandGroups[i].meshAssetLines.name += (":" + i);
 					hairAsset.strandGroups[i].meshAssetStrips.name += (":" + i);
 					hairAsset.strandGroups[i].meshAssetTubes.name += (":" + i);
+					hairAsset.strandGroups[i].meshAssetRaytracedTubes.name += (":" + i);
 				}
 			}
 

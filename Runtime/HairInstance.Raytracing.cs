@@ -49,8 +49,8 @@ namespace Unity.DemoTeam.Hair
             public MeshFilter   filter;
             public MeshRenderer renderer;
 
-            [NonSerialized] public Material material;
-            [NonSerialized] public Mesh mesh;
+            [NonSerialized] public Material       material;
+            [NonSerialized] public Mesh           mesh;
             [NonSerialized] public GraphicsBuffer bufferP;
             [NonSerialized] public GraphicsBuffer bufferT;
             [NonSerialized] public GraphicsBuffer bufferUV;
@@ -92,7 +92,7 @@ namespace Unity.DemoTeam.Hair
                 rayTracingMaterial.CopyPropertiesFromMaterial(materialInstance);
                 
                 // this will force disable the renderer for all rendering passes but still cause it to be present 
-                // in the acceleration structure. it's a bit of a hack.
+                // in the acceleration structure. it's a hack.
                 rayTracingMaterial.renderQueue = Int32.MaxValue; 
             }
 
@@ -146,7 +146,7 @@ namespace Unity.DemoTeam.Hair
 
                     // override whatever is being rasterized to use the tube geo representation. 
                     {
-                        var vertexIDKeywords = new LocalKeyword[3]
+                        var vertexIDKeywords = new LocalKeyword[]
                         {
                             new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_LINES"),
                             new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_STRIPS"),
