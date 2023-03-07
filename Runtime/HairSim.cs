@@ -136,6 +136,9 @@ namespace Unity.DemoTeam.Hair
 			public static int _BoundaryMatrixInv;
 			public static int _BoundaryMatrixW2PrevW;
 
+			// misc
+			public static int _DummyRenderTarget;
+
 			// debug
 			public static int _DebugCluster;
 			public static int _DebugSliceAxis;
@@ -1077,6 +1080,14 @@ namespace Unity.DemoTeam.Hair
 
 			if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsVertexStageUAVWrites))
 			{
+				// this path uses UAV writes from the vertex stage to funnel out data from the root mesh.
+				// despite not actually rendering anything (all fragments clipped), we need to also bind
+				// a dummy render target to avoid an unspecified target being bound for the draw.
+				{
+					cmd.GetTemporaryRT(UniformIDs._DummyRenderTarget, 1, 1);
+					cmd.SetRenderTarget(UniformIDs._DummyRenderTarget);
+				}
+
 				BindSolverData(cmd, solverData);
 
 				cmd.SetRandomWriteTarget(1, solverData.rootPosition);
