@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -51,9 +53,7 @@ namespace Unity.DemoTeam.Hair
 
             [NonSerialized] public Material       material;
             [NonSerialized] public Mesh           mesh;
-            [NonSerialized] public GraphicsBuffer bufferP;
-            [NonSerialized] public GraphicsBuffer bufferT;
-            [NonSerialized] public GraphicsBuffer bufferN;
+            [NonSerialized] public GraphicsBuffer buffer;
             [NonSerialized] public GraphicsBuffer bufferUV;
         }
         
@@ -92,6 +92,13 @@ namespace Unity.DemoTeam.Hair
                 rayTracingMaterial.shader = materialInstance.shader;
                 rayTracingMaterial.CopyPropertiesFromMaterial(materialInstance);
                 
+                // override whatever is being rasterized to use the tube geo representation. 
+                {
+                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_LINES",  false);
+                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_STRIPS", false);
+                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_TUBES",  true);
+                }
+
                 // this will force disable the renderer for all rendering passes but still cause it to be present 
                 // in the acceleration structure. it's a hack.
                 rayTracingMaterial.renderQueue = Int32.MaxValue; 
@@ -103,23 +110,17 @@ namespace Unity.DemoTeam.Hair
                 // todo: support subdivision staging
                 mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetRaytracedTubes;
 
-                CoreUtils.SafeRelease(rayTracingObjects.bufferP);
-                CoreUtils.SafeRelease(rayTracingObjects.bufferT);
-                CoreUtils.SafeRelease(rayTracingObjects.bufferN);
+                CoreUtils.SafeRelease(rayTracingObjects.buffer);
                 CoreUtils.SafeRelease(rayTracingObjects.bufferUV);
                 {
                     mesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
 
-                    var streamIndexP  = mesh.GetVertexAttributeStream(VertexAttribute.Position);
-                    var streamIndexN  = mesh.GetVertexAttributeStream(VertexAttribute.Normal);
-                    var streamIndexT  = mesh.GetVertexAttributeStream(VertexAttribute.Tangent);
-                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord0);
+                    var streamIndex  = mesh.GetVertexAttributeStream(VertexAttribute.Position);
+                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord1);
 
-                    if (streamIndexP != -1 && streamIndexN != -1 && streamIndexT != -1 && streamIndexUV != -1)
+                    if (streamIndex != -1 && streamIndexUV != -1)
                     {
-                        rayTracingObjects.bufferP  = mesh.GetVertexBuffer(streamIndexP);
-                        rayTracingObjects.bufferN  = mesh.GetVertexBuffer(streamIndexN);
-                        rayTracingObjects.bufferT  = mesh.GetVertexBuffer(streamIndexT);
+                        rayTracingObjects.buffer   = mesh.GetVertexBuffer(streamIndex);
                         rayTracingObjects.bufferUV = mesh.GetVertexBuffer(streamIndexUV);
                     }
                     else
@@ -168,9 +169,7 @@ namespace Unity.DemoTeam.Hair
                     cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_WorldToObject", rayTracingObjects.container.transform.worldToLocalMatrix);
                     
                     cmd.SetComputeParamsFromMaterial(s_updateMeshPositionsCS, kernelIndex, rayTracingMaterial);
-                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferP",  rayTracingObjects.bufferP);
-                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferN",  rayTracingObjects.bufferN);
-                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferT",  rayTracingObjects.bufferT);
+                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBuffer",   rayTracingObjects.buffer);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferUV", rayTracingObjects.bufferUV);
                     cmd.DispatchCompute(s_updateMeshPositionsCS, kernelIndex, (mesh.vertexCount + 1024 - 1) / 1024, 1, 1);
                 }

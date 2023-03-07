@@ -23,9 +23,7 @@
 
 #include "HairVertex.hlsl"
 
-RWByteAddressBuffer _VertexBufferP;
-RWByteAddressBuffer _VertexBufferN;
-RWByteAddressBuffer _VertexBufferT;
+RWByteAddressBuffer _VertexBuffer;
 ByteAddressBuffer   _VertexBufferUV;
 
 float2 LoadVertexUV(uint vertexID)
@@ -48,9 +46,10 @@ void Main(uint3 dispatchID : SV_DispatchThreadID)
         const float3 x = TransformObjectToWorld(v.positionOS);
         const float3 y = GetAbsolutePositionWS(x);
         const float3 z = TransformWorldToObject(y);
-    
-        _VertexBufferP.Store3(12u * vertexID, asuint(z));
-        _VertexBufferN.Store3(12u * vertexID, asuint(v.normalOS));
-        _VertexBufferT.Store3(12u * vertexID, asuint(v.tangentOS));
+
+        // todo: the stride + offset should probably not be hard coded
+        _VertexBuffer.Store3((40u * vertexID) + 0u,  asuint(z));
+        _VertexBuffer.Store3((40u * vertexID) + 12u, asuint(v.normalOS));
+        _VertexBuffer.Store4((40u * vertexID) + 24u, asuint(float4(v.tangentOS, 1.0)));
     }
 }

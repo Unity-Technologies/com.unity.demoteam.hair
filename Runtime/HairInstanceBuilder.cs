@@ -483,18 +483,22 @@ namespace Unity.DemoTeam.Hair
 					}
 					else
 					{
-						// for ray tracing, we need an explicit position, normal, and tangent stream to update. 
-						// additionally, the renderer will be rejected by the acceleration structure if there is no position stream.
 						meshTubes.SetVertexBufferParams(meshVertexCount, attributes: new [] 
 						{
-							new VertexAttributeDescriptor(VertexAttribute.Position,  VertexAttributeFormat.Float32, dimension: 3, stream: 0),// vertexP
-							new VertexAttributeDescriptor(VertexAttribute.Normal,    VertexAttributeFormat.Float32, dimension: 3, stream: 1),// vertexN
-							new VertexAttributeDescriptor(VertexAttribute.Tangent,   VertexAttributeFormat.Float32, dimension: 3, stream: 2),// vertexT
-							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.UNorm16, dimension: 2, stream: 3),// vertexUV
+							// for ray tracing, we need an explicit position, normal, and tangent stream to update. 
+							// additionally, the renderer will be rejected by the acceleration structure if there is no position stream.
+							new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, dimension: 3, stream: 0),
+							new VertexAttributeDescriptor(VertexAttribute.Normal,   VertexAttributeFormat.Float32, dimension: 3, stream: 0),
+							new VertexAttributeDescriptor(VertexAttribute.Tangent,  VertexAttributeFormat.Float32, dimension: 4, stream: 0),
+							
+							// still need these original streams for UVs etc.
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 1),// vertexID
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 2),// vertexUV
 						});
 						
 						// still need to set the uv data for the tube offsets
-						meshTubes.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 3, meshUpdateFlags);
+						meshTubes.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+						meshTubes.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
 					}
 
 					meshTubes.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
