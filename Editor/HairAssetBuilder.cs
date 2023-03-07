@@ -679,7 +679,7 @@ namespace Unity.DemoTeam.Hair
 								combinedCurveSet.curveCount += alembicCurveSetInfo.curveCount;
 								combinedCurveSet.curveVertexCount.AddRange(alembicCurveVertexCount.GetUnsafePtr(), alembicCurveVertexCount.Length);
 								combinedCurveSet.vertexDataPosition.AddRange(alembicVertexDataPositionPtr, alembicCurveSetInfo.vertexDataPosition.Length);
-								combinedCurveSet.vertexDataTexCoord.AddRange(alembicVertexDataPositionPtr, alembicCurveSetInfo.vertexDataTexCoord.Length);
+								combinedCurveSet.vertexDataTexCoord.AddRange(alembicVertexDataTexCoordPtr, alembicCurveSetInfo.vertexDataTexCoord.Length);
 								combinedCurveSet.vertexDataDiameter.AddRange(alembicVertexDataDiameterPtr, alembicCurveSetInfo.vertexDataDiameter.Length);
 							}
 						}
