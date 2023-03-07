@@ -194,14 +194,13 @@ namespace Unity.DemoTeam.Hair
 			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines), FormerlySerializedAs("strandRendererGroupingValue")]
 			public LineRendering.RendererGroup strandRendererGroup;
 #endif
-#if HAS_PACKAGE_UNITY_HDRP
-			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines)]
-			public bool supportsRaytracing;
-#endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
 			public int strandLayers;
 			public MotionVectorGenerationMode motionVectors;
+#if HAS_PACKAGE_UNITY_HDRP
+			public bool raytracing;
+#endif
 
 			[LineHeader("Simulation")]
 

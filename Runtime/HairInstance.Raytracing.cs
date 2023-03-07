@@ -30,6 +30,13 @@ namespace Unity.DemoTeam.Hair
 
             return meshTubes;
         }
+
+        static bool HasRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance)
+        {
+            return strandGroupInstance.sceneObjects.rayTracingObjects.container != null ||
+                   strandGroupInstance.sceneObjects.rayTracingObjects.filter    != null ||
+                   strandGroupInstance.sceneObjects.rayTracingObjects.renderer  != null;
+        }
         
         static void BuildRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance, int index, HideFlags hideFlags = HideFlags.NotEditable)
         {
@@ -38,7 +45,15 @@ namespace Unity.DemoTeam.Hair
             strandGroupInstance.sceneObjects.rayTracingObjects.renderer  = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.rayTracingObjects.container, hideFlags);
         }
 
-        static void DestroyRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance)
+        public static void BuildRayTracingObjectsIfNeeded(ref HairInstance.GroupInstance strandGroupInstance, HideFlags hideFlags = HideFlags.NotEditable)
+        {
+            if (HasRayTracingObjects(ref strandGroupInstance))
+                return; 
+
+            BuildRayTracingObjects(ref strandGroupInstance, index: 0, hideFlags);
+        }
+
+        public static void DestroyRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance)
         {
             CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.container);
             CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.material);
@@ -86,6 +101,14 @@ namespace Unity.DemoTeam.Hair
         
         void UpdateRayTracingState(ref GroupInstance strandGroupInstance, HairSim.SolverData solverData, ref Material materialInstance, CommandBuffer cmd)
         {
+            if (!settingsSystem.raytracing)
+            {
+                HairInstanceBuilder.DestroyRayTracingObjects(ref strandGroupInstance);
+                return;
+            }
+            
+            HairInstanceBuilder.BuildRayTracingObjectsIfNeeded(ref strandGroupInstance);
+            
             ref var rayTracingObjects         = ref strandGroupInstance.sceneObjects.rayTracingObjects;
             ref var rayTracingMesh            = ref rayTracingObjects.mesh;
             ref var rayTracingSubdivision = ref rayTracingObjects.meshInstanceSubdivision;
