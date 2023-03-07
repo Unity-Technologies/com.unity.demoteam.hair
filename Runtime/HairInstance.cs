@@ -379,6 +379,7 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDisable()
 		{
+			ReleasePrerequisite();
 			ReleaseRuntimeData();
 
 			s_instances.Remove(this);
@@ -481,6 +482,19 @@ namespace Unity.DemoTeam.Hair
 #endif
 		private int preqCountdown = 1;
 
+		void ReleasePrerequisite()
+		{
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2
+			foreach (var preq in preqGPUAttachmentTargets)
+			{
+				preq.afterGPUAttachmentWorkCommitted -= HandlePrerequisite;
+			}
+
+			preqGPUAttachmentTargets.Clear();
+			preqGPUAttachmentTargetsHash = new Hash128();
+#endif
+		}
+
 		void UpdatePrerequisite()
 		{
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2
@@ -505,13 +519,7 @@ namespace Unity.DemoTeam.Hair
 
 			if (hash != preqGPUAttachmentTargetsHash)
 			{
-				foreach (var preq in preqGPUAttachmentTargets)
-				{
-					preq.afterGPUAttachmentWorkCommitted -= HandlePrerequisite;
-				}
-
-				preqGPUAttachmentTargets.Clear();
-				preqGPUAttachmentTargetsHash = hash;
+				ReleasePrerequisite();
 
 				if (strandGroupInstances != null)
 				{
@@ -533,6 +541,8 @@ namespace Unity.DemoTeam.Hair
 				{
 					preq.afterGPUAttachmentWorkCommitted += HandlePrerequisite;
 				}
+
+				preqGPUAttachmentTargetsHash = hash;
 			}
 
 			preqCountdown = 1 + preqGPUAttachmentTargets.Count;
