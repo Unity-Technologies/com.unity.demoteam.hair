@@ -349,7 +349,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds, bool buildForRaytracing = false)
+		public static unsafe void BuildMeshTubes(Mesh meshTubes, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds, bool buildForRaytracing = false)
 		{
 			const int numSides = 4;
 			
@@ -473,31 +473,34 @@ namespace Unity.DemoTeam.Hair
 				{
 					if (!buildForRaytracing)
 					{
-						meshStrips.SetVertexBufferParams(meshVertexCount, attributes: new [] {
+						meshTubes.SetVertexBufferParams(meshVertexCount, attributes: new [] {
 							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
 							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
 						});
 
-						meshStrips.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
-						meshStrips.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+						meshTubes.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+						meshTubes.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
 					}
 					else
 					{
-						meshStrips.SetVertexBufferParams(meshVertexCount, attributes: new [] {
-							new VertexAttributeDescriptor(VertexAttribute.Position,  VertexAttributeFormat.Float32, dimension: 3, stream: 0),
-							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 1),// vertexID
-							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 2),// vertexUV
-							new VertexAttributeDescriptor(VertexAttribute.Tangent,   VertexAttributeFormat.Float32, dimension: 3, stream: 3),// vertexT
+						// for ray tracing, we need an explicit position, normal, and tangent stream to update. 
+						// additionally, the renderer will be rejected by the acceleration structure if there is no position stream.
+						meshTubes.SetVertexBufferParams(meshVertexCount, attributes: new [] 
+						{
+							new VertexAttributeDescriptor(VertexAttribute.Position,  VertexAttributeFormat.Float32, dimension: 3, stream: 0),// vertexP
+							new VertexAttributeDescriptor(VertexAttribute.Normal,    VertexAttributeFormat.Float32, dimension: 3, stream: 1),// vertexN
+							new VertexAttributeDescriptor(VertexAttribute.Tangent,   VertexAttributeFormat.Float32, dimension: 3, stream: 2),// vertexT
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.UNorm16, dimension: 2, stream: 3),// vertexUV
 						});
-
-						meshStrips.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
-						meshStrips.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
+						
+						// still need to set the uv data for the tube offsets
+						meshTubes.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 3, meshUpdateFlags);
 					}
 
-					meshStrips.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
-					meshStrips.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
-					meshStrips.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Triangles), meshUpdateFlags);
-					meshStrips.bounds = bounds;
+					meshTubes.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
+					meshTubes.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
+					meshTubes.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Triangles), meshUpdateFlags);
+					meshTubes.bounds = bounds;
 				}
 			}
 		}

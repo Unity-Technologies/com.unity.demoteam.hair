@@ -23,9 +23,10 @@
 
 #include "HairVertex.hlsl"
 
-ByteAddressBuffer   _VertexBufferUV;
 RWByteAddressBuffer _VertexBufferP;
+RWByteAddressBuffer _VertexBufferN;
 RWByteAddressBuffer _VertexBufferT;
+ByteAddressBuffer   _VertexBufferUV;
 
 float2 LoadVertexUV(uint vertexID)
 {
@@ -38,16 +39,18 @@ float2 LoadVertexUV(uint vertexID)
 [numthreads(1024, 1, 1)]
 void Main(uint3 dispatchID : SV_DispatchThreadID)
 {
-    uint   vertexID = dispatchID.x;
-    float2 vertexUV = LoadVertexUV(vertexID);
+    const uint   vertexID = dispatchID.x;
+    const float2 vertexUV = LoadVertexUV(vertexID);
 
-    HairVertex v = GetHairVertex(vertexID, vertexUV, 0, 0, 0);
-
-    // temp hack: un-do some translations
-    const float3 x = TransformObjectToWorld(v.positionOS);
-    const float3 y = GetAbsolutePositionWS(x);
-    const float3 z = TransformWorldToObject(y);
+    const HairVertex v = GetHairVertex(vertexID, vertexUV, 0, 0, 0);
+    {
+        // temp hack: un-do some translations
+        const float3 x = TransformObjectToWorld(v.positionOS);
+        const float3 y = GetAbsolutePositionWS(x);
+        const float3 z = TransformWorldToObject(y);
     
-    _VertexBufferP.Store3((12u * vertexID), asuint(z));
-    _VertexBufferT.Store3((12u * vertexID), asuint(v.tangentOS));
+        _VertexBufferP.Store3(12u * vertexID, asuint(z));
+        _VertexBufferN.Store3(12u * vertexID, asuint(v.normalOS));
+        _VertexBufferT.Store3(12u * vertexID, asuint(v.tangentOS));
+    }
 }

@@ -53,6 +53,7 @@ namespace Unity.DemoTeam.Hair
             [NonSerialized] public Mesh           mesh;
             [NonSerialized] public GraphicsBuffer bufferP;
             [NonSerialized] public GraphicsBuffer bufferT;
+            [NonSerialized] public GraphicsBuffer bufferN;
             [NonSerialized] public GraphicsBuffer bufferUV;
         }
         
@@ -103,19 +104,23 @@ namespace Unity.DemoTeam.Hair
                 mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetRaytracedTubes;
 
                 CoreUtils.SafeRelease(rayTracingObjects.bufferP);
+                CoreUtils.SafeRelease(rayTracingObjects.bufferT);
+                CoreUtils.SafeRelease(rayTracingObjects.bufferN);
                 CoreUtils.SafeRelease(rayTracingObjects.bufferUV);
                 {
                     mesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
 
                     var streamIndexP  = mesh.GetVertexAttributeStream(VertexAttribute.Position);
-                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord1);
+                    var streamIndexN  = mesh.GetVertexAttributeStream(VertexAttribute.Normal);
                     var streamIndexT  = mesh.GetVertexAttributeStream(VertexAttribute.Tangent);
+                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord0);
 
-                    if (streamIndexP != -1 && streamIndexUV != -1)
+                    if (streamIndexP != -1 && streamIndexN != -1 && streamIndexT != -1 && streamIndexUV != -1)
                     {
                         rayTracingObjects.bufferP  = mesh.GetVertexBuffer(streamIndexP);
-                        rayTracingObjects.bufferUV = mesh.GetVertexBuffer(streamIndexUV);
+                        rayTracingObjects.bufferN  = mesh.GetVertexBuffer(streamIndexN);
                         rayTracingObjects.bufferT  = mesh.GetVertexBuffer(streamIndexT);
+                        rayTracingObjects.bufferUV = mesh.GetVertexBuffer(streamIndexUV);
                     }
                     else
                     {
@@ -164,7 +169,8 @@ namespace Unity.DemoTeam.Hair
                     
                     cmd.SetComputeParamsFromMaterial(s_updateMeshPositionsCS, kernelIndex, rayTracingMaterial);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferP",  rayTracingObjects.bufferP);
-                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferT", rayTracingObjects.bufferT);
+                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferN",  rayTracingObjects.bufferN);
+                    cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferT",  rayTracingObjects.bufferT);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferUV", rayTracingObjects.bufferUV);
                     cmd.DispatchCompute(s_updateMeshPositionsCS, kernelIndex, (mesh.vertexCount + 1024 - 1) / 1024, 1, 1);
                 }
