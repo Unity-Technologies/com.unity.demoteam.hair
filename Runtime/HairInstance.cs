@@ -1233,7 +1233,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 #if HAS_PACKAGE_UNITY_HDRP
-			UpdateRayTracingState(ref strandGroupInstance, ref materialInstance, cmd);
+			UpdateRayTracingState(ref strandGroupInstance, solverData, ref materialInstance, cmd);
 #endif			
 		}
 

@@ -23,6 +23,14 @@ namespace Unity.DemoTeam.Hair
             return meshTubes;
         }
         
+        public static Mesh CreateMeshRaytracedTubesIfNull(ref Mesh meshTubes, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+        {
+            if (meshTubes == null)
+                meshTubes = CreateMeshRaytracedTubes(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+
+            return meshTubes;
+        }
+        
         static void BuildRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance, int index, HideFlags hideFlags = HideFlags.NotEditable)
         {
             strandGroupInstance.sceneObjects.rayTracingObjects.container = CreateContainer("RaytracedStrands:" + index, strandGroupInstance.sceneObjects.groupContainer,        hideFlags);
@@ -55,6 +63,7 @@ namespace Unity.DemoTeam.Hair
             [NonSerialized] public Mesh           mesh;
             [NonSerialized] public GraphicsBuffer buffer;
             [NonSerialized] public GraphicsBuffer bufferUV;
+            [NonSerialized] public uint           meshInstanceSubdivision;
         }
         
 #if UNITY_EDITOR
@@ -75,9 +84,11 @@ namespace Unity.DemoTeam.Hair
             s_loadedRaytracingResources = true;
         }
         
-        void UpdateRayTracingState(ref GroupInstance strandGroupInstance, ref Material materialInstance, CommandBuffer cmd)
+        void UpdateRayTracingState(ref GroupInstance strandGroupInstance, HairSim.SolverData solverData, ref Material materialInstance, CommandBuffer cmd)
         {
-            ref var rayTracingObjects = ref strandGroupInstance.sceneObjects.rayTracingObjects;
+            ref var rayTracingObjects         = ref strandGroupInstance.sceneObjects.rayTracingObjects;
+            ref var rayTracingMesh            = ref rayTracingObjects.mesh;
+            ref var rayTracingSubdivision = ref rayTracingObjects.meshInstanceSubdivision;
             
             // update material instance
             ref var rayTracingMaterial = ref rayTracingObjects.material;
@@ -107,9 +118,19 @@ namespace Unity.DemoTeam.Hair
             // update mesh
             var mesh = null as Mesh;
             {
-                // todo: support subdivision staging
-                mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetRaytracedTubes;
-
+                var subdivision = solverData.cbuffer._StagingSubdivision;
+                
+                if (subdivision != rayTracingSubdivision)
+                {
+                    CoreUtils.Destroy(rayTracingMesh);
+                    rayTracingSubdivision = subdivision;
+                }
+                
+                if (subdivision > 0)
+                    mesh = HairInstanceBuilder.CreateMeshRaytracedTubesIfNull(ref rayTracingObjects.mesh, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+                else
+                    mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetRaytracedTubes;
+                
                 CoreUtils.SafeRelease(rayTracingObjects.buffer);
                 CoreUtils.SafeRelease(rayTracingObjects.bufferUV);
                 {
