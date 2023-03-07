@@ -1,7 +1,7 @@
 #ifndef __HAIRVERTEX_HLSL__
 #define __HAIRVERTEX_HLSL__
 
-/*
+/* required pragmas
 #pragma multi_compile __ STAGING_COMPRESSION
 // 0 == staging data full precision
 // 1 == staging data compressed
@@ -27,19 +27,6 @@
 
 #ifndef normalize_safe
 #define normalize_safe(x) (x * rsqrt(max(1e-7, dot(x, x))))
-#endif
-
-#ifndef HAIR_VERTEX_ID_LINES
-#define HAIR_VERTEX_ID_LINES 0
-#endif
-#ifndef HAIR_VERTEX_ID_STRIPS
-#define HAIR_VERTEX_ID_STRIPS 0
-#endif
-#ifndef HAIR_VERTEX_SRC_SOLVER
-#define HAIR_VERTEX_SRC_SOLVER 0
-#endif
-#ifndef HAIR_VERTEX_SRC_STAGING
-#define HAIR_VERTEX_SRC_STAGING 0
 #endif
 
 #include "HairSimData.hlsl"

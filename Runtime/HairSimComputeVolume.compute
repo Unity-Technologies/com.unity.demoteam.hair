@@ -32,19 +32,6 @@
 // 0 == uniform target density
 // 1 == non uniform target density
 
-#ifndef VOLUME_SUPPORT_CONTRACTION
-#define VOLUME_SUPPORT_CONTRACTION 0
-#endif
-#ifndef VOLUME_SPLAT_CLUSTERS
-#define VOLUME_SPLAT_CLUSTERS 0
-#endif
-#ifndef VOLUME_TARGET_INITIAL_POSE
-#define VOLUME_TARGET_INITIAL_POSE 0
-#endif
-#ifndef VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
-#define VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES 0
-#endif
-
 //------------------
 // features derived
 
