@@ -136,6 +136,8 @@ namespace Unity.DemoTeam.Hair
 		//--------
 		// meshes
 
+		public const MeshUpdateFlags MESH_UPDATE_UNCHECKED = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds;
+
 		public static unsafe void BuildMeshRoots(Mesh meshRoots, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
 			using (var indices = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
@@ -150,7 +152,7 @@ namespace Unity.DemoTeam.Hair
 
 				// apply to mesh
 				var meshVertexCount = strandCount;
-				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				var meshUpdateFlags = MESH_UPDATE_UNCHECKED;
 				{
 					meshRoots.SetVertexBufferParams(meshVertexCount,
 						new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, dimension: 3, stream: 0),
@@ -162,7 +164,7 @@ namespace Unity.DemoTeam.Hair
 
 					meshRoots.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
 					meshRoots.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
-					meshRoots.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Points), meshUpdateFlags);
+					meshRoots.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Points) { vertexCount = meshVertexCount }, meshUpdateFlags);
 					meshRoots.RecalculateBounds();
 				}
 			}
@@ -222,7 +224,7 @@ namespace Unity.DemoTeam.Hair
 
 				// apply to mesh
 				var meshVertexCount = strandCount * perLineVertices;
-				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				var meshUpdateFlags = MESH_UPDATE_UNCHECKED;
 				{
 					meshLines.SetVertexBufferParams(meshVertexCount,
 						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
@@ -234,7 +236,7 @@ namespace Unity.DemoTeam.Hair
 
 					meshLines.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
 					meshLines.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
-					meshLines.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Lines), meshUpdateFlags);
+					meshLines.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Lines) { vertexCount = meshVertexCount, bounds = bounds }, meshUpdateFlags);
 					meshLines.bounds = bounds;
 				}
 			}
@@ -322,7 +324,7 @@ namespace Unity.DemoTeam.Hair
 
 				// apply to mesh asset
 				var meshVertexCount = strandCount * perStripVertices;
-				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				var meshUpdateFlags = MESH_UPDATE_UNCHECKED;
 				{
 					meshStrips.SetVertexBufferParams(meshVertexCount,
 						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
@@ -334,7 +336,7 @@ namespace Unity.DemoTeam.Hair
 
 					meshStrips.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
 					meshStrips.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
-					meshStrips.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Triangles), meshUpdateFlags);
+					meshStrips.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Triangles) { vertexCount = meshVertexCount, bounds = bounds }, meshUpdateFlags);
 					meshStrips.bounds = bounds;
 				}
 			}
