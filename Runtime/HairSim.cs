@@ -1073,12 +1073,12 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
 		}
 
-		public static void PushSolverRoots(CommandBuffer cmd, ref SolverData solverData, Mesh rootMesh)
+		public static void PushSolverRoots(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref SolverData solverData, Mesh rootMesh)
 		{
 			CoreUtils.Swap(ref solverData.rootPosition, ref solverData.rootPositionPrev);
 			CoreUtils.Swap(ref solverData.rootFrame, ref solverData.rootFramePrev);
 
-			if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsVertexStageUAVWrites))
+			if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsVertexStageUAVWrites) && cmdFlags.HasFlag(CommandBufferExecutionFlags.AsyncCompute) == false)
 			{
 				// this path uses UAV writes from the vertex stage to funnel out data from the root mesh.
 				// despite not actually rendering anything (all fragments clipped), we need to also bind
@@ -1587,7 +1587,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void StepVolumeData(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData[] solverData)
+		public static void StepVolumeData(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData[] solverData)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.Volume))
 			{
@@ -1595,7 +1595,7 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != solverData.Length; i++)
 				{
-					StepVolumeData_Insert(cmd, ref volumeData, volumeSettings, solverData[i]);
+					StepVolumeData_Insert(cmd, cmdFlags, ref volumeData, volumeSettings, solverData[i]);
 				}
 
 				StepVolumeData_Resolve(cmd, ref volumeData, volumeSettings);
@@ -1616,7 +1616,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		private static void StepVolumeData_Insert(CommandBuffer cmd, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData solverData)
+		private static void StepVolumeData_Insert(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in VolumeSettings volumeSettings, in SolverData solverData)
 		{
 			var splatStrandCount = volumeData.keywords.VOLUME_SPLAT_CLUSTERS ? solverData.cbuffer._SolverStrandCount : solverData.cbuffer._StrandCount;
 			var splatParticleCount = splatStrandCount * solverData.cbuffer._StrandParticleCount;
@@ -1666,7 +1666,11 @@ namespace Unity.DemoTeam.Hair
 
 					case VolumeSettings.SplatMethod.Rasterization:
 						{
-							if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsGeometryStage))
+							if (cmdFlags.HasFlag(CommandBufferExecutionFlags.AsyncCompute))
+							{
+								goto case VolumeSettings.SplatMethod.Compute;
+							}
+							else if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsGeometryStage))
 							{
 								using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_Rasterization))
 								{
@@ -1685,12 +1689,19 @@ namespace Unity.DemoTeam.Hair
 
 					case VolumeSettings.SplatMethod.RasterizationNoGS:
 						{
-							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_RasterizationNoGS))
+							if (cmdFlags.HasFlag(CommandBufferExecutionFlags.AsyncCompute))
 							{
-								CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
-								BindVolumeData(cmd, volumeData);
-								BindSolverData(cmd, solverData);
-								cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, (int)splatParticleCount * 8, 1);
+								goto case VolumeSettings.SplatMethod.Compute;
+							}
+							else
+							{
+								using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_RasterizationNoGS))
+								{
+									CoreUtils.SetRenderTarget(cmd, volumeData.volumeVelocity, ClearFlag.Color);
+									BindVolumeData(cmd, volumeData);
+									BindSolverData(cmd, solverData);
+									cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, (int)splatParticleCount * 8, 1);
+								}
 							}
 						}
 						break;

@@ -152,6 +152,12 @@ namespace Unity.DemoTeam.Hair
 				HDRPHighQualityLines,
 			}
 
+			public enum UpdateMode
+			{
+				BuiltinEvent,
+				External,
+			}
+
 			public enum SimulationRate
 			{
 				Fixed30Hz,
@@ -191,6 +197,11 @@ namespace Unity.DemoTeam.Hair
 			public int strandLayers;
 			public MotionVectorGenerationMode motionVectors;
 
+			[LineHeader("Execution")]
+
+			[Tooltip("Specifies whether updates are triggered by builtin event handling or from external script (controlled entirely by application)")]
+			public UpdateMode updateMode;
+
 			[LineHeader("Simulation")]
 
 			[ToggleGroup, Tooltip("Enable simulation")]
@@ -229,6 +240,8 @@ namespace Unity.DemoTeam.Hair
 				strandShadows = ShadowCastingMode.On,
 				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
 				motionVectors = MotionVectorGenerationMode.Camera,
+
+				updateMode = UpdateMode.BuiltinEvent,
 
 				simulation = true,
 				simulationRate = SimulationRate.Fixed30Hz,
@@ -379,8 +392,8 @@ namespace Unity.DemoTeam.Hair
 
 		void OnDisable()
 		{
-			ReleasePrerequisite();
 			ReleaseRuntimeData();
+			ReleasePrerequisite();
 
 			s_instances.Remove(this);
 		}
@@ -555,8 +568,20 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (--preqCountdown == 0)
 			{
-				LateUpdateInternal();
+				HandlePrerequisiteCompleted();
 			}
+		}
+
+		void HandlePrerequisiteCompleted()
+		{
+			var cmd = CommandBufferPool.Get();
+			{
+				if (DispatchUpdate(cmd, CommandBufferExecutionFlags.None, Time.deltaTime))
+				{
+					Graphics.ExecuteCommandBuffer(cmd);
+				}
+			}
+			CommandBufferPool.Release(cmd);
 		}
 
 		void Update()
@@ -569,22 +594,10 @@ namespace Unity.DemoTeam.Hair
 
 		void LateUpdate()
 		{
-			HandlePrerequisite();
-		}
-
-		void LateUpdateInternal()
-		{
-			var cmd = CommandBufferPool.Get();
+			if (settingsSystem.updateMode == SettingsSystem.UpdateMode.BuiltinEvent)
 			{
-				if (InitializeRuntimeData(cmd))
-				{
-					UpdateSimulationLOD(cmd);
-					UpdateSimulationState(cmd);
-					UpdateRenderingState(cmd);
-					Graphics.ExecuteCommandBuffer(cmd);
-				}
+				HandlePrerequisite();
 			}
-			CommandBufferPool.Release(cmd);
 		}
 
 		enum StrandGroupInstancesStatus
@@ -1005,9 +1018,9 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void UpdateSimulationState(CommandBuffer cmd)
+		void UpdateSimulationState(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, float dt)
 		{
-			var stepCount = DispatchStepsAccumulated(cmd, Time.deltaTime);
+			var stepCount = DispatchStepsAccumulated(cmd, cmdFlags, dt);
 			if (stepCount > 0)
 			{
 				// fire event
@@ -1385,7 +1398,22 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public int DispatchStepsAccumulated(CommandBuffer cmd, float dt)
+		public bool DispatchUpdate(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, float dt)
+		{
+			if (InitializeRuntimeData(cmd, cmdFlags))
+			{
+				UpdateSimulationLOD(cmd);
+				UpdateSimulationState(cmd, cmdFlags, dt);
+				UpdateRenderingState(cmd);
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+		public int DispatchStepsAccumulated(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, float dt)
 		{
 			var active = GetSimulationActive();
 			var stepDT = GetSimulationTimeStep();
@@ -1419,7 +1447,7 @@ namespace Unity.DemoTeam.Hair
 			// perform the steps
 			if (stepCount > 0)
 			{
-				DispatchSteps(cmd, stepDT, stepCount);
+				DispatchSteps(cmd, cmdFlags, stepDT, stepCount);
 			}
 
 			// update counters
@@ -1431,9 +1459,9 @@ namespace Unity.DemoTeam.Hair
 			return stepCount;
 		}
 
-		public void DispatchSteps(CommandBuffer cmd, float stepDT, int stepCount)
+		public void DispatchSteps(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, float stepDT, int stepCount)
 		{
-			if (!InitializeRuntimeData(cmd))
+			if (!InitializeRuntimeData(cmd, cmdFlags))
 				return;
 
 			// get bounds and scale
@@ -1451,7 +1479,7 @@ namespace Unity.DemoTeam.Hair
 				var strandScale = GetStrandScale(strandGroupInstances[i]);
 
 				HairSim.PushSolverParams(cmd, ref solverData[i], GetSettingsSolver(strandGroupInstances[i]), rootTransform, rootSkinningRotation, strandDiameter, strandMargin, strandScale, stepDT);
-				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh);
 			}
 
 			// update volume boundaries
@@ -1461,7 +1489,7 @@ namespace Unity.DemoTeam.Hair
 			if (HairSim.PrepareVolumeData(ref volumeData, settingsVolume))
 			{
 				HairSim.PushVolumeParams(cmd, ref volumeData, settingsVolume, solverData, simulationBounds);
-				HairSim.StepVolumeData(cmd, ref volumeData, settingsVolume, solverData);
+				HairSim.StepVolumeData(cmd, cmdFlags, ref volumeData, settingsVolume, solverData);
 			}
 
 			// perform the steps
@@ -1478,13 +1506,13 @@ namespace Unity.DemoTeam.Hair
 
 				// step volume data
 				HairSim.PushVolumeParams(cmd, ref volumeData, settingsVolume, solverData, simulationBounds);
-				HairSim.StepVolumeData(cmd, ref volumeData, settingsVolume, solverData);
+				HairSim.StepVolumeData(cmd, cmdFlags, ref volumeData, settingsVolume, solverData);
 			}
 		}
 
-		public void DispatchDraw(CommandBuffer cmd)
+		public void DispatchDraw(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags)
 		{
-			if (!InitializeRuntimeData(cmd))
+			if (!InitializeRuntimeData(cmd, cmdFlags))
 				return;
 
 			// draw solver data
@@ -1497,7 +1525,7 @@ namespace Unity.DemoTeam.Hair
 			HairSim.DrawVolumeData(cmd, volumeData, settingsDebug);
 		}
 
-		bool InitializeRuntimeData(CommandBuffer cmd)
+		bool InitializeRuntimeData(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags)
 		{
 			var status = CheckStrandGroupInstances();
 			if (status != StrandGroupInstancesStatus.Valid)
@@ -1609,14 +1637,14 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.PushSolverLOD(cmd, ref solverData[i], strandGroupAsset.lodCount - 1);//TODO will need to move this around to generate rest density per LOD, to support target density initial pose in particles
 				HairSim.PushSolverParams(cmd, ref solverData[i], GetSettingsSolver(strandGroupInstances[i]), rootTransform, rootSkinningRotation, strandDiameter, strandMargin, strandScale, 1.0f);
-				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh);
 				{
 					HairSim.InitSolverData(cmd, solverData[i]);
 				}
 
 				//TODO clean this up (currently necessary for full initialization of root buffers)
-				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
-				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh);
 			}
 
 			// init volume data
@@ -1625,7 +1653,7 @@ namespace Unity.DemoTeam.Hair
 				var simulationBounds = GetSimulationBounds();
 
 				HairSim.PushVolumeParams(cmd, ref volumeData, settingsVolume, solverData, simulationBounds);
-				HairSim.StepVolumeData(cmd, ref volumeData, settingsVolume, solverData);
+				HairSim.StepVolumeData(cmd, cmdFlags, ref volumeData, settingsVolume, solverData);
 
 				for (int i = 0; i != solverData.Length; i++)
 				{

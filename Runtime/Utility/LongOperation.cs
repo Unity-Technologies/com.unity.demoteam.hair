@@ -48,7 +48,7 @@ namespace Unity.DemoTeam.Hair
 
 		bool WaitForTime()
 		{
-			const int WAIT_TICKS = 100;
+			const int WAIT_TICKS = 125;// milliseconds
 			unchecked
 			{
 				var tick = Environment.TickCount;
