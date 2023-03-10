@@ -81,6 +81,9 @@ namespace Unity.DemoTeam.Hair
 			public static int _VertexBufferNormal;
 			public static int _VertexBufferNormalOffset;
 			public static int _VertexBufferNormalStride;
+			public static int _VertexBufferTangent;
+			public static int _VertexBufferTangentOffset;
+			public static int _VertexBufferTangentStride;
 
 			public static int _RootUV;
 			public static int _RootScale;
@@ -88,9 +91,11 @@ namespace Unity.DemoTeam.Hair
 			public static int _RootPositionPrev;
 			public static int _RootFrame;
 			public static int _RootFramePrev;
+			public static int _RootFrameFromTangentFrame;
 
 			public static int _SubstepRootPosition;
 			public static int _SubstepRootFrame;
+			public static int _SubstepFraction;
 
 			public static int _InitialRootDirection;
 			public static int _InitialParticleOffset;
@@ -1075,6 +1080,12 @@ namespace Unity.DemoTeam.Hair
 
 		public static void PushSolverRoots(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref SolverData solverData, Mesh rootMesh)
 		{
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_1_PREVIEW
+			var validTangents = rootMesh.HasVertexAttribute(VertexAttribute.Tangent);
+#else
+			var validTangents = false;
+#endif
+
 			CoreUtils.Swap(ref solverData.rootPosition, ref solverData.rootPositionPrev);
 			CoreUtils.Swap(ref solverData.rootFrame, ref solverData.rootFramePrev);
 
@@ -1087,6 +1098,9 @@ namespace Unity.DemoTeam.Hair
 					cmd.GetTemporaryRT(UniformIDs._DummyRenderTarget, 1, 1);
 					cmd.SetRenderTarget(UniformIDs._DummyRenderTarget);
 				}
+
+				//TODO move to keyword after splitting kernels into separate units
+				cmd.SetGlobalInt(UniformIDs._RootFrameFromTangentFrame, validTangents ? 1 : 0);
 
 				BindSolverData(cmd, solverData);
 
@@ -1112,8 +1126,13 @@ namespace Unity.DemoTeam.Hair
 				var normalOffset = rootMesh.GetVertexAttributeOffset(VertexAttribute.Normal);
 				var normalStride = rootMesh.GetVertexBufferStride(normalStream);
 
+				var tangentStream = rootMesh.GetVertexAttributeStream(VertexAttribute.Tangent);
+				var tangentOffset = rootMesh.GetVertexAttributeOffset(VertexAttribute.Tangent);
+				var tangentStride = rootMesh.GetVertexBufferStride(tangentStream);
+
 				using (GraphicsBuffer vertexBufferPosition = rootMesh.GetVertexBuffer(positionStream))
 				using (GraphicsBuffer vertexBufferNormal = rootMesh.GetVertexBuffer(normalStream))
+				using (GraphicsBuffer vertexBufferTangent = validTangents ? rootMesh.GetVertexBuffer(tangentStream) : null)
 				{
 					int numX = ((int)solverData.cbuffer._StrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
 					int numY = 1;
@@ -1121,11 +1140,17 @@ namespace Unity.DemoTeam.Hair
 
 					cmd.SetComputeBufferParam(s_solverCS, SolverKernels.KUpdateRoots, UniformIDs._VertexBufferPosition, vertexBufferPosition);
 					cmd.SetComputeBufferParam(s_solverCS, SolverKernels.KUpdateRoots, UniformIDs._VertexBufferNormal, vertexBufferNormal);
+					cmd.SetComputeBufferParam(s_solverCS, SolverKernels.KUpdateRoots, UniformIDs._VertexBufferTangent, validTangents ? vertexBufferTangent : vertexBufferNormal);
 
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferPositionOffset, positionOffset);
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferPositionStride, positionStride);
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferNormalOffset, normalOffset);
 					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferNormalStride, normalStride);
+					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferTangentOffset, tangentOffset);
+					cmd.SetComputeIntParam(s_solverCS, UniformIDs._VertexBufferTangentStride, tangentStride);
+
+					//TODO move to keyword after splitting kernels into separate units
+					cmd.SetComputeIntParam(s_solverCS, UniformIDs._RootFrameFromTangentFrame, validTangents ? 1 : 0);
 
 					BindSolverData(cmd, s_solverCS, SolverKernels.KUpdateRoots, solverData);
 					cmd.DispatchCompute(s_solverCS, SolverKernels.KUpdateRoots, numX, numY, numZ);
@@ -1503,7 +1528,7 @@ namespace Unity.DemoTeam.Hair
 						using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepRoots))
 						{
 							//TODO move into cbuffer?
-							cmd.SetComputeFloatParam(s_solverCS, "_SubstepFraction", substepFrac);
+							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._SubstepFraction, substepFrac);
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KSubstepRoots, solverData);
 							cmd.DispatchCompute(s_solverCS, SolverKernels.KSubstepRoots, rootsNumX, rootsNumY, rootsNumZ);

@@ -93,6 +93,7 @@ namespace Unity.DemoTeam.Hair
 			public Vector4 _WorldRotation;				// quat(xyz,w): primary skinning bone rotation
 			public Vector4 _WorldGravity;				// xyz: gravity vector, w: -
 
+			// 32
 			public Vector4 _StagingOriginExtent;		// xyz: origin, w: scale
 			public Vector4 _StagingOriginExtentPrev;	// ...
 

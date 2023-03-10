@@ -140,9 +140,21 @@ namespace Unity.DemoTeam.Hair
 
 		public static unsafe void BuildMeshRoots(Mesh meshRoots, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
+			using (var tangent = new NativeArray<Vector4>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			using (var indices = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
+				var tangentPtr = (Vector4*)tangent.GetUnsafePtr();
 				var indicesPtr = (int*)indices.GetUnsafePtr();
+
+				// write tangent
+				for (int i = 0; i != strandCount; i++)
+				{
+					var localRootFrame = Quaternion.FromToRotation(Vector3.up, rootDirection[i]);
+					var localRootPerp = localRootFrame * Vector3.right;
+					{
+						*(tangentPtr++) = new Vector4(localRootPerp.x, localRootPerp.y, localRootPerp.z, 1.0f);
+					}
+				}
 
 				// write indices
 				for (int i = 0; i != strandCount; i++)
@@ -156,11 +168,13 @@ namespace Unity.DemoTeam.Hair
 				{
 					meshRoots.SetVertexBufferParams(meshVertexCount,
 						new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, dimension: 3, stream: 0),
-						new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, dimension: 3, stream: 1)
+						new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, dimension: 3, stream: 1),
+						new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, dimension: 4, stream: 2)
 					);
 
 					meshRoots.SetVertexBufferData(rootPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
 					meshRoots.SetVertexBufferData(rootDirection, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+					meshRoots.SetVertexBufferData(tangent, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
 
 					meshRoots.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
 					meshRoots.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);

@@ -48,7 +48,12 @@
         {
             "name": "com.unity.demoteam.digital-human",
             "expression": "0.2.0-preview",
-            "define": "HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2"
+            "define": "HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW"
+        },
+        {
+            "name": "com.unity.demoteam.digital-human",
+            "expression": "0.2.1-preview",
+            "define": "HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_1_PREVIEW"
         },
         {
             "name": "com.unity.demoteam.mesh-to-sdf",

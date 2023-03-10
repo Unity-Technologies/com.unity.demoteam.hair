@@ -494,11 +494,16 @@ void KInitializePostVolume(
 
 ByteAddressBuffer _VertexBufferPosition;
 ByteAddressBuffer _VertexBufferNormal;
+ByteAddressBuffer _VertexBufferTangent;
 
 uint _VertexBufferPositionOffset;
 uint _VertexBufferPositionStride;
 uint _VertexBufferNormalOffset;
 uint _VertexBufferNormalStride;
+uint _VertexBufferTangentOffset;
+uint _VertexBufferTangentStride;
+
+uint _RootFrameFromTangentFrame;
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void KUpdateRoots(
@@ -515,28 +520,43 @@ void KUpdateRoots(
 
 	uint addressPosition = strandIndex * _VertexBufferPositionStride + _VertexBufferPositionOffset;
 	uint addressNormal = strandIndex * _VertexBufferNormalStride + _VertexBufferNormalOffset;
+	uint addressTangent = strandIndex * _VertexBufferTangentStride + _VertexBufferTangentOffset;
 
 	float3 positionOS = asfloat(_VertexBufferPosition.Load3(addressPosition));
-	float3 normalOS = asfloat(_VertexBufferNormal.Load3(addressNormal));// contains the direction of the first segment
+	float3 normalOS = asfloat(_VertexBufferNormal.Load3(addressNormal));
+	float4 tangentOS = asfloat(_VertexBufferTangent.Load4(addressTangent));
 
 	// update root position
 	_RootPosition[strandIndex].xyz = mul(_RootTransform, float4(positionOS, 1.0)).xyz;
 
 	// update root frame
 	{
-		// add direction
-		float3 localRootDir = normalOS;
-		float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), localRootDir);
+		if (_RootFrameFromTangentFrame != 0)
+		{
+			// reconstruct from tangent frame
+			float3 localRootDir = normalOS;
+			float3 localRootPerp = tangentOS.xyz * tangentOS.w;
+			float4 localRootFrame = MakeQuaternionLookAtBasis(float3(0.0, 1.0, 0.0), localRootDir, float3(1.0, 0.0, 0.0), localRootPerp);
 
-	#if 1
-		// add twist from skinning delta
-		float4 skinningBoneLocalDelta = QMul(_RootRotationInv, _WorldRotation);
-		float4 skinningBoneLocalTwist = QDecomposeTwist(skinningBoneLocalDelta, localRootDir);
-		localRootFrame = QMul(skinningBoneLocalTwist, localRootFrame);
-	#endif
+			// output world frame
+			_RootFrame[strandIndex] = normalize(QMul(_RootRotation, localRootFrame));
+		}
+		else
+		{
+			// reconstruct partially from direction
+			float3 localRootDir = normalOS;
+			float4 localRootFrame = MakeQuaternionFromTo(float3(0.0, 1.0, 0.0), localRootDir);
 
-		// output world frame
-		_RootFrame[strandIndex] = normalize(QMul(_RootRotation, localRootFrame));
+			// approximate twist from skinning bone delta
+			float4 skinningBoneLocalDelta = QMul(_RootRotationInv, _WorldRotation);
+			float4 skinningBoneLocalTwist = QDecomposeTwist(skinningBoneLocalDelta, localRootDir);
+			{
+				localRootFrame = QMul(skinningBoneLocalTwist, localRootFrame);
+			}
+
+			// output world frame
+			_RootFrame[strandIndex] = normalize(QMul(_RootRotation, localRootFrame));
+		}
 	}
 }
 
