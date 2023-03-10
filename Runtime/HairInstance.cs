@@ -1112,7 +1112,6 @@ namespace Unity.DemoTeam.Hair
 
 			// select mesh
 			var mesh = null as Mesh;
-			var meshShared = false;
 			{
 				ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
 				ref var meshInstanceStrips = ref strandGroupInstance.sceneObjects.meshInstanceStrips;
@@ -1144,10 +1143,8 @@ namespace Unity.DemoTeam.Hair
 							else
 							{
 								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetLines;
-#if UNITY_2021_2_OR_NEWER
-								meshShared = true;
-#else
-								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, mesh, HideFlags.HideAndDontSave);
+#if !UNITY_2021_2_OR_NEWER
+								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroupInstance.groupAssetReference.Resolve().meshAssetLines, HideFlags.HideAndDontSave);
 #endif
 							}
 						}
@@ -1162,9 +1159,7 @@ namespace Unity.DemoTeam.Hair
 							else
 							{
 								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetStrips;
-#if UNITY_2021_2_OR_NEWER
-								meshShared = true;
-#else
+#if !UNITY_2021_2_OR_NEWER
 								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, mesh, HideFlags.HideAndDontSave);
 #endif
 							}
@@ -1215,7 +1210,7 @@ namespace Unity.DemoTeam.Hair
 				meshRenderer.bounds = GetSimulationBounds();
 #else
 				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
-				if (mesh != null && meshShared == false)
+				if (mesh != null)
 					mesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
 
 				//TODO provide better local bounds
