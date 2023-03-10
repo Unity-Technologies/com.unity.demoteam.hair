@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Rendering;
@@ -636,7 +637,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void UpdateStrandGroupInstances()
+		void UpdateStrandGroupInstances(bool skipPrefabInstanceHandling = false)
 		{
 			var status = CheckStrandGroupInstances();
 
@@ -649,7 +650,7 @@ namespace Unity.DemoTeam.Hair
 
 #if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
-			if (isPrefabInstance)
+			if (isPrefabInstance && !skipPrefabInstanceHandling)
 			{
 				// did the asset change since the prefab was built?
 				switch (status)
@@ -657,6 +658,15 @@ namespace Unity.DemoTeam.Hair
 					case StrandGroupInstancesStatus.RequireRebuild:
 						{
 							var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+
+							if (Path.HasExtension(".usd"))
+							{
+								// USD is a special exception where the prefab path does not point to a true prefab, and PrefabUtility.LoadPrefabContents
+								// will fail. So we start over this routine and force skip the prefab instance handling. 
+								UpdateStrandGroupInstances(skipPrefabInstanceHandling: true);
+								return;
+							}
+							
 #if UNITY_2021_2_OR_NEWER
 							var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
 #else
