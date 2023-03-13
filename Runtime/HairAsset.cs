@@ -533,6 +533,13 @@ namespace Unity.DemoTeam.Hair
 				while (PerformVersionBump(ref strandGroups[i])) { };
 			}
 		}
+
+#if SUPPORT_CONTENT_UPGRADE
+		void Reset()
+		{
+			settingsAlembic.OLD__transferred = true;
+		}
+#endif
 	}
 
 	public static class HairAssetProvisional
