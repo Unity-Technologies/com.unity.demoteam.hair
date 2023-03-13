@@ -33,8 +33,8 @@ namespace Unity.DemoTeam.Hair
 
         static bool HasRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance)
         {
-            return strandGroupInstance.sceneObjects.rayTracingObjects.container != null ||
-                   strandGroupInstance.sceneObjects.rayTracingObjects.filter    != null ||
+            return strandGroupInstance.sceneObjects.rayTracingObjects.container != null &&
+                   strandGroupInstance.sceneObjects.rayTracingObjects.filter    != null &&
                    strandGroupInstance.sceneObjects.rayTracingObjects.renderer  != null;
         }
         
