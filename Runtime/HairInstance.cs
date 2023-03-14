@@ -1075,13 +1075,13 @@ namespace Unity.DemoTeam.Hair
 			ref var materialInstance = ref strandGroupInstance.sceneObjects.materialInstance;
 			{
 				var materialAsset = GetStrandMaterial(strandGroupInstance);
-				if (materialAsset != null)
+				if (materialAsset != null && materialAsset.shader != null)
 				{
 					if (materialInstance == null)
 					{
-						materialInstance = new Material(materialAsset);
-						materialInstance.name += "(Instance)";
+						materialInstance = new Material(materialAsset.shader);
 						materialInstance.hideFlags = HideFlags.HideAndDontSave;
+						materialInstance.name = materialAsset.name + "(Instance)";
 					}
 					else
 					{
@@ -1090,9 +1090,9 @@ namespace Unity.DemoTeam.Hair
 							materialInstance.shader = materialAsset.shader;
 							materialInstance.name = materialAsset.name + "(Instance)";
 						}
-
-						materialInstance.CopyPropertiesFromMaterial(materialAsset);
 					}
+
+					materialInstance.CopyPropertiesFromMaterial(materialAsset);
 				}
 
 				if (materialInstance != null)
