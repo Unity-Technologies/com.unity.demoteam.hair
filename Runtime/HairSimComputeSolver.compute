@@ -1604,6 +1604,9 @@ void KInterpolate(
 	float strandContribHi = _RootScale[strandIndex] / _RootScale[strandIndexHi];
 
 	float4 rootFrame = _RootFrame[strandIndex];
+	float4 rootFrameLo = _RootFrame[strandIndexLo];
+	float4 rootFrameHi = _RootFrame[strandIndexHi];
+
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
 	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
 	float3 rootPositionHi = _RootPosition[strandIndexHi].xyz;
@@ -1613,8 +1616,8 @@ void KInterpolate(
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride, iHi = strandParticleBeginHi + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
 	{
 		float3 initialOffset = QMul(rootFrame, _InitialParticleOffset[i].xyz) * _GroupScale;
-		float3 initialOffsetLo = QMul(rootFrame, _InitialParticleOffset[iLo].xyz) * _GroupScale;
-		float3 initialOffsetHi = QMul(rootFrame, _InitialParticleOffset[iHi].xyz) * _GroupScale;
+		float3 initialOffsetLo = QMul(rootFrameLo, _InitialParticleOffset[iLo].xyz) * _GroupScale;
+		float3 initialOffsetHi = QMul(rootFrameHi, _InitialParticleOffset[iHi].xyz) * _GroupScale;
 
 		float3 currentOffsetLo = _ParticlePosition[iLo].xyz - rootPositionLo;
 		float3 currentOffsetHi = _ParticlePosition[iHi].xyz - rootPositionHi;
@@ -1648,6 +1651,8 @@ void KInterpolateNearest(
 	float strandContribLo = _RootScale[strandIndex] / _RootScale[strandIndexLo];
 
 	float4 rootFrame = _RootFrame[strandIndex];
+	float4 rootFrameLo = _RootFrame[strandIndexLo];
+
 	float3 rootPosition = _RootPosition[strandIndex].xyz;
 	float3 rootPositionLo = _RootPosition[strandIndexLo].xyz;
 
@@ -1656,7 +1661,7 @@ void KInterpolateNearest(
 	for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride)
 	{
 		float3 initialOffset = QMul(rootFrame, _InitialParticleOffset[i].xyz) * _GroupScale;
-		float3 initialOffsetLo = QMul(rootFrame, _InitialParticleOffset[iLo].xyz) * _GroupScale;
+		float3 initialOffsetLo = QMul(rootFrameLo, _InitialParticleOffset[iLo].xyz) * _GroupScale;
 
 		float3 currentOffsetLo = _ParticlePosition[iLo].xyz - rootPositionLo;
 
