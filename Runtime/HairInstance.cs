@@ -1210,7 +1210,10 @@ namespace Unity.DemoTeam.Hair
 			{
 #if UNITY_2021_2_OR_NEWER
 				// starting with 2021.2 we can override renderer bounds directly
-				meshRenderer.bounds = GetSimulationBounds();
+				meshRenderer.localBounds = GetSimulationBounds().WithTransform(meshRenderer.transform.worldToLocalMatrix);
+
+				//TODO the world space bounds override is failing in some cases -- figure out why
+				//meshRenderer.bounds = GetSimulationBounds();
 #else
 				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
 				if (mesh != null)

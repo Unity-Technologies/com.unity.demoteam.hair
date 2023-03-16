@@ -151,7 +151,7 @@ namespace Unity.DemoTeam.Hair
 				asyncWait = asyncExecution && (asyncUpload == false);
 
 				if (asyncWait)
-					cmdFence = Graphics.CreateAsyncGraphicsFence();
+					cmdFence = Graphics.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.AllGPUOperations);
 				else
 					cmdFence = new GraphicsFence();
 			}
