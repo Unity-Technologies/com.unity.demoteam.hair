@@ -1610,17 +1610,20 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					solverData[i].rootUV.SetData(strandGroupAsset.rootUV);
-					solverData[i].rootScale.SetData(strandGroupAsset.rootScale);
+					using (var uploadCtx = new HairSimUtility.BufferUploadContext(cmd, cmdFlags))
+					{
+						uploadCtx.SetData(solverData[i].rootUV, strandGroupAsset.rootUV);
+						uploadCtx.SetData(solverData[i].rootScale, strandGroupAsset.rootScale);
 
-					//TODO keeping this buffer for asset compatibility only -- remove when adding upgrade path
-					solverData[i].initialRootDirection.SetData(alignedRootDirection);
+						//TODO keeping this buffer for asset compatibility only -- remove when adding upgrade path
+						uploadCtx.SetData(solverData[i].initialRootDirection, alignedRootDirection);
 
-					solverData[i].particlePosition.SetData(alignedParticlePosition);
+						uploadCtx.SetData(solverData[i].particlePosition, alignedParticlePosition);
 
-					solverData[i].lodGuideCount.SetData(strandGroupAsset.lodGuideCount);
-					solverData[i].lodGuideIndex.SetData(strandGroupAsset.lodGuideIndex);
-					solverData[i].lodGuideCarry.SetData(strandGroupAsset.lodGuideCarry);
+						uploadCtx.SetData(solverData[i].lodGuideCount, strandGroupAsset.lodGuideCount);
+						uploadCtx.SetData(solverData[i].lodGuideIndex, strandGroupAsset.lodGuideIndex);
+						uploadCtx.SetData(solverData[i].lodGuideCarry, strandGroupAsset.lodGuideCarry);
+					}
 
 					// NOTE: the remaining buffers are initialized in KInitialize and KInitializePostVolume
 				}
