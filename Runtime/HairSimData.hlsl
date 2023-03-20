@@ -122,7 +122,7 @@ struct BoundaryShape
 	//  capsule |  centerA    radius     centerB    __pad
 	//  sphere  |  center     radius     __pad      __pad
 	//  torus   |  center     radiusA    axis       radiusB
-	//  cube    |  __pad      __pad      __pad      __pad
+	//  cube    |  extent     __pad      __pad      __pad
 
 	float3 pA; float tA;
 	float3 pB; float tB;

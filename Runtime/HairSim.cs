@@ -1345,11 +1345,17 @@ namespace Unity.DemoTeam.Hair
 					cbuffer._BoundaryWorldMargin = volumeSettings.collisionMargin * 0.01f;
 
 					// pack boundaries
-					int writeIndexDiscrete = 0;
-					int writeIndexCapsule = writeIndexDiscrete + (int)cbuffer._BoundaryCountDiscrete;
-					int writeIndexSphere = writeIndexCapsule + (int)cbuffer._BoundaryCountCapsule;
-					int writeIndexTorus = writeIndexSphere + (int)cbuffer._BoundaryCountSphere;
-					int writeIndexCube = writeIndexTorus + (int)cbuffer._BoundaryCountTorus;
+					int firstIndexDiscrete = 0;
+					int firstIndexCapsule = firstIndexDiscrete + (int)cbuffer._BoundaryCountDiscrete;
+					int firstIndexSphere = firstIndexCapsule + (int)cbuffer._BoundaryCountCapsule;
+					int firstIndexTorus = firstIndexSphere + (int)cbuffer._BoundaryCountSphere;
+					int firstIndexCube = firstIndexTorus + (int)cbuffer._BoundaryCountTorus;
+
+					int writeIndexDiscrete = firstIndexDiscrete;
+					int writeIndexCapsule = firstIndexCapsule;
+					int writeIndexSphere = firstIndexSphere;
+					int writeIndexTorus = firstIndexTorus;
+					int writeIndexCube = firstIndexCube;
 					int writeCount = 0;
 
 					if (boundarySDFIndex != -1)
@@ -1418,6 +1424,11 @@ namespace Unity.DemoTeam.Hair
 						if (i < cbuffer._BoundaryCountDiscrete && boundarySDFIndex != -1)
 						{
 							ptrMatrixInv[i] = boundaryList[boundarySDFIndex].sdf.worldToUVW;
+						}
+						// world to prim for cube
+						else if (i < cbuffer._BoundaryCountCube + firstIndexCube && i >= firstIndexCube)
+						{
+							ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i].WithoutScale());
 						}
 					}
 
