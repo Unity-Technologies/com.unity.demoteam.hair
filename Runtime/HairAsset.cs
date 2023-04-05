@@ -122,9 +122,9 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Strands")]
 
-			[Range(64, HairSim.MAX_STRAND_COUNT), Tooltip("Number of strands")]
+			[Range(HairSim.MIN_STRAND_COUNT, HairSim.MAX_STRAND_COUNT), Tooltip("Number of strands")]
 			public int strandCount;
-			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of equidistant particles along each strand")]
+			[Range(HairSim.MIN_STRAND_PARTICLE_COUNT, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of equidistant particles along each strand")]
 			public int strandParticleCount;
 			[Range(0.001f, 5.0f), Tooltip("Strand length (in meters)")]
 			public float strandLength;
@@ -248,6 +248,11 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsResolve
 		{
+			public const int MIN_RESAMPLE_RESOLUTION = HairSim.MIN_STRAND_PARTICLE_COUNT;
+			public const int MAX_RESAMPLE_RESOLUTION = HairSim.MAX_STRAND_PARTICLE_COUNT;
+			public const int MIN_RESAMPLE_QUALITY = 1;
+			public const int MAX_RESAMPLE_QUALITY = 5;
+
 			public enum RootUV
 			{
 				Uniform,
@@ -267,9 +272,9 @@ namespace Unity.DemoTeam.Hair
 
 			[Tooltip("Resample curves to ensure a specific number of equidistant particles along each strand")]
 			public bool resampleCurves;
-			[Range(3, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of equidistant particles along each strand")]
+			[Range(MIN_RESAMPLE_RESOLUTION, MAX_RESAMPLE_RESOLUTION), Tooltip("Number of equidistant particles along each strand")]
 			public int resampleParticleCount;
-			[Range(1, 5), Tooltip("Number of resampling iterations")]
+			[Range(MIN_RESAMPLE_QUALITY, MAX_RESAMPLE_QUALITY), Tooltip("Number of resampling iterations")]
 			public int resampleQuality;
 
 			public static readonly SettingsResolve defaults = new SettingsResolve()

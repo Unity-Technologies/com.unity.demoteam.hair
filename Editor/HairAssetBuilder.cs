@@ -332,8 +332,8 @@ namespace Unity.DemoTeam.Hair
 			{
 				// resampling enabled if requested by user
 				var resampling = settings.resampleCurves;
-				var resamplingIterations = settings.resampleQuality;
-				var resamplingVertexCount = settings.resampleParticleCount;
+				var resamplingIterations = Mathf.Clamp(settings.resampleQuality, HairAsset.SettingsResolve.MIN_RESAMPLE_QUALITY, HairAsset.SettingsResolve.MAX_RESAMPLE_QUALITY);
+				var resamplingVertexCount = Mathf.Clamp(settings.resampleParticleCount, HairAsset.SettingsResolve.MIN_RESAMPLE_RESOLUTION, HairAsset.SettingsResolve.MAX_RESAMPLE_RESOLUTION);
 
 				// resampling required if there are curves with varying vertex count
 				var resamplingRequired = !resampling && (curveSetInfo.minVertexCount != curveSetInfo.maxVertexCount);
