@@ -135,6 +135,12 @@ float3 GetVolumeImpulse(float3 x0, float3 v0)
 		volumeImpulse += _CellVelocity * (VolumeSampleVector(_VolumeVelocity, volumeUVW, ss) - v0);
 	}
 
+	// add cell forces
+	if (_CellForces > 0.0)
+	{
+		volumeImpulse += _CellForces * VolumeSampleVector(_VolumeImpulse, volumeUVW);
+	}
+
 	return volumeImpulse;
 }
 

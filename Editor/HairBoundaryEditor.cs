@@ -49,7 +49,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUILayout.BeginVertical(EditorStyles.inspectorFullWidthMargins);
 			{
-				EditorGUILayout.LabelField("Hair Boundary", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.LabelField("Boundary Settings", EditorStyles.centeredGreyMiniLabel);
 				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 				{
 					DrawBoundaryGUI();
@@ -67,7 +67,7 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUI.BeginChangeCheck();
 
-			StructPropertyFieldsWithHeader(_settings, "Settings Boundary");
+			StructPropertyFieldsWithHeader(_settings, "Settings Shape");
 
 			var selectedMode = (HairBoundary.Settings.Mode)_settings_mode.intValue;
 			var selectedType = (HairBoundary.Settings.Type)_settings_type.intValue;

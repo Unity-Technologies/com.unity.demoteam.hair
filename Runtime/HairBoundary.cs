@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -117,8 +118,8 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public SDFSource source;
-			[VisibleIf(nameof(source), SDFSource.Texture)]
-			public Texture kSDF;
+			[VisibleIf(nameof(source), SDFSource.Texture), FormerlySerializedAs("kSDF")]
+			public Texture kSDFTexture;
 			[VisibleIf(nameof(source), SDFSource.Texture)]
 			public Bounds kSDFWorldBounds;
 #if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
@@ -134,7 +135,7 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SettingsSDF defaults = new SettingsSDF
 			{
 				source = SDFSource.Texture,
-				kSDF = null,
+				kSDFTexture = null,
 				kSDFWorldBounds = new Bounds(Vector3.zero, Vector3.one),
 #if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
 				kSDFComponent = null,
@@ -480,9 +481,9 @@ namespace Unity.DemoTeam.Hair
 				{
 					case SettingsSDF.SDFSource.Texture:
 						{
-							if (boundary.settingsSDF.kSDF != null)
+							if (boundary.settingsSDF.kSDFTexture != null)
 							{
-								data = GetRuntimeSDF(sourceTransform, boundary.settingsSDF.kSDF, boundary.settingsSDF.kSDFWorldBounds);
+								data = GetRuntimeSDF(sourceTransform, boundary.settingsSDF.kSDFTexture, boundary.settingsSDF.kSDFWorldBounds);
 								return true;
 							}
 						}

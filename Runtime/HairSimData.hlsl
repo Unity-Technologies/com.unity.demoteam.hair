@@ -105,6 +105,7 @@ HAIRSIM_VOLUMEDATA<float> _VolumePressure;			// x: pressure
 HAIRSIM_VOLUMEDATA<float> _VolumePressureNext;		// x: pressure (output of iteration)
 HAIRSIM_VOLUMEDATA<float3> _VolumePressureGrad;		// xyz: pressure gradient, w: -
 
+HAIRSIM_VOLUMEPROBE<float3> _VolumeImpulse;
 HAIRSIM_VOLUMEPROBE<float4> _VolumeStrandCountProbe;
 
 SamplerState _Volume_point_clamp;
@@ -132,6 +133,24 @@ StructuredBuffer<BoundaryShape> _BoundaryShape;
 StructuredBuffer<float4x4> _BoundaryMatrix;
 StructuredBuffer<float4x4> _BoundaryMatrixInv;
 StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;
+
+//--------------
+// volume winds
+
+struct WindEmitter
+{
+	float3 p;	// emitter origin
+	float3 n;	// emitter forward
+	float t0;	// emitter base offset
+	float h0;	// emitter base radius
+	float m;	// emitter slope
+
+	float v;	// flow speed
+	float A;	// flow pulse amplitude
+	float f;	// flow pulse frequency
+};
+
+StructuredBuffer<WindEmitter> _WindEmitter;
 
 //---------
 // utility

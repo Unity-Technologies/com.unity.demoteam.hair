@@ -219,12 +219,16 @@ namespace Unity.DemoTeam.Hair
 
 						EditorGUILayout.BeginHorizontal();
 						{
-							property_hairAssetQuickEdit.boolValue = GUILayout.Toggle(property_hairAssetQuickEdit.boolValue, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+							using (new EditorGUI.DisabledScope(property_hairAsset.objectReferenceValue == null))
+							{
+								property_hairAssetQuickEdit.boolValue = GUILayout.Toggle(property_hairAssetQuickEdit.boolValue, HairGUIStyles.miniButtoniconEdit, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+							}
+
 							EditorGUILayout.ObjectField(property_hairAsset, GUIContent.none);
 
 							if (multipleAssets)//TODO considering: using (new EditorGUI.DisabledScope(multipleAssets == false))
 							{
-								property_delete = GUILayout.Button("-", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+								property_delete = GUILayout.Button(HairGUIStyles.miniButtonIconSub, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 							}
 						}
 						EditorGUILayout.EndHorizontal();
@@ -262,7 +266,7 @@ namespace Unity.DemoTeam.Hair
 
 				EditorGUILayout.BeginHorizontal();
 				{
-					if (GUILayout.Button("+", GUILayout.Width(widthSymbol)))
+					if (GUILayout.Button(HairGUIStyles.miniButtonIconAdd, GUILayout.Width(widthSymbol)))
 					{
 						var countPrev = _strandGroupProviders.arraySize;
 						var countNext = countPrev + 1;
@@ -391,7 +395,7 @@ namespace Unity.DemoTeam.Hair
 
 					EditorGUILayout.BeginHorizontal();
 					{
-						var expanded = GUILayout.Toggle(property.isExpanded, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+						var expanded = GUILayout.Toggle(property.isExpanded, HairGUIStyles.miniButtoniconEdit, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 						if (expanded != property.isExpanded)
 							property.isExpanded = expanded;
 
@@ -434,7 +438,7 @@ namespace Unity.DemoTeam.Hair
 
 					EditorGUILayout.BeginHorizontal();
 					{
-						var expanded = GUILayout.Toggle(property.isExpanded, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+						var expanded = GUILayout.Toggle(property.isExpanded, HairGUIStyles.miniButtoniconEdit, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 						if (expanded != property.isExpanded)
 							property.isExpanded = expanded;
 
@@ -479,7 +483,7 @@ namespace Unity.DemoTeam.Hair
 
 						if (true)
 						{
-							property_delete = GUILayout.Button("-", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+							property_delete = GUILayout.Button(HairGUIStyles.miniButtonIconSub, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 						}
 					}
 					EditorGUILayout.EndHorizontal();
@@ -594,6 +598,7 @@ namespace Unity.DemoTeam.Hair
 								case 4: return "pressure";
 								case 5: return "grad(pressure)";
 								case 6: return "scattering";
+								case 7: return "impulse(wind+external)";
 							}
 							return "unknown";
 						}

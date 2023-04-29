@@ -58,6 +58,7 @@ CBUFFER_START(SolverCBuffer)
     float _AngularDampingInterval;
     float _CellPressure;
     float _CellVelocity;
+    float _CellForces;
     float _BoundaryFriction;
     float _FTLDamping;
     float _LocalCurvature;
@@ -69,7 +70,6 @@ CBUFFER_START(SolverCBuffer)
     float _GlobalFadeOffset;
     float _GlobalFadeExtent;
     float _scbpad1;
-    float _scbpad2;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer
@@ -90,8 +90,12 @@ CBUFFER_START(VolumeCBuffer)
     float _BoundaryWorldMargin;
     uint _StrandCountPhi;
     uint _StrandCountTheta;
-    uint _StrandCountSubstep;
+    uint _StrandCountSubsteps;
     float _StrandCountDiameter;
+    uint _WindEmitterCount;
+    float _WindEmitterTime;
+    uint _WindPropagationSubsteps;
+    float _WindPropagationExtinction;
     float _vcbpad1;
     float _vcbpad2;
 CBUFFER_END

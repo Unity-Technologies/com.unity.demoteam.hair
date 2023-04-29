@@ -133,6 +133,7 @@ namespace Unity.DemoTeam.Hair
 			public float _AngularDampingInterval;
 			public float _CellPressure;
 			public float _CellVelocity;
+			public float _CellForces;
 
 			public float _BoundaryFriction;
 			public float _FTLDamping;
@@ -140,16 +141,15 @@ namespace Unity.DemoTeam.Hair
 			public float _LocalShape;
 			public float _LocalShapeBias;
 
-			// 73
+			// 74
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
 
-			// 78 --> 80 (pad to 16 byte boundary)
+			// 79 --> 80 (pad to 16 byte boundary)
 			public float _scbpad1;
-			public float _scbpad2;
 		}
 
 		/*
@@ -195,6 +195,7 @@ namespace Unity.DemoTeam.Hair
 			public RenderTexture volumePressureGrad;	// xyz: pressure gradient, w: -
 
 			public RenderTexture volumeStrandCountProbe;
+			public RenderTexture volumeImpulse;			// xyz: accumulated external forces, w: -
 
 			public RenderTexture boundarySDF;			// x: signed distance to arbitrary solid
 			public RenderTexture boundarySDF_undefined;	// .. (placeholder for when inactive)
@@ -202,12 +203,14 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer boundaryShape;			// arr(HairBoundary.RuntimeShape.Data)
 			public ComputeBuffer boundaryMatrix;		// arr(float4x4): local to world
 			public ComputeBuffer boundaryMatrixInv;		// arr(float4x4): world to local
-			public ComputeBuffer boundaryMatrixW2PrevW;	// arr(float4x4): world to previous world
+			public ComputeBuffer boundaryMatrixW2PrevW; // arr(float4x4): world to previous world
 
 			public NativeArray<HairBoundary.RuntimeTransform> boundaryPrevXform;
 			public int boundaryPrevCount;
 			public int boundaryPrevCountDiscard;
 			public int boundaryPrevCountUnknown;
+
+			public ComputeBuffer windEmitter;			// arr(HairWind.RuntimeEmitter)
 		}
 
 		public struct VolumeKeywords
@@ -264,10 +267,16 @@ namespace Unity.DemoTeam.Hair
 			// 22
 			public uint _StrandCountPhi;
 			public uint _StrandCountTheta;
-			public uint _StrandCountSubstep;
+			public uint _StrandCountSubsteps;
 			public float _StrandCountDiameter;
 
-			// 26 --> 28 (pad to 16 byte boundary)
+			// 26
+			public uint _WindEmitterCount;
+			public float _WindEmitterTime;
+			public uint _WindPropagationSubsteps;
+			public float _WindPropagationExtinction;
+
+			// 30 --> 32 (pad to 16 byte boundary)
 			public float _vcbpad1;
 			public float _vcbpad2;
 		}

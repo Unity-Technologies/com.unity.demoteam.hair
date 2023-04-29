@@ -12,6 +12,7 @@
 #pragma kernel KVolumePressureGradient			F_PRESSURE
 #pragma kernel KVolumeStrandCountProbe			F_PROBE
 #pragma kernel KVolumeStrandCountProbeDefault	F_PROBE
+#pragma kernel KVolumeWind						F_WIND
 
 //----------
 // features
@@ -71,7 +72,7 @@
 
 #define HAIRSIM_WRITEABLE_VOLUMEACCU (F_CLEAR || F_SPLAT)
 #define HAIRSIM_WRITEABLE_VOLUMEDATA (F_RESOLVE || F_DIVERGENCE || F_PRESSURE)
-#define HAIRSIM_WRITEABLE_VOLUMEPROBE (F_PROBE)
+#define HAIRSIM_WRITEABLE_VOLUMEPROBE (F_CLEAR || F_PROBE || F_WIND)
 
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
@@ -253,6 +254,8 @@ void KVolumeClear(
 	_AccuVelocityX[accuIdx] = 0;
 	_AccuVelocityY[accuIdx] = 0;
 	_AccuVelocityZ[accuIdx] = 0;
+
+	_VolumeImpulse[worldIdx] = 0;
 }
 
 #endif//F_CLEAR
@@ -920,3 +923,154 @@ void KVolumeStrandCountProbeDefault(
 }
 
 #endif//F_PROBE
+
+//--------------
+// kernels wind
+
+#if F_WIND
+
+float SphericalCellCrossSectionRadiusCubed(float V)
+{
+	float rrr = (3.0 * abs(V)) / (4.0 * 3.14159);
+	return rrr;
+}
+
+float SphericalCellCrossSectionRadius(float V)
+{
+	float rrr = SphericalCellCrossSectionRadiusCubed(V);
+	float r = pow(rrr, 1.0 / 3.0);
+	return r;
+}
+
+float SphericalCellCrossSection(float V)
+{
+	float rrr = SphericalCellCrossSectionRadiusCubed(V);
+	float rr = pow(rrr, 2.0 / 3.0);
+	float A = 3.14159 * rr;
+	return A;
+}
+
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
+void KVolumeWind(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	const float rho = _VolumeDensity[worldIdx];
+
+	// early out in empty cells
+	if (rho == 0.0)
+	{
+		return;
+	}
+
+	// gather impulses
+	float4 Lsum = 0.0;
+
+	for (uint i = 0; i != _WindEmitterCount; i++)
+	{
+		const WindEmitter wind = _WindEmitter[i];
+
+		float3 p = VolumeIndexToWorld(worldIdx);
+		float3 r = p - wind.p;
+
+		float t = dot(wind.n, r);
+		float h = wind.m * (t - wind.t0) + wind.h0;
+
+		float3 a = r - wind.n * t;
+		float bb = dot(a, a);
+
+		// check if cell center is inside emitter volume
+		//TODO handle overlap?
+		if (isinf(wind.h0) || (t >= wind.t0 && bb <= h * h))
+		{
+			// compute trace direction and distance from emitter base
+			float3 n = (wind.m == 0.0) ? wind.n : normalize(r) * (t < 0.0 ? -1.0 : 1.0);
+			float nd = dot(n, r) * (1.0 - wind.t0 / (t + 1e-5));
+
+			// compute transmittance ahead of current cell
+			float T = 1.0;
+			{
+				VolumeTraceState trace = VolumeTraceBegin(p, -n, 1.0, _WindPropagationSubsteps);
+
+				float S = length(VolumeWorldCellStep(-n)) / _WindPropagationSubsteps;
+				float R = nd - (S * _WindPropagationSubsteps);
+				float k = _WindPropagationExtinction * S;
+
+#define ABSORB(x) SphericalCellCrossSection(x)
+//#define ABSORB(x) pow(abs(x), 2.0 / 3.0)
+
+				while (T > 1e-5 && R >= 0.0 && VolumeTraceStep(trace))
+				{
+					T *= exp(-ABSORB(saturate(VolumeSampleScalar(_VolumeDensity, trace.uvw))) * k);
+					R -= S;
+				}
+			}
+
+			// compute absorption in current cell
+			float A = ABSORB(saturate(0.1 + rho));
+
+			// note: approach to attenuation
+			//
+			//	Ka: inf at x=0
+			//		Ka(x,t) => 1 / x^2
+			//
+			//	Kb: inf at x=0, one at x=-t, x=t
+			//		Kb(x,t) => 1 / (x/t)^2
+			//		Kb(x,t) => t^2 / x^2
+			//
+			//	Kc: h at x=0, one at x=-t, x=t
+			//		Kc(x,t,h) => (t^2 + (t^2 + e) / (h - 1 + e)) / (x^2 + (t^2 + e) / (h - 1 + e))
+			//
+			//	Kd: |t|+1 at x=0, one at x=-t, x=t
+			//		Kd(x,t) => (t^2 + (t^2 + e) / (|t| + e)) / (x^2 + (t^2 + e) / (|t| + e))
+			//		Kd(x,t) => (t^2 * (|t| + e) + t^2 + e) / (x^2 * (|t| + e) + t^2 + e)
+			//
+			//	Ke: |t|^2+1 at x=0, one at x=-t, x=t
+			//		Ke(x,t) => (t^2 * (|t| + e) + |t| + e) / (x^2 * (|t| + e) + |t| + e)
+			//		Ke(x,t) => (t^2 + 1) / (x^2 + 1)
+			//
+			//	Kf: [1..h] at x=0, one at x=-t, x=t
+			//		Kf(x,t,h) => (t^2 + (t^2 + 1) / (h - 1 + e)) / (x^2 + (t^2 + 1) / (h - 1 + e))
+			//		Kf(x,t,h) => (e * t^2 + t^2 * h + 1) / (x^2 * (h - 1 + e) + t^2 + 1)
+			//		Kf(x,t,h) => (t^2 * h + 1) / (x^2 * (h - 1) + t^2 + 1)
+			//
+			//	Kg: TODO half at x=-s, x=s, one at x=-1, x=t
+
+			// compute flow in current cell
+			float va = (wind.m == 0.0) ? 1.0 : (wind.t0 * wind.t0 * 2.0f + 1.0f) / (nd * nd * (2.0f - 1.0f) + wind.t0 * wind.t0 + 1.0f);
+			float vd = isinf(wind.h0) ? dot(r, n) : nd;
+			float vf = wind.v + wind.A * (0.5 * cos(vd * wind.f - _WindEmitterTime * (wind.v + 0.5 * wind.A)) + 0.5);
+			float3 v = (va * vf) * n;
+
+			// calc delta velocity
+			float3 u = saturate(T / A) * v - _VolumeVelocity[worldIdx].xyz;
+			float ud = length(u);
+
+			// note: drag force
+			// Fd = 0.5 rho |u|^2 Cd A
+			//    = 0.5 rho u |u| Cd A
+
+			// calc impulse
+			float3 L = 0.5 * (u * ud);
+			float Lw = length(L);
+				
+			// add to sum
+			Lsum.xyz += Lw * L;
+			Lsum.w += Lw;
+		}
+	}
+
+	// apply weighted average
+	if (Lsum.w > 0.0)
+	{	
+		_VolumeImpulse[worldIdx].xyz += (Lsum.xyz / Lsum.w) * (_DT * _Substeps);
+	}
+}
+
+#endif//F_WIND
