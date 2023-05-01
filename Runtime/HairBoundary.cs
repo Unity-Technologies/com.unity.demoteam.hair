@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -117,8 +118,8 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public SDFSource source;
-			[VisibleIf(nameof(source), SDFSource.Texture)]
-			public Texture kSDF;
+			[VisibleIf(nameof(source), SDFSource.Texture), FormerlySerializedAs("kSDF")]
+			public Texture kSDFTexture;
 			[VisibleIf(nameof(source), SDFSource.Texture)]
 			public Bounds kSDFWorldBounds;
 #if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
@@ -134,7 +135,7 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SettingsSDF defaults = new SettingsSDF
 			{
 				source = SDFSource.Texture,
-				kSDF = null,
+				kSDFTexture = null,
 				kSDFWorldBounds = new Bounds(Vector3.zero, Vector3.one),
 #if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
 				kSDFComponent = null,
@@ -180,7 +181,7 @@ namespace Unity.DemoTeam.Hair
 				//  capsule |  centerA    radius     centerB    __pad
 				//  sphere  |  center     radius     __pad      __pad
 				//  torus   |  center     radiusA    axis       radiusB
-				//  cube    |  __pad      __pad      __pad      __pad
+				//  cube    |  extent     __pad      __pad      __pad
 
 				public Vector3 pA; public float tA;
 				public Vector3 pB; public float tB;
@@ -308,8 +309,7 @@ namespace Unity.DemoTeam.Hair
 					type = RuntimeShape.Type.Cube,
 					data = new RuntimeShape.Data
 					{
-						pA = Vector3.zero,
-						pB = Vector3.one * 0.5f,
+						pA = worldSize * 0.5f,
 					},
 				},
 			};
@@ -481,9 +481,9 @@ namespace Unity.DemoTeam.Hair
 				{
 					case SettingsSDF.SDFSource.Texture:
 						{
-							if (boundary.settingsSDF.kSDF != null)
+							if (boundary.settingsSDF.kSDFTexture != null)
 							{
-								data = GetRuntimeSDF(sourceTransform, boundary.settingsSDF.kSDF, boundary.settingsSDF.kSDFWorldBounds);
+								data = GetRuntimeSDF(sourceTransform, boundary.settingsSDF.kSDFTexture, boundary.settingsSDF.kSDFWorldBounds);
 								return true;
 							}
 						}
@@ -640,11 +640,11 @@ namespace Unity.DemoTeam.Hair
 					break;
 				case RuntimeShape.Type.Cube:
 					{
-						var localCenter = data.shape.data.pA;
-						var localExtent = data.shape.data.pB;
+						var localCenter = Vector3.zero;
+						var localExtent = Vector3.one;
 						{
 							Gizmos.matrix = data.xform.matrix;
-							Gizmos.DrawWireCube(localCenter, localExtent * 2.0f);
+							Gizmos.DrawWireCube(localCenter, localExtent);
 						}
 					}
 					break;

@@ -53,14 +53,14 @@ float SdTorus(float3 p, const float3 center, const float3 axis, const float radi
 	return length(q) - t.y;
 }
 
-float SdCube(float3 p, const float4x4 invM)
+float SdCube(float3 p, const float3 extent, const float4x4 invM)
 {
 	p = mul(invM, float4(p, 1.0)).xyz;
 
 	// see: "distance functions" by Inigo Quilez
 	// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
 
-	const float3 b = float3(0.5, 0.5, 0.5);
+	const float3 b = extent;
 	const float3 q = abs(p) - b;
 
 	return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
@@ -79,6 +79,11 @@ float SdSphere(const float3 p, const BoundaryShape sphere)
 float SdTorus(const float3 p, const BoundaryShape torus)
 {
 	return SdTorus(p, torus.pA, torus.pB, torus.tA, torus.tB);
+}
+
+float SdCube(const float3 p, const BoundaryShape cube, const float4x4 invM)
+{
+	return SdCube(p, cube.pA, invM);
 }
 
 //------------------
@@ -113,7 +118,7 @@ float BoundaryDistance(const float3 p)
 
 	for (j += _BoundaryCountCube; i != j; i++)
 	{
-		d = min(d, SdCube(p, _BoundaryMatrixInv[i]));
+		d = min(d, SdCube(p, _BoundaryShape[i], _BoundaryMatrixInv[i]));
 	}
 
 	return d;
@@ -152,7 +157,7 @@ uint BoundarySelect(const float3 p, const float d)
 
 	for (j += _BoundaryCountCube; i != j; i++)
 	{
-		if (d == SdCube(p, _BoundaryMatrixInv[i]))
+		if (d == SdCube(p, _BoundaryShape[i], _BoundaryMatrixInv[i]))
 			index = i;
 	}
 

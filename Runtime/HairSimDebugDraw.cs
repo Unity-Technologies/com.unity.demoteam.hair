@@ -71,7 +71,7 @@ namespace Unity.DemoTeam.Hair
 				foreach (var hairInstance in HairInstance.s_instances)
 				{
 					if (hairInstance != null && hairInstance.isActiveAndEnabled)
-						hairInstance.DispatchDraw(cmd);
+						hairInstance.DispatchDraw(cmd, CommandBufferExecutionFlags.None);
 				}
 			}
 		}

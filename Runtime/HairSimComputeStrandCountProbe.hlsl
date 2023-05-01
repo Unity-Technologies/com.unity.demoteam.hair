@@ -20,7 +20,7 @@ real3 SphericalToCartesian(real phi, real cosTheta)
 //TODO optimize
 float EstimateStrandCount(float3 P, float3 L)
 {
-	const int numStepsWithinCell = _StrandCountSubstep;
+	const int numStepsWithinCell = _StrandCountSubsteps;
 	const int numSteps = _VolumeCells.x * numStepsWithinCell;
 
 	VolumeTraceState trace = VolumeTraceBegin(P, L, 0, numStepsWithinCell);

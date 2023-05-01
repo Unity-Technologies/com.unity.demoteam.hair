@@ -161,7 +161,7 @@ namespace Unity.DemoTeam.Hair
 							case HairBoundary.RuntimeShape.Type.Capsule: return SdCapsule(p, data.shape.data);
 							case HairBoundary.RuntimeShape.Type.Sphere: return SdSphere(p, data.shape.data);
 							case HairBoundary.RuntimeShape.Type.Torus: return SdTorus(p, data.shape.data);
-							case HairBoundary.RuntimeShape.Type.Cube: return SdCube(p, Matrix4x4.Inverse(data.xform.matrix));
+							case HairBoundary.RuntimeShape.Type.Cube: return SdCube(p, data.shape.data, Matrix4x4.Inverse(data.xform.matrix.WithoutScale()));
 						}
 					}
 					break;
@@ -219,14 +219,15 @@ namespace Unity.DemoTeam.Hair
 			return length(q) - t.y;
 		}
 
-		public static float SdCube(float3 p, in float4x4 invM)
+		public static float SdCube(in float3 p, in HairBoundary.RuntimeShape.Data cube, in float4x4 invM) => SdCube(p, cube.pA, invM);
+		public static float SdCube(float3 p, in float3 extent, in float4x4 invM)
 		{
 			p = mul(invM, float4(p, 1.0f)).xyz;
 
 			// see: "distance functions" by Inigo Quilez
 			// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
 
-			float3 b = float3(0.5f, 0.5f, 0.5f);
+			float3 b = extent;
 			float3 q = abs(p) - b;
 
 			return length(max(q, 0.0f)) + min(max(q.x, max(q.y, q.z)), 0.0f);
