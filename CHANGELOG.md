@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added a new component 'HairWind' for authoring wind emitters that can affect hair. The HairWind component represents a single emitter, and can be configured either as a standalone emitter (preferred), or as a proxy for an existing WindZone (more limited).
+- Added new component 'HairWind' for authoring wind emitters that can affect hair. The HairWind component represents a single emitter, and can be configured either as a standalone emitter (preferred), or as a proxy for an existing WindZone (more limited).
 - Added support for wind forces via volumetric wind propagation. Wind propagation is enabled per HairInstance under volume settings. When enabled, wind will begin to propagate through hair, and act on hair according to how much wind was able to pass through the volume between a cell and any emitters, taking into account the physical density of hair in the volume.
 
 ### Fixed
 
+- Fixed an issue with root updates not taking the correct path on some platforms.
+- Fixed missing 'noinstancing' option in the default builtin lit material.
 - Fixed missing clamps on parameters used to control resampling.
 
 

@@ -586,6 +586,14 @@ namespace Unity.DemoTeam.Hair
 				{
 					switch (SystemInfo.graphicsDeviceType)
 					{
+						case GraphicsDeviceType.Direct3D11:
+						case GraphicsDeviceType.Direct3D12:
+						case GraphicsDeviceType.Vulkan:
+							s_runtimeFlags |= RuntimeFlags.SupportsGeometryStage;
+							s_runtimeFlags |= RuntimeFlags.SupportsTextureAtomics;
+							s_runtimeFlags |= RuntimeFlags.SupportsVertexStageUAVWrites;
+							break;
+
 						case GraphicsDeviceType.Metal:
 							s_runtimeFlags |= RuntimeFlags.PointRasterizationRequiresPointSize;
 							break;
@@ -593,7 +601,6 @@ namespace Unity.DemoTeam.Hair
 						default:
 							s_runtimeFlags |= RuntimeFlags.SupportsGeometryStage;
 							s_runtimeFlags |= RuntimeFlags.SupportsTextureAtomics;
-							s_runtimeFlags |= RuntimeFlags.SupportsVertexStageUAVWrites;
 							break;
 					}
 				}
