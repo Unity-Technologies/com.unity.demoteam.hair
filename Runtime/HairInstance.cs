@@ -1208,9 +1208,7 @@ namespace Unity.DemoTeam.Hair
 							else
 							{
 								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetTubes;
-#if UNITY_2021_2_OR_NEWER
-								meshShared = true;
-#else
+#if !UNITY_2021_2_OR_NEWER
 								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceTubes, mesh, HideFlags.HideAndDontSave);
 #endif
 							}
