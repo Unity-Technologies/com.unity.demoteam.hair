@@ -239,7 +239,7 @@ namespace Unity.DemoTeam.Hair
 #endif
 				strandShadows = ShadowCastingMode.On,
 				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
-				motionVectors = MotionVectorGenerationMode.Camera,
+				motionVectors = MotionVectorGenerationMode.Object,
 
 				updateMode = UpdateMode.BuiltinEvent,
 
@@ -1243,7 +1243,7 @@ namespace Unity.DemoTeam.Hair
 
 			materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
 			materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
-			materialInstance.SetTexture("_UntypedVolumeStrandCountProbe", volumeData.volumeStrandCountProbe);
+			materialInstance.SetTexture("_UntypedVolumeScattering", volumeData.volumeScattering);
 
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines || settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
