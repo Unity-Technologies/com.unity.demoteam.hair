@@ -97,7 +97,7 @@ CBUFFER_START(VolumeCBuffer)
     uint _BoundaryCountCube;
     float _BoundaryWorldEpsilon;
     float _BoundaryWorldMargin;
-    float _ScatteringProbeUnit;
+    float _ScatteringProbeUnitWidth;
     uint _ScatteringProbeSubsteps;
     uint _ScatteringProbeSamplesTheta;
     uint _ScatteringProbeSamplesPhi;

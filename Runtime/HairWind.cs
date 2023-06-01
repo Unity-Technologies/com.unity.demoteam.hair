@@ -419,7 +419,7 @@ namespace Unity.DemoTeam.Hair
 			var lossyScaleAbs = transform.lossyScale.Abs();
 			var lossyScaleAbsMax = lossyScaleAbs.CMax();
 
-			Gizmos.color = Color.Lerp(Color.clear, Color.cyan, opacity * 0.75f);
+			Gizmos.color = Color.Lerp(Color.clear, Color.cyan, opacity * 0.6f);
 			Gizmos.matrix = Matrix4x4.identity;
 
 			var size = 3.0f;

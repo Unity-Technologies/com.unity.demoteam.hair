@@ -49,7 +49,7 @@ float EstimateStrandCount(float3 P, float3 L)
 	}
 
 	const float stepLength = length(VolumeWorldSize() * trace.uvwStep);
-	const float stepCapacity = max(0.0, stepLength / _ScatteringProbeUnit);
+	const float stepCapacity = max(0.0, stepLength / _ScatteringProbeUnitWidth);
 
 	return (rho_sum * stepCapacity);
 }

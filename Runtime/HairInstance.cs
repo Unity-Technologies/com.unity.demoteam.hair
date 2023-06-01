@@ -140,7 +140,7 @@ namespace Unity.DemoTeam.Hair
 
 			public enum LODSelection
 			{
-				Automatic,//TODO
+				Automatic,
 				Fixed,
 			}
 
@@ -181,6 +181,10 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("LOD")]
 
 			public LODSelection kLODSearch;
+			[VisibleIf(nameof(kLODSearch), LODSelection.Automatic)]
+			public CameraType kLODSearchViews;
+			[VisibleIf(nameof(kLODSearch), LODSelection.Automatic)]
+			public AnimationCurve kLODSearchCurve;
 			[Range(0.0f, 1.0f)]
 			public float kLODSearchValue;
 			public bool kLODBlending;
@@ -230,6 +234,8 @@ namespace Unity.DemoTeam.Hair
 				boundsScaleValue = 1.25f,
 
 				kLODSearch = LODSelection.Fixed,
+				kLODSearchViews = ~CameraType.SceneView,
+				kLODSearchCurve = AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 1.0f),
 				kLODSearchValue = 1.0f,
 				kLODBlending = false,
 
@@ -1018,10 +1024,80 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
+		static Camera[] s_lodCameras = new Camera[32];
+		static Plane[] s_lodFrustum = new Plane[6];
+
+		static float ComputeViewportLOD(Camera camera, in Bounds bounds, in Vector3 boundsCenter, float boundsRadius, in SettingsSystem settings)
+		{
+			/**/GeometryUtility.CalculateFrustumPlanes(camera, s_lodFrustum);
+			if (GeometryUtility.TestPlanesAABB(s_lodFrustum, bounds))
+			{
+				var d = Mathf.Max(Vector3.Dot(camera.transform.forward, boundsCenter - camera.transform.position), camera.nearClipPlane);
+				var h = Mathf.Tan(0.5f * Mathf.Deg2Rad * camera.GetGateFittedFieldOfView()) * d;
+
+				var s = boundsRadius / h;
+				var k = settings.kLODSearchCurve.Evaluate(s);// Mathf.InverseLerp(settings.kLODSearchViewSize, settings.kLODSearchViewSizeMax, s);
+
+				//Debug.Log("checking cam: " + camera.ToString() + " => vis, distance " + d + ", size " + s);
+				return k;
+			}
+			else
+			{
+				//Debug.Log("checking cam: " + camera.ToString() + " => hidden");
+				return 0.0f;
+			}
+		}
+
 		void UpdateSimulationLOD(CommandBuffer cmd)
 		{
 			var lodValue = settingsSystem.kLODSearchValue;
 			var lodBlending = settingsSystem.kLODBlending;
+
+			if (settingsSystem.kLODSearch == SettingsSystem.LODSelection.Automatic)
+			{
+				var lodViews = 0.0f;
+				{
+					var bounds = GetSimulationBounds();
+					var boundsCenter = bounds.center;
+					var boundsRadius = bounds.extents.Abs().CMax();
+
+					// check regular cameras
+					if ((settingsSystem.kLODSearchViews & ~CameraType.SceneView) != 0)
+					{
+						var n = Camera.GetAllCameras(s_lodCameras);
+						for (int i = 0; i != n; i++)
+						{
+							var camera = s_lodCameras[i];
+							if (camera != null && camera.isActiveAndEnabled && settingsSystem.kLODSearchViews.HasFlag(camera.cameraType))
+							{
+								lodViews = Mathf.Max(lodViews, ComputeViewportLOD(camera, bounds, boundsCenter, boundsRadius, settingsSystem));
+							}
+						}
+					}
+
+					// check scene view cameras
+					if (settingsSystem.kLODSearchViews.HasFlag(CameraType.SceneView))
+					{
+#if UNITY_EDITOR
+						var sceneViews = UnityEditor.SceneView.sceneViews;
+						for (int i = 0; i != sceneViews.Count; i++)
+						{
+							var sceneView = sceneViews[i] as UnityEditor.SceneView;
+							if (sceneView != null)
+							{
+								var camera = sceneView.camera;
+								if (camera != null)
+								{
+									lodViews = Mathf.Max(lodViews, ComputeViewportLOD(camera, bounds, boundsCenter, boundsRadius, settingsSystem));
+								}
+							}
+						}
+#endif
+					}
+				}
+
+				lodValue = Mathf.Clamp01(lodViews);
+			}
 
 			for (int i = 0; i != solverData.Length; i++)
 			{

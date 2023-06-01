@@ -282,8 +282,8 @@ namespace Unity.DemoTeam.Hair
 			public bool distanceLRA;
 			[ToggleGroup, Tooltip("Enable 'follow the leader' distance constraint (hard particle-particle distance, non-physical)")]
 			public bool distanceFTL;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("FTL correction / damping factor")]
-			public float distanceFTLDamping;
+			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("FTL correction factor"), FormerlySerializedAs("distanceFTLDamping")]
+			public float distanceFTLCorrection;
 
 			[ToggleGroup, Tooltip("Enable bending curvature constraint")]
 			public bool localCurvature;
@@ -346,7 +346,7 @@ namespace Unity.DemoTeam.Hair
 				distance = true,
 				distanceLRA = true,
 				distanceFTL = false,
-				distanceFTLDamping = 0.8f,
+				distanceFTLCorrection = 0.8f,
 				localCurvature = false,
 				localCurvatureMode = LocalCurvatureMode.LessThan,
 				localCurvatureValue = 0.1f,
@@ -443,12 +443,12 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Scattering")]
 
-			[ToggleGroup]
-			public bool strandCountProbe;
-			[ToggleGroupItem(withLabel = true), Range(1, 10)]
-			public uint strandCountProbeCellSubsteps;
-			[Range(0.0f, 2.0f)]
-			public float strandCountBias;
+			[ToggleGroup, FormerlySerializedAs("strandCountProbe")]
+			public bool scatteringProbe;
+			[ToggleGroupItem(withLabel = true), Range(1, 10), FormerlySerializedAs("strandCountProbeCellSubsteps")]
+			public uint scatteringProbeCellSubsteps;
+			[Range(0.0f, 2.0f), FormerlySerializedAs("strandCountBias")]
+			public float scatteringProbeBias;
 			[Range(0, 20), FormerlySerializedAs("probeStepsTheta")]
 			public uint probeSamplesTheta;
 			[Range(0, 20), FormerlySerializedAs("probeStepsPhi")]
@@ -460,7 +460,7 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem(withLabel = true), Range(0.0f, 10.0f)]
 			public float probeOcclusionSolidDensity;
 
-			[LineHeader("Wind Forces")]
+			[LineHeader("Wind")]
 
 			[ToggleGroup]
 			public bool windPropagation;
@@ -507,9 +507,9 @@ namespace Unity.DemoTeam.Hair
 				targetDensity = TargetDensity.Uniform,
 				targetDensityInfluence = 1.0f,
 
-				strandCountProbe = false,
-				strandCountProbeCellSubsteps = 1,
-				strandCountBias = 1.0f,
+				scatteringProbe = false,
+				scatteringProbeCellSubsteps = 1,
+				scatteringProbeBias = 1.0f,
 				probeSamplesTheta = 5,
 				probeSamplesPhi = 10,
 				probeOcclusion = true,
@@ -1021,7 +1021,7 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._CellForces = solverSettings.cellForces;
 
 			cbuffer._BoundaryFriction = solverSettings.boundaryCollisionFriction;
-			cbuffer._FTLDamping = solverSettings.distanceFTLDamping;
+			cbuffer._FTLDamping = solverSettings.distanceFTLCorrection;
 			cbuffer._LocalCurvature = solverSettings.localCurvatureValue * 0.5f;
 			cbuffer._LocalShape = solverSettings.localShapeInfluence;
 			cbuffer._LocalShapeBias = solverSettings.localShapeBias ? solverSettings.localShapeBiasValue : 0.0f;
@@ -1310,7 +1310,7 @@ namespace Unity.DemoTeam.Hair
 
 			cbuffer._TargetDensityFactor = volumeSettings.targetDensityInfluence;
 
-			cbuffer._ScatteringProbeUnit = 0.0f;
+			cbuffer._ScatteringProbeUnitWidth = 0.0f;
 			{
 				var d = 0.0f;
 				var w = 0.0f;
@@ -1323,10 +1323,10 @@ namespace Unity.DemoTeam.Hair
 
 				if (w > 0.0f)
 				{
-					cbuffer._ScatteringProbeUnit = (d / w) * (1.0f / Mathf.Max(1e-7f, volumeSettings.strandCountBias));
+					cbuffer._ScatteringProbeUnitWidth = (d / w) * (1.0f / Mathf.Max(1e-7f, volumeSettings.scatteringProbeBias));
 				}
 			}
-			cbuffer._ScatteringProbeSubsteps = volumeSettings.strandCountProbeCellSubsteps;
+			cbuffer._ScatteringProbeSubsteps = volumeSettings.scatteringProbeCellSubsteps;
 			cbuffer._ScatteringProbeSamplesTheta = volumeSettings.probeSamplesTheta;
 			cbuffer._ScatteringProbeSamplesPhi = volumeSettings.probeSamplesPhi;
 			cbuffer._ScatteringProbeOccluderDensity = (volumeSettings.probeOcclusion ? volumeSettings.probeOcclusionSolidDensity : 0.0f);
@@ -1340,8 +1340,8 @@ namespace Unity.DemoTeam.Hair
 			// derive features
 			VolumeFeatures features = 0;
 			{
-				features |= (volumeSettings.strandCountProbe) ? VolumeFeatures.Scattering : 0;
-				features |= (volumeSettings.strandCountProbe && (cbuffer._ScatteringProbeOccluderDensity == 0.0f || volumeSettings.probeOcclusionMode == VolumeSettings.OcclusionMode.Discrete)) ? VolumeFeatures.ScatteringFastpath : 0;
+				features |= (volumeSettings.scatteringProbe) ? VolumeFeatures.Scattering : 0;
+				features |= (volumeSettings.scatteringProbe && (cbuffer._ScatteringProbeOccluderDensity == 0.0f || volumeSettings.probeOcclusionMode == VolumeSettings.OcclusionMode.Discrete)) ? VolumeFeatures.ScatteringFastpath : 0;
 				features |= (volumeSettings.windPropagation) ? VolumeFeatures.Wind : 0;
 				features |= (volumeSettings.windPropagation && (cbuffer._WindPropagationOccluderDensity == 0.0f || volumeSettings.windOcclusionMode == VolumeSettings.OcclusionMode.Discrete)) ? VolumeFeatures.WindFastpath : 0;
 			}
@@ -1944,7 +1944,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// scattering probe
-			if (volumeSettings.strandCountProbe)
+			if (volumeSettings.scatteringProbe)
 			{
 				using (new ProfilingScope(cmd, MarkersGPU.Volume_7_Scattering))
 				{

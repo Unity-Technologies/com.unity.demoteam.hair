@@ -277,7 +277,7 @@ namespace Unity.DemoTeam.Hair
 			public float _BoundaryWorldMargin;
 
 			// 23
-			public float _ScatteringProbeUnit;
+			public float _ScatteringProbeUnitWidth;
 			public uint _ScatteringProbeSubsteps;
 			public uint _ScatteringProbeSamplesTheta;
 			public uint _ScatteringProbeSamplesPhi;

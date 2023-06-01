@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Added
+
+- Added support for automatic LOD selection based on size of bounds in viewport.
+
+### Changed
+
+- Renamed various fields.
+
+
 ## [0.11.0-exp.1] - 2023-05-26
 
 ### Added
@@ -95,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.11.1-exp.1...HEAD
+[0.11.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.10.1-exp.1...0.11.0-exp.1
 [0.10.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.9.1-exp.1...0.10.0-exp.1
 [0.9.1-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.9.0-exp.1...0.9.1-exp.1
 [0.9.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/releases/tag/0.9.0-exp.1
