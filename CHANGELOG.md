@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Renamed various fields.
 
+### Fixed
+
+- Fixed an issue with HairAsset inspector capturing mouse when clicking outside inspector after long progress bar (was triggering rebuild with the 'auto' option enabled).
+
 
 ## [0.11.0-exp.1] - 2023-05-26
 
@@ -106,8 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
-[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.11.1-exp.1...HEAD
-[0.11.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.10.1-exp.1...0.11.0-exp.1
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.11.0-exp.1...HEAD
+[0.11.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.10.0-exp.1...0.11.0-exp.1
 [0.10.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.9.1-exp.1...0.10.0-exp.1
 [0.9.1-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.9.0-exp.1...0.9.1-exp.1
 [0.9.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/releases/tag/0.9.0-exp.1
