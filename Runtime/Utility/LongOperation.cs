@@ -256,12 +256,6 @@ namespace Unity.DemoTeam.Hair
 		{
 			show = EditorUtility.DisplayProgressBar,
 			hide = EditorUtility.ClearProgressBar,
-
-			//TODO find a way to reset hotcontrol if a mouse-hold-drag initiated the operation and the hold was released in the meantime
-			//if (s_stack.IsEmpty)
-			//{
-			//	EditorGUIUtility.hotControl = 0;
-			//}
 		};
 #endif
 
