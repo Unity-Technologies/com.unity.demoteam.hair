@@ -12,6 +12,10 @@ namespace Unity.DemoTeam.Hair
 		public static readonly GUIStyle statusBox;
 		public static readonly GUIStyle statusBoxVertical;
 
+		public static readonly GUIContent miniButtoniconEdit;
+		public static readonly GUIContent miniButtonIconAdd;
+		public static readonly GUIContent miniButtonIconSub;
+
 		static HairGUIStyles()
 		{
 			settingsBox = new GUIStyle(EditorStyles.helpBox);
@@ -34,6 +38,10 @@ namespace Unity.DemoTeam.Hair
 			statusBoxVertical.font = EditorStyles.miniFont;
 			statusBoxVertical.fontSize = 8;
 			statusBoxVertical.wordWrap = true;
+
+			miniButtoniconEdit = EditorGUIUtility.IconContent("editicon.sml");
+			miniButtonIconAdd = new GUIContent("+");// EditorGUIUtility.IconContent("Toolbar Plus");
+			miniButtonIconSub = new GUIContent("-");// EditorGUIUtility.IconContent("Toolbar Minus");
 		}
 	}
 }

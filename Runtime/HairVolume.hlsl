@@ -6,7 +6,7 @@
 
 Texture3D _UntypedVolumeDensity;
 Texture3D _UntypedVolumeVelocity;
-Texture3D _UntypedVolumeStrandCountProbe;
+Texture3D _UntypedVolumeScattering;
 
 void HairVolume_float(
 	in float3 in_positionWS,
@@ -17,7 +17,7 @@ void HairVolume_float(
 	out float3 out_cellSizeUVW,
 	out Texture3D out_volumeDensity,
 	out Texture3D out_volumeVelocity,
-	out Texture3D out_volumeStrandCountProbe,
+	out Texture3D out_volumeScattering,
 	out float3 out_volumeUVW)
 {
 	out_boundsMinWS = _VolumeWorldMin.xyz;
@@ -27,7 +27,7 @@ void HairVolume_float(
 	out_cellSizeUVW = 1.0f / _VolumeCells.xyz;
 	out_volumeDensity = _UntypedVolumeDensity;
 	out_volumeVelocity = _UntypedVolumeVelocity;
-	out_volumeStrandCountProbe = _UntypedVolumeStrandCountProbe;
+	out_volumeScattering = _UntypedVolumeScattering;
 	out_volumeUVW = VolumeWorldToUVW(in_positionWS);
 }
 

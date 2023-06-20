@@ -164,15 +164,20 @@ float4 NextQuaternionFromBendRMF(float3 p0, float3 p1, float3 p2, float4 q1)
 #endif
 }
 
-float4 MakeQuaternionLookAt(float3 forward, float3 up)
+float4 MakeQuaternionLookAtBasis(float3 forwardRef, float3 forward, float3 upRef, float3 up)
 {
-	float3 localForward = float3(0, 0, 1);
-	float3 localUp = float3(0, 1, 0);
-
-	float4 rotForward = MakeQuaternionFromTo(localForward, forward);
-	float4 rotForwardTwist = MakeQuaternionFromToWithFallback(QMul(rotForward, localUp), up, forward);
+	float4 rotForward = MakeQuaternionFromTo(forwardRef, forward);
+	float4 rotForwardTwist = MakeQuaternionFromToWithFallback(QMul(rotForward, upRef), up, forward);
 
 	return QMul(rotForwardTwist, rotForward);
+}
+
+float4 MakeQuaternionLookAt(float3 forward, float3 up)
+{
+	float3 unityForward = float3(0, 0, 1);
+	float3 unityUp = float3(0, 1, 0);
+
+	return MakeQuaternionLookAtBasis(unityForward, forward, unityUp, up);
 }
 
 float4 QDecomposeTwist(float4 q, float3 axis)

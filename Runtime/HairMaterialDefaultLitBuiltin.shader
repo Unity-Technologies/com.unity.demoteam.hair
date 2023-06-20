@@ -28,7 +28,7 @@ Shader "Hair/Default/HairMaterialDefaultLitBuiltin"
 
 		CGPROGRAM
 
-		#pragma surface BuiltinSurf Lambert vertex:BuiltinVert addshadow fullforwardshadows nolightmap nodynlightmap nometa
+		#pragma surface BuiltinSurf Lambert vertex:BuiltinVert addshadow fullforwardshadows noinstancing nolightmap nodynlightmap nometa
 		#pragma enable_cbuffer// required on some targets to include custom constant buffers in surface shaders (e.g. metal)
 
 		ENDCG

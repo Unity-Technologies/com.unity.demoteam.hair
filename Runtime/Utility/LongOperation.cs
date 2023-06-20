@@ -48,7 +48,7 @@ namespace Unity.DemoTeam.Hair
 
 		bool WaitForTime()
 		{
-			const int WAIT_TICKS = 100;
+			const int WAIT_TICKS = 125;// milliseconds
 			unchecked
 			{
 				var tick = Environment.TickCount;
@@ -256,12 +256,6 @@ namespace Unity.DemoTeam.Hair
 		{
 			show = EditorUtility.DisplayProgressBar,
 			hide = EditorUtility.ClearProgressBar,
-
-			//TODO find a way to reset hotcontrol if a mouse-hold-drag initiated the operation and the hold was released in the meantime
-			//if (s_stack.IsEmpty)
-			//{
-			//	EditorGUIUtility.hotControl = 0;
-			//}
 		};
 #endif
 

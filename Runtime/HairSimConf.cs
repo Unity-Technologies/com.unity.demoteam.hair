@@ -8,7 +8,10 @@ namespace Unity.DemoTeam.Hair
 		public struct Conf
 		{
 			public const int MAX_BOUNDARIES = 8;
-			// N == max number of colliders
+			// N == max number of boundary shapes
+
+			public const int MAX_WINDS = 8;
+			// N == max number of wind emitters
 
 			public const int SECOND_ORDER_UPDATE = 0;
 			// 0 == off (smaller memory footprint)

@@ -554,10 +554,10 @@
     "m_Type": "UnityEditor.ShaderGraph.Texture3DMaterialSlot",
     "m_ObjectId": "8ecfad928db843e98eb02330bceb45fe",
     "m_Id": 9,
-    "m_DisplayName": "volumeStrandCountProbe",
+    "m_DisplayName": "volumeScattering",
     "m_SlotType": 1,
     "m_Hidden": false,
-    "m_ShaderOutputName": "volumeStrandCountProbe",
+    "m_ShaderOutputName": "volumeScattering",
     "m_StageCapability": 3
 }
 
@@ -663,10 +663,10 @@
     "m_Type": "UnityEditor.ShaderGraph.Texture3DInputMaterialSlot",
     "m_ObjectId": "bc701a7ba6af4598b012b9c4683c4eb9",
     "m_Id": 9,
-    "m_DisplayName": "volumeStrandCountProbe",
+    "m_DisplayName": "volumeScatteringProbe",
     "m_SlotType": 0,
     "m_Hidden": false,
-    "m_ShaderOutputName": "volumeStrandCountProbe",
+    "m_ShaderOutputName": "volumeScatteringProbe",
     "m_StageCapability": 3,
     "m_Texture": {
         "m_SerializedTexture": "{\"texture\":{\"instanceID\":0}}",

@@ -35,6 +35,14 @@ namespace Unity.DemoTeam.Hair
 		}
 	}
 
+	public static class Matrix4x4Extensions
+	{
+		public static Matrix4x4 WithoutScale(this Matrix4x4 value)
+		{
+			return Matrix4x4.TRS(value.GetColumn(3), Quaternion.LookRotation(value.GetColumn(2), value.GetColumn(1)), Vector3.one);
+		}
+	}
+
 	public static class QuaternionExtensions
 	{
 		public static Vector4 ToVector4(this Quaternion value)

@@ -332,8 +332,8 @@ namespace Unity.DemoTeam.Hair
 			{
 				// resampling enabled if requested by user
 				var resampling = settings.resampleCurves;
-				var resamplingIterations = settings.resampleQuality;
-				var resamplingVertexCount = settings.resampleParticleCount;
+				var resamplingIterations = Mathf.Clamp(settings.resampleQuality, HairAsset.SettingsResolve.MIN_RESAMPLE_QUALITY, HairAsset.SettingsResolve.MAX_RESAMPLE_QUALITY);
+				var resamplingVertexCount = Mathf.Clamp(settings.resampleParticleCount, HairAsset.SettingsResolve.MIN_RESAMPLE_RESOLUTION, HairAsset.SettingsResolve.MAX_RESAMPLE_RESOLUTION);
 
 				// resampling required if there are curves with varying vertex count
 				var resamplingRequired = !resampling && (curveSetInfo.minVertexCount != curveSetInfo.maxVertexCount);
@@ -679,7 +679,7 @@ namespace Unity.DemoTeam.Hair
 								combinedCurveSet.curveCount += alembicCurveSetInfo.curveCount;
 								combinedCurveSet.curveVertexCount.AddRange(alembicCurveVertexCount.GetUnsafePtr(), alembicCurveVertexCount.Length);
 								combinedCurveSet.vertexDataPosition.AddRange(alembicVertexDataPositionPtr, alembicCurveSetInfo.vertexDataPosition.Length);
-								combinedCurveSet.vertexDataTexCoord.AddRange(alembicVertexDataPositionPtr, alembicCurveSetInfo.vertexDataTexCoord.Length);
+								combinedCurveSet.vertexDataTexCoord.AddRange(alembicVertexDataTexCoordPtr, alembicCurveSetInfo.vertexDataTexCoord.Length);
 								combinedCurveSet.vertexDataDiameter.AddRange(alembicVertexDataDiameterPtr, alembicCurveSetInfo.vertexDataDiameter.Length);
 							}
 						}

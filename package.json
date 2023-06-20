@@ -1,7 +1,7 @@
 {
   "name": "com.unity.demoteam.hair",
   "displayName": "Demo Team Hair System",
-  "version": "0.9.1-exp.1",
+  "version": "0.11.0-exp.1",
   "unity": "2020.2",
   "unityRelease": "0f1",
   "description": "An integrated solution for authoring / importing / simulating / rendering strand-based hair in Unity.",

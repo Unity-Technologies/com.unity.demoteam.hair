@@ -264,6 +264,17 @@ namespace Unity.DemoTeam.Hair
 			if (hairAsset == null)
 				return;
 
+			var currentEv = Event.current.type;
+			if (currentEv == EventType.MouseDown)
+			{
+				// prevent accidental changes due to hotControl not being reset if mouse was released during long progress bar
+				if (EditorGUIUtility.hotControl != 0)
+				{
+					EditorGUIUtility.hotControl = 0;
+					GUIUtility.keyboardControl = 0;
+				}
+			}
+
 			EditorGUI.BeginChangeCheck();
 			{
 				StructPropertyFieldsWithHeader(_settingsBasic);

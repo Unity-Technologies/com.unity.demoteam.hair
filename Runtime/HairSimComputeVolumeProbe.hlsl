@@ -1,5 +1,8 @@
-#ifndef __HAIRSIMCOMPUTESTRANDCOUNTPROBE_HLSL__
-#define __HAIRSIMCOMPUTESTRANDCOUNTPROBE_HLSL__
+#ifndef __HAIRSIMCOMPUTEVOLUMEPROBE_HLSL__
+#define __HAIRSIMCOMPUTEVOLUMEPROBE_HLSL__
+
+#define HALF_SQRT_INV_PI    0.5 * 0.56418958354775628694 
+#define HALF_SQRT_3_DIV_PI  0.5 * 0.97720502380583984317
 
 // Transforms the unit vector from the spherical to the Cartesian (right-handed, Z up) coordinate.
 real3 SphericalToCartesian(real cosPhi, real sinPhi, real cosTheta)
@@ -17,32 +20,39 @@ real3 SphericalToCartesian(real phi, real cosTheta)
 	return SphericalToCartesian(cosPhi, sinPhi, cosTheta);
 }
 
-//TODO optimize
 float EstimateStrandCount(float3 P, float3 L)
 {
-	const int numStepsWithinCell = _StrandCountSubstep;
-	const int numSteps = _VolumeCells.x * numStepsWithinCell;
-
-	VolumeTraceState trace = VolumeTraceBegin(P, L, 0, numStepsWithinCell);
-
 	float rho_sum = 0;
 
-	for (int i = 0; i != numSteps; i++)
+	VolumeTraceState trace = VolumeTraceBegin(P, L, 0, _ScatteringProbeSubsteps);
+
+	if ((_VolumeFeatures & VOLUMEFEATURES_SCATTERING_FASTPATH) != 0)
 	{
-		if (VolumeTraceStep(trace))
+		while (VolumeTraceStep(trace))
 		{
 			rho_sum += VolumeSampleScalar(_VolumeDensity, trace.uvw);
 		}
 	}
+	else
+	{
+		while (VolumeTraceStep(trace))
+		{
+			if (BoundaryDistance(VolumeUVWToWorld(trace.uvw)) < _ScatteringProbeOccluderMargin)
+			{
+				rho_sum += VolumeSampleScalar(_VolumeDensity, trace.uvw) + _ScatteringProbeOccluderDensity;
+			}
+			else
+			{
+				rho_sum += VolumeSampleScalar(_VolumeDensity, trace.uvw);
+			}
+		}
+	}
 
 	const float stepLength = length(VolumeWorldSize() * trace.uvwStep);
-	const float stepVolume = stepLength * stepLength * stepLength;
+	const float stepCapacity = max(0.0, stepLength / _ScatteringProbeUnitWidth);
 
-	return rho_sum * max(0.0, stepLength / _StrandCountDiameter);
+	return (rho_sum * stepCapacity);
 }
-
-#define HALF_SQRT_INV_PI    0.5 * 0.56418958354775628694 
-#define HALF_SQRT_3_DIV_PI  0.5 * 0.97720502380583984317
 
 float EstimateSH(int l, int m, float3 L)
 {
@@ -61,19 +71,19 @@ float EstimateSH(int l, int m, float3 L)
 
 float EncodeSHCoefficient(float3 P, int l, int m)
 {
-	const int STEPS_PHI   = _StrandCountPhi;
-	const int STEPS_THETA = _StrandCountTheta;
+	const int SAMPLES_PHI = _ScatteringProbeSamplesPhi;
+	const int SAMPLES_THETA = _ScatteringProbeSamplesTheta;
 
-	const float dPhi = TWO_PI / STEPS_PHI;
-	const float dTheta = PI / STEPS_THETA;
+	const float dPhi = TWO_PI / SAMPLES_PHI;// step yaw
+	const float dTheta = PI / SAMPLES_THETA;// step pitch
 
 	float C = 0;
 
-	for (int i = 0; i < STEPS_PHI; i++)
+	for (int i = 0; i < SAMPLES_PHI; i++)
 	{
 		float phi = i * dPhi;
 
-		for (int j = 0; j < STEPS_THETA; j++)
+		for (int j = 0; j < SAMPLES_THETA; j++)
 		{
 			float theta = (0.5 + j) * dTheta;
 
@@ -109,20 +119,20 @@ void ProjectStrandCountSH(uint3 index, inout float coefficients[4])
 // Projects the neighboring density field of the cell into an L1 spherical harmonic.
 float4 ProjectStrandCountSH_L0L1(float3 P)
 {
-	const int STEPS_PHI = _StrandCountPhi;
-	const int STEPS_THETA = _StrandCountTheta;
+	const int SAMPLES_PHI = _ScatteringProbeSamplesPhi;
+	const int SAMPLES_THETA = _ScatteringProbeSamplesTheta;
 
-	const float dPhi = TWO_PI / STEPS_PHI;// steps yaw
-	const float dTheta = PI / STEPS_THETA;// steps pitch
+	const float dPhi = TWO_PI / SAMPLES_PHI;// step yaw
+	const float dTheta = PI / SAMPLES_THETA;// step pitch
 
-	float4 strandCountProbe = 0.0;
+	float4 probe = 0.0;
 
-	for (int i = 0; i < STEPS_PHI; i++)
+	for (int i = 0; i < SAMPLES_PHI; i++)
 	{
 		float sinPhi, cosPhi;
 		sincos(i * dPhi, sinPhi, cosPhi);
 
-		for (int j = 0; j < STEPS_THETA; j++)
+		for (int j = 0; j < SAMPLES_THETA; j++)
 		{
 			float sinTheta, cosTheta;
 			sincos((0.5 + j) * dTheta, sinTheta, cosTheta);
@@ -136,20 +146,20 @@ float4 ProjectStrandCountSH_L0L1(float3 P)
 			float strandCountTerm = strandCountApprox * sinTheta * dPhi * dTheta;
 
 			// L0
-			strandCountProbe.x += strandCountTerm * EstimateSH(0,  0, L);
+			probe.x += strandCountTerm * EstimateSH(0,  0, L);
 
 			// L1
-			strandCountProbe.y += strandCountTerm * EstimateSH(1, -1, L);
-			strandCountProbe.z += strandCountTerm * EstimateSH(1,  0, L);
-			strandCountProbe.w += strandCountTerm * EstimateSH(1, +1, L);
+			probe.y += strandCountTerm * EstimateSH(1, -1, L);
+			probe.z += strandCountTerm * EstimateSH(1,  0, L);
+			probe.w += strandCountTerm * EstimateSH(1, +1, L);
 		}
 	}
 
-	return strandCountProbe;
+	return probe;
 }
 
 // Returns the approximate strand count in direction L from an L1 band spherical harmonic.
-float DecodeStrandCount(float3 L, float4 strandCountProbe)
+float DecodeStrandCount(float3 L, float4 probe)
 {
 	float4 Ylm = float4(
 		HALF_SQRT_INV_PI,
@@ -158,7 +168,7 @@ float DecodeStrandCount(float3 L, float4 strandCountProbe)
 		HALF_SQRT_3_DIV_PI * L.x
 		);
 
-	return abs(dot(strandCountProbe, Ylm));
+	return abs(dot(probe, Ylm));
 }
 
-#endif//__HAIRSIMCOMPUTESTRANDCOUNTPROBE_HLSL__
+#endif//__HAIRSIMCOMPUTEVOLUMEPROBE_HLSL__

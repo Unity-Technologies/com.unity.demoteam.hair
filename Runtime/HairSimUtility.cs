@@ -33,27 +33,44 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static bool CreateVolume(ref RenderTexture volume, string name, int cells, RenderTextureFormat format)
+		public static RenderTextureDescriptor MakeVolumeDesc(int cellCount, RenderTextureFormat cellFormat)
 		{
-			if (volume != null && volume.width == cells && volume.format == format)
+			return new RenderTextureDescriptor()
+			{
+				dimension = TextureDimension.Tex3D,
+				width = cellCount,
+				height = cellCount,
+				volumeDepth = cellCount,
+				colorFormat = cellFormat,
+				enableRandomWrite = true,
+				msaaSamples = 1,
+			};
+		}
+
+		public static RenderTextureDescriptor MakeVolumeDesc(int cellCount, GraphicsFormat cellFormat)
+		{
+			return new RenderTextureDescriptor()
+			{
+				dimension = TextureDimension.Tex3D,
+				width = cellCount,
+				height = cellCount,
+				volumeDepth = cellCount,
+				graphicsFormat = cellFormat,
+				enableRandomWrite = true,
+				msaaSamples = 1,
+			};
+		}
+
+		public static bool CreateVolume(ref RenderTexture volume, string name, int cellCount, RenderTextureFormat cellFormat)
+		{
+			if (volume != null && volume.width == cellCount && volume.format == cellFormat)
 				return false;
 
 			if (volume != null)
 				volume.Release();
 
-			RenderTextureDescriptor volumeDesc = new RenderTextureDescriptor()
-			{
-				dimension = TextureDimension.Tex3D,
-				width = cells,
-				height = cells,
-				volumeDepth = cells,
-				colorFormat = format,
-				enableRandomWrite = true,
-				msaaSamples = 1,
-			};
-
 			//Debug.Log("creating volume " + name);
-			volume = new RenderTexture(volumeDesc);
+			volume = new RenderTexture(MakeVolumeDesc(cellCount, cellFormat));
 			volume.wrapMode = TextureWrapMode.Clamp;
 			volume.hideFlags = HideFlags.HideAndDontSave;
 			volume.name = name;
@@ -69,19 +86,8 @@ namespace Unity.DemoTeam.Hair
 			if (volume != null)
 				volume.Release();
 
-			RenderTextureDescriptor volumeDesc = new RenderTextureDescriptor()
-			{
-				dimension = TextureDimension.Tex3D,
-				width = cellCount,
-				height = cellCount,
-				volumeDepth = cellCount,
-				graphicsFormat = cellFormat,
-				enableRandomWrite = true,
-				msaaSamples = 1,
-			};
-
 			//Debug.Log("creating volume " + name);
-			volume = new RenderTexture(volumeDesc);
+			volume = new RenderTexture(MakeVolumeDesc(cellCount, cellFormat));
 			volume.wrapMode = TextureWrapMode.Clamp;
 			volume.hideFlags = HideFlags.HideAndDontSave;
 			volume.name = name;
@@ -100,6 +106,15 @@ namespace Unity.DemoTeam.Hair
 
 		//----------
 		// gpu data
+
+		public static void PushComputeBufferData(CommandBuffer cmd, in ComputeBuffer buffer, in Array bufferData)
+		{
+#if UNITY_2021_1_OR_NEWER
+			cmd.SetBufferData(buffer, bufferData);
+#else
+			cmd.SetComputeBufferData(buffer, bufferData);
+#endif
+		}
 
 		public static void PushComputeBufferData<T>(CommandBuffer cmd, in ComputeBuffer buffer, in NativeArray<T> bufferData) where T : struct
 		{
@@ -121,6 +136,52 @@ namespace Unity.DemoTeam.Hair
 				cmd.SetComputeBufferData(cbuffer, cbufferStaging);
 #endif
 				cbufferStaging.Dispose();
+			}
+		}
+
+		public struct BufferUploadContext : IDisposable
+		{
+			CommandBuffer cmd;
+			GraphicsFence cmdFence;
+
+			bool asyncExecution;
+			bool asyncUpload;
+			bool asyncWait;
+
+			public BufferUploadContext(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags)
+			{
+				this.cmd = cmd;
+
+				asyncExecution = cmdFlags.HasFlag(CommandBufferExecutionFlags.AsyncCompute);
+				asyncUpload = asyncExecution && (SystemInfo.supportsGraphicsFence == false);
+				asyncWait = asyncExecution && (asyncUpload == false);
+
+				if (asyncWait)
+					cmdFence = Graphics.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.AllGPUOperations);
+				else
+					cmdFence = new GraphicsFence();
+			}
+
+			public void SetData(ComputeBuffer buffer, Array data)
+			{
+				if (asyncUpload)
+					PushComputeBufferData(cmd, buffer, data);
+				else
+					buffer.SetData(data);
+			}
+
+			public void SetData<T>(ComputeBuffer buffer, in NativeArray<T> data) where T : struct
+			{
+				if (asyncUpload)
+					PushComputeBufferData(cmd, buffer, data);
+				else
+					buffer.SetData(data);
+			}
+
+			public void Dispose()
+			{
+				if (asyncWait)
+					cmd.WaitOnAsyncGraphicsFence(cmdFence);
 			}
 		}
 
