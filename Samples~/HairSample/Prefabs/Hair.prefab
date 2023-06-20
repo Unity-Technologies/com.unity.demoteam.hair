@@ -376,9 +376,9 @@ MonoBehaviour:
     pressureSolution: 1
     targetDensity: 0
     targetDensityInfluence: 1
-    strandCountProbe: 0
-    strandCountProbeCellSubsteps: 1
-    strandCountBias: 1
+    scatteringProbe: 0
+    scatteringProbeCellSubsteps: 1
+    scatteringProbeBias: 1
     probeStepsTheta: 5
     probeStepsPhi: 10
     collisionMargin: 0.25

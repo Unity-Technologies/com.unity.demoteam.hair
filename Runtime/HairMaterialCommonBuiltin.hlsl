@@ -1,7 +1,7 @@
 #ifndef __HAIRMATERIALCOMMONBUILTIN_HLSL__
 #define __HAIRMATERIALCOMMONBUILTIN_HLSL__
 
-/*
+/* required pragmas
 #pragma multi_compile __ STAGING_COMPRESSION
 // 0 == staging data full precision
 // 1 == staging data compressed

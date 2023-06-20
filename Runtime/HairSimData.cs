@@ -18,16 +18,13 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer rootScale;				// x: relative strand length [0..1] (to maximum in group)
 			public ComputeBuffer rootPosition;			// xyz: strand root position, w: -
 			public ComputeBuffer rootPositionPrev;		// ...
-			public ComputeBuffer rootDirection;			// xyz: strand root direction, w: -
-			public ComputeBuffer rootDirectionPrev;		// ...
 			public ComputeBuffer rootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
 			public ComputeBuffer rootFramePrev;			// ...
 
 			public ComputeBuffer substepRootPosition;	// substep root data (pre-step blend)
-			public ComputeBuffer substepRootDirection;	// ...
 			public ComputeBuffer substepRootFrame;		// ...
 
-			public ComputeBuffer initialRootFrame;			// quat(xyz,w): initial strand root local frame
+			public ComputeBuffer initialRootDirection;		// xyz: initial local root direction, w: -
 			public ComputeBuffer initialParticleOffset;		// xyz: initial particle offset from strand root, w: -
 			public ComputeBuffer initialParticleFrameDelta; // quat(xyz,w): initial particle material frame delta
 
@@ -96,6 +93,7 @@ namespace Unity.DemoTeam.Hair
 			public Vector4 _WorldRotation;				// quat(xyz,w): primary skinning bone rotation
 			public Vector4 _WorldGravity;				// xyz: gravity vector, w: -
 
+			// 32
 			public Vector4 _StagingOriginExtent;		// xyz: origin, w: scale
 			public Vector4 _StagingOriginExtentPrev;	// ...
 
@@ -135,6 +133,7 @@ namespace Unity.DemoTeam.Hair
 			public float _AngularDampingInterval;
 			public float _CellPressure;
 			public float _CellVelocity;
+			public float _CellForces;
 
 			public float _BoundaryFriction;
 			public float _FTLDamping;
@@ -142,16 +141,17 @@ namespace Unity.DemoTeam.Hair
 			public float _LocalShape;
 			public float _LocalShapeBias;
 
-			// 73
+			// 74
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
 
-			// 78 --> 80 (pad to 16 byte boundary)
+			// 79 --> 80 (pad to 16 byte boundary)
 			public float _scbpad1;
-			public float _scbpad2;
+			//public float _scbpad2;
+			//public float _scbpad3;
 		}
 
 		/*
@@ -187,7 +187,7 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer accuVelocityYBuffer;	// x: ... ... ... .. y-velocity
 			public ComputeBuffer accuVelocityZBuffer;	// x: .. ... ... ... z-velocity
 
-			public RenderTexture volumeDensity;			// x: density (as fraction occupied)
+			public RenderTexture volumeDensity;			// x: density (cell fraction occupied)
 			public RenderTexture volumeDensity0;		// x: density target
 			public RenderTexture volumeVelocity;		// xyz: velocity, w: accumulated weight
 
@@ -196,20 +196,32 @@ namespace Unity.DemoTeam.Hair
 			public RenderTexture volumePressureNext;	// x: pressure (output of iteration)
 			public RenderTexture volumePressureGrad;	// xyz: pressure gradient, w: -
 
-			public RenderTexture volumeStrandCountProbe;
+			public RenderTexture volumeScattering;		// xyzw: L1 spherical harmonic
+			public RenderTexture volumeImpulse;			// xyz: accumulated external forces, w: -
 
 			public RenderTexture boundarySDF;			// x: signed distance to arbitrary solid
 			public RenderTexture boundarySDF_undefined;	// .. (placeholder for when inactive)
 
-			public ComputeBuffer boundaryShape;			// arr(HairBoundary.RuntimeShape.Data)
-			public ComputeBuffer boundaryMatrix;		// arr(float4x4): local to world
-			public ComputeBuffer boundaryMatrixInv;		// arr(float4x4): world to local
-			public ComputeBuffer boundaryMatrixW2PrevW;	// arr(float4x4): world to previous world
+			public ComputeBuffer boundaryShape;			// array(HairBoundary.RuntimeShape.Data)
+			public ComputeBuffer boundaryMatrix;		// array(float4x4): local to world
+			public ComputeBuffer boundaryMatrixInv;		// array(float4x4): world to local
+			public ComputeBuffer boundaryMatrixW2PrevW; // array(float4x4): world to previous world
 
 			public NativeArray<HairBoundary.RuntimeTransform> boundaryPrevXform;
 			public int boundaryPrevCount;
 			public int boundaryPrevCountDiscard;
 			public int boundaryPrevCountUnknown;
+
+			public ComputeBuffer windEmitter;			// array(HairWind.RuntimeEmitter)
+		}
+
+		[Flags, GenerateHLSL]
+		public enum VolumeFeatures : uint
+		{
+			Scattering			= 1 << 0,
+			ScatteringFastpath	= 1 << 1,
+			Wind				= 1 << 2,
+			WindFastpath		= 1 << 3,
 		}
 
 		public struct VolumeKeywords
@@ -248,30 +260,42 @@ namespace Unity.DemoTeam.Hair
 			public Vector4 _VolumeWorldMax;
 
 			// 12
+			public uint _VolumeFeatures;
+
+			// 13
 			public float _AllGroupsDebugWeight;
 			public float _AllGroupsMaxParticleVolume;
-
 			public float _TargetDensityFactor;
 
-			// 15
+			// 16
 			public uint _BoundaryCountDiscrete;
 			public uint _BoundaryCountCapsule;
 			public uint _BoundaryCountSphere;
 			public uint _BoundaryCountTorus;
 			public uint _BoundaryCountCube;
-
 			public float _BoundaryWorldEpsilon;
 			public float _BoundaryWorldMargin;
 
-			// 22
-			public uint _StrandCountPhi;
-			public uint _StrandCountTheta;
-			public uint _StrandCountSubstep;
-			public float _StrandCountDiameter;
+			// 23
+			public float _ScatteringProbeUnitWidth;
+			public uint _ScatteringProbeSubsteps;
+			public uint _ScatteringProbeSamplesTheta;
+			public uint _ScatteringProbeSamplesPhi;
+			public float _ScatteringProbeOccluderDensity;
+			public float _ScatteringProbeOccluderMargin;
 
-			// 26 --> 28 (pad to 16 byte boundary)
+			// 29
+			public float _WindEmitterClock;
+			public uint _WindEmitterCount;
+			public uint _WindPropagationSubsteps;
+			public float _WindPropagationExtinction;
+			public float _WindPropagationOccluderDensity;
+			public float _WindPropagationOccluderMargin;
+
+			// 35 --> 36 (pad to 16 byte boundary)
 			public float _vcbpad1;
-			public float _vcbpad2;
+			//public float _vcbpad2;
+			//public float _vcbpad3;
 		}
 	}
 }

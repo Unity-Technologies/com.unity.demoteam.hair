@@ -112,14 +112,8 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUISystem(object userData)
 		{
-			//TODO remove when automatic LOD selection is implemented
 			var hairInstance = userData as HairInstance;
 			{
-				if (hairInstance.settingsSystem.kLODSearch == HairInstance.SettingsSystem.LODSelection.Automatic)
-				{
-					EditorGUILayout.HelpBox("Configuration warning: Automatic LOD selection not yet implemented.", MessageType.Warning, wide: true);
-				}
-
 				if (hairInstance.settingsSystem.strandRenderer == HairInstance.SettingsSystem.StrandRenderer.HDRPHighQualityLines)
 				{
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
@@ -219,12 +213,16 @@ namespace Unity.DemoTeam.Hair
 
 						EditorGUILayout.BeginHorizontal();
 						{
-							property_hairAssetQuickEdit.boolValue = GUILayout.Toggle(property_hairAssetQuickEdit.boolValue, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+							using (new EditorGUI.DisabledScope(property_hairAsset.objectReferenceValue == null))
+							{
+								property_hairAssetQuickEdit.boolValue = GUILayout.Toggle(property_hairAssetQuickEdit.boolValue, HairGUIStyles.miniButtoniconEdit, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+							}
+
 							EditorGUILayout.ObjectField(property_hairAsset, GUIContent.none);
 
 							if (multipleAssets)//TODO considering: using (new EditorGUI.DisabledScope(multipleAssets == false))
 							{
-								property_delete = GUILayout.Button("-", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+								property_delete = GUILayout.Button(HairGUIStyles.miniButtonIconSub, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 							}
 						}
 						EditorGUILayout.EndHorizontal();
@@ -262,7 +260,7 @@ namespace Unity.DemoTeam.Hair
 
 				EditorGUILayout.BeginHorizontal();
 				{
-					if (GUILayout.Button("+", GUILayout.Width(widthSymbol)))
+					if (GUILayout.Button(HairGUIStyles.miniButtonIconAdd, GUILayout.Width(widthSymbol)))
 					{
 						var countPrev = _strandGroupProviders.arraySize;
 						var countNext = countPrev + 1;
@@ -391,7 +389,7 @@ namespace Unity.DemoTeam.Hair
 
 					EditorGUILayout.BeginHorizontal();
 					{
-						var expanded = GUILayout.Toggle(property.isExpanded, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+						var expanded = GUILayout.Toggle(property.isExpanded, HairGUIStyles.miniButtoniconEdit, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 						if (expanded != property.isExpanded)
 							property.isExpanded = expanded;
 
@@ -434,7 +432,7 @@ namespace Unity.DemoTeam.Hair
 
 					EditorGUILayout.BeginHorizontal();
 					{
-						var expanded = GUILayout.Toggle(property.isExpanded, ". . .", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+						var expanded = GUILayout.Toggle(property.isExpanded, HairGUIStyles.miniButtoniconEdit, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 						if (expanded != property.isExpanded)
 							property.isExpanded = expanded;
 
@@ -479,7 +477,7 @@ namespace Unity.DemoTeam.Hair
 
 						if (true)
 						{
-							property_delete = GUILayout.Button("-", EditorStyles.miniButton, GUILayout.Width(widthSymbol));
+							property_delete = GUILayout.Button(HairGUIStyles.miniButtonIconSub, EditorStyles.miniButton, GUILayout.Width(widthSymbol));
 						}
 					}
 					EditorGUILayout.EndHorizontal();
@@ -593,7 +591,8 @@ namespace Unity.DemoTeam.Hair
 								case 3: return "divergence";
 								case 4: return "pressure";
 								case 5: return "grad(pressure)";
-								case 6: return "scattering";
+								case 6: return "probes(scattering)";
+								case 7: return "impulse(wind+external)";
 							}
 							return "unknown";
 						}

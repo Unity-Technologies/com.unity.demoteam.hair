@@ -20,6 +20,14 @@
 #define SOLVERFEATURES_POSE_GLOBAL_POSITION (1024)
 #define SOLVERFEATURES_POSE_GLOBAL_ROTATION (2048)
 
+//
+// Unity.DemoTeam.Hair.HairSim+VolumeFeatures:  static fields
+//
+#define VOLUMEFEATURES_SCATTERING (1)
+#define VOLUMEFEATURES_SCATTERING_FASTPATH (2)
+#define VOLUMEFEATURES_WIND (4)
+#define VOLUMEFEATURES_WIND_FASTPATH (8)
+
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer
 // PackingRules = Exact
 CBUFFER_START(SolverCBuffer)
@@ -58,6 +66,7 @@ CBUFFER_START(SolverCBuffer)
     float _AngularDampingInterval;
     float _CellPressure;
     float _CellVelocity;
+    float _CellForces;
     float _BoundaryFriction;
     float _FTLDamping;
     float _LocalCurvature;
@@ -69,7 +78,6 @@ CBUFFER_START(SolverCBuffer)
     float _GlobalFadeOffset;
     float _GlobalFadeExtent;
     float _scbpad1;
-    float _scbpad2;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer
@@ -78,6 +86,7 @@ CBUFFER_START(VolumeCBuffer)
     float4 _VolumeCells;
     float4 _VolumeWorldMin;
     float4 _VolumeWorldMax;
+    uint _VolumeFeatures;
     float _AllGroupsDebugWeight;
     float _AllGroupsMaxParticleVolume;
     float _TargetDensityFactor;
@@ -88,12 +97,19 @@ CBUFFER_START(VolumeCBuffer)
     uint _BoundaryCountCube;
     float _BoundaryWorldEpsilon;
     float _BoundaryWorldMargin;
-    uint _StrandCountPhi;
-    uint _StrandCountTheta;
-    uint _StrandCountSubstep;
-    float _StrandCountDiameter;
+    float _ScatteringProbeUnitWidth;
+    uint _ScatteringProbeSubsteps;
+    uint _ScatteringProbeSamplesTheta;
+    uint _ScatteringProbeSamplesPhi;
+    float _ScatteringProbeOccluderDensity;
+    float _ScatteringProbeOccluderMargin;
+    float _WindEmitterClock;
+    uint _WindEmitterCount;
+    uint _WindPropagationSubsteps;
+    float _WindPropagationExtinction;
+    float _WindPropagationOccluderDensity;
+    float _WindPropagationOccluderMargin;
     float _vcbpad1;
-    float _vcbpad2;
 CBUFFER_END
 
 

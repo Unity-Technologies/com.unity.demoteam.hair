@@ -282,19 +282,24 @@ VolumeTraceState VolumeTraceBegin(float3 worldPos, float3 worldDir, float cellOf
 	return trace;
 }
 
+bool VolumeTraceEnded(in VolumeTraceState trace)
+{
+	// trace has ended if for any axis the trace is outside the volume and not reentering
+	if (any((trace.uvw < 0 && trace.uvwStep <= 0) || (trace.uvw > 1 && trace.uvwStep >= 0)))
+		return true;
+	else
+		return false;
+}
+
 bool VolumeTraceStep(inout VolumeTraceState trace)
 {
 	trace.uvw += trace.uvwStep;
 
-	// terminate if for any axis the trace is outside the volume and not reentering
-	if (any((trace.uvw < 0 && trace.uvwStep <= 0) || (trace.uvw > 1 && trace.uvwStep >= 0)))
-	{
+	// signal no further steps required if the trace has exited the volume
+	if (VolumeTraceEnded(trace))
 		return false;
-	}
 	else
-	{
 		return true;
-	}
 }
 
 #endif//__HAIRSIMCOMPUTEVOLUMEUTILITY_HLSL__

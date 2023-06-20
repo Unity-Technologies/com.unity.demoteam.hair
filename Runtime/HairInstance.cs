@@ -141,7 +141,7 @@ namespace Unity.DemoTeam.Hair
 
 			public enum LODSelection
 			{
-				Automatic,//TODO
+				Automatic,
 				Fixed,
 			}
 
@@ -152,6 +152,12 @@ namespace Unity.DemoTeam.Hair
 				BuiltinStrips,
 				BuiltinTubes,
 				HDRPHighQualityLines,
+			}
+
+			public enum UpdateMode
+			{
+				BuiltinEvent,
+				External,
 			}
 
 			public enum SimulationRate
@@ -177,6 +183,10 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("LOD")]
 
 			public LODSelection kLODSearch;
+			[VisibleIf(nameof(kLODSearch), LODSelection.Automatic)]
+			public CameraType kLODSearchViews;
+			[VisibleIf(nameof(kLODSearch), LODSelection.Automatic)]
+			public AnimationCurve kLODSearchCurve;
 			[Range(0.0f, 1.0f)]
 			public float kLODSearchValue;
 			public bool kLODBlending;
@@ -192,6 +202,11 @@ namespace Unity.DemoTeam.Hair
 			[RenderingLayerMask]
 			public int strandLayers;
 			public MotionVectorGenerationMode motionVectors;
+
+			[LineHeader("Execution")]
+
+			[Tooltip("Specifies whether updates are triggered by builtin event handling or from external script (controlled entirely by application)")]
+			public UpdateMode updateMode;
 
 			[LineHeader("Simulation")]
 
@@ -221,6 +236,8 @@ namespace Unity.DemoTeam.Hair
 				boundsScaleValue = 1.25f,
 
 				kLODSearch = LODSelection.Fixed,
+				kLODSearchViews = ~CameraType.SceneView,
+				kLODSearchCurve = AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 1.0f),
 				kLODSearchValue = 1.0f,
 				kLODBlending = false,
 
@@ -230,7 +247,9 @@ namespace Unity.DemoTeam.Hair
 #endif
 				strandShadows = ShadowCastingMode.On,
 				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
-				motionVectors = MotionVectorGenerationMode.Camera,
+				motionVectors = MotionVectorGenerationMode.Object,
+
+				updateMode = UpdateMode.BuiltinEvent,
 
 				simulation = true,
 				simulationRate = SimulationRate.Fixed30Hz,
@@ -382,6 +401,7 @@ namespace Unity.DemoTeam.Hair
 		void OnDisable()
 		{
 			ReleaseRuntimeData();
+			ReleasePrerequisite();
 
 			s_instances.Remove(this);
 		}
@@ -396,42 +416,19 @@ namespace Unity.DemoTeam.Hair
 			if (solverData == null)
 				return;
 
-			// volume bounds
+			// show volume bounds
 			var volumeCenter = HairSim.GetVolumeCenter(volumeData);
 			var volumeExtent = HairSim.GetVolumeExtent(volumeData);
 
 			Gizmos.color = Color.Lerp(Color.white, Color.clear, 0.5f);
 			Gizmos.DrawWireCube(volumeCenter, 2.0f * volumeExtent);
 
-			// volume gravity
+			// show volume gravity
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				Gizmos.color = Color.cyan;
 				Gizmos.DrawRay(volumeCenter, solverData[i].cbuffer._WorldGravity * 0.1f);
 			}
-
-			/*
-#if UNITY_EDITOR
-			// volume boundaries
-			{
-				var boundaries = HairBoundaryUtility.Gather(settingsVolume.boundariesPriority, volumeSort: true, settingsVolume.boundariesCollect, GetSimulationBounds(), Quaternion.identity, settingsVolume.boundariesCollectMode == HairSim.VolumeSettings.CollectMode.IncludeColliders);
-
-				for (int i = 0; i != boundaries.Count; i++)
-				{
-					var boundaryData = boundaries[i];
-					var boundaryOrigin = boundaryData.xform.matrix.MultiplyPoint3x4(Vector3.zero);
-					var boundaryDistance = HairBoundaryUtility.SdBoundary(volumeCenter, boundaryData);
-					var boundaryColor = (i < HairSim.MAX_BOUNDARIES) ? Color.green : Color.red;
-
-					Gizmos.color = boundaryColor;
-					Gizmos.DrawLine(volumeCenter, boundaryOrigin);
-
-					UnityEditor.Handles.color = boundaryColor;
-					UnityEditor.Handles.Label(boundaryOrigin, "d[" + i + "]: " + boundaryDistance);
-				}
-			}
-#endif
-			*/
 		}
 
 		void OnDrawGizmosSelected()
@@ -439,6 +436,7 @@ namespace Unity.DemoTeam.Hair
 			if (strandGroupInstances == null)
 				return;
 
+			// show group bounds
 			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
 				ref readonly var strandGroupInstance = ref strandGroupInstances[i];
@@ -475,17 +473,63 @@ namespace Unity.DemoTeam.Hair
 				}
 #endif
 			}
+
+			/*
+#if UNITY_EDITOR
+			// show volume boundaries
+			{
+				var boundaries = HairBoundaryUtility.Gather(settingsVolume.boundariesPriority, volumeSort: true, settingsVolume.boundariesCollect, GetSimulationBounds(), Quaternion.identity, settingsVolume.boundariesCollectMode == HairSim.VolumeSettings.CollectMode.IncludeColliders);
+
+				for (int i = 0; i != boundaries.Count; i++)
+				{
+					var boundaryData = boundaries[i];
+					var boundaryOrigin = boundaryData.xform.matrix.MultiplyPoint3x4(Vector3.zero);
+					var boundaryDistance = HairBoundaryUtility.SdBoundary(volumeCenter, boundaryData);
+					var boundaryColor = (i < HairSim.MAX_BOUNDARIES) ? Color.green : Color.red;
+
+					Gizmos.color = boundaryColor;
+					Gizmos.DrawLine(volumeCenter, boundaryOrigin);
+
+					UnityEditor.Handles.color = boundaryColor;
+					UnityEditor.Handles.Label(boundaryOrigin, "d[" + i + "]: " + boundaryDistance);
+				}
+			}
+#endif
+			*/
+
+			// show volume wind
+			if (settingsVolume.windPropagation)
+			{
+				foreach (var wind in HairWind.s_winds)
+				{
+					if (wind != null && wind.isActiveAndEnabled)
+						wind.DrawGizmos();
+				}
+			}
 		}
 
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
 		private HashSet<SkinAttachmentTarget> preqGPUAttachmentTargets = new HashSet<SkinAttachmentTarget>();
 		private Hash128 preqGPUAttachmentTargetsHash = new Hash128();
 #endif
 		private int preqCountdown = 1;
 
+		void ReleasePrerequisite()
+		{
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
+			foreach (var preq in preqGPUAttachmentTargets)
+			{
+				preq.afterGPUAttachmentWorkCommitted -= HandlePrerequisite;
+			}
+
+			preqGPUAttachmentTargets.Clear();
+			preqGPUAttachmentTargetsHash = new Hash128();
+#endif
+		}
+
 		void UpdatePrerequisite()
 		{
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_2
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
 			var hash = new Hash128();
 			{
 				if (strandGroupInstances != null)
@@ -507,13 +551,7 @@ namespace Unity.DemoTeam.Hair
 
 			if (hash != preqGPUAttachmentTargetsHash)
 			{
-				foreach (var preq in preqGPUAttachmentTargets)
-				{
-					preq.afterGPUAttachmentWorkCommitted -= HandlePrerequisite;
-				}
-
-				preqGPUAttachmentTargets.Clear();
-				preqGPUAttachmentTargetsHash = hash;
+				ReleasePrerequisite();
 
 				if (strandGroupInstances != null)
 				{
@@ -535,6 +573,8 @@ namespace Unity.DemoTeam.Hair
 				{
 					preq.afterGPUAttachmentWorkCommitted += HandlePrerequisite;
 				}
+
+				preqGPUAttachmentTargetsHash = hash;
 			}
 
 			preqCountdown = 1 + preqGPUAttachmentTargets.Count;
@@ -547,8 +587,20 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (--preqCountdown == 0)
 			{
-				LateUpdateInternal();
+				HandlePrerequisiteCompleted();
 			}
+		}
+
+		void HandlePrerequisiteCompleted()
+		{
+			var cmd = CommandBufferPool.Get();
+			{
+				if (DispatchUpdate(cmd, CommandBufferExecutionFlags.None, Time.deltaTime))
+				{
+					Graphics.ExecuteCommandBuffer(cmd);
+				}
+			}
+			CommandBufferPool.Release(cmd);
 		}
 
 		void Update()
@@ -561,22 +613,10 @@ namespace Unity.DemoTeam.Hair
 
 		void LateUpdate()
 		{
-			HandlePrerequisite();
-		}
-
-		void LateUpdateInternal()
-		{
-			var cmd = CommandBufferPool.Get();
+			if (settingsSystem.updateMode == SettingsSystem.UpdateMode.BuiltinEvent)
 			{
-				if (InitializeRuntimeData(cmd))
-				{
-					UpdateSimulationLOD(cmd);
-					UpdateSimulationState(cmd);
-					UpdateRenderingState(cmd);
-					Graphics.ExecuteCommandBuffer(cmd);
-				}
+				HandlePrerequisite();
 			}
-			CommandBufferPool.Release(cmd);
 		}
 
 		enum StrandGroupInstancesStatus
@@ -816,7 +856,7 @@ namespace Unity.DemoTeam.Hair
 
 			// map settings to group instances
 #if true
-#if HAS_PACKAGE_UNITY_COLLECTIONS_1_3_0 && !HAS_PACKAGE_UNITY_COLLECTIONS_2_0_0_UNTIL_2_2_0_PREVIEW_20
+#if HAS_PACKAGE_UNITY_COLLECTIONS_1_3_0 && !HAS_PACKAGE_UNITY_COLLECTIONS_2_0_0_UNTIL_2_1_0_EXP_4
 			using (var groupAssetInstancesMap = new UnsafeParallelMultiHashMap<ulong, int>(strandGroupInstances.Length, Allocator.Temp))
 #else
 			using (var groupAssetInstancesMap = new UnsafeMultiHashMap<ulong, int>(strandGroupInstances.Length, Allocator.Temp))
@@ -986,10 +1026,80 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
+		static Camera[] s_lodCameras = new Camera[32];
+		static Plane[] s_lodFrustum = new Plane[6];
+
+		static float ComputeViewportLOD(Camera camera, in Bounds bounds, in Vector3 boundsCenter, float boundsRadius, in SettingsSystem settings)
+		{
+			/**/GeometryUtility.CalculateFrustumPlanes(camera, s_lodFrustum);
+			if (GeometryUtility.TestPlanesAABB(s_lodFrustum, bounds))
+			{
+				var d = Mathf.Max(Vector3.Dot(camera.transform.forward, boundsCenter - camera.transform.position), camera.nearClipPlane);
+				var h = Mathf.Tan(0.5f * Mathf.Deg2Rad * camera.GetGateFittedFieldOfView()) * d;
+
+				var s = boundsRadius / h;
+				var k = settings.kLODSearchCurve.Evaluate(s);// Mathf.InverseLerp(settings.kLODSearchViewSize, settings.kLODSearchViewSizeMax, s);
+
+				//Debug.Log("checking cam: " + camera.ToString() + " => vis, distance " + d + ", size " + s);
+				return k;
+			}
+			else
+			{
+				//Debug.Log("checking cam: " + camera.ToString() + " => hidden");
+				return 0.0f;
+			}
+		}
+
 		void UpdateSimulationLOD(CommandBuffer cmd)
 		{
 			var lodValue = settingsSystem.kLODSearchValue;
 			var lodBlending = settingsSystem.kLODBlending;
+
+			if (settingsSystem.kLODSearch == SettingsSystem.LODSelection.Automatic)
+			{
+				var lodViews = 0.0f;
+				{
+					var bounds = GetSimulationBounds();
+					var boundsCenter = bounds.center;
+					var boundsRadius = bounds.extents.Abs().CMax();
+
+					// check regular cameras
+					if ((settingsSystem.kLODSearchViews & ~CameraType.SceneView) != 0)
+					{
+						var n = Camera.GetAllCameras(s_lodCameras);
+						for (int i = 0; i != n; i++)
+						{
+							var camera = s_lodCameras[i];
+							if (camera != null && camera.isActiveAndEnabled && settingsSystem.kLODSearchViews.HasFlag(camera.cameraType))
+							{
+								lodViews = Mathf.Max(lodViews, ComputeViewportLOD(camera, bounds, boundsCenter, boundsRadius, settingsSystem));
+							}
+						}
+					}
+
+					// check scene view cameras
+					if (settingsSystem.kLODSearchViews.HasFlag(CameraType.SceneView))
+					{
+#if UNITY_EDITOR
+						var sceneViews = UnityEditor.SceneView.sceneViews;
+						for (int i = 0; i != sceneViews.Count; i++)
+						{
+							var sceneView = sceneViews[i] as UnityEditor.SceneView;
+							if (sceneView != null)
+							{
+								var camera = sceneView.camera;
+								if (camera != null)
+								{
+									lodViews = Mathf.Max(lodViews, ComputeViewportLOD(camera, bounds, boundsCenter, boundsRadius, settingsSystem));
+								}
+							}
+						}
+#endif
+					}
+				}
+
+				lodValue = Mathf.Clamp01(lodViews);
+			}
 
 			for (int i = 0; i != solverData.Length; i++)
 			{
@@ -997,9 +1107,9 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void UpdateSimulationState(CommandBuffer cmd)
+		void UpdateSimulationState(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, float dt)
 		{
-			var stepCount = DispatchStepsAccumulated(cmd, Time.deltaTime);
+			var stepCount = DispatchStepsAccumulated(cmd, cmdFlags, dt);
 			if (stepCount > 0)
 			{
 				// fire event
@@ -1054,13 +1164,13 @@ namespace Unity.DemoTeam.Hair
 			ref var materialInstance = ref strandGroupInstance.sceneObjects.materialInstance;
 			{
 				var materialAsset = GetStrandMaterial(strandGroupInstance);
-				if (materialAsset != null)
+				if (materialAsset != null && materialAsset.shader != null)
 				{
 					if (materialInstance == null)
 					{
-						materialInstance = new Material(materialAsset);
-						materialInstance.name += "(Instance)";
+						materialInstance = new Material(materialAsset.shader);
 						materialInstance.hideFlags = HideFlags.HideAndDontSave;
+						materialInstance.name = materialAsset.name + "(Instance)";
 					}
 					else
 					{
@@ -1069,9 +1179,9 @@ namespace Unity.DemoTeam.Hair
 							materialInstance.shader = materialAsset.shader;
 							materialInstance.name = materialAsset.name + "(Instance)";
 						}
-
-						materialInstance.CopyPropertiesFromMaterial(materialAsset);
 					}
+
+					materialInstance.CopyPropertiesFromMaterial(materialAsset);
 				}
 
 				if (materialInstance != null)
@@ -1091,7 +1201,6 @@ namespace Unity.DemoTeam.Hair
 
 			// select mesh
 			var mesh = null as Mesh;
-			var meshShared = false;
 			{
 				ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
 				ref var meshInstanceStrips = ref strandGroupInstance.sceneObjects.meshInstanceStrips;
@@ -1125,10 +1234,8 @@ namespace Unity.DemoTeam.Hair
 							else
 							{
 								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetLines;
-#if UNITY_2021_2_OR_NEWER
-								meshShared = true;
-#else
-								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, mesh, HideFlags.HideAndDontSave);
+#if !UNITY_2021_2_OR_NEWER
+								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroupInstance.groupAssetReference.Resolve().meshAssetLines, HideFlags.HideAndDontSave);
 #endif
 							}
 						}
@@ -1143,9 +1250,7 @@ namespace Unity.DemoTeam.Hair
 							else
 							{
 								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetStrips;
-#if UNITY_2021_2_OR_NEWER
-								meshShared = true;
-#else
+#if !UNITY_2021_2_OR_NEWER
 								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, mesh, HideFlags.HideAndDontSave);
 #endif
 							}
@@ -1187,6 +1292,9 @@ namespace Unity.DemoTeam.Hair
 				meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
 				meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
 
+				if (meshRenderer.rayTracingMode != UnityEngine.Experimental.Rendering.RayTracingMode.Off && SystemInfo.supportsRayTracing)
+					meshRenderer.rayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode.Off;
+
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
 				ref var meshRendererHDRP = ref strandGroupInstance.sceneObjects.strandMeshRendererHDRP;
 				{
@@ -1210,10 +1318,13 @@ namespace Unity.DemoTeam.Hair
 			{
 #if UNITY_2021_2_OR_NEWER
 				// starting with 2021.2 we can override renderer bounds directly
-				meshRenderer.bounds = GetSimulationBounds();
+				meshRenderer.localBounds = GetSimulationBounds().WithTransform(meshRenderer.transform.worldToLocalMatrix);
+
+				//TODO the world space bounds override is failing in some cases -- figure out why
+				//meshRenderer.bounds = GetSimulationBounds();
 #else
 				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
-				if (mesh != null && meshShared == false)
+				if (mesh != null)
 					mesh.bounds = GetSimulationBounds().WithTransform(meshFilter.transform.worldToLocalMatrix);
 
 				//TODO provide better local bounds
@@ -1229,7 +1340,7 @@ namespace Unity.DemoTeam.Hair
 
 			materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
 			materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
-			materialInstance.SetTexture("_UntypedVolumeStrandCountProbe", volumeData.volumeStrandCountProbe);
+			materialInstance.SetTexture("_UntypedVolumeScattering", volumeData.volumeScattering);
 
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines || settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
@@ -1397,7 +1508,22 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public int DispatchStepsAccumulated(CommandBuffer cmd, float dt)
+		public bool DispatchUpdate(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, float dt)
+		{
+			if (InitializeRuntimeData(cmd, cmdFlags))
+			{
+				UpdateSimulationLOD(cmd);
+				UpdateSimulationState(cmd, cmdFlags, dt);
+				UpdateRenderingState(cmd);
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+		public int DispatchStepsAccumulated(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, float dt)
 		{
 			var active = GetSimulationActive();
 			var stepDT = GetSimulationTimeStep();
@@ -1431,7 +1557,7 @@ namespace Unity.DemoTeam.Hair
 			// perform the steps
 			if (stepCount > 0)
 			{
-				DispatchSteps(cmd, stepDT, stepCount);
+				DispatchSteps(cmd, cmdFlags, stepDT, stepCount);
 			}
 
 			// update counters
@@ -1443,9 +1569,9 @@ namespace Unity.DemoTeam.Hair
 			return stepCount;
 		}
 
-		public void DispatchSteps(CommandBuffer cmd, float stepDT, int stepCount)
+		public void DispatchSteps(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, float stepDT, int stepCount)
 		{
-			if (!InitializeRuntimeData(cmd))
+			if (!InitializeRuntimeData(cmd, cmdFlags))
 				return;
 
 			// get bounds and scale
@@ -1463,7 +1589,7 @@ namespace Unity.DemoTeam.Hair
 				var strandScale = GetStrandScale(strandGroupInstances[i]);
 
 				HairSim.PushSolverParams(cmd, ref solverData[i], GetSettingsSolver(strandGroupInstances[i]), rootTransform, rootSkinningRotation, strandDiameter, strandMargin, strandScale, stepDT);
-				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh);
 			}
 
 			// update volume boundaries
@@ -1473,7 +1599,7 @@ namespace Unity.DemoTeam.Hair
 			if (HairSim.PrepareVolumeData(ref volumeData, settingsVolume))
 			{
 				HairSim.PushVolumeParams(cmd, ref volumeData, settingsVolume, solverData, simulationBounds);
-				HairSim.StepVolumeData(cmd, ref volumeData, settingsVolume, solverData);
+				HairSim.StepVolumeData(cmd, cmdFlags, ref volumeData, settingsVolume, solverData);
 			}
 
 			// perform the steps
@@ -1490,13 +1616,13 @@ namespace Unity.DemoTeam.Hair
 
 				// step volume data
 				HairSim.PushVolumeParams(cmd, ref volumeData, settingsVolume, solverData, simulationBounds);
-				HairSim.StepVolumeData(cmd, ref volumeData, settingsVolume, solverData);
+				HairSim.StepVolumeData(cmd, cmdFlags, ref volumeData, settingsVolume, solverData);
 			}
 		}
 
-		public void DispatchDraw(CommandBuffer cmd)
+		public void DispatchDraw(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags)
 		{
-			if (!InitializeRuntimeData(cmd))
+			if (!InitializeRuntimeData(cmd, cmdFlags))
 				return;
 
 			// draw solver data
@@ -1509,7 +1635,7 @@ namespace Unity.DemoTeam.Hair
 			HairSim.DrawVolumeData(cmd, volumeData, settingsDebug);
 		}
 
-		bool InitializeRuntimeData(CommandBuffer cmd)
+		bool InitializeRuntimeData(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags)
 		{
 			var status = CheckStrandGroupInstances();
 			if (status != StrandGroupInstancesStatus.Valid)
@@ -1583,32 +1709,33 @@ namespace Unity.DemoTeam.Hair
 				*/
 				//DEBUG END
 
-				using (var alignedRootPosition = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var alignedRootDirection = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var alignedParticlePosition = new NativeArray<Vector4>(strandGroupParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
 					unsafe
 					{
-						fixed (void* rootPositionPtr = strandGroupAsset.rootPosition)
 						fixed (void* rootDirectionPtr = strandGroupAsset.rootDirection)
 						fixed (void* particlePositionPtr = strandGroupAsset.particlePosition)
 						{
-							UnsafeUtility.MemCpyStride(alignedRootPosition.GetUnsafePtr(), sizeof(Vector4), rootPositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupAsset.strandCount);
 							UnsafeUtility.MemCpyStride(alignedRootDirection.GetUnsafePtr(), sizeof(Vector4), rootDirectionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupAsset.strandCount);
 							UnsafeUtility.MemCpyStride(alignedParticlePosition.GetUnsafePtr(), sizeof(Vector4), particlePositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupParticleCount);
 						}
 					}
 
-					solverData[i].rootUV.SetData(strandGroupAsset.rootUV);
-					solverData[i].rootScale.SetData(strandGroupAsset.rootScale);
-					solverData[i].rootPosition.SetData(alignedRootPosition);
-					solverData[i].rootDirection.SetData(alignedRootDirection);
+					using (var uploadCtx = new HairSimUtility.BufferUploadContext(cmd, cmdFlags))
+					{
+						uploadCtx.SetData(solverData[i].rootUV, strandGroupAsset.rootUV);
+						uploadCtx.SetData(solverData[i].rootScale, strandGroupAsset.rootScale);
 
-					solverData[i].particlePosition.SetData(alignedParticlePosition);
+						//TODO keeping this buffer for asset compatibility only -- remove when adding upgrade path
+						uploadCtx.SetData(solverData[i].initialRootDirection, alignedRootDirection);
 
-					solverData[i].lodGuideCount.SetData(strandGroupAsset.lodGuideCount);
-					solverData[i].lodGuideIndex.SetData(strandGroupAsset.lodGuideIndex);
-					solverData[i].lodGuideCarry.SetData(strandGroupAsset.lodGuideCarry);
+						uploadCtx.SetData(solverData[i].particlePosition, alignedParticlePosition);
+
+						uploadCtx.SetData(solverData[i].lodGuideCount, strandGroupAsset.lodGuideCount);
+						uploadCtx.SetData(solverData[i].lodGuideIndex, strandGroupAsset.lodGuideIndex);
+						uploadCtx.SetData(solverData[i].lodGuideCarry, strandGroupAsset.lodGuideCarry);
+					}
 
 					// NOTE: the remaining buffers are initialized in KInitialize and KInitializePostVolume
 				}
@@ -1623,14 +1750,14 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.PushSolverLOD(cmd, ref solverData[i], strandGroupAsset.lodCount - 1);//TODO will need to move this around to generate rest density per LOD, to support target density initial pose in particles
 				HairSim.PushSolverParams(cmd, ref solverData[i], GetSettingsSolver(strandGroupInstances[i]), rootTransform, rootSkinningRotation, strandDiameter, strandMargin, strandScale, 1.0f);
-				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh);
 				{
 					HairSim.InitSolverData(cmd, solverData[i]);
 				}
 
 				//TODO clean this up (currently necessary for full initialization of root buffers)
-				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
-				HairSim.PushSolverRoots(cmd, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh);
 			}
 
 			// init volume data
@@ -1639,7 +1766,7 @@ namespace Unity.DemoTeam.Hair
 				var simulationBounds = GetSimulationBounds();
 
 				HairSim.PushVolumeParams(cmd, ref volumeData, settingsVolume, solverData, simulationBounds);
-				HairSim.StepVolumeData(cmd, ref volumeData, settingsVolume, solverData);
+				HairSim.StepVolumeData(cmd, cmdFlags, ref volumeData, settingsVolume, solverData);
 
 				for (int i = 0; i != solverData.Length; i++)
 				{
