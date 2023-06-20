@@ -83,10 +83,10 @@ HAIRSIM_SOLVERDATA<float3> _StagingPositionPrev;	// ...
 #define HAIRSIM_VOLUMEDATA Texture3D
 #endif
 
-#if HAIRSIM_WRITEABLE_VOLUMEPROBE
-#define HAIRSIM_VOLUMEPROBE RWTexture3D
+#if HAIRSIM_WRITEABLE_VOLUMEOPTS
+#define HAIRSIM_VOLUMEOPTS RWTexture3D
 #else
-#define HAIRSIM_VOLUMEPROBE Texture3D
+#define HAIRSIM_VOLUMEOPTS Texture3D
 #endif
 
 HAIRSIM_VOLUMEACCU<int> _AccuWeight;				// x: fp accumulated weight
@@ -96,7 +96,7 @@ HAIRSIM_VOLUMEACCU<int> _AccuVelocityY;				// x: ... ... ... .. y-velocity
 HAIRSIM_VOLUMEACCU<int> _AccuVelocityZ;				// x: .. ... ... ... z-velocity
 //TODO this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 
-HAIRSIM_VOLUMEDATA<float> _VolumeDensity;			// x: density (as fraction occupied)
+HAIRSIM_VOLUMEDATA<float> _VolumeDensity;			// x: density (cell fraction occupied)
 HAIRSIM_VOLUMEDATA<float> _VolumeDensity0;			// x: density target
 HAIRSIM_VOLUMEDATA<float4> _VolumeVelocity;			// xyz: velocity, w: accumulated weight
 
@@ -105,8 +105,8 @@ HAIRSIM_VOLUMEDATA<float> _VolumePressure;			// x: pressure
 HAIRSIM_VOLUMEDATA<float> _VolumePressureNext;		// x: pressure (output of iteration)
 HAIRSIM_VOLUMEDATA<float3> _VolumePressureGrad;		// xyz: pressure gradient, w: -
 
-HAIRSIM_VOLUMEPROBE<float3> _VolumeImpulse;
-HAIRSIM_VOLUMEPROBE<float4> _VolumeStrandCountProbe;
+HAIRSIM_VOLUMEOPTS<float4> _VolumeScattering;		// xyzw: L1 spherical harmonic
+HAIRSIM_VOLUMEOPTS<float3> _VolumeImpulse;			// xyz: accumulated external forces, w: -
 
 SamplerState _Volume_point_clamp;
 SamplerState _Volume_trilinear_clamp;

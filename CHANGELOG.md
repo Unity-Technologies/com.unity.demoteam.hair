@@ -9,8 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added support for automatic LOD selection based on size of bounds in viewport.
+
+### Changed
+
+- Renamed various fields.
+
+### Fixed
+
+- Fixed an issue with HairAsset inspector capturing mouse when clicking outside inspector after long progress bar (was triggering rebuild with the 'auto' option enabled).
+
+
+## [0.11.0-exp.1] - 2023-05-26
+
+### Added
+
+- Added new option to account for solid occluders in wind propagation.
+- Added new option to account for solid occluders in strand count probe construction.
 - Added new component 'HairWind' for authoring wind emitters that can affect hair. The HairWind component represents a single emitter, and can be configured either as a standalone emitter (preferred), or as a proxy for an existing WindZone (more limited).
-- Added support for wind forces via volumetric wind propagation. Wind propagation is enabled per HairInstance under volume settings. When enabled, wind will begin to propagate through hair, and act on hair according to how much wind was able to pass through the volume between a cell and any emitters, taking into account the physical density of hair in the volume.
+- Added support for volumetric wind propagation. Wind propagation is enabled per HairInstance (under volume settings). When enabled, wind will propagate through the volume of hair, and act on strands accordingly, taking into account the physical density of hair in the volume.
 
 ### Fixed
 
@@ -93,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.11.0-exp.1...HEAD
+[0.11.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.10.0-exp.1...0.11.0-exp.1
 [0.10.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.9.1-exp.1...0.10.0-exp.1
 [0.9.1-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.9.0-exp.1...0.9.1-exp.1
 [0.9.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/releases/tag/0.9.0-exp.1

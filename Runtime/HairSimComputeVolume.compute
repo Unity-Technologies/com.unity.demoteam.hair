@@ -5,13 +5,14 @@
 #pragma kernel KVolumeSplatVelocityY			F_SPLAT
 #pragma kernel KVolumeSplatVelocityZ			F_SPLAT
 #pragma kernel KVolumeResolve					F_RESOLVE
-#pragma kernel KVolumeResolveFromRasterization	F_RESOLVE
+#pragma kernel KVolumeResolveRaster				F_RESOLVE
 #pragma kernel KVolumeDivergence				F_DIVERGENCE
 #pragma kernel KVolumePressureEOS				F_PRESSURE
 #pragma kernel KVolumePressureSolve				F_PRESSURE
 #pragma kernel KVolumePressureGradient			F_PRESSURE
-#pragma kernel KVolumeStrandCountProbe			F_PROBE
-#pragma kernel KVolumeStrandCountProbeDefault	F_PROBE
+#pragma kernel KVolumeScatteringPrep			F_SCATTERING
+#pragma kernel KVolumeScattering				F_SCATTERING
+#pragma kernel KVolumeWindPrep					F_WIND
 #pragma kernel KVolumeWind						F_WIND
 
 //----------
@@ -72,15 +73,16 @@
 
 #define HAIRSIM_WRITEABLE_VOLUMEACCU (F_CLEAR || F_SPLAT)
 #define HAIRSIM_WRITEABLE_VOLUMEDATA (F_RESOLVE || F_DIVERGENCE || F_PRESSURE)
-#define HAIRSIM_WRITEABLE_VOLUMEPROBE (F_CLEAR || F_PROBE || F_WIND)
+#define HAIRSIM_WRITEABLE_VOLUMEOPTS (F_CLEAR || F_SCATTERING || F_WIND)
 
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeVolumeUtility.hlsl"
+#include "HairSimComputeSolverBoundaries.hlsl"
 #include "HairSimComputeSolverQuaternion.hlsl"
 
-#if F_PROBE
-#include "HairSimComputeStrandCountProbe.hlsl"
+#if F_SCATTERING
+#include "HairSimComputeVolumeProbe.hlsl"
 #endif
 
 //--------
@@ -255,6 +257,7 @@ void KVolumeClear(
 	_AccuVelocityY[accuIdx] = 0;
 	_AccuVelocityZ[accuIdx] = 0;
 
+	_VolumeScattering[worldIdx] = 0;
 	_VolumeImpulse[worldIdx] = 0;
 }
 
@@ -476,7 +479,7 @@ void KVolumeResolve(
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeResolveFromRasterization(
+void KVolumeResolveRaster(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -870,13 +873,16 @@ void KVolumePressureGradient(
 
 #endif//F_PRESSURE
 
-//----------------------------
-// kernels strand count probe
+//--------------------
+// kernels scattering
 
-#if F_PROBE
+#if F_SCATTERING
+
+RWTexture3D<float> _VolumeDensityComp;
+Texture3D<float> _VolumeDensityPreComp;
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeStrandCountProbe(
+void KVolumeScatteringPrep(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -886,21 +892,41 @@ void KVolumeStrandCountProbe(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	const float rho = _VolumeDensity[worldIdx];
+	if (BoundaryDistance(VolumeIndexToWorld(worldIdx)) < _ScatteringProbeOccluderMargin)
+	{
+		_VolumeDensityComp[worldIdx] = _VolumeDensity[worldIdx] + _ScatteringProbeOccluderDensity;
+	}
+	else
+	{
+		_VolumeDensityComp[worldIdx] = _VolumeDensity[worldIdx];
+	}
+}
+
+[numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
+void KVolumeScattering(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	const float rho = _VolumeDensityPreComp[worldIdx];
 
 	// early out in empty cells
 	if (rho == 0.0)
 	{
-		_VolumeStrandCountProbe[worldIdx] = 0.0;
 		return;
 	}
 
 #if 1
-	_VolumeStrandCountProbe[worldIdx] = ProjectStrandCountSH_L0L1(VolumeIndexToWorld(worldIdx));
+	_VolumeScattering[worldIdx] = ProjectStrandCountSH_L0L1(VolumeIndexToWorld(worldIdx));
 #else
 	float coefficients[4];
 	ProjectStrandCountSH(worldIdx, coefficients);
-	_VolumeStrandCountProbe[worldIdx] = float4(
+	_VolumeScattering[worldIdx] = float4(
 		coefficients[0],
 		coefficients[1],
 		coefficients[2],
@@ -908,8 +934,18 @@ void KVolumeStrandCountProbe(
 #endif
 }
 
+#endif//F_SCATTERING
+
+//--------------
+// kernels wind
+
+#if F_WIND
+
+RWTexture3D<float> _VolumeDensityComp;
+Texture3D<float> _VolumeDensityPreComp;
+
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
-void KVolumeStrandCountProbeDefault(
+void KVolumeWindPrep(
 	uint3 groupIdx : SV_GroupID,
 	uint3 localIdx : SV_GroupThreadID,
 	uint3 worldIdx : SV_DispatchThreadID,
@@ -919,15 +955,15 @@ void KVolumeStrandCountProbeDefault(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	_VolumeStrandCountProbe[worldIdx] = 0.0;
+	if (BoundaryDistance(VolumeIndexToWorld(worldIdx)) < _WindPropagationOccluderMargin)
+	{
+		_VolumeDensityComp[worldIdx] = _VolumeDensity[worldIdx] + _WindPropagationOccluderDensity;
+	}
+	else
+	{
+		_VolumeDensityComp[worldIdx] = _VolumeDensity[worldIdx];
+	}
 }
-
-#endif//F_PROBE
-
-//--------------
-// kernels wind
-
-#if F_WIND
 
 float SphericalCellCrossSectionRadiusCubed(float V)
 {
@@ -961,7 +997,7 @@ void KVolumeWind(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	const float rho = _VolumeDensity[worldIdx];
+	const float rho = _VolumeDensityPreComp[worldIdx];
 
 	// early out in empty cells
 	if (rho == 0.0)
@@ -999,17 +1035,47 @@ void KVolumeWind(
 				VolumeTraceState trace = VolumeTraceBegin(p, -n, 1.0, _WindPropagationSubsteps);
 
 				float S = length(VolumeWorldCellStep(-n)) / _WindPropagationSubsteps;
-				float R = nd - (S * _WindPropagationSubsteps);
+				float R = nd - (S * _WindPropagationSubsteps);// remaining trace distance to emitter
 				float k = _WindPropagationExtinction * S;
 
-#define ABSORB(x) SphericalCellCrossSection(x)
-//#define ABSORB(x) pow(abs(x), 2.0 / 3.0)
+//#define ABSORB(x) SphericalCellCrossSection(x)
+#define ABSORB(x) pow(abs(x), 2.0 / 3.0)
 
-				while (T > 1e-5 && R >= 0.0 && VolumeTraceStep(trace))
+				if ((_VolumeFeatures & VOLUMEFEATURES_WIND_FASTPATH) != 0)
 				{
-					T *= exp(-ABSORB(saturate(VolumeSampleScalar(_VolumeDensity, trace.uvw))) * k);
-					R -= S;
+					while (T > 1e-5 && R >= 0.0 && VolumeTraceStep(trace))
+					{
+						T *= exp(-ABSORB(VolumeSampleScalar(_VolumeDensity, trace.uvw)) * k);
+						R -= S;
+					}
 				}
+				else
+				{
+					while (T > 1e-5 && R >= 0.0 && VolumeTraceStep(trace))
+					{
+						if (BoundaryDistance(VolumeUVWToWorld(trace.uvw)) < _WindPropagationOccluderMargin)
+						{
+							T = 0.0;
+						}
+						else
+						{
+							T *= exp(-ABSORB(VolumeSampleScalar(_VolumeDensity, trace.uvw)) * k);
+							R -= S;
+						}
+					}
+				}
+
+				//TODO handle boundaries outside the discrete volume
+				//if (R > 0.0 && VolumeTraceEnded(trace))
+				//{
+				//	// need to compute distance to closest solid along emitter ray
+				//	//	- march sdf within conservative total bounds?
+				//	//	- add ray-primitive intersection?
+				//	if (BoundaryIntersection(VolumeUVWToWorld(trace.uvw, -n))
+				//	{
+				//		T = 0.0;
+				//	}
+				//}
 			}
 
 			// compute absorption in current cell
@@ -1043,9 +1109,9 @@ void KVolumeWind(
 			//	Kg: TODO half at x=-s, x=s, one at x=-1, x=t
 
 			// compute flow in current cell
-			float va = (wind.m == 0.0) ? 1.0 : (wind.t0 * wind.t0 * 2.0f + 1.0f) / (nd * nd * (2.0f - 1.0f) + wind.t0 * wind.t0 + 1.0f);
+			float va = (wind.m == 0.0) ? 1.0 : (wind.t0 * wind.t0 * 2.0f + 1.0f) / (nd * nd * (2.0f - 1.0f) + wind.t0 * wind.t0 + 1.0f);// (using Kf)
 			float vd = isinf(wind.h0) ? dot(r, n) : nd;
-			float vf = wind.v + wind.A * (0.5 * cos(vd * wind.f - _WindEmitterTime * (wind.v + 0.5 * wind.A)) + 0.5);
+			float vf = wind.v + wind.A * (0.5 * cos(vd * wind.f - _WindEmitterClock * (wind.v + 0.5 * wind.A)) + 0.5);
 			float3 v = (va * vf) * n;
 
 			// calc delta velocity

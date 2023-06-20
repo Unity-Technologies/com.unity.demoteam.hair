@@ -112,14 +112,8 @@ namespace Unity.DemoTeam.Hair
 
 		static StructValidation ValidationGUISystem(object userData)
 		{
-			//TODO remove when automatic LOD selection is implemented
 			var hairInstance = userData as HairInstance;
 			{
-				if (hairInstance.settingsSystem.kLODSearch == HairInstance.SettingsSystem.LODSelection.Automatic)
-				{
-					EditorGUILayout.HelpBox("Configuration warning: Automatic LOD selection not yet implemented.", MessageType.Warning, wide: true);
-				}
-
 				if (hairInstance.settingsSystem.strandRenderer == HairInstance.SettingsSystem.StrandRenderer.HDRPHighQualityLines)
 				{
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
@@ -597,7 +591,7 @@ namespace Unity.DemoTeam.Hair
 								case 3: return "divergence";
 								case 4: return "pressure";
 								case 5: return "grad(pressure)";
-								case 6: return "scattering";
+								case 6: return "probes(scattering)";
 								case 7: return "impulse(wind+external)";
 							}
 							return "unknown";

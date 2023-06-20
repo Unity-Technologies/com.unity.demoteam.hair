@@ -330,26 +330,26 @@ namespace Unity.DemoTeam.Hair
 
 			if (TryGetData(this, ref data))
 			{
-				DrawGizmosRuntimeEmitter(data);
+				DrawGizmosRuntimeEmitter(data, selected ? 1.0f : 0.5f);
 
 				if (selected)
 				{
-					//DrawGizmosRuntimeEmitterGrid(data, 16);
-
 					if (isActiveAndEnabled)
 					{
-						DrawGizmosRuntimeEmitterFlow(data, 256, Time.time, Time.deltaTime);
+						DrawGizmosRuntimeEmitterFlow(data, selected ? 1.0f : 0.5f, 256, Time.time, Time.deltaTime);
 					}
+
+					//DrawGizmosRuntimeEmitterGrid(data, 16);
 				}
 			}
 		}
 
-		public void DrawGizmosRuntimeEmitter(in RuntimeData data)
+		public void DrawGizmosRuntimeEmitter(in RuntimeData data, float opacity)
 		{
 			var lossyScaleAbs = transform.lossyScale.Abs();
 			var lossyScaleAbsMax = lossyScaleAbs.CMax();
 
-			Gizmos.color = Color.cyan;
+			Gizmos.color = Color.Lerp(Color.clear, Color.cyan, opacity);
 			Gizmos.matrix = Matrix4x4.identity;
 
 			switch (data.type)
@@ -412,14 +412,14 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public void DrawGizmosRuntimeEmitterFlow(in RuntimeData data, uint samples, float t, float dt)
+		public void DrawGizmosRuntimeEmitterFlow(in RuntimeData data, float opacity, uint samples, float t, float dt)
 		{
 			dt = Mathf.Clamp(dt, 1.0f / 120.0f, 1.0f / 15.0f);
 
 			var lossyScaleAbs = transform.lossyScale.Abs();
 			var lossyScaleAbsMax = lossyScaleAbs.CMax();
 
-			Gizmos.color = Color.Lerp(Color.cyan, Color.clear, 0.25f);
+			Gizmos.color = Color.Lerp(Color.clear, Color.cyan, opacity * 0.6f);
 			Gizmos.matrix = Matrix4x4.identity;
 
 			var size = 3.0f;
