@@ -5,10 +5,14 @@
 #define USE_DERIVED_CACHE
 
 using System;
+using Accord.Math;
 using UnityEngine;
 using UnityEditor;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using UnityEngine.Assertions;
+using Vector3 = UnityEngine.Vector3;
+using Vector4 = UnityEngine.Vector4;
 #if HAS_PACKAGE_UNITY_COLLECTIONS_1_0_0_PRE_3
 using Unity.Collections.NotBurstCompatible;
 #endif
@@ -355,6 +359,11 @@ namespace Unity.DemoTeam.Hair
 					uniformCurveSet.vertexDataDiameter = new UnsafeList<float>(curveSet.curveCount * resamplingVertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 					uniformVertexCount = resamplingVertexCount;
 					uniformVertexAlloc = true;
+					
+					// an additional intermediate buffer containing blend weights and vertex indices for 
+					// miscellaneous vertex data (e.g. texcoord, diameter) resampling
+					// layout: { vertexIndex0, vertexIndex1, blendWeight }
+					var blendWeights = new UnsafeList<Vector3>(curveSet.curveCount * resamplingVertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 
 					// perform the resampling
 					using (var longOperation = new LongOperationScope("Resampling curves"))
@@ -370,6 +379,8 @@ namespace Unity.DemoTeam.Hair
 						var dstDataTexCoordPtr = uniformCurveSet.vertexDataTexCoord.Ptr;
 						var dstDataDiameterPtr = uniformCurveSet.vertexDataDiameter.Ptr;
 						var dstVertexOffset = 0;
+
+						var blendWeightsPtr = blendWeights.Ptr;
 
 						for (int i = 0; i != curveSet.curveCount; i++)
 						{
@@ -403,6 +414,8 @@ namespace Unity.DemoTeam.Hair
 							}
 						}
 					}
+
+					blendWeights.Dispose();
 				}
 			}
 
@@ -1616,6 +1629,7 @@ namespace Unity.DemoTeam.Hair
 
 		static unsafe void ResampleWithHint(Vector3* srcPos, int srcCount, out int srcIndex, Vector3* dstPos, int dstCount, out int dstIndex, float dstSpacing)
 		{
+			// The resampled curve always shares the same 0th vertex with the source curve. 
 			dstPos[0] = srcPos[0];
 
 			dstIndex = 1;
@@ -1624,10 +1638,14 @@ namespace Unity.DemoTeam.Hair
 			var dstPosPrev = dstPos[0];
 			var dstSpacingSq = dstSpacing * dstSpacing;
 
+			// Crawl along the curve until we have run out of source vertices to
+			// resample from, or new vertices needed of creating. 
 			while (srcIndex < srcCount && dstIndex < dstCount)
 			{
 				var r = srcPos[srcIndex] - dstPosPrev;
 				var rNormSq = Vector3.SqrMagnitude(r);
+				
+				// Do not produce a resampled point until we have crawled far enough. 
 				if (rNormSq >= dstSpacingSq)
 				{
 					// find point on line between [srcIndex] and [srcIndex-1]
@@ -1635,25 +1653,40 @@ namespace Unity.DemoTeam.Hair
 					var p = srcPos[srcIndex] - n * Vector3.Dot(n, r);
 
 					// b = sqrt(cc - aa) 
-					var aa = Vector3.SqrMagnitude(dstPosPrev - p);
+					var aa = Vector3.SqrMagnitude(dstPosPrev - p); 
 					var bb = dstSpacingSq - aa;
 
+					// If the new point is too close to the previously resampled one,
+					// push it a bit farther so that it is exactly dstSpacing away. 
 					if (bb > float.Epsilon)
 						dstPos[dstIndex] = p + n * Mathf.Sqrt(bb);
 					else
 						dstPos[dstIndex] = p;
-
+					
+					// Additionally, compute blend weights needed for resampling any additional vertex data
+					// as a post-process step later.
+					{
+						float d0 = Vector3.SqrMagnitude(dstPos[dstIndex] - srcPos[srcIndex - 1]);
+						float d1 = Vector3.SqrMagnitude(srcPos[srcIndex] - srcPos[srcIndex - 1]);
+						float  t = Mathf.Clamp01(d0 / d1); // Compute a "barycentric" coordinate to blend between vertex data. 
+						
+						// Assert.IsTrue(d0 / d1 <= 1.0f);
+						// Assert.IsTrue(d0 / d1 >= 0.0f);
+						
+					}
+					
 					dstPosPrev = dstPos[dstIndex++];
 				}
 				else
 				{
+					// Proceed to the next curve vertex since the current one is too close. 
 					srcIndex++;
 				}
 			}
 		}
 
 		unsafe struct LODChain : IDisposable
-		{
+  		{
 			public LongOperationScope longOperation;
 
 			public UnsafeClusterSet clusterSet;
