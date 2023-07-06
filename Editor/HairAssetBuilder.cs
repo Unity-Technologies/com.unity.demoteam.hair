@@ -390,25 +390,42 @@ namespace Unity.DemoTeam.Hair
 							{
 								Resample(
 									srcDataPositionPtr + srcVertexOffset, srcVertexCount,
-									dstDataPositionPtr + dstVertexOffset, dstVertexCount, resamplingIterations);
+									dstDataPositionPtr + dstVertexOffset, dstVertexCount, 
+									blendWeightsPtr    + dstVertexOffset, resamplingIterations);
 
 								srcVertexOffset += srcVertexCount;
 								dstVertexOffset += dstVertexCount;
 							}
 						}
 
-						//TODO resampling needs to also deal with other attributes
-						//TODO for example by changing resampling to also return blend weights
-						//TODO ... for now, just copy the first uv to satisfy root resolve and ignore the rest
-						if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
+						// Use the blend weights to resample any non-positional data requested by the vertex features.
+						if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter) || 
+						    curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
 						{
 							srcVertexOffset = 0;
 							dstVertexOffset = 0;
-
+							
 							for (int i = 0; i != curveSet.curveCount; i++)
 							{
-								dstDataTexCoordPtr[dstVertexOffset] = srcDataTexCoordPtr[srcVertexOffset];
+								for (int j = 0; j < dstVertexCount; j++)
+								{
+									// Fetch the blend weight. 
+									var  d = dstVertexOffset + j;
+									var  w = blendWeightsPtr[d];
+									var s0 = srcVertexOffset + (int) w.x;
+									var s1 = srcVertexOffset + (int) w.y;
 
+									if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter))
+									{
+										dstDataDiameterPtr[d] = Mathf.Lerp(srcDataDiameterPtr[s0], srcDataDiameterPtr[s1], w.z);
+									}
+									
+									if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
+									{
+										dstDataTexCoordPtr[d] = Vector2.Lerp(srcDataTexCoordPtr[s0], srcDataTexCoordPtr[s1], w.z);
+									}
+								}
+								
 								srcVertexOffset += srcVertexCountPtr[i];
 								dstVertexOffset += dstVertexCount;
 							}
@@ -1580,8 +1597,9 @@ namespace Unity.DemoTeam.Hair
 			return true;// success
 		}
 
-		static unsafe void Resample(Vector3* srcPos, int srcCount, Vector3* dstPos, int dstCount, int iterations)
+		static unsafe void Resample(Vector3* srcPos, int srcCount, Vector3* dstPos, int dstCount, Vector3* blendWeights, int iterations)
 		{
+			// Sum up the length of the source curve. 
 			var length = 0.0f;
 			{
 				for (int i = 1; i != srcCount; i++)
@@ -1590,10 +1608,12 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			// The resampled curve should have the same length as the source curve.
+			// However
 			var dstLength = length;
 			var dstSpacing = dstLength / (dstCount - 1);
 
-			ResampleWithHint(srcPos, srcCount, out var srcIndex, dstPos, dstCount, out var dstIndex, dstSpacing);
+			ResampleWithHint(srcPos, srcCount, out var srcIndex, dstPos, dstCount, out var dstIndex, blendWeights, dstSpacing);
 
 			// run a couple of iterations
 			for (int i = 0; i != iterations; i++)
@@ -1605,7 +1625,7 @@ namespace Unity.DemoTeam.Hair
 					dstLength = (dstIndex - 1) * dstSpacing + remainder;
 					dstSpacing = dstLength / (dstCount - 1);
 
-					ResampleWithHint(srcPos, srcCount, out srcIndex, dstPos, dstCount, out dstIndex, dstSpacing);
+					ResampleWithHint(srcPos, srcCount, out srcIndex, dstPos, dstCount, out dstIndex, blendWeights, dstSpacing);
 				}
 				else
 				{
@@ -1622,16 +1642,25 @@ namespace Unity.DemoTeam.Hair
 				while (dstIndex < dstCount)
 				{
 					dstPos[dstIndex] = dstPosPrev + dstDirTail * dstSpacing;
+
+					// Extrapolated blend weights are just a continuation of the last source vertex.
+					blendWeights[dstIndex].x = srcCount - 1;
+					blendWeights[dstIndex].y = srcCount - 1;
+					blendWeights[dstIndex].z = 0.0f;
+					
 					dstPosPrev = dstPos[dstIndex++];
 				}
 			}
 		}
 
-		static unsafe void ResampleWithHint(Vector3* srcPos, int srcCount, out int srcIndex, Vector3* dstPos, int dstCount, out int dstIndex, float dstSpacing)
+		static unsafe void ResampleWithHint(Vector3* srcPos, int srcCount, out int srcIndex, Vector3* dstPos, int dstCount, out int dstIndex, Vector3* blendWeights, float dstSpacing)
 		{
 			// The resampled curve always shares the same 0th vertex with the source curve. 
 			dstPos[0] = srcPos[0];
 
+			// The first blend weight will just select the first vertex's data.
+			blendWeights[0] = Vector3.zero;
+			
 			dstIndex = 1;
 			srcIndex = 1;
 
@@ -1663,16 +1692,15 @@ namespace Unity.DemoTeam.Hair
 					else
 						dstPos[dstIndex] = p;
 					
-					// Additionally, compute blend weights needed for resampling any additional vertex data
-					// as a post-process step later.
+					// Additionally, compute blend weights needed for resampling any additional vertex data.
 					{
 						float d0 = Vector3.SqrMagnitude(dstPos[dstIndex] - srcPos[srcIndex - 1]);
 						float d1 = Vector3.SqrMagnitude(srcPos[srcIndex] - srcPos[srcIndex - 1]);
-						float  t = Mathf.Clamp01(d0 / d1); // Compute a "barycentric" coordinate to blend between vertex data. 
 						
-						// Assert.IsTrue(d0 / d1 <= 1.0f);
-						// Assert.IsTrue(d0 / d1 >= 0.0f);
-						
+						// The blend weight is the ratio between distances. 
+						blendWeights[dstIndex].x = srcIndex - 1;
+						blendWeights[dstIndex].y = srcIndex;
+						blendWeights[dstIndex].z = Mathf.Clamp01(d0 / d1);;
 					}
 					
 					dstPosPrev = dstPos[dstIndex++];
