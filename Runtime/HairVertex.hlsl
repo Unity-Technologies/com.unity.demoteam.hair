@@ -157,7 +157,7 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 	float3 vertexNormalWS = cross(vertexTangentWS, vertexBitangentWS);
 
 #if HAIR_VERTEX_ID_STRIPS
-	float3 vertexOffsetWS = vertexTangentWS * (_GroupMaxParticleDiameter * (vertexUV.x - 0.5));
+	float3 vertexOffsetWS = vertexTangentWS * (_ParticleDiameter[i] * (vertexUV.x - 0.5));
 #else
 	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
 #endif

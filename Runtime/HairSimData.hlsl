@@ -38,6 +38,7 @@ HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrevPrev;	// ...
 HAIRSIM_SOLVERDATA<float4> _ParticlePositionCorr;	// xyz: ftl correction, w: -
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;		// xyz: velocity, w: splatting weight
 HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;	// xyz: velocity, w: splatting weight
+HAIRSIM_SOLVERDATA<float>  _ParticleDiameter;
 
 HAIRSIM_SOLVERDATA<uint> _LODGuideCount;			// n: lod index -> num. guides
 HAIRSIM_SOLVERDATA<uint> _LODGuideIndex;			// i: lod index * strand count + strand index -> guide index
