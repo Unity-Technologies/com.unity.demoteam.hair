@@ -70,6 +70,7 @@
 // include
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl"
 
 #define HAIRSIM_WRITEABLE_VOLUMEACCU (F_CLEAR || F_SPLAT)
 #define HAIRSIM_WRITEABLE_VOLUMEDATA (F_RESOLVE || F_DIVERGENCE || F_PRESSURE)
@@ -982,8 +983,88 @@ float SphericalCellCrossSection(float V)
 {
 	float rrr = SphericalCellCrossSectionRadiusCubed(V);
 	float rr = pow(rrr, 2.0 / 3.0);
-	float A = 3.14159 * rr;
+	float A = PI * rr;
 	return A;
+}
+
+float ValueNoise(in float2 x)
+{
+	float2 i = floor(x);
+	float2 f = frac(x);
+
+	f = f * f * (3.0 - 2.0 * f);
+
+	uint2 j = uint2(int2(i));
+	float a00 = JenkinsHash(j + uint2(0, 0));
+	float a10 = JenkinsHash(j + uint2(1, 0));
+	float a01 = JenkinsHash(j + uint2(0, 1));
+	float a11 = JenkinsHash(j + uint2(1, 1));
+	float b0 = lerp(a00, a10, f.x);
+	float b1 = lerp(a01, a11, f.x);
+
+	return lerp(b0, b1, f.y) / (float)UINT_MAX;
+}
+
+float ValueNoise(in float3 x)
+{
+	float3 i = floor(x);
+	float3 f = frac(x);
+
+	f = f * f * (3.0 - 2.0 * f);
+
+	uint3 j = uint3(int3(i));
+	float a000 = JenkinsHash(j + uint3(0, 0, 0));
+	float a100 = JenkinsHash(j + uint3(1, 0, 0));
+	float a010 = JenkinsHash(j + uint3(0, 1, 0));
+	float a110 = JenkinsHash(j + uint3(1, 1, 0));
+	float a001 = JenkinsHash(j + uint3(0, 0, 1));
+	float a101 = JenkinsHash(j + uint3(1, 0, 1));
+	float a011 = JenkinsHash(j + uint3(0, 1, 1));
+	float a111 = JenkinsHash(j + uint3(1, 1, 1));
+	float b00 = lerp(a000, a100, f.x);
+	float b10 = lerp(a010, a110, f.x);
+	float b01 = lerp(a001, a101, f.x);
+	float b11 = lerp(a011, a111, f.x);
+	float c0 = lerp(b00, b10, f.y);
+	float c1 = lerp(b01, b11, f.y);
+
+	return lerp(c0, c1, f.z) / (float)UINT_MAX;
+}
+
+float ValueNoiseFractal(in float2 x, const uint octaves = 3, const float persistence = 0.5)
+{
+	float v = 0.0;
+	float s = 0.0;
+	float a = 1.0;
+
+	for (uint k = 0; k != octaves; k++)
+	{
+		v += a * ValueNoise(x);
+		s += a;
+
+		x *= 2.0;
+		a *= persistence;
+	}
+
+	return v / max(1.0, s);
+}
+
+float ValueNoiseFractal(in float3 x, const uint octaves = 3, const float persistence = 0.5)
+{
+	float v = 0.0;
+	float s = 0.0;
+	float a = 1.0;
+
+	for (uint k = 0; k != octaves; k++)
+	{
+		v += a * ValueNoise(x);
+		s += a;
+
+		x *= 2.0;
+		a *= persistence;
+	}
+
+	return v / max(1.0, s);
 }
 
 [numthreads(VOLUME_NUM_X, VOLUME_NUM_Y, VOLUME_NUM_Z)]
@@ -1022,7 +1103,7 @@ void KVolumeWind(
 		float bb = dot(a, a);
 
 		// check if cell center is inside emitter volume
-		//TODO handle overlap?
+		//TODO handle partial overlap?
 		if (isinf(wind.h0) || (t >= wind.t0 && bb <= h * h))
 		{
 			// compute trace direction and distance from emitter base
@@ -1111,7 +1192,18 @@ void KVolumeWind(
 			// compute flow in current cell
 			float va = (wind.m == 0.0) ? 1.0 : (wind.t0 * wind.t0 * 2.0f + 1.0f) / (nd * nd * (2.0f - 1.0f) + wind.t0 * wind.t0 + 1.0f);// (using Kf)
 			float vd = isinf(wind.h0) ? dot(r, n) : nd;
-			float vf = wind.v + wind.A * (0.5 * cos(vd * wind.f - _WindEmitterClock * (wind.v + 0.5 * wind.A)) + 0.5);
+			float vt = vd / (wind.v + wind.A);
+			float vc = wind.f * (vt - _WindEmitterClock);
+
+			if (wind.jd > 0.0)
+			{
+				if (isinf(wind.m))// spherical emitter
+					vc += wind.jd * (ValueNoiseFractal(wind.jw * (p - wind.jp * n * (vd - 0.5))) * 2.0 - 1.0);
+				else
+					vc += wind.jd * (ValueNoiseFractal(wind.jw * (p - wind.jp * n * vd)) * 2.0 - 1.0);
+			}
+
+			float vf = wind.v + wind.A * (0.5 * cos(2.0 * PI * vc) + 0.5);
 			float3 v = (va * vf) * n;
 
 			// calc delta velocity

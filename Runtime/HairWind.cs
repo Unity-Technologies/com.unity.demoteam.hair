@@ -56,8 +56,11 @@ namespace Unity.DemoTeam.Hair
 		{
 			[LineHeader("Geometry")]
 
+			[Tooltip("Turbine base width (in meters)")]
 			public float baseWidth;
+			[Tooltip("Turbine nozzle width (in meters)")]
 			public float nozzleWidth;
+			[Tooltip("Turbine nozzle offset (in meters)")]
 			public float nozzleOffset;
 
 			public static readonly SettingsTurbine defaults = new SettingsTurbine
@@ -71,20 +74,42 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsFlow
 		{
+			public enum JitterSpace
+			{
+				Planar,
+				Global,
+			}
+
 			[LineHeader("Flow")]
 
 			[Tooltip("Base speed (in meters per second)")]
 			public float baseSpeed;
 			[Tooltip("Pulse amplitude (in meters per second)")]
 			public float pulseAmplitude;
-			[Tooltip("Pulse frequency")]
+			[Tooltip("Pulse frequency (in cycles per second)")]
 			public float pulseFrequency;
+
+			[LineHeader("Noise")]
+
+			[ToggleGroup, Tooltip("Enable noise-based timing jitter (to reduce uniformity of pulses)")]
+			public bool timingJitter;
+			[ToggleGroupItem, Tooltip("Controls whether the timing jitter varies over the emitter surface only (planar) or over the entire volume (global)")]
+			public JitterSpace timingJitterSpace;
+			[ToggleGroupItem, Range(0.0f, 4.0f), Tooltip("Timing jitter displacement (in pulse cycles)")]
+			public float timingJitterDisplacement;
+			[EditableIf(nameof(timingJitter), true), Tooltip("Timing jitter resolution (in noise cells per meter)")]
+			public float timingJitterResolution;
 
 			public static readonly SettingsFlow defaults = new SettingsFlow
 			{
-				baseSpeed = 1.0f,
-				pulseAmplitude = 0.0f,
-				pulseFrequency = 1.0f,
+				baseSpeed = 0.25f,
+				pulseAmplitude = 1.0f,
+				pulseFrequency = 0.25f,
+
+				timingJitter = true,
+				timingJitterSpace = JitterSpace.Planar,
+				timingJitterDisplacement = 0.25f,
+				timingJitterResolution = 1.0f,
 			};
 		}
 
@@ -109,15 +134,19 @@ namespace Unity.DemoTeam.Hair
 
 		public struct RuntimeEmitter
 		{
-			public Vector3 p;   // emitter origin
-			public Vector3 n;   // emitter forward
-			public float t0;    // emitter base offset
-			public float h0;    // emitter base radius
-			public float m;     // emitter slope
+			public Vector3 p;	// emitter origin
+			public Vector3 n;	// emitter forward
+			public float t0;	// emitter base offset
+			public float h0;	// emitter base radius
+			public float m;		// emitter slope
 
-			public float v;     // flow speed
-			public float A;     // flow pulse amplitude
-			public float f;     // flow pulse frequency
+			public float v;		// flow speed
+			public float A;		// flow pulse amplitude
+			public float f;		// flow pulse frequency
+
+			public float jd;	// jitter displacement
+			public float jw;	// jitter resolution
+			public float jp;	// jitter planar
 		}
 
 		public static SettingsFlow MakeSettingsFlow(WindZone windZone)
@@ -127,6 +156,10 @@ namespace Unity.DemoTeam.Hair
 				baseSpeed = windZone.windMain,
 				pulseAmplitude = windZone.windPulseMagnitude,
 				pulseFrequency = windZone.windPulseFrequency,
+
+				timingJitter = false,
+				timingJitterDisplacement = 0.0f,
+				timingJitterResolution = 0.0f,
 			};
 		}
 
@@ -140,6 +173,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					p = transform.position,
 					n = transform.forward,
+
 					t0 = float.MinValue,
 					h0 = float.PositiveInfinity,
 					m = 0.0f,
@@ -147,6 +181,10 @@ namespace Unity.DemoTeam.Hair
 					v = flow.baseSpeed,
 					A = flow.pulseAmplitude,
 					f = flow.pulseFrequency,
+
+					jd = flow.timingJitter ? flow.timingJitterDisplacement : 0.0f,
+					jw = flow.timingJitterResolution,
+					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
 				},
 			};
 		}
@@ -161,6 +199,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					p = transform.position,
 					n = Vector3.zero,
+
 					t0 = 0.0f,
 					h0 = float.PositiveInfinity,
 					m = float.PositiveInfinity,
@@ -168,6 +207,10 @@ namespace Unity.DemoTeam.Hair
 					v = flow.baseSpeed,
 					A = flow.pulseAmplitude,
 					f = flow.pulseFrequency,
+
+					jd = flow.timingJitter ? flow.timingJitterDisplacement : 0.0f,
+					jw = flow.timingJitterResolution,
+					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
 				}
 			};
 		}
@@ -206,6 +249,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					p = transform.position - t0 * transform.forward,
 					n = transform.forward,
+
 					t0 = t0,
 					h0 = h0,
 					m = m,
@@ -213,6 +257,10 @@ namespace Unity.DemoTeam.Hair
 					v = flow.baseSpeed,
 					A = flow.pulseAmplitude,
 					f = flow.pulseFrequency,
+
+					jd = flow.timingJitter ? flow.timingJitterDisplacement : 0.0f,
+					jw = flow.timingJitterResolution,
+					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
 				}
 			};
 		}

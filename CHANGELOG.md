@@ -5,19 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [Unreleased]
+## [unreleased]
 
 ### Added
 
+- Added support for noise-based timing jitter in wind emitters (HairWind) to reduce uniformity of pulses.
 - Added support for automatic LOD selection based on size of bounds in viewport.
 
 ### Changed
 
+- Improved tooltips in the HairWind component.
 - Renamed various fields.
 
 ### Fixed
 
-- Fixed an issue with HairAsset inspector capturing mouse when clicking outside inspector after long progress bar (was triggering rebuild with the 'auto' option enabled).
+- Fixed an issue with the HairAsset inspector capturing mouse when clicking outside inspector after long progress bar (was triggering rebuild with the 'auto' option enabled).
 
 
 ## [0.11.0-exp.1] - 2023-05-26
