@@ -448,6 +448,7 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector3[] rootDirection;
 
 			[HideInInspector] public Vector3[] particlePosition;
+			[HideInInspector] public float[] particleDiameter;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
 			public int lodCount;

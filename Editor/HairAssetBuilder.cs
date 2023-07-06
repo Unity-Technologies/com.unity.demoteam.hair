@@ -449,7 +449,7 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.rootPosition = new Vector3[uniformCurveSet.curveCount];
 			strandGroup.rootDirection = new Vector3[uniformCurveSet.curveCount];
 			strandGroup.particlePosition = new Vector3[uniformCurveSet.curveCount * uniformVertexCount];
-			//TODO particleTexCoord, particleDiameter for visual purposes
+			strandGroup.particleDiameter = new float[uniformCurveSet.curveCount * uniformVertexCount];
 
 			// build strand buffers
 			{
@@ -541,12 +541,17 @@ namespace Unity.DemoTeam.Hair
 				{
 					case HairAsset.MemoryLayout.Sequential:
 						{
-							var srcBasePtr = uniformVertexDataPositionPtr;
-							var srcLength = sizeof(Vector3) * uniformCurveSet.curveCount * uniformVertexCount;
+							var srcBasePositionPtr = uniformVertexDataPositionPtr;
+							var srcBaseDiameterPtr = uniformVertexDataDiameterPtr;
+							
+							var srcPositionLength = sizeof(Vector3) * uniformCurveSet.curveCount * uniformVertexCount;
+							var srcDiameterLength = sizeof(float)   * uniformCurveSet.curveCount * uniformVertexCount;
 
-							fixed (Vector3* dstBasePtr = strandGroup.particlePosition)
+							fixed (Vector3* dstBasePositionPtr = strandGroup.particlePosition)
+							fixed (float*   dstBaseDiameterPtr = strandGroup.particleDiameter)
 							{
-								UnsafeUtility.MemCpy(dstBasePtr, srcBasePtr, srcLength);
+								UnsafeUtility.MemCpy(dstBasePositionPtr, srcBasePositionPtr, srcPositionLength);
+								UnsafeUtility.MemCpy(dstBaseDiameterPtr, srcBaseDiameterPtr, srcDiameterLength);
 							}
 						}
 						break;
@@ -554,18 +559,28 @@ namespace Unity.DemoTeam.Hair
 					case HairAsset.MemoryLayout.Interleaved:
 						unsafe
 						{
-							var srcBasePtr = uniformVertexDataPositionPtr;
-							var srcStride = sizeof(Vector3);
-							var dstStride = sizeof(Vector3) * strandGroup.strandCount;
+							var srcBasePositionPtr = uniformVertexDataPositionPtr;
+							var srcBaseDiameterPtr = uniformVertexDataDiameterPtr;
 
-							fixed (Vector3* dstBasePtr = strandGroup.particlePosition)
+							var srcPositionStride = sizeof(Vector3);
+							var srcDiameterStride = sizeof(float);
+							
+							var dstPositionStride = sizeof(Vector3) * strandGroup.strandCount;
+							var dstDiameterStride = sizeof(float)   * strandGroup.strandCount;
+
+							fixed (Vector3* dstBasePositionPtr = strandGroup.particlePosition)
+							fixed (float*   dstBaseDiameterPtr = strandGroup.particleDiameter)
 							{
 								for (int i = 0; i != uniformCurveSet.curveCount; i++)
 								{
-									var srcPtr = srcBasePtr + i * uniformVertexCount;
-									var dstPtr = dstBasePtr + i;
+									var srcPositionPtr = srcBasePositionPtr + i * uniformVertexCount;
+									var dstPositionPtr = dstBasePositionPtr + i;
+									
+									var srcDiameterPtr = srcBaseDiameterPtr + i * uniformVertexCount;
+									var dstDiameterPtr = dstBaseDiameterPtr + i;
 
-									UnsafeUtility.MemCpyStride(dstPtr, dstStride, srcPtr, srcStride, srcStride, uniformVertexCount);
+									UnsafeUtility.MemCpyStride(dstPositionPtr, dstPositionStride, srcPositionPtr, srcPositionStride, srcPositionStride, uniformVertexCount);
+									UnsafeUtility.MemCpyStride(dstDiameterPtr, dstDiameterStride, srcDiameterPtr, srcDiameterStride, srcDiameterStride, uniformVertexCount);
 								}
 							}
 						}
