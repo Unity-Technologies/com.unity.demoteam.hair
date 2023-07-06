@@ -1689,14 +1689,17 @@ namespace Unity.DemoTeam.Hair
 
 				using (var alignedRootDirection = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var alignedParticlePosition = new NativeArray<Vector4>(strandGroupParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var alignedParticleDiameter = new NativeArray<float>(strandGroupParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
 					unsafe
 					{
 						fixed (void* rootDirectionPtr = strandGroupAsset.rootDirection)
 						fixed (void* particlePositionPtr = strandGroupAsset.particlePosition)
+						fixed (void* particleDiameterPtr = strandGroupAsset.particleDiameter)
 						{
 							UnsafeUtility.MemCpyStride(alignedRootDirection.GetUnsafePtr(), sizeof(Vector4), rootDirectionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupAsset.strandCount);
 							UnsafeUtility.MemCpyStride(alignedParticlePosition.GetUnsafePtr(), sizeof(Vector4), particlePositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupParticleCount);
+							UnsafeUtility.MemCpyStride(alignedParticleDiameter.GetUnsafePtr(), sizeof(float), particleDiameterPtr, sizeof(float), sizeof(float), strandGroupParticleCount);
 						}
 					}
 
@@ -1709,6 +1712,7 @@ namespace Unity.DemoTeam.Hair
 						uploadCtx.SetData(solverData[i].initialRootDirection, alignedRootDirection);
 
 						uploadCtx.SetData(solverData[i].particlePosition, alignedParticlePosition);
+						uploadCtx.SetData(solverData[i].particleDiameter, alignedParticleDiameter);
 
 						uploadCtx.SetData(solverData[i].lodGuideCount, strandGroupAsset.lodGuideCount);
 						uploadCtx.SetData(solverData[i].lodGuideIndex, strandGroupAsset.lodGuideIndex);

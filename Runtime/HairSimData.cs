@@ -38,7 +38,8 @@ namespace Unity.DemoTeam.Hair
 			public ComputeBuffer particlePositionCorr;	// xyz: ftl correction, w: -
 			public ComputeBuffer particleVelocity;		// xyz: velocity, w: splatting weight
 			public ComputeBuffer particleVelocityPrev;  // xyz: velocity, w: splatting weight
-
+			public ComputeBuffer particleDiameter;		// x: diameter (mm)
+			
 			public ComputeBuffer lodGuideCount;			// n: lod index -> num. guides
 			public ComputeBuffer lodGuideIndex;			// i: lod index * strand count + strand index -> guide index
 			public ComputeBuffer lodGuideCarry;			// f: lod index * strand count + strand index -> guide carry
