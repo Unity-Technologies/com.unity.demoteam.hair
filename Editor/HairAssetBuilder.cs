@@ -596,7 +596,6 @@ namespace Unity.DemoTeam.Hair
 						break;
 
 					case HairAsset.MemoryLayout.Interleaved:
-						unsafe
 						{
 							var srcBasePositionPtr = uniformVertexDataPositionPtr;
 							var srcBaseDiameterPtr = uniformVertexDataDiameterPtr;
