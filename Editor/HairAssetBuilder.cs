@@ -401,7 +401,7 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						// Use the blend weights to resample any non-positional data requested by the vertex features.
-						if (uniformCurveSet.vertexFeatures.HasFlag(~HairAsset.VertexFeatures.Position))
+						if (uniformCurveSet.vertexFeatures > 0)
 						{
 							srcVertexOffset = 0;
 							dstVertexOffset = 0;

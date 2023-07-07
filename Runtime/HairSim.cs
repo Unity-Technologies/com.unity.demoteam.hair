@@ -108,7 +108,9 @@ namespace Unity.DemoTeam.Hair
 			public static int _ParticlePositionCorr;
 			public static int _ParticleVelocity;
 			public static int _ParticleVelocityPrev;
+			
 			public static int _ParticleDiameter;
+			public static int _ParticleTexCoord;
 
 			public static int _LODGuideCount;
 			public static int _LODGuideIndex;
@@ -912,6 +914,7 @@ namespace Unity.DemoTeam.Hair
 			// optional vertex data	
 			{
 				target.BindComputeBuffer(UniformIDs._ParticleDiameter, solverData.particleDiameter);
+				target.BindComputeBuffer(UniformIDs._ParticleTexCoord, solverData.particleTexCoord);
 			}
 
 			target.BindComputeBuffer(UniformIDs._LODGuideCount, solverData.lodGuideCount);
