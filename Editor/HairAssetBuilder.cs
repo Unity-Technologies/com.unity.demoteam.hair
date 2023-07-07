@@ -306,14 +306,14 @@ namespace Unity.DemoTeam.Hair
 
 			var curveSetInfo = new HairAssetProvisional.CurveSetInfo(curveSet);
 			{
-				var curveSetIncompleteReason = (HairAssetProvisional.CurveSet.VertexFeatures)0;
+				var curveSetIncompleteReason = (HairAsset.VertexFeatures)0;
 				{
 					if (curveSetInfo.sumVertexCount > curveSet.vertexDataPosition.Length)
-						curveSetIncompleteReason |= HairAssetProvisional.CurveSet.VertexFeatures.Position;
-					if (curveSetInfo.sumVertexCount > curveSet.vertexDataTexCoord.Length && curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
-						curveSetIncompleteReason |= HairAssetProvisional.CurveSet.VertexFeatures.TexCoord;
-					if (curveSetInfo.sumVertexCount > curveSet.vertexDataDiameter.Length && curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter))
-						curveSetIncompleteReason |= HairAssetProvisional.CurveSet.VertexFeatures.Diameter;
+						curveSetIncompleteReason |= HairAsset.VertexFeatures.Position;
+					if (curveSetInfo.sumVertexCount > curveSet.vertexDataTexCoord.Length && curveSet.vertexFeatures.HasFlag(HairAsset.VertexFeatures.TexCoord))
+						curveSetIncompleteReason |= HairAsset.VertexFeatures.TexCoord;
+					if (curveSetInfo.sumVertexCount > curveSet.vertexDataDiameter.Length && curveSet.vertexFeatures.HasFlag(HairAsset.VertexFeatures.Diameter))
+						curveSetIncompleteReason |= HairAsset.VertexFeatures.Diameter;
 				}
 
 				if (curveSetIncompleteReason != 0)
@@ -331,6 +331,7 @@ namespace Unity.DemoTeam.Hair
 
 			// sanitize input curve data to guarantee uniform vertex count
 			var uniformCurveSet = curveSet;
+			
 			var uniformVertexCount = curveSetInfo.maxVertexCount;
 			var uniformVertexAlloc = false;
 			{
@@ -356,12 +357,13 @@ namespace Unity.DemoTeam.Hair
 					// allocate buffers for resampled data
 					uniformCurveSet.vertexDataPosition = new UnsafeList<Vector3>(curveSet.curveCount * resamplingVertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 					uniformCurveSet.vertexDataTexCoord = new UnsafeList<Vector2>(curveSet.curveCount * resamplingVertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-					uniformCurveSet.vertexDataDiameter = new UnsafeList<float>(curveSet.curveCount * resamplingVertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+					uniformCurveSet.vertexDataDiameter = new UnsafeList<float>  (curveSet.curveCount * resamplingVertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+					
 					uniformVertexCount = resamplingVertexCount;
 					uniformVertexAlloc = true;
 					
 					// an additional intermediate buffer containing blend weights and vertex indices for 
-					// miscellaneous vertex data (e.g. texcoord, diameter) resampling
+					// miscellaneous vertex data (e.g. texcoord, diameter, custom) resampling
 					// layout: { vertexIndex0, vertexIndex1, blendWeight }
 					var blendWeights = new UnsafeList<Vector3>(curveSet.curveCount * resamplingVertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 
@@ -399,8 +401,8 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						// Use the blend weights to resample any non-positional data requested by the vertex features.
-						if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter) || 
-						    curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
+						if (uniformCurveSet.vertexFeatures.HasFlag(HairAsset.VertexFeatures.Diameter) || 
+						    uniformCurveSet.vertexFeatures.HasFlag(HairAsset.VertexFeatures.TexCoord))
 						{
 							srcVertexOffset = 0;
 							dstVertexOffset = 0;
@@ -415,12 +417,12 @@ namespace Unity.DemoTeam.Hair
 									var s0 = srcVertexOffset + (int) w.x;
 									var s1 = srcVertexOffset + (int) w.y;
 
-									if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter))
+									if (uniformCurveSet.vertexFeatures.HasFlag(HairAsset.VertexFeatures.Diameter))
 									{
 										dstDataDiameterPtr[d] = Mathf.Lerp(srcDataDiameterPtr[s0], srcDataDiameterPtr[s1], w.z);
 									}
 									
-									if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
+									if (uniformCurveSet.vertexFeatures.HasFlag(HairAsset.VertexFeatures.TexCoord))
 									{
 										dstDataTexCoordPtr[d] = Vector2.Lerp(srcDataTexCoordPtr[s0], srcDataTexCoordPtr[s1], w.z);
 									}
@@ -443,13 +445,26 @@ namespace Unity.DemoTeam.Hair
 			// set memory layout
 			strandGroup.particleMemoryLayout = hairAsset.settingsBasic.memoryLayout;
 
+			
 			// prep strand buffers
 			strandGroup.rootUV = new Vector2[uniformCurveSet.curveCount];
 			strandGroup.rootScale = new float[uniformCurveSet.curveCount];// written in FinalizeStrandGroup(..)
 			strandGroup.rootPosition = new Vector3[uniformCurveSet.curveCount];
 			strandGroup.rootDirection = new Vector3[uniformCurveSet.curveCount];
 			strandGroup.particlePosition = new Vector3[uniformCurveSet.curveCount * uniformVertexCount];
-			strandGroup.particleDiameter = new float[uniformCurveSet.curveCount * uniformVertexCount];
+			
+			// set the vertex data features
+			{
+				strandGroup.vertexFeatureFlags = (uint) uniformCurveSet.vertexFeatures;
+
+				int GetAllocationSize(HairAsset.VertexFeatures flag)
+				{
+					return uniformCurveSet.vertexFeatures.HasFlag(flag) ? 
+						uniformCurveSet.curveCount * uniformVertexCount : 1;
+				}
+				
+				strandGroup.particleDiameter = new float[GetAllocationSize(HairAsset.VertexFeatures.Diameter)];
+			}
 
 			// build strand buffers
 			{
@@ -520,7 +535,7 @@ namespace Unity.DemoTeam.Hair
 
 					case HairAsset.SettingsResolve.RootUV.ResolveFromCurveUV:
 						{
-							if (curveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
+							if (curveSet.vertexFeatures.HasFlag(HairAsset.VertexFeatures.TexCoord))
 							{
 								for (int i = 0; i != uniformCurveSet.curveCount; i++)
 								{
@@ -551,7 +566,17 @@ namespace Unity.DemoTeam.Hair
 							fixed (float*   dstBaseDiameterPtr = strandGroup.particleDiameter)
 							{
 								UnsafeUtility.MemCpy(dstBasePositionPtr, srcBasePositionPtr, srcPositionLength);
-								UnsafeUtility.MemCpy(dstBaseDiameterPtr, srcBaseDiameterPtr, srcDiameterLength);
+
+								// optional vertex data
+								{
+									void MemCpyIfNeeded(HairAsset.VertexFeatures feature, void* dst, void* src, long size)
+									{
+										if (uniformCurveSet.vertexFeatures.HasFlag(feature))
+											UnsafeUtility.MemCpy(dst, src, size);
+									}
+									
+									MemCpyIfNeeded(HairAsset.VertexFeatures.Diameter, dstBaseDiameterPtr, srcBaseDiameterPtr, srcDiameterLength);
+								}
 							}
 						}
 						break;
@@ -580,7 +605,17 @@ namespace Unity.DemoTeam.Hair
 									var dstDiameterPtr = dstBaseDiameterPtr + i;
 
 									UnsafeUtility.MemCpyStride(dstPositionPtr, dstPositionStride, srcPositionPtr, srcPositionStride, srcPositionStride, uniformVertexCount);
-									UnsafeUtility.MemCpyStride(dstDiameterPtr, dstDiameterStride, srcDiameterPtr, srcDiameterStride, srcDiameterStride, uniformVertexCount);
+
+									// optional vertex data
+									{
+										void MemCpyStrideIfNeeded(HairAsset.VertexFeatures feature, void* dst, void* src, int dstStride, int srcStride, int size)
+										{
+											if (uniformCurveSet.vertexFeatures.HasFlag(feature))
+												UnsafeUtility.MemCpyStride(dst, dstStride, src, srcStride, srcStride, size);
+										}
+										
+										MemCpyStrideIfNeeded(HairAsset.VertexFeatures.Diameter, dstDiameterPtr, srcDiameterPtr, dstDiameterStride, srcDiameterStride, uniformVertexCount);
+									}
 								}
 							}
 						}
@@ -634,7 +669,7 @@ namespace Unity.DemoTeam.Hair
 			public Vector3[] vertexDataPosition;
 			public Vector2[] vertexDataTexCoord;
 			public float[] vertexDataDiameter;
-			public HairAssetProvisional.CurveSet.VertexFeatures vertexFeatures;
+			public HairAsset.VertexFeatures vertexFeatures;
 		}
 
 		static unsafe AlembicCurvesInfo PrepareAlembicCurvesInfo(AlembicCurves curveSet)
@@ -649,14 +684,14 @@ namespace Unity.DemoTeam.Hair
 				vertexDataPosition = curveSet.Positions,
 				vertexDataTexCoord = curveSet.UVs,
 				vertexDataDiameter = curveSet.Widths,
-				vertexFeatures = HairAssetProvisional.CurveSet.VertexFeatures.Position,
+				vertexFeatures = HairAsset.VertexFeatures.Position,
 			};
 
 			// find vertex features
 			if (info.vertexDataTexCoord != null && info.vertexDataTexCoord.Length > 0)
-				info.vertexFeatures |= HairAssetProvisional.CurveSet.VertexFeatures.TexCoord;
+				info.vertexFeatures |= HairAsset.VertexFeatures.TexCoord;
 			if (info.vertexDataDiameter != null && info.vertexDataDiameter.Length > 0)
-				info.vertexFeatures |= HairAssetProvisional.CurveSet.VertexFeatures.Diameter;
+				info.vertexFeatures |= HairAsset.VertexFeatures.Diameter;
 
 			// find min-max vertex count
 			if (info.curveCount > 0)
@@ -690,7 +725,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				var combinedCurveVertexCountMin = 0;
 				var combinedCurveVertexCountMax = 0;
-				var combinedCurveVertexFeatures = HairAssetProvisional.CurveSet.VertexFeatures.Position;
+				var combinedCurveVertexFeatures = HairAsset.VertexFeatures.Position;
 
 				while (alembicCurveSetIndex < alembicCurveSets.Length)
 				{

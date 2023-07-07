@@ -705,7 +705,6 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverData.particlePositionPrevPrev, "ParticlePosition_2", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector4);
-				changed |= CreateBuffer(ref solverData.particleDiameter, "ParticleDiameter", particleCount, particleStrideScalar);
 				
 				changed |= CreateBuffer(ref solverData.lodGuideCount, "LODGuideCount", Mathf.Max(1, lodCount), particleStrideIndex);
 				changed |= CreateBuffer(ref solverData.lodGuideIndex, "LODGuideIndex", Mathf.Max(1, lodCount) * strandCount, particleStrideIndex);

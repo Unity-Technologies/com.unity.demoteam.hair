@@ -1632,6 +1632,10 @@ namespace Unity.DemoTeam.Hair
 			{
 				ref readonly var strandGroupAsset = ref strandGroupInstances[i].groupAssetReference.Resolve();
 
+				var vertexFeatureFlags = (HairAsset.VertexFeatures)strandGroupAsset.vertexFeatureFlags;
+
+				int strandGroupParticleCount = strandGroupAsset.strandCount * strandGroupAsset.strandParticleCount;
+				
 				HairSim.PrepareSolverData(ref solverData[i], strandGroupAsset.strandCount, strandGroupAsset.strandParticleCount, strandGroupAsset.lodCount);
 				{
 					solverData[i].memoryLayout = strandGroupAsset.particleMemoryLayout;
@@ -1656,9 +1660,18 @@ namespace Unity.DemoTeam.Hair
 					solverData[i].initialTotalLength = strandGroupAsset.totalLength;
 					solverData[i].lodGuideCountCPU = new NativeArray<int>(strandGroupAsset.lodGuideCount, Allocator.Persistent);
 					solverData[i].lodThreshold = new NativeArray<float>(strandGroupAsset.lodThreshold, Allocator.Persistent);
-				}
 
-				int strandGroupParticleCount = strandGroupAsset.strandCount * strandGroupAsset.strandParticleCount;
+					// optional vertex data
+					{
+						void CreateBufferIfNeeded(HairAsset.VertexFeatures flag, ref ComputeBuffer buf, string name, int stride)
+						{
+							var count = vertexFeatureFlags.HasFlag(flag) ? strandGroupParticleCount : 1;
+							HairSimUtility.CreateBuffer(ref buf, name, count, stride);
+						}
+						
+						CreateBufferIfNeeded(HairAsset.VertexFeatures.Diameter, ref solverData[i].particleDiameter, "ParticleDiameter", sizeof(float));
+					}
+				}
 
 				//DEBUG BEGIN
 				/*
@@ -1687,19 +1700,29 @@ namespace Unity.DemoTeam.Hair
 				*/
 				//DEBUG END
 
-				using (var alignedRootDirection = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (var alignedParticlePosition = new NativeArray<Vector4>(strandGroupParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
-				using (var alignedParticleDiameter = new NativeArray<float>(strandGroupParticleCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var alignedRootDirection    = new NativeArray<Vector4>(strandGroupAsset.strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var alignedParticlePosition = new NativeArray<Vector4>(strandGroupParticleCount,     Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var alignedParticleDiameter = new NativeArray<float>  (strandGroupParticleCount,     Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
 					unsafe
 					{
-						fixed (void* rootDirectionPtr = strandGroupAsset.rootDirection)
+						fixed (void* rootDirectionPtr    = strandGroupAsset.rootDirection)
 						fixed (void* particlePositionPtr = strandGroupAsset.particlePosition)
 						fixed (void* particleDiameterPtr = strandGroupAsset.particleDiameter)
 						{
 							UnsafeUtility.MemCpyStride(alignedRootDirection.GetUnsafePtr(), sizeof(Vector4), rootDirectionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupAsset.strandCount);
 							UnsafeUtility.MemCpyStride(alignedParticlePosition.GetUnsafePtr(), sizeof(Vector4), particlePositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupParticleCount);
-							UnsafeUtility.MemCpyStride(alignedParticleDiameter.GetUnsafePtr(), sizeof(float), particleDiameterPtr, sizeof(float), sizeof(float), strandGroupParticleCount);
+
+							// optional vertex data
+							{
+								void CopyDataIfNeeded(HairAsset.VertexFeatures feature, void* dst, int dstStride, void* src, int srcStride)
+								{
+									if (vertexFeatureFlags.HasFlag(feature))
+										UnsafeUtility.MemCpyStride(dst, dstStride, src, srcStride, srcStride, strandGroupParticleCount);
+								}
+								
+								CopyDataIfNeeded(HairAsset.VertexFeatures.Diameter, alignedParticleDiameter.GetUnsafePtr(), sizeof(float), particleDiameterPtr, sizeof(float));
+							}
 						}
 					}
 
@@ -1712,8 +1735,18 @@ namespace Unity.DemoTeam.Hair
 						uploadCtx.SetData(solverData[i].initialRootDirection, alignedRootDirection);
 
 						uploadCtx.SetData(solverData[i].particlePosition, alignedParticlePosition);
-						uploadCtx.SetData(solverData[i].particleDiameter, alignedParticleDiameter);
 
+						// optional vertex data	
+						{
+							void SetDataIfNeeded<T>(HairAsset.VertexFeatures flag, ComputeBuffer buf, NativeArray<T> data) where T : struct
+							{
+								if (vertexFeatureFlags.HasFlag(flag))
+									uploadCtx.SetData(buf, data);
+							}
+							
+							SetDataIfNeeded(HairAsset.VertexFeatures.Diameter, solverData[i].particleDiameter, alignedParticleDiameter);
+						}
+						
 						uploadCtx.SetData(solverData[i].lodGuideCount, strandGroupAsset.lodGuideCount);
 						uploadCtx.SetData(solverData[i].lodGuideIndex, strandGroupAsset.lodGuideIndex);
 						uploadCtx.SetData(solverData[i].lodGuideCarry, strandGroupAsset.lodGuideCarry);

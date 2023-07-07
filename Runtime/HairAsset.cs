@@ -37,6 +37,14 @@ namespace Unity.DemoTeam.Hair
 			Strands,
 			Strands3pt,
 		}
+		
+		[Flags]
+		public enum VertexFeatures
+		{
+			Position = 1 << 0,
+			TexCoord = 1 << 1,
+			Diameter = 1 << 2,
+		}
 
 		[Serializable]
 		public struct SettingsBasic
@@ -447,8 +455,10 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector3[] rootPosition;
 			[HideInInspector] public Vector3[] rootDirection;
 
-			[HideInInspector] public Vector3[] particlePosition;
+			[HideInInspector] public uint vertexFeatureFlags;
 			[HideInInspector] public float[] particleDiameter;
+			
+			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
 			public int lodCount;
@@ -626,20 +636,12 @@ namespace Unity.DemoTeam.Hair
 
 		public struct CurveSet : IDisposable
 		{
-			[Flags]
-			public enum VertexFeatures
-			{
-				Position = 1 << 0,
-				TexCoord = 1 << 1,
-				Diameter = 1 << 2,
-			}
-
 			public int curveCount;							// number of curves in set
 			public UnsafeList<int> curveVertexCount;		// i: curve index -> number of vertices in curve
 			public UnsafeList<Vector3> vertexDataPosition;	// j: vertex index -> curve vertex position
 			public UnsafeList<Vector2> vertexDataTexCoord;	// j: vertex index -> curve vertex texcoord
 			public UnsafeList<float> vertexDataDiameter;	// j: vertex index -> curve vertex diameter
-			public VertexFeatures vertexFeatures;			// m: vertex feature flags
+			public HairAsset.VertexFeatures vertexFeatures;	// m: vertex feature flags
 
 			// vertex data must laid out sequentially, e.g. for two curves a and b:
 			//		curveVertexCount	[ 4 2 ]
@@ -661,7 +663,7 @@ namespace Unity.DemoTeam.Hair
 				this.vertexDataPosition = new UnsafeList<Vector3>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 				this.vertexDataTexCoord = new UnsafeList<Vector2>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 				this.vertexDataDiameter = new UnsafeList<float>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
-				this.vertexFeatures = VertexFeatures.Position;
+				this.vertexFeatures = HairAsset.VertexFeatures.Position;
 			}
 
 			public void Dispose()
