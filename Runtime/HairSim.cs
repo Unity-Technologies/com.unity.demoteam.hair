@@ -111,6 +111,7 @@ namespace Unity.DemoTeam.Hair
 			
 			public static int _ParticleDiameter;
 			public static int _ParticleTexCoord;
+			public static int _ParticleUserData;
 
 			public static int _LODGuideCount;
 			public static int _LODGuideIndex;
@@ -822,7 +823,10 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverData.particlePositionCorr);
 			ReleaseBuffer(ref solverData.particleVelocity);
 			ReleaseBuffer(ref solverData.particleVelocityPrev);
+			
 			ReleaseBuffer(ref solverData.particleDiameter);
+			ReleaseBuffer(ref solverData.particleTexCoord);
+			ReleaseBuffer(ref solverData.particleUserData);
 
 			ReleaseBuffer(ref solverData.lodGuideCount);
 			ReleaseBuffer(ref solverData.lodGuideIndex);
@@ -915,6 +919,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				target.BindComputeBuffer(UniformIDs._ParticleDiameter, solverData.particleDiameter);
 				target.BindComputeBuffer(UniformIDs._ParticleTexCoord, solverData.particleTexCoord);
+				target.BindComputeBuffer(UniformIDs._ParticleUserData, solverData.particleUserData);
 			}
 
 			target.BindComputeBuffer(UniformIDs._LODGuideCount, solverData.lodGuideCount);

@@ -41,6 +41,7 @@ namespace Unity.DemoTeam.Hair
 			
 			public ComputeBuffer particleDiameter;		// x: diameter (mm)
 			public ComputeBuffer particleTexCoord;
+			public ComputeBuffer particleUserData;
 			
 			public ComputeBuffer lodGuideCount;			// n: lod index -> num. guides
 			public ComputeBuffer lodGuideIndex;			// i: lod index * strand count + strand index -> guide index

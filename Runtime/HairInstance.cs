@@ -1671,6 +1671,7 @@ namespace Unity.DemoTeam.Hair
 						
 						CreateBufferIfNeeded(HairAsset.VertexFeatures.Diameter, ref solverData[i].particleDiameter, "ParticleDiameter", sizeof(float));
 						CreateBufferIfNeeded(HairAsset.VertexFeatures.TexCoord, ref solverData[i].particleTexCoord, "ParticleTexCoord", sizeof(float) * 2);
+						CreateBufferIfNeeded(HairAsset.VertexFeatures.UserData, ref solverData[i].particleUserData, "ParticleUserData", sizeof(float) * 3);
 					}
 				}
 
@@ -1705,6 +1706,7 @@ namespace Unity.DemoTeam.Hair
 				using (var alignedParticlePosition = new NativeArray<Vector4>(strandGroupParticleCount,     Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var alignedParticleDiameter = new NativeArray<float>  (strandGroupParticleCount,     Allocator.Temp, NativeArrayOptions.ClearMemory))
 				using (var alignedParticleTexCoord = new NativeArray<Vector2>(strandGroupParticleCount,     Allocator.Temp, NativeArrayOptions.ClearMemory))
+				using (var alignedParticleUserData = new NativeArray<Vector3>(strandGroupParticleCount,     Allocator.Temp, NativeArrayOptions.ClearMemory))
 				{
 					unsafe
 					{
@@ -1712,6 +1714,7 @@ namespace Unity.DemoTeam.Hair
 						fixed (void* particlePositionPtr = strandGroupAsset.particlePosition)
 						fixed (void* particleDiameterPtr = strandGroupAsset.particleDiameter)
 						fixed (void* particleTexCoordPtr = strandGroupAsset.particleTexCoord)
+						fixed (void* particleUserDataPtr = strandGroupAsset.particleUserData)
 						{
 							UnsafeUtility.MemCpyStride(alignedRootDirection.GetUnsafePtr(), sizeof(Vector4), rootDirectionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupAsset.strandCount);
 							UnsafeUtility.MemCpyStride(alignedParticlePosition.GetUnsafePtr(), sizeof(Vector4), particlePositionPtr, sizeof(Vector3), sizeof(Vector3), strandGroupParticleCount);
@@ -1726,6 +1729,7 @@ namespace Unity.DemoTeam.Hair
 								
 								CopyDataIfNeeded(HairAsset.VertexFeatures.Diameter, alignedParticleDiameter.GetUnsafePtr(), sizeof(float), particleDiameterPtr, sizeof(float));
 								CopyDataIfNeeded(HairAsset.VertexFeatures.TexCoord, alignedParticleTexCoord.GetUnsafePtr(), sizeof(Vector2), particleTexCoordPtr, sizeof(Vector2));
+								CopyDataIfNeeded(HairAsset.VertexFeatures.UserData, alignedParticleUserData.GetUnsafePtr(), sizeof(Vector3), particleUserDataPtr, sizeof(Vector3));
 							}
 						}
 					}
@@ -1750,6 +1754,7 @@ namespace Unity.DemoTeam.Hair
 							
 							SetDataIfNeeded(HairAsset.VertexFeatures.Diameter, solverData[i].particleDiameter, alignedParticleDiameter);
 							SetDataIfNeeded(HairAsset.VertexFeatures.TexCoord, solverData[i].particleTexCoord, alignedParticleTexCoord);
+							SetDataIfNeeded(HairAsset.VertexFeatures.UserData, solverData[i].particleUserData, alignedParticleUserData);
 						}
 						
 						uploadCtx.SetData(solverData[i].lodGuideCount, strandGroupAsset.lodGuideCount);
