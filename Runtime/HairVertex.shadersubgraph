@@ -865,6 +865,11 @@
             "id": 3,
             "displayName": "STRIPS",
             "referenceName": "STRIPS"
+        },
+        {
+            "id": 5,
+            "displayName": "TUBES",
+            "referenceName": "TUBES"
         }
     ],
     "m_Value": 0,
@@ -1284,6 +1289,24 @@
         "z": 0.0
     },
     "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.CategoryData",
+    "m_ObjectId": "c77fc09a36ca451f966b12260c6382d0",
+    "m_Name": "",
+    "m_ChildObjectList": [
+        {
+            "m_Id": "713b1bf6463c468aba186a6346036b5c"
+        },
+        {
+            "m_Id": "d1c902dcc9e34d99beeea82b65e1dd5d"
+        },
+        {
+            "m_Id": "8ecf9c27dc314aa891635892143b8f36"
+        }
+    ]
 }
 
 {

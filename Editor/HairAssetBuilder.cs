@@ -152,11 +152,15 @@ namespace Unity.DemoTeam.Hair
 						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetRoots, hairAsset);
 						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetLines, hairAsset);
 						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetStrips, hairAsset);
+						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetTubes, hairAsset);
+						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetRaytracedTubes, hairAsset);
 					}
 
 					hairAsset.strandGroups[i].meshAssetRoots.name += (":" + i);
 					hairAsset.strandGroups[i].meshAssetLines.name += (":" + i);
 					hairAsset.strandGroups[i].meshAssetStrips.name += (":" + i);
+					hairAsset.strandGroups[i].meshAssetTubes.name += (":" + i);
+					hairAsset.strandGroups[i].meshAssetRaytracedTubes.name += (":" + i);
 				}
 			}
 
@@ -930,6 +934,20 @@ namespace Unity.DemoTeam.Hair
 						strandGroup.bounds);
 
 					strandGroup.meshAssetStrips = HairInstanceBuilder.CreateMeshStrips(
+						hideFlags,
+						strandGroup.particleMemoryLayout,
+						strandGroup.strandCount,
+						strandGroup.strandParticleCount,
+						strandGroup.bounds);
+
+					strandGroup.meshAssetTubes = HairInstanceBuilder.CreateMeshTubes(
+						hideFlags,
+						strandGroup.particleMemoryLayout,
+						strandGroup.strandCount,
+						strandGroup.strandParticleCount,
+						strandGroup.bounds);
+
+					strandGroup.meshAssetRaytracedTubes = HairInstanceBuilder.CreateMeshRaytracedTubes(
 						hideFlags,
 						strandGroup.particleMemoryLayout,
 						strandGroup.strandCount,

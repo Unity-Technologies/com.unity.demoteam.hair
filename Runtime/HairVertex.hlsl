@@ -6,9 +6,10 @@
 // 0 == staging data full precision
 // 1 == staging data compressed
 
-#pragma multi_compile HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
+#pragma multi_compile HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS HAIR_VERTEX_ID_TUBES
 // *_LINES == render as line segments
 // *_STRIPS == render as view facing strips
+// *_TUBES == render as tubes
 
 #pragma multi_compile HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
 // *_SOLVER == source vertex from solver data
@@ -27,6 +28,22 @@
 
 #ifndef normalize_safe
 #define normalize_safe(x) (x * rsqrt(max(1e-7, dot(x, x))))
+#endif
+
+#ifndef HAIR_VERTEX_ID_LINES
+#define HAIR_VERTEX_ID_LINES 0
+#endif
+#ifndef HAIR_VERTEX_ID_STRIPS
+#define HAIR_VERTEX_ID_STRIPS 0
+#endif
+#ifndef HAIR_VERTEX_ID_TUBES
+#define HAIR_VERTEX_ID_TUBES 0
+#endif
+#ifndef HAIR_VERTEX_SRC_SOLVER
+#define HAIR_VERTEX_SRC_SOLVER 0
+#endif
+#ifndef HAIR_VERTEX_SRC_STAGING
+#define HAIR_VERTEX_SRC_STAGING 0
 #endif
 
 #include "HairSimData.hlsl"
@@ -128,10 +145,22 @@ float3 GetStrandDebugColor(in int strandIndex)
 	return lerp(strandColorLo, strandColorHi, _LODBlendFraction);
 }
 
+void UnpackTubeOffsets(float texcoord, out float offsetU, out float offsetV)
+{
+	// Unpack the UV back into a 16-bit uint.
+	const uint unpacked = (uint)(texcoord * ((1u << 16u) - 1u) + 0.5);
+
+	// Then just check the first bit in the 8-bit partitions. 
+	offsetU = (unpacked & (1 << 8u)) != 0;
+	offsetV = (unpacked & (1 << 0u)) != 0;
+}
+
 HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 {
 #if HAIR_VERTEX_ID_STRIPS
 	uint linearParticleIndex = vertexID >> 1;
+#elif HAIR_VERTEX_ID_TUBES
+	uint linearParticleIndex = vertexID >> 2;
 #else
 	uint linearParticleIndex = vertexID;
 #endif
@@ -160,6 +189,18 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 
 #if HAIR_VERTEX_ID_STRIPS
 	float3 vertexOffsetWS = vertexTangentWS * (_ParticleDiameter[i] * (vertexUV.x - 0.5));
+#elif HAIR_VERTEX_ID_TUBES
+	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
+	{
+		// Normal requires normalization for tube offset to work.
+		vertexNormalWS = normalize_safe(vertexNormalWS);
+		
+		float offsetU, offsetV;
+		UnpackTubeOffsets(vertexUV.x, offsetU, offsetV);
+		
+		vertexOffsetWS += vertexTangentWS * (_ParticleDiameter[i] * (offsetU - 0.5));
+		vertexOffsetWS += vertexNormalWS  * (_ParticleDiameter[i] * (offsetV - 0.5));
+	}
 #else
 	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
 #endif
@@ -229,7 +270,7 @@ HairVertex GetHairVertex(
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS)
 {
-#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS)
+#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS || HAIR_VERTEX_ID_TUBES)
 	return GetHairVertex_Live(in_vertexID, in_vertexUV);
 #else
 	return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);

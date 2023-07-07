@@ -4,11 +4,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using RayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode;
 
 #if HAS_PACKAGE_UNITY_HDRP
 using UnityEngine.Rendering.HighDefinition;
@@ -21,7 +23,7 @@ using Unity.DemoTeam.DigitalHuman;
 namespace Unity.DemoTeam.Hair
 {
 	[ExecuteAlways, SelectionBase]
-	public class HairInstance : MonoBehaviour
+	public partial class HairInstance : MonoBehaviour
 	{
 		public static HashSet<HairInstance> s_instances = new HashSet<HairInstance>();
 
@@ -88,7 +90,13 @@ namespace Unity.DemoTeam.Hair
 
 				[NonSerialized] public Mesh meshInstanceLines;
 				[NonSerialized] public Mesh meshInstanceStrips;
+				[NonSerialized] public Mesh meshInstanceTubes;
 				[NonSerialized] public uint meshInstanceSubdivision;
+				
+#if HAS_PACKAGE_UNITY_HDRP
+				// Objects are created at runtime. 
+				public RaytracingObjects rayTracingObjects;
+#endif
 			}
 
 #if SUPPORT_CONTENT_UPGRADE
@@ -149,6 +157,7 @@ namespace Unity.DemoTeam.Hair
 				Disabled,
 				BuiltinLines,
 				BuiltinStrips,
+				BuiltinTubes,
 				HDRPHighQualityLines,
 			}
 
@@ -200,6 +209,9 @@ namespace Unity.DemoTeam.Hair
 			[RenderingLayerMask]
 			public int strandLayers;
 			public MotionVectorGenerationMode motionVectors;
+#if HAS_PACKAGE_UNITY_HDRP
+			public bool raytracing;
+#endif
 
 			[LineHeader("Execution")]
 
@@ -665,7 +677,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void UpdateStrandGroupInstances()
+		void UpdateStrandGroupInstances(bool skipPrefabInstanceHandling = false)
 		{
 			var status = CheckStrandGroupInstances();
 
@@ -678,7 +690,7 @@ namespace Unity.DemoTeam.Hair
 
 #if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
-			if (isPrefabInstance)
+			if (isPrefabInstance && !skipPrefabInstanceHandling)
 			{
 				// did the asset change since the prefab was built?
 				switch (status)
@@ -686,6 +698,15 @@ namespace Unity.DemoTeam.Hair
 					case StrandGroupInstancesStatus.RequireRebuild:
 						{
 							var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+
+							if (Path.HasExtension(".usd"))
+							{
+								// USD is a special exception where the prefab path does not point to a true prefab, and PrefabUtility.LoadPrefabContents
+								// will fail. So we start over this routine and force skip the prefab instance handling. 
+								UpdateStrandGroupInstances(skipPrefabInstanceHandling: true);
+								return;
+							}
+							
 #if UNITY_2021_2_OR_NEWER
 							var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
 #else
@@ -1146,7 +1167,7 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				UpdateRendererState(ref strandGroupInstances[i], solverData[i]);
+				UpdateRendererState(ref strandGroupInstances[i], solverData[i], cmd);
 			}
 
 			// fire event
@@ -1154,7 +1175,7 @@ namespace Unity.DemoTeam.Hair
 				onRenderingStateChanged(cmd);
 		}
 
-		void UpdateRendererState(ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData)
+		void UpdateRendererState(ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData, in CommandBuffer cmd)
 		{
 			ref readonly var settingsStrands = ref GetSettingsStrands(strandGroupInstance);
 
@@ -1202,6 +1223,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
 				ref var meshInstanceStrips = ref strandGroupInstance.sceneObjects.meshInstanceStrips;
+				ref var meshInstanceTubes = ref strandGroupInstance.sceneObjects.meshInstanceTubes;
 				ref var meshInstanceSubdivision = ref strandGroupInstance.sceneObjects.meshInstanceSubdivision;
 
 				var subdivision = solverData.cbuffer._StagingSubdivision;
@@ -1209,6 +1231,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					CoreUtils.Destroy(meshInstanceLines);
 					CoreUtils.Destroy(meshInstanceStrips);
+					CoreUtils.Destroy(meshInstanceTubes);
 					meshInstanceSubdivision = subdivision;
 				}
 
@@ -1252,6 +1275,21 @@ namespace Unity.DemoTeam.Hair
 							}
 						}
 						break;
+					case SettingsSystem.StrandRenderer.BuiltinTubes:
+						{
+							if (subdivision > 0)
+							{
+								mesh = HairInstanceBuilder.CreateMeshTubesIfNull(ref meshInstanceTubes, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.cbuffer._StrandCount, (int)solverData.cbuffer._StagingVertexCount, new Bounds());
+							}
+							else
+							{
+								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetTubes;
+#if !UNITY_2021_2_OR_NEWER
+								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceTubes, mesh, HideFlags.HideAndDontSave);
+#endif
+							}
+						}
+						break;
 				}
 			}
 
@@ -1270,6 +1308,7 @@ namespace Unity.DemoTeam.Hair
 				meshRenderer.shadowCastingMode = settingsSystem.strandShadows;
 				meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
 				meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
+				meshRenderer.rayTracingMode = RayTracingMode.Off;
 
 				if (meshRenderer.rayTracingMode != UnityEngine.Experimental.Rendering.RayTracingMode.Off && SystemInfo.supportsRayTracing)
 					meshRenderer.rayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode.Off;
@@ -1310,6 +1349,10 @@ namespace Unity.DemoTeam.Hair
 				//mesh.bounds = GetSimulationBounds(worldSquare: false, worldToLocalTransform: meshFilter.transform.worldToLocalMatrix);
 #endif
 			}
+
+#if HAS_PACKAGE_UNITY_HDRP
+			UpdateRayTracingState(ref strandGroupInstance, solverData, ref materialInstance, cmd);
+#endif			
 		}
 
 		static void UpdateMaterialState(Material materialInstance, in SettingsSystem settingsSystem, in SettingsStrands settingsStrands, in HairSim.SolverData solverData, in HairSim.VolumeData volumeData)
@@ -1323,6 +1366,7 @@ namespace Unity.DemoTeam.Hair
 
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines || settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
+			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_TUBES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinTubes);
 
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
 			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
@@ -1814,6 +1858,11 @@ namespace Unity.DemoTeam.Hair
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
+					
+#if HAS_PACKAGE_UNITY_HDRP
+					ReleaseRayTracingData(ref strandGroupInstances[i]);
+#endif
 				}
 			}
 
