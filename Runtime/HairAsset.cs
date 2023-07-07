@@ -44,6 +44,7 @@ namespace Unity.DemoTeam.Hair
 			Position = 1 << 0,
 			TexCoord = 1 << 1,
 			Diameter = 1 << 2,
+			UserData = 1 << 3,
 		}
 
 		[Serializable]
@@ -455,9 +456,10 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector3[] rootPosition;
 			[HideInInspector] public Vector3[] rootDirection;
 
-			[HideInInspector] public uint vertexFeatureFlags;
-			[HideInInspector] public float[] particleDiameter;
+			[HideInInspector] public uint      vertexFeatureFlags;
+			[HideInInspector] public float[]   particleDiameter;
 			[HideInInspector] public Vector2[] particleTexCoord;
+			[HideInInspector] public Vector3[] particleUserData;
 			
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
@@ -642,6 +644,7 @@ namespace Unity.DemoTeam.Hair
 			public UnsafeList<Vector3> vertexDataPosition;	// j: vertex index -> curve vertex position
 			public UnsafeList<Vector2> vertexDataTexCoord;	// j: vertex index -> curve vertex texcoord
 			public UnsafeList<float> vertexDataDiameter;	// j: vertex index -> curve vertex diameter
+			public UnsafeList<Vector3> vertexDataUserData;  // j: vertex index -> custom user data
 			public HairAsset.VertexFeatures vertexFeatures;	// m: vertex feature flags
 
 			// vertex data must laid out sequentially, e.g. for two curves a and b:
@@ -664,6 +667,7 @@ namespace Unity.DemoTeam.Hair
 				this.vertexDataPosition = new UnsafeList<Vector3>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 				this.vertexDataTexCoord = new UnsafeList<Vector2>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 				this.vertexDataDiameter = new UnsafeList<float>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.vertexDataUserData = new UnsafeList<Vector3>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 				this.vertexFeatures = HairAsset.VertexFeatures.Position;
 			}
 
@@ -672,6 +676,7 @@ namespace Unity.DemoTeam.Hair
 				curveVertexCount.Dispose();
 				vertexDataPosition.Dispose();
 				vertexDataTexCoord.Dispose();
+				vertexDataUserData.Dispose();
 				vertexDataDiameter.Dispose();
 			}
 		}
