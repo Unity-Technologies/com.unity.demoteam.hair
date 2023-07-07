@@ -457,6 +457,7 @@ namespace Unity.DemoTeam.Hair
 
 			[HideInInspector] public uint vertexFeatureFlags;
 			[HideInInspector] public float[] particleDiameter;
+			[HideInInspector] public Vector2[] particleTexCoord;
 			
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;

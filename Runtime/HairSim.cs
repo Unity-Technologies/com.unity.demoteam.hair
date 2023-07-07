@@ -908,7 +908,11 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			target.BindComputeBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			target.BindComputeBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
-			target.BindComputeBuffer(UniformIDs._ParticleDiameter, solverData.particleDiameter);
+			
+			// optional vertex data	
+			{
+				target.BindComputeBuffer(UniformIDs._ParticleDiameter, solverData.particleDiameter);
+			}
 
 			target.BindComputeBuffer(UniformIDs._LODGuideCount, solverData.lodGuideCount);
 			target.BindComputeBuffer(UniformIDs._LODGuideIndex, solverData.lodGuideIndex);
