@@ -215,11 +215,11 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 		x.tangentWS = vertexTangentWS;
 		x.bitangentWS = vertexBitangentWS;
 		x.rootUV = _RootUV[strandIndex];
-		x.strandUV = vertexUV * float2(1.0, _RootScale[strandIndex]);
+		x.strandUV = vertexUV; //  * float2(1.0, _RootScale[strandIndex]);
 		x.strandIndex = strandIndex;
 		x.strandNormalTS = GetStrandNormalTangentSpace(vertexUV);
 		x.strandDebugColor = GetStrandDebugColor(strandIndex);
-		x.particleUserData = _ParticleUserData[i];
+		x.particleUserData = _ParticleDiameter[i].xxx;
 	}
 	return x;
 }

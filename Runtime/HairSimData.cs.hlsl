@@ -1,9 +1,17 @@
 //
-// This file was automatically generated. Please don't edit by hand.
+// This file was automatically generated. Please don't edit by hand. Execute Editor command [ Edit > Rendering > Generate Shader Includes ] instead
 //
 
 #ifndef HAIRSIMDATA_CS_HLSL
 #define HAIRSIMDATA_CS_HLSL
+//
+// Unity.DemoTeam.Hair.HairSim+VolumeFeatures:  static fields
+//
+#define VOLUMEFEATURES_SCATTERING (1)
+#define VOLUMEFEATURES_SCATTERING_FASTPATH (2)
+#define VOLUMEFEATURES_WIND (4)
+#define VOLUMEFEATURES_WIND_FASTPATH (8)
+
 //
 // Unity.DemoTeam.Hair.HairSim+SolverFeatures:  static fields
 //
@@ -19,14 +27,6 @@
 #define SOLVERFEATURES_POSE_LOCAL_SHAPE_RWD (512)
 #define SOLVERFEATURES_POSE_GLOBAL_POSITION (1024)
 #define SOLVERFEATURES_POSE_GLOBAL_ROTATION (2048)
-
-//
-// Unity.DemoTeam.Hair.HairSim+VolumeFeatures:  static fields
-//
-#define VOLUMEFEATURES_SCATTERING (1)
-#define VOLUMEFEATURES_SCATTERING_FASTPATH (2)
-#define VOLUMEFEATURES_WIND (4)
-#define VOLUMEFEATURES_WIND_FASTPATH (8)
 
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer
 // PackingRules = Exact
