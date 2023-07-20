@@ -188,7 +188,7 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 	float3 vertexNormalWS = cross(vertexTangentWS, vertexBitangentWS);
 
 #if HAIR_VERTEX_ID_STRIPS
-	float3 vertexOffsetWS = vertexTangentWS * (_ParticleDiameter[i] * (vertexUV.x - 0.5));
+	float3 vertexOffsetWS = vertexTangentWS * ((0.01 * _ParticleDiameter[i]) * (vertexUV.x - 0.5));
 #elif HAIR_VERTEX_ID_TUBES
 	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
 	{
@@ -198,8 +198,8 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 		float offsetU, offsetV;
 		UnpackTubeOffsets(vertexUV.x, offsetU, offsetV);
 		
-		vertexOffsetWS += vertexTangentWS * (_ParticleDiameter[i] * (offsetU - 0.5));
-		vertexOffsetWS += vertexNormalWS  * (_ParticleDiameter[i] * (offsetV - 0.5));
+		vertexOffsetWS += vertexTangentWS * ((0.01 * _ParticleDiameter[i]) * (offsetU - 0.5));
+		vertexOffsetWS += vertexNormalWS  * ((0.01 * _ParticleDiameter[i]) * (offsetV - 0.5));
 	}
 #else
 	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
