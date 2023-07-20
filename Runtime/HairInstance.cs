@@ -204,8 +204,6 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
 			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines), FormerlySerializedAs("strandRendererGroupingValue")]
 			public LineRendering.RendererGroup strandRendererGroup;
-			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines)]
-			public AnimationCurve strandRendererLODCurve;
 #endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
@@ -256,7 +254,6 @@ namespace Unity.DemoTeam.Hair
 				strandRenderer = StrandRenderer.BuiltinLines,
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
 				strandRendererGroup = LineRendering.RendererGroup.None,
-				strandRendererLODCurve = AnimationCurve.Constant(0.0f, 1.0f, 1.0f),
 #endif
 				strandShadows = ShadowCastingMode.On,
 				strandLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
@@ -1330,8 +1327,7 @@ namespace Unity.DemoTeam.Hair
 
 					meshRendererHDRP.enabled = true;
 					meshRendererHDRP.rendererGroup = settingsSystem.strandRendererGroup;
-					meshRendererHDRP.rendererLODMode = LineRendering.RendererLODMode.CameraDistance;
-					meshRendererHDRP.rendererLODCameraDistanceCurve = settingsSystem.strandRendererLODCurve;
+					meshRendererHDRP.rendererLODMode = LineRendering.RendererLODMode.ScreenCoverage;
 					meshRendererHDRP.enableHighQualityLineRendering = (settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
 				}
 #endif
