@@ -152,6 +152,10 @@ struct WindEmitter
 	float v;	// flow speed
 	float A;	// flow pulse amplitude
 	float f;	// flow pulse frequency
+
+	float jd;	// jitter displacement
+	float jw;	// jitter resolution
+	float jp;	// jitter planar
 };
 
 StructuredBuffer<WindEmitter> _WindEmitter;
