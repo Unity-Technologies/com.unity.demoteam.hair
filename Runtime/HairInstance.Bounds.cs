@@ -111,12 +111,17 @@ namespace Unity.DemoTeam.Hair
 							s_MaxBoundingCorner = new Vector3(OrderedUintToFloat(data[3]), OrderedUintToFloat(data[4]), OrderedUintToFloat(data[5]));
 						}
 					});
-					cmd.WaitAllAsyncReadbackRequests();
 
+					if (float.IsNaN(s_MinBoundingCorner.x) || float.IsNaN(s_MaxBoundingCorner.x))
+					{
+					#if UNITY_EDITOR
+						Debug.LogWarning("Automatic GPU Bounds produced an invalid result. Falling back to Automatic CPU.");
+					#endif
+						goto case SettingsSystem.BoundsMode.Automatic;
+					}
+					
 					bounds.center = 0.5f * (s_MinBoundingCorner + s_MaxBoundingCorner);
 					bounds.size   = s_MaxBoundingCorner - s_MinBoundingCorner;
-
-					// goto case SettingsSystem.BoundsMode.Automatic;
 				}
 					break;
 

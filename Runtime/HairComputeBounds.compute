@@ -26,17 +26,12 @@ uint FloatToOrderedUint(float value)
 [numthreads(1, 1, 1)]
 void ClearBuffer()
 {
-    // For min corner, we want to start with the highest possible value
-    uint maxVal = UINT_MAX;
-    _BoundsBuffer.Store(0u, maxVal);  // x
-    _BoundsBuffer.Store(4u, maxVal);  // y
-    _BoundsBuffer.Store(8u, maxVal);  // z
-
-    // For max corner, we want to start with the lowest possible value
-    uint minVal = 0u;
-    _BoundsBuffer.Store(12u, minVal); // x
-    _BoundsBuffer.Store(16u, minVal); // y
-    _BoundsBuffer.Store(20u, minVal); // z
+    _BoundsBuffer.Store(0u,  UINT_MAX); // x
+    _BoundsBuffer.Store(4u,  UINT_MAX); // y
+    _BoundsBuffer.Store(8u,  UINT_MAX); // z
+    _BoundsBuffer.Store(12u, 0u);       // x
+    _BoundsBuffer.Store(16u, 0u);       // y
+    _BoundsBuffer.Store(20u, 0u);       // z
 }
 
 [numthreads(64, 1, 1)]
@@ -44,14 +39,15 @@ void Compute(uint3 dispatchID : SV_DispatchThreadID)
 {
     if (dispatchID.x >= _ParticleCount)
         return;
-    
+
+    // Load the current 
     float3 positionOS = LoadPosition(dispatchID.x);
 
     const uint sortableX = FloatToOrderedUint(positionOS.x);
     const uint sortableY = FloatToOrderedUint(positionOS.y);
     const uint sortableZ = FloatToOrderedUint(positionOS.z);
 
-    // if (WaveIsFirstLane())
+    // TODO: Optimize
     {
         _BoundsBuffer.InterlockedMin(0u,  sortableX);
         _BoundsBuffer.InterlockedMin(4u,  sortableY);
