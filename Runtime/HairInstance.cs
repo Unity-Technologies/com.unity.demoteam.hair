@@ -143,6 +143,7 @@ namespace Unity.DemoTeam.Hair
 			public enum BoundsMode
 			{
 				Automatic,
+				AutomaticGPU,
 				Fixed,
 			}
 
@@ -1413,46 +1414,10 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		// TODO: Remove
 		public Bounds GetSimulationBounds(bool worldSquare = true, Matrix4x4? worldToLocalTransform = null)
 		{
-			Debug.Assert(worldSquare == false || worldToLocalTransform == null);
-
-			var boundsScale = settingsSystem.boundsScale ? settingsSystem.boundsScaleValue : 1.25f;
-			var bounds = new Bounds();
-			{
-				bounds.center = Vector3.zero;
-				bounds.extents = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
-			}
-
-			switch (settingsSystem.boundsMode)
-			{
-				case SettingsSystem.BoundsMode.Automatic:
-					{
-						for (int i = 0; i != strandGroupInstances.Length; i++)
-						{
-							var rootMargin = GetStrandScale(strandGroupInstances[i]) * strandGroupInstances[i].groupAssetReference.Resolve().maxStrandLength;
-							var rootBounds = GetRootBounds(strandGroupInstances[i], worldToLocalTransform);
-							{
-								rootBounds.Expand(2.0f * rootMargin * boundsScale);
-							}
-
-							bounds.Encapsulate(rootBounds);
-						}
-					}
-					break;
-
-				case SettingsSystem.BoundsMode.Fixed:
-					{
-						bounds.center = settingsSystem.boundsCenter + this.transform.position;
-						bounds.extents = settingsSystem.boundsExtent * boundsScale;
-					}
-					break;
-			}
-
-			if (worldSquare)
-				return new Bounds(bounds.center, bounds.size.CMax() * Vector3.one);
-			else
-				return bounds;
+			return simulationBounds;
 		}
 
 		public ref readonly SettingsSkinning GetSettingsSkinning(in GroupInstance strandGroupInstance)
@@ -1535,6 +1500,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			if (InitializeRuntimeData(cmd, cmdFlags))
 			{
+				UpdateSimulationBounds(cmd);
 				UpdateSimulationLOD(cmd);
 				UpdateSimulationState(cmd, cmdFlags, dt);
 				UpdateRenderingState(cmd);

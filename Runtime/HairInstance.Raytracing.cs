@@ -91,7 +91,7 @@ namespace Unity.DemoTeam.Hair
             if (s_loadedRaytracingResources)
                 return;
             
-            var resources = HairRaytracingResources.Load();
+            var resources = HairSystemResources.Load();
             {
                 s_updateMeshPositionsCS = resources.computeUpdateMeshVertices;
             }

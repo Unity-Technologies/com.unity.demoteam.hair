@@ -1,0 +1,64 @@
+#pragma kernel ClearBuffer
+#pragma kernel Compute
+
+#pragma enable_d3d11_debug_symbols
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
+#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
+#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariablesFunctions.hlsl"
+
+#include "HairVertex.hlsl"
+
+int _ParticleCount;
+
+// minimum corner (12 bytes)
+// maximum corner (12 bytes)
+RWByteAddressBuffer _BoundsBuffer;
+
+// Converts a float to an unsigned integer in a way that preserves the order of the numbers
+uint FloatToOrderedUint(float value)
+{
+    uint u = asuint(value);
+    return u >> 31 ? ~u : (u | (1 << 31));
+}
+
+[numthreads(1, 1, 1)]
+void ClearBuffer()
+{
+    // For min corner, we want to start with the highest possible value
+    uint maxVal = UINT_MAX;
+    _BoundsBuffer.Store(0u, maxVal);  // x
+    _BoundsBuffer.Store(4u, maxVal);  // y
+    _BoundsBuffer.Store(8u, maxVal);  // z
+
+    // For max corner, we want to start with the lowest possible value
+    uint minVal = 0u;
+    _BoundsBuffer.Store(12u, minVal); // x
+    _BoundsBuffer.Store(16u, minVal); // y
+    _BoundsBuffer.Store(20u, minVal); // z
+}
+
+[numthreads(64, 1, 1)]
+void Compute(uint3 dispatchID : SV_DispatchThreadID)
+{
+    if (dispatchID.x >= _ParticleCount)
+        return;
+    
+    float3 positionOS = LoadPosition(dispatchID.x);
+
+    const uint sortableX = FloatToOrderedUint(positionOS.x);
+    const uint sortableY = FloatToOrderedUint(positionOS.y);
+    const uint sortableZ = FloatToOrderedUint(positionOS.z);
+
+    // if (WaveIsFirstLane())
+    {
+        _BoundsBuffer.InterlockedMin(0u,  sortableX);
+        _BoundsBuffer.InterlockedMin(4u,  sortableY);
+        _BoundsBuffer.InterlockedMin(8u,  sortableZ);
+        
+        if (sortableX != UINT_MAX) _BoundsBuffer.InterlockedMax(12u, sortableX);
+        if (sortableY != UINT_MAX) _BoundsBuffer.InterlockedMax(16u, sortableY);
+        if (sortableZ != UINT_MAX) _BoundsBuffer.InterlockedMax(20u, sortableZ);
+    }
+}

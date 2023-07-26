@@ -50,13 +50,13 @@ namespace Unity.DemoTeam.Hair
 		{
 			switch (pipelineLabel)
 			{
-				case PipelineLabel.Builtin: return HairSimResources.Load().defaultBuiltin;
-				case PipelineLabel.Custom: return HairSimResources.Load().defaultCustom;
-				case PipelineLabel.HDRP: return HairSimResources.Load().defaultHDRP;
-				case PipelineLabel.URP: return HairSimResources.Load().defaultURP;
+				case PipelineLabel.Builtin: return HairSystemResources.Load().defaultBuiltin;
+				case PipelineLabel.Custom: return HairSystemResources.Load().defaultCustom;
+				case PipelineLabel.HDRP: return HairSystemResources.Load().defaultHDRP;
+				case PipelineLabel.URP: return HairSystemResources.Load().defaultURP;
 			}
 
-			return HairSimResources.Load().defaultCustom;
+			return HairSystemResources.Load().defaultCustom;
 		}
 
 		public static Material GetPipelineDefaultMaterial(RenderPipeline pipeline) => GetPipelineDefaultMaterial(GetPipelineLabel(pipeline));
@@ -120,8 +120,8 @@ namespace Unity.DemoTeam.Hair
 		{
 			switch (type)
 			{
-				case ReplacementType.Async: return HairSimResources.Load().replaceAsync;
-				case ReplacementType.Error: return HairSimResources.Load().replaceError;
+				case ReplacementType.Async: return HairSystemResources.Load().replaceAsync;
+				case ReplacementType.Error: return HairSystemResources.Load().replaceError;
 			}
 
 			return null;

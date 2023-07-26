@@ -634,7 +634,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				var resources = HairSimResources.Load();
+				var resources = HairSystemResources.Load();
 				{
 					s_solverCS = resources.computeSolver;
 					s_solverRootsMat = CoreUtils.CreateEngineMaterial(resources.computeRoots);
