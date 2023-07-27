@@ -5,7 +5,6 @@
 #define USE_DERIVED_CACHE
 
 using System;
-using Accord.Math;
 using UnityEngine;
 using UnityEditor;
 using Unity.Collections;
