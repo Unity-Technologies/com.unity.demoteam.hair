@@ -52,7 +52,8 @@ void Compute(uint3 dispatchID : SV_DispatchThreadID)
         _BoundsBuffer.InterlockedMin(0u,  sortableX);
         _BoundsBuffer.InterlockedMin(4u,  sortableY);
         _BoundsBuffer.InterlockedMin(8u,  sortableZ);
-        
+
+        // There seems to be some ~0 results that produce nans later on, guard it here.
         if (sortableX != UINT_MAX) _BoundsBuffer.InterlockedMax(12u, sortableX);
         if (sortableY != UINT_MAX) _BoundsBuffer.InterlockedMax(16u, sortableY);
         if (sortableZ != UINT_MAX) _BoundsBuffer.InterlockedMax(20u, sortableZ);

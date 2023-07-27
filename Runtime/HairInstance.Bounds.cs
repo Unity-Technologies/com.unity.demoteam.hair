@@ -67,6 +67,12 @@ namespace Unity.DemoTeam.Hair
 
 				case SettingsSystem.BoundsMode.AutomaticGPU:
 				{
+					if (cmd == null)
+					{	
+						// No command buffer provided to record commands, fall back to automatic CPU.
+						goto case SettingsSystem.BoundsMode.Automatic;
+					}
+					
 					if (s_boundsBuffer == null)
 						s_boundsBuffer = new ComputeBuffer(6, sizeof(uint), ComputeBufferType.Raw);
 

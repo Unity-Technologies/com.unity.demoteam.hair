@@ -1417,6 +1417,12 @@ namespace Unity.DemoTeam.Hair
 		// TODO: Remove
 		public Bounds GetSimulationBounds(bool worldSquare = true, Matrix4x4? worldToLocalTransform = null)
 		{
+			if (simulationBounds.extents == Vector3.zero)
+			{
+				// Force automatic CPU bounds in case the bounds are invalid. 
+				UpdateSimulationBounds(null);
+			}
+			
 			return simulationBounds;
 		}
 
