@@ -1832,7 +1832,7 @@ namespace Unity.DemoTeam.Hair
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
-					
+					ReleaseBoundsData();
 #if HAS_PACKAGE_UNITY_HDRP
 					ReleaseRayTracingData(ref strandGroupInstances[i]);
 #endif
