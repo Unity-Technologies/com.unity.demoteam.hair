@@ -75,29 +75,32 @@ namespace Unity.DemoTeam.Hair
 					if (s_boundsBuffer == null)
 						s_boundsBuffer = new ComputeBuffer(6, sizeof(uint), ComputeBufferType.Raw);
 
-					// Clear the bounds buffer
-					cmd.SetComputeBufferParam(s_computeBoundsCS, 0, "_BoundsBuffer", s_boundsBuffer);
-					cmd.DispatchCompute(s_computeBoundsCS, 0, 1, 1, 1);
-					
-					// Compute the min/max position across all strand group instances. 
-					for (int i = 0; i != strandGroupInstances.Length; i++)
+					using (new ProfilingScope(cmd, new ProfilingSampler("Compute Bounds (GPU)")))
 					{
-						// Bind the particle position buffer
-						HairSim.BindSolverData(cmd, s_computeBoundsCS, 1, solverData[i]);
-
-						cmd.SetComputeBufferParam(s_computeBoundsCS, 1, "_BoundsBuffer", s_boundsBuffer);
+						// Clear the bounds buffer
+						cmd.SetComputeBufferParam(s_computeBoundsCS, 0, "_BoundsBuffer", s_boundsBuffer);
+						cmd.DispatchCompute(s_computeBoundsCS, 0, 1, 1, 1);
 						
-						int particleCount;
+						// Compute the min/max position across all strand group instances. 
+						for (int i = 0; i != strandGroupInstances.Length; i++)
 						{
-							var strandGroup = strandGroupInstances[i].groupAssetReference.Resolve();
-							particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
-						}
-						
-						// Push the particle count to avoid min/max with uninitialized memory. 
-						cmd.SetComputeIntParam(s_computeBoundsCS, "_ParticleCount", particleCount);
+							// Bind the particle position buffer
+							HairSim.BindSolverData(cmd, s_computeBoundsCS, 1, solverData[i]);
 
-						const int groupSize = 64;
-						cmd.DispatchCompute(s_computeBoundsCS, 1, (particleCount + groupSize - 1) / groupSize, 1, 1);
+							cmd.SetComputeBufferParam(s_computeBoundsCS, 1, "_BoundsBuffer", s_boundsBuffer);
+							
+							int particleCount;
+							{
+								var strandGroup = strandGroupInstances[i].groupAssetReference.Resolve();
+								particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
+							}
+							
+							// Push the particle count to avoid min/max with uninitialized memory. 
+							cmd.SetComputeIntParam(s_computeBoundsCS, "_ParticleCount", particleCount);
+
+							const int groupSize = 64;
+							cmd.DispatchCompute(s_computeBoundsCS, 1, (particleCount + groupSize - 1) / groupSize, 1, 1);
+						}
 					}
 					
 					float OrderedUintToFloat(uint u)
