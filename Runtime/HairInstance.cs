@@ -183,6 +183,7 @@ namespace Unity.DemoTeam.Hair
 			public Vector3 boundsCenter;
 			[VisibleIf(nameof(boundsMode), BoundsMode.Fixed)]
 			public Vector3 boundsExtent;
+			public bool boundsSquare;
 			[ToggleGroup]
 			public bool boundsScale;
 			[ToggleGroupItem, Range(0.0f, 2.0f)]
@@ -205,6 +206,12 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
 			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines), FormerlySerializedAs("strandRendererGroupingValue")]
 			public LineRendering.RendererGroup strandRendererGroup;
+			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines)]
+			public LineRendering.RendererLODMode strandRendererLODMode;
+			[VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines)]
+			public AnimationCurve strandRendererLODCurve;
+			[Range(0.0f, 1.0f), VisibleIf(nameof(strandRenderer), StrandRenderer.HDRPHighQualityLines)]
+			public float strandRendererLODFixed;
 #endif
 			public ShadowCastingMode strandShadows;
 			[RenderingLayerMask]
@@ -245,6 +252,7 @@ namespace Unity.DemoTeam.Hair
 				boundsExtent = new Vector3(1.0f, 1.0f, 1.0f),
 				boundsScale = false,
 				boundsScaleValue = 1.25f,
+				boundsSquare = true,
 
 				kLODSearch = LODSelection.Fixed,
 				kLODSearchViews = ~CameraType.SceneView,
@@ -1328,7 +1336,10 @@ namespace Unity.DemoTeam.Hair
 
 					meshRendererHDRP.enabled = true;
 					meshRendererHDRP.rendererGroup = settingsSystem.strandRendererGroup;
-					meshRendererHDRP.rendererLODMode = LineRendering.RendererLODMode.ScreenCoverage;
+					meshRendererHDRP.rendererLODMode = settingsSystem.strandRendererLODMode;
+					meshRendererHDRP.rendererLODFixed = settingsSystem.strandRendererLODFixed;
+					meshRendererHDRP.rendererLODCameraCoverageCurve = settingsSystem.strandRendererLODCurve;
+					meshRendererHDRP.rendererLODCameraDistanceCurve = settingsSystem.strandRendererLODCurve;
 					meshRendererHDRP.enableHighQualityLineRendering = (settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
 				}
 #endif

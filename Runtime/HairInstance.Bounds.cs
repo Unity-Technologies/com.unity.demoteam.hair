@@ -87,26 +87,17 @@ namespace Unity.DemoTeam.Hair
 
 						cmd.SetComputeBufferParam(s_computeBoundsCS, 1, "_BoundsBuffer", boundsBuffer);
 						
-						// Compute the min/max position across all strand group instances. 
-						for (int i = 0; i != strandGroupInstances.Length; i++)
+						int particleCount;
 						{
-							// Bind the particle position buffer
-							HairSim.BindSolverData(cmd, s_computeBoundsCS, 1, solverData[i]);
-
-							cmd.SetComputeBufferParam(s_computeBoundsCS, 1, "_BoundsBuffer", s_boundsBuffer);
-							
-							int particleCount;
-							{
-								var strandGroup = strandGroupInstances[i].groupAssetReference.Resolve();
-								particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
-							}
-							
-							// Push the particle count to avoid min/max with uninitialized memory. 
-							cmd.SetComputeIntParam(s_computeBoundsCS, "_ParticleCount", particleCount);
-
-							const int groupSize = 64;
-							cmd.DispatchCompute(s_computeBoundsCS, 1, (particleCount + groupSize - 1) / groupSize, 1, 1);
+							var strandGroup = strandGroupInstances[i].groupAssetReference.Resolve();
+							particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
 						}
+						
+						// Push the particle count to avoid min/max with uninitialized memory. 
+						cmd.SetComputeIntParam(s_computeBoundsCS, "_ParticleCount", particleCount);
+
+						const int groupSize = 64;
+						cmd.DispatchCompute(s_computeBoundsCS, 1, (particleCount + groupSize - 1) / groupSize, 1, 1);
 					}
 					
 					float OrderedUintToFloat(uint u)
@@ -147,7 +138,7 @@ namespace Unity.DemoTeam.Hair
 					break;
 			}
 
-			if (worldSquare)
+			if (settingsSystem.boundsSquare)
 			{
 				bounds = new Bounds(bounds.center, bounds.size.CMax() * Vector3.one);
 			}
