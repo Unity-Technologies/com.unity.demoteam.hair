@@ -10,7 +10,7 @@ namespace Unity.DemoTeam.Hair
 	    [NonSerialized] public Bounds simulationBounds;
 
 	    static ComputeShader s_computeBoundsCS;
-	    static ComputeBuffer s_boundsBuffer;
+	    static ComputeBuffer boundsBuffer;
 	    
 	    static bool s_loadedBoundsComputeResources = false;
 	    
@@ -32,8 +32,8 @@ namespace Unity.DemoTeam.Hair
 		    s_loadedBoundsComputeResources = true;
 	    }
 
-	    private static Vector3 s_MinBoundingCorner;
-	    private static Vector3 s_MaxBoundingCorner;
+	    private Vector3 minBoundingCorner;
+	    private Vector3 maxBoundingCorner;
 	    
 		void UpdateSimulationBounds(CommandBuffer cmd, bool worldSquare = true, Matrix4x4? worldToLocalTransform = null)
 		{
@@ -72,14 +72,20 @@ namespace Unity.DemoTeam.Hair
 						goto case SettingsSystem.BoundsMode.Automatic;
 					}
 					
-					if (s_boundsBuffer == null)
-						s_boundsBuffer = new ComputeBuffer(6, sizeof(uint), ComputeBufferType.Raw);
+					if (boundsBuffer == null)
+						boundsBuffer = new ComputeBuffer(6, sizeof(uint), ComputeBufferType.Raw);
 
-					using (new ProfilingScope(cmd, new ProfilingSampler("Compute Bounds (GPU)")))
+					// Clear the bounds buffer
+					cmd.SetComputeBufferParam(s_computeBoundsCS, 0, "_BoundsBuffer", boundsBuffer);
+					cmd.DispatchCompute(s_computeBoundsCS, 0, 1, 1, 1);
+					
+					// Compute the min/max position across all strand group instances. 
+					for (int i = 0; i != strandGroupInstances.Length; i++)
 					{
-						// Clear the bounds buffer
-						cmd.SetComputeBufferParam(s_computeBoundsCS, 0, "_BoundsBuffer", s_boundsBuffer);
-						cmd.DispatchCompute(s_computeBoundsCS, 0, 1, 1, 1);
+						// Bind the particle position buffer
+						HairSim.BindSolverData(cmd, s_computeBoundsCS, 1, solverData[i]);
+
+						cmd.SetComputeBufferParam(s_computeBoundsCS, 1, "_BoundsBuffer", boundsBuffer);
 						
 						// Compute the min/max position across all strand group instances. 
 						for (int i = 0; i != strandGroupInstances.Length; i++)
@@ -110,17 +116,17 @@ namespace Unity.DemoTeam.Hair
 					}
 					
 					// Read-back
-					cmd.RequestAsyncReadback(s_boundsBuffer, request =>
+					cmd.RequestAsyncReadback(boundsBuffer, request =>
 					{
 						if (!request.hasError)
 						{
 							var data = request.GetData<uint>();
-							s_MinBoundingCorner = new Vector3(OrderedUintToFloat(data[0]), OrderedUintToFloat(data[1]), OrderedUintToFloat(data[2]));
-							s_MaxBoundingCorner = new Vector3(OrderedUintToFloat(data[3]), OrderedUintToFloat(data[4]), OrderedUintToFloat(data[5]));
+							minBoundingCorner = new Vector3(OrderedUintToFloat(data[0]), OrderedUintToFloat(data[1]), OrderedUintToFloat(data[2]));
+							maxBoundingCorner = new Vector3(OrderedUintToFloat(data[3]), OrderedUintToFloat(data[4]), OrderedUintToFloat(data[5]));
 						}
 					});
 
-					if (float.IsNaN(s_MinBoundingCorner.x) || float.IsNaN(s_MaxBoundingCorner.x))
+					if (float.IsNaN(minBoundingCorner.x) || float.IsNaN(maxBoundingCorner.x))
 					{
 					#if UNITY_EDITOR
 						Debug.LogWarning("Automatic GPU Bounds produced an invalid result. Falling back to Automatic CPU.");
@@ -128,8 +134,8 @@ namespace Unity.DemoTeam.Hair
 						goto case SettingsSystem.BoundsMode.Automatic;
 					}
 					
-					bounds.center = 0.5f * (s_MinBoundingCorner + s_MaxBoundingCorner);
-					bounds.size   = s_MaxBoundingCorner - s_MinBoundingCorner;
+					bounds.center = 0.5f * (minBoundingCorner + maxBoundingCorner);
+					bounds.size   = maxBoundingCorner - minBoundingCorner;
 				}
 					break;
 
@@ -145,6 +151,12 @@ namespace Unity.DemoTeam.Hair
 			{
 				bounds = new Bounds(bounds.center, bounds.size.CMax() * Vector3.one);
 			}
+		}
+
+		void ReleaseBoundsData()
+		{
+			boundsBuffer?.Dispose();
+			boundsBuffer = null;
 		}
     }
 }
