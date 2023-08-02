@@ -10,7 +10,7 @@ namespace Unity.DemoTeam.Hair
 	    [NonSerialized] public Bounds simulationBounds;
 
 	    static ComputeShader s_computeBoundsCS;
-	    static ComputeBuffer boundsBuffer;
+	    ComputeBuffer boundsBuffer;
 	    
 	    static bool s_loadedBoundsComputeResources = false;
 	    
