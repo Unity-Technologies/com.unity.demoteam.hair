@@ -5,6 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Unity.DemoTeam.Hair
 {
+	using static HairSimUtility;
     public partial class HairInstance
     {
 	    [NonSerialized] public Bounds simulationBounds;
@@ -13,6 +14,13 @@ namespace Unity.DemoTeam.Hair
 	    ComputeBuffer boundsBuffer;
 	    
 	    static bool s_loadedBoundsComputeResources = false;
+	    
+	    static class BoundsKernels
+	    {
+		    public static int KClearBuffer;
+		    public static int KComputeBoundsStrands;
+		    public static int KComputeBoundsRoots;
+	    }
 	    
 #if UNITY_EDITOR
 	    [UnityEditor.InitializeOnLoadMethod]
@@ -29,6 +37,7 @@ namespace Unity.DemoTeam.Hair
 			    s_computeBoundsCS = resources.computeBounds;
 		    }
 
+		    InitializeStaticFields(typeof(BoundsKernels), (string s) => s_computeBoundsCS.FindKernel(s));
 		    s_loadedBoundsComputeResources = true;
 	    }
 
@@ -76,28 +85,33 @@ namespace Unity.DemoTeam.Hair
 						boundsBuffer = new ComputeBuffer(6, sizeof(uint), ComputeBufferType.Raw);
 
 					// Clear the bounds buffer
-					cmd.SetComputeBufferParam(s_computeBoundsCS, 0, "_BoundsBuffer", boundsBuffer);
-					cmd.DispatchCompute(s_computeBoundsCS, 0, 1, 1, 1);
+					cmd.SetComputeBufferParam(s_computeBoundsCS, BoundsKernels.KClearBuffer, "_BoundsBuffer", boundsBuffer);
+					cmd.DispatchCompute(s_computeBoundsCS,  BoundsKernels.KClearBuffer, 1, 1, 1);
+
+					bool calculateBoundsFromRoots = settingsSystem.approximateBoundsFromRoots;
+					int calculateBoundsKernel = calculateBoundsFromRoots
+						? BoundsKernels.KComputeBoundsRoots
+						: BoundsKernels.KComputeBoundsStrands;
 					
 					// Compute the min/max position across all strand group instances. 
 					for (int i = 0; i != strandGroupInstances.Length; i++)
 					{
+						var rootMargin = GetStrandScale(strandGroupInstances[i]) * strandGroupInstances[i].groupAssetReference.Resolve().maxStrandLength;
+						var pointSize = new Vector3(rootMargin * boundsScale, rootMargin * boundsScale, rootMargin * boundsScale);
 						// Bind the particle position buffer
-						HairSim.BindSolverData(cmd, s_computeBoundsCS, 1, solverData[i]);
+						HairSim.BindSolverData(cmd, s_computeBoundsCS,  calculateBoundsKernel, solverData[i]);
 
-						cmd.SetComputeBufferParam(s_computeBoundsCS, 1, "_BoundsBuffer", boundsBuffer);
+						cmd.SetComputeVectorParam(s_computeBoundsCS, "_BoundsMargin", pointSize);
+						cmd.SetComputeBufferParam(s_computeBoundsCS, calculateBoundsKernel, "_BoundsBuffer", boundsBuffer);
 						
 						int particleCount;
 						{
 							var strandGroup = strandGroupInstances[i].groupAssetReference.Resolve();
-							particleCount = strandGroup.strandCount * strandGroup.strandParticleCount;
+							particleCount = calculateBoundsFromRoots ? strandGroup.strandCount : strandGroup.strandCount * strandGroup.strandParticleCount;
 						}
 						
-						// Push the particle count to avoid min/max with uninitialized memory. 
-						cmd.SetComputeIntParam(s_computeBoundsCS, "_ParticleCount", particleCount);
-
 						const int groupSize = 64;
-						cmd.DispatchCompute(s_computeBoundsCS, 1, (particleCount + groupSize - 1) / groupSize, 1, 1);
+						cmd.DispatchCompute(s_computeBoundsCS, calculateBoundsKernel, (particleCount + groupSize - 1) / groupSize, 1, 1);
 					}
 					
 					float OrderedUintToFloat(uint u)

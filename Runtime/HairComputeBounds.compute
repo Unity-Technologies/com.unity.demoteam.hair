@@ -1,5 +1,6 @@
-#pragma kernel ClearBuffer
-#pragma kernel Compute
+#pragma kernel KClearBuffer
+#pragma kernel KComputeBoundsStrands
+#pragma kernel KComputeBoundsRoots
 
 #pragma enable_d3d11_debug_symbols
 
@@ -9,9 +10,7 @@
 #include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariablesFunctions.hlsl"
 
 #include "HairVertex.hlsl"
-
-int _ParticleCount;
-
+float3 _BoundsMargin;
 // minimum corner (12 bytes)
 // maximum corner (12 bytes)
 RWByteAddressBuffer _BoundsBuffer;
@@ -24,7 +23,7 @@ uint FloatToOrderedUint(float value)
 }
 
 [numthreads(1, 1, 1)]
-void ClearBuffer()
+void KClearBuffer()
 {
     _BoundsBuffer.Store(0u,  UINT_MAX); // x
     _BoundsBuffer.Store(4u,  UINT_MAX); // y
@@ -34,28 +33,50 @@ void ClearBuffer()
     _BoundsBuffer.Store(20u, 0u);       // z
 }
 
-[numthreads(64, 1, 1)]
-void Compute(uint3 dispatchID : SV_DispatchThreadID)
+void ExpandBounds(float3 positionOS, float3 pointSize)
 {
-    if (dispatchID.x >= _ParticleCount)
+    const float3 cornerMin = positionOS - pointSize;
+    const float3 cornerMax = positionOS + pointSize;
+    
+    const uint sortableXMin = FloatToOrderedUint(cornerMin.x);
+    const uint sortableYMin = FloatToOrderedUint(cornerMin.y);
+    const uint sortableZMin = FloatToOrderedUint(cornerMin.z);
+
+    const uint sortableXMax = FloatToOrderedUint(cornerMax.x);
+    const uint sortableYMax = FloatToOrderedUint(cornerMax.y);
+    const uint sortableZMax = FloatToOrderedUint(cornerMax.z);
+
+    // TODO: Optimize
+    {
+        _BoundsBuffer.InterlockedMin(0u,  sortableXMin);
+        _BoundsBuffer.InterlockedMin(4u,  sortableYMin);
+        _BoundsBuffer.InterlockedMin(8u,  sortableZMin);
+
+        // There seems to be some ~0 results that produce nans later on, guard it here.
+        if (sortableXMax != UINT_MAX) _BoundsBuffer.InterlockedMax(12u, sortableXMax);
+        if (sortableYMax != UINT_MAX) _BoundsBuffer.InterlockedMax(16u, sortableYMax);
+        if (sortableZMax != UINT_MAX) _BoundsBuffer.InterlockedMax(20u, sortableZMax);
+    }
+}
+[numthreads(64, 1, 1)]
+void KComputeBoundsStrands(uint3 dispatchID : SV_DispatchThreadID)
+{
+    if(dispatchID.x >= _StrandParticleCount*_SolverStrandCount)
         return;
 
     // Load the current 
     float3 positionOS = LoadPosition(dispatchID.x);
+    ExpandBounds(positionOS, 0);
+}
 
-    const uint sortableX = FloatToOrderedUint(positionOS.x);
-    const uint sortableY = FloatToOrderedUint(positionOS.y);
-    const uint sortableZ = FloatToOrderedUint(positionOS.z);
 
-    // TODO: Optimize
-    {
-        _BoundsBuffer.InterlockedMin(0u,  sortableX);
-        _BoundsBuffer.InterlockedMin(4u,  sortableY);
-        _BoundsBuffer.InterlockedMin(8u,  sortableZ);
+[numthreads(64, 1, 1)]
+void KComputeBoundsRoots(uint3 dispatchID : SV_DispatchThreadID)
+{
+    if (dispatchID.x >= _SolverStrandCount)
+        return;
 
-        // There seems to be some ~0 results that produce nans later on, guard it here.
-        if (sortableX != UINT_MAX) _BoundsBuffer.InterlockedMax(12u, sortableX);
-        if (sortableY != UINT_MAX) _BoundsBuffer.InterlockedMax(16u, sortableY);
-        if (sortableZ != UINT_MAX) _BoundsBuffer.InterlockedMax(20u, sortableZ);
-    }
+    // Load the current 
+    float3 positionOS = _RootPosition[dispatchID.x];
+    ExpandBounds(positionOS, _BoundsMargin);
 }

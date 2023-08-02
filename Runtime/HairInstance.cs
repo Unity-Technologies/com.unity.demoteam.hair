@@ -188,7 +188,8 @@ namespace Unity.DemoTeam.Hair
 			public bool boundsScale;
 			[ToggleGroupItem, Range(0.0f, 2.0f)]
 			public float boundsScaleValue;
-
+			[VisibleIf(nameof(boundsMode), BoundsMode.AutomaticGPU)]
+			public bool approximateBoundsFromRoots;
 			[LineHeader("LOD")]
 
 			public LODSelection kLODSearch;
@@ -252,6 +253,7 @@ namespace Unity.DemoTeam.Hair
 				boundsExtent = new Vector3(1.0f, 1.0f, 1.0f),
 				boundsScale = false,
 				boundsScaleValue = 1.25f,
+				approximateBoundsFromRoots = false,
 				boundsSquare = true,
 
 				kLODSearch = LODSelection.Fixed,
