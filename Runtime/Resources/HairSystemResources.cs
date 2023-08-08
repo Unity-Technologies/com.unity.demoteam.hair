@@ -2,14 +2,14 @@ using UnityEngine;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class HairSimResources : ScriptableObject
+	public class HairSystemResources : ScriptableObject
 	{
-		static HairSimResources s_resources;
+		static HairSystemResources s_resources;
 
-		public static HairSimResources Load()
+		public static HairSystemResources Load()
 		{
 			if (s_resources == null)
-				s_resources = Resources.Load<HairSimResources>("HairSimResources");
+				s_resources = Resources.Load<HairSystemResources>("HairSystemResources");
 
 			return s_resources;
 		}
@@ -18,10 +18,11 @@ namespace Unity.DemoTeam.Hair
 
 		public Shader computeRoots;
 		public ComputeShader computeSolver;
-
 		public ComputeShader computeVolume;
 		public Shader computeVolumeRaster;
-
+		public ComputeShader computeUpdateMeshVertices;
+		public ComputeShader computeBounds;
+		
 		[LineHeader("Debugging")]
 
 		public Shader debugDraw;

@@ -66,7 +66,7 @@ struct appdata_hair
 {
 	float vertexID : TEXCOORD0;
 	float2 vertexUV : TEXCOORD1;
-#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS)
+#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS || HAIR_VERTEX_ID_TUBES)
 	float4 vertex : COLOR;
 #else
 	float4 vertex : POSITION;

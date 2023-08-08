@@ -14,7 +14,7 @@ using Unity.DemoTeam.DigitalHuman;
 
 namespace Unity.DemoTeam.Hair
 {
-	public static class HairInstanceBuilder
+	public static partial class HairInstanceBuilder
 	{
 		public static void ClearHairInstance(HairInstance hairInstance)
 		{
@@ -34,6 +34,11 @@ namespace Unity.DemoTeam.Hair
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
+					
+#if HAS_PACKAGE_UNITY_HDRP
+					DestroyRayTracingObjects(ref strandGroupInstances[i]);
+#endif
 				}
 			}
 
@@ -123,6 +128,10 @@ namespace Unity.DemoTeam.Hair
 						strandGroupInstance.sceneObjects.strandMeshRendererHDRP = CreateComponent<HDAdditionalMeshRendererSettings>(strandGroupInstance.sceneObjects.strandMeshContainer, hideFlags);
 #endif
 					}
+					
+#if HAS_PACKAGE_UNITY_HDRP
+					BuildRayTracingObjects(ref strandGroupInstance, flatIndex, hideFlags);
+#endif
 				}
 
 				hairInstance.strandGroupChecksums[writeIndexChecksum++] = hairAsset.checksum;
@@ -312,13 +321,13 @@ namespace Unity.DemoTeam.Hair
 						//  :  .   :
 						//  |,     |
 						//  4------5
-						//  |    ,´|
-						//  |  ,´  |      etc.
-						//  |,´    |    
+						//  |    ,ï¿½|
+						//  |  ,ï¿½  |      etc.
+						//  |,ï¿½    |    
 						//  2------3    12----13
-						//  |    ,´|    |    ,´|
-						//  |  ,´  |    |  ,´  |
-						//  |,´    |    |,´    |
+						//  |    ,ï¿½|    |    ,ï¿½|
+						//  |  ,ï¿½  |    |  ,ï¿½  |
+						//  |,ï¿½    |    |,ï¿½    |
 						//  0------1    10----11
 						//  .
 						//  |
@@ -356,6 +365,166 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public static unsafe void BuildMeshTubes(Mesh meshTubes, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds, bool buildForRaytracing = false)
+		{
+			const int numSides = 4;
+			
+			var perTubeVertices  = numSides * strandParticleCount;
+			var perTubeSegments  = strandParticleCount - 1;
+			var perTubeTriangles = (2 * numSides * perTubeSegments) + 4;
+			var perTubeIndices   = perTubeTriangles * 3;
+			
+			var unormU0 = (uint) (sbyte.MaxValue * 0.0f);
+			var unormU1 = (uint) (sbyte.MaxValue * 1.0f);
+			var unormV0 = (uint) (sbyte.MaxValue * 0.0f);
+			var unormV1 = (uint) (sbyte.MaxValue * 1.0f);
+			
+			var unormVs = UInt16.MaxValue / (float)perTubeSegments;
+
+			using (var vertexID = new NativeArray<float>  (strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var vertexUV = new NativeArray<uint>   (strandCount * perTubeVertices, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var indices  = new NativeArray<int>    (strandCount * perTubeIndices,  Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			{
+				var vertexIDPtr = (float*)vertexID.GetUnsafePtr();
+				var vertexUVPtr = (uint*)vertexUV.GetUnsafePtr();
+				var indicesPtr  = (int*)indices.GetUnsafePtr();
+				
+				// write vertex ID
+				for (int i = 0, k = 0; i != strandCount; i++)
+				{
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					for (int j = strandParticleBegin; j != strandParticleEnd; j += strandParticleStride)
+					{
+						// four vertices per particle
+						*(vertexIDPtr++) = k++;// vertexID
+						*(vertexIDPtr++) = k++;// ...
+						*(vertexIDPtr++) = k++;// ...
+						*(vertexIDPtr++) = k++;// ...
+					}
+				}
+ 
+				// write vertex UV
+				for (int i = 0; i != strandCount; i++)
+				{
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					for (int j = strandParticleBegin, k = 0; j != strandParticleEnd; j += strandParticleStride, k++)
+					{
+						var unormV = (uint)(unormVs * k);
+						{
+							// four vertices per particle
+							*(vertexUVPtr++) = (unormV << 16) | (unormU0 << 8) | (unormV1);// texCoord
+							*(vertexUVPtr++) = (unormV << 16) | (unormU1 << 8) | (unormV1);// ...
+							*(vertexUVPtr++) = (unormV << 16) | (unormU1 << 8) | (unormV0);// ...
+							*(vertexUVPtr++) = (unormV << 16) | (unormU0 << 8) | (unormV0);// ...
+						}
+					}
+				}
+
+				void CreateTriangle(int offset, int i0, int i1, int i2)
+				{
+					*(indicesPtr++) = offset + i0;
+					*(indicesPtr++) = offset + i1;
+					*(indicesPtr++) = offset + i2;
+				}
+				
+				// write indices
+				for (int i = 0, segmentBase = 0; i != strandCount; i++, segmentBase += 4)
+				{
+					//           6 ---- 5  
+					//           |    ,Â´|  
+					//           |  ,Â´  |              
+					//  7 ---- 4 |,Â´    |   
+					//  |    ,Â´| 2 ---- 1   
+					//  |  ,Â´  |    
+					//  |,Â´    |    
+					//  3------0    
+					//  .
+					//  |
+					//  '--- segmentBase
+					
+					// end cap a
+					{
+						CreateTriangle(segmentBase, 0, 2, 1);
+						CreateTriangle(segmentBase, 0, 3, 2);
+					}
+					
+					for (int j = 0; j != perTubeSegments; j++, segmentBase += 4)
+					{
+						// side a
+						{
+							CreateTriangle(segmentBase, 0, 1, 5);
+							CreateTriangle(segmentBase, 0, 5, 4);
+						}
+
+						// side b
+						{
+							CreateTriangle(segmentBase, 1, 2, 6);
+							CreateTriangle(segmentBase, 1, 6, 5);
+						}
+
+						// side c
+						{
+							CreateTriangle(segmentBase, 2, 3, 7);
+							CreateTriangle(segmentBase, 2, 7, 6);
+						}
+						
+						// side d
+						{
+							CreateTriangle(segmentBase, 3, 0, 4);
+							CreateTriangle(segmentBase, 3, 4, 7);
+						}
+					}
+					
+					// end cap b
+					{
+						CreateTriangle(segmentBase, 1, 2, 0);
+						CreateTriangle(segmentBase, 2, 3, 0);
+					}
+				}
+				// apply to mesh asset
+				var meshVertexCount = strandCount * perTubeVertices;
+				var meshUpdateFlags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+				{
+					if (!buildForRaytracing)
+					{
+						meshTubes.SetVertexBufferParams(meshVertexCount, attributes: new [] {
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 0),// vertexID
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 1) // vertexUV
+						});
+
+						meshTubes.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+						meshTubes.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+					}
+					else
+					{
+						meshTubes.SetVertexBufferParams(meshVertexCount, attributes: new [] 
+						{
+							// for ray tracing, we need an explicit position, normal, and tangent stream to update. 
+							// additionally, the renderer will be rejected by the acceleration structure if there is no position stream.
+							new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, dimension: 3, stream: 0),
+							new VertexAttributeDescriptor(VertexAttribute.Normal,   VertexAttributeFormat.Float32, dimension: 3, stream: 0),
+							new VertexAttributeDescriptor(VertexAttribute.Tangent,  VertexAttributeFormat.Float32, dimension: 4, stream: 0),
+							
+							// still need these original streams for UVs etc.
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 1, stream: 1),// vertexID
+							new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.UNorm16, dimension: 2, stream: 2),// vertexUV
+						});
+						
+						// still need to set the uv data for the tube offsets
+						meshTubes.SetVertexBufferData(vertexID, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+						meshTubes.SetVertexBufferData(vertexUV, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
+					}
+
+					meshTubes.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
+					meshTubes.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
+					meshTubes.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Triangles), meshUpdateFlags);
+					meshTubes.bounds = bounds;
+				}
+			}
+		}
+		
 		public static Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
 			var meshRoots = new Mesh();
@@ -411,6 +580,25 @@ namespace Unity.DemoTeam.Hair
 				meshStrips = CreateMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshStrips;
+		}
+		
+		public static Mesh CreateMeshTubes(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			var meshTubes = new Mesh();
+			{
+				meshTubes.hideFlags = hideFlags;
+				meshTubes.name = "X-Tubes";
+				BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
+			}
+			return meshTubes;
+		}
+
+		public static Mesh CreateMeshTubesIfNull(ref Mesh meshTubes, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			if (meshTubes == null)
+				meshTubes = CreateMeshTubes(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+
+			return meshTubes;
 		}
 
 		public static Mesh CreateMeshInstance(Mesh original, HideFlags hideFlags)

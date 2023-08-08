@@ -8,7 +8,7 @@ Shader "Hair/Default/HairMaterialDefaultUnlit"
 	// 0 == staging data full precision
 	// 1 == staging data compressed
 
-	#pragma multi_compile __ HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
+	#pragma multi_compile __ HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS HAIR_VERTEX_ID_TUBES
 	// *_LINES == render as line segments
 	// *_STRIPS == render as view facing strips
 
