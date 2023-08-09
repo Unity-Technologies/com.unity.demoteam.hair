@@ -4,11 +4,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+
+#if UNITY_EDITOR 
+using UnityEditor;
+#endif
 
 #if HAS_PACKAGE_UNITY_HDRP
 using UnityEngine.Rendering.HighDefinition;
@@ -74,7 +79,12 @@ namespace Unity.DemoTeam.Hair
 				public GameObject rootMeshContainer;
 				public MeshFilter rootMeshFilter;
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
+				public SkinAttachmentMesh rootMeshAttachment;
+#else
 				public SkinAttachment rootMeshAttachment;
+#endif
+				
 #endif
 
 				public GameObject strandMeshContainer;
@@ -268,8 +278,14 @@ namespace Unity.DemoTeam.Hair
 
 			[ToggleGroup]
 			public bool rootsAttach;
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
+			[ToggleGroupItem]
+			public Renderer rootsAttachTarget;
+			public Mesh explicitRootsAttachMesh;
+#else
 			[ToggleGroupItem]
 			public SkinAttachmentTarget rootsAttachTarget;
+#endif
 			[HideInInspector]
 			public PrimarySkinningBone rootsAttachTargetBone;
 #endif
@@ -506,7 +522,11 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
+
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
+		private HashSet<SkinAttachmentMesh> preqGPUAttachments = new HashSet<SkinAttachmentMesh>();
+		private Hash128 preqGPUAttachmentHash = default;
+#elif HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
 		private HashSet<SkinAttachmentTarget> preqGPUAttachmentTargets = new HashSet<SkinAttachmentTarget>();
 		private Hash128 preqGPUAttachmentTargetsHash = new Hash128();
 #endif
@@ -514,7 +534,16 @@ namespace Unity.DemoTeam.Hair
 
 		void ReleasePrerequisite()
 		{
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
+			
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
+			foreach (var preq in preqGPUAttachments)
+			{
+				preq.onSkinAttachmentMeshResolved -= HandlePrerequisite;
+			}
+
+			preqGPUAttachments.Clear();
+			preqGPUAttachmentHash = default;
+#elif HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
 			foreach (var preq in preqGPUAttachmentTargets)
 			{
 				preq.afterGPUAttachmentWorkCommitted -= HandlePrerequisite;
@@ -525,9 +554,61 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
+
+		
+		
 		void UpdatePrerequisite()
 		{
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
+			var hash = new Hash128();
+			{
+				if (strandGroupInstances != null)
+				{
+					for (int i = 0; i != strandGroupInstances.Length; i++)
+					{
+						SkinAttachmentMesh rootAttachment = strandGroupInstances[i].sceneObjects.rootMeshAttachment;
+						ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
+						if (settingsSkinning.rootsAttach)
+						{
+							if (rootAttachment != null && rootAttachment.isActiveAndEnabled && rootAttachment.SchedulingMode == SkinAttachmentComponentCommon.SchedulingMode.GPU)
+							{
+								hash.Append(rootAttachment.GetInstanceID());
+							}
+						}
+					}
+				}
+			}
+
+			if (hash != preqGPUAttachmentHash)
+			{
+				ReleasePrerequisite();
+
+				if (strandGroupInstances != null)
+				{
+					for (int i = 0; i != strandGroupInstances.Length; i++)
+					{
+						SkinAttachmentMesh rootAttachment = strandGroupInstances[i].sceneObjects.rootMeshAttachment;
+						ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
+						if (settingsSkinning.rootsAttach)
+						{
+							if (rootAttachment != null && rootAttachment.isActiveAndEnabled  && rootAttachment.SchedulingMode == SkinAttachmentComponentCommon.SchedulingMode.GPU)
+							{
+								preqGPUAttachments.Add(rootAttachment);
+							}
+						}
+					}
+				}
+
+				foreach (var preq in preqGPUAttachments)
+				{
+					preq.onSkinAttachmentMeshResolved += HandlePrerequisite;
+				}
+
+				preqGPUAttachmentHash = hash;
+			}
+
+			preqCountdown = 1 + preqGPUAttachments.Count;
+#elif HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_0_PREVIEW
 			var hash = new Hash128();
 			{
 				if (strandGroupInstances != null)
@@ -946,7 +1027,33 @@ namespace Unity.DemoTeam.Hair
 
 			UpdateStrandGroupSettings();
 		}
-
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
+		SkinAttachmentDataStorage GetAttachmentDataStorage(ref GroupInstance groupInstance)
+		{
+			SkinAttachmentDataStorage storage = null;
+			if (groupInstance.sceneObjects.rootMeshAttachment != null)
+			{
+				storage = groupInstance.sceneObjects.rootMeshAttachment.DataStorage;
+			}
+			
+#if UNITY_EDITOR
+			if(storage == null)
+			{
+				HairAsset hairAsset = groupInstance.groupAssetReference.hairAsset;
+				string hairAssetPath = AssetDatabase.GetAssetPath(hairAsset);
+				string storagePath = Path.GetDirectoryName(hairAssetPath) + "/" + Path.GetFileNameWithoutExtension(hairAssetPath) + "_SkinAttachmentDataStorage" + ".asset";
+				storage = (SkinAttachmentDataStorage)AssetDatabase.LoadAssetAtPath(storagePath, typeof(SkinAttachmentDataStorage));
+				if(storage == null)
+				{
+					storage = ScriptableObject.CreateInstance<SkinAttachmentDataStorage>();
+					AssetDatabase.CreateAsset(storage, storagePath);
+				}
+			}
+			
+#endif
+			return storage;
+		}
+#endif
 		void UpdateAttachedState()
 		{
 			if (strandGroupInstances == null)
@@ -959,6 +1066,68 @@ namespace Unity.DemoTeam.Hair
 				return;
 #endif
 
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
+
+			{
+				for (int i = 0; i != strandGroupInstances.Length; i++)
+				{
+					ref var strandGroupInstance = ref strandGroupInstances[i];
+					ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstance);
+					var container = strandGroupInstance.sceneObjects.rootMeshContainer;
+					
+					//remove old SkinAttachment
+					{
+						
+						SkinAttachment oldAttachment;
+						if (container != null && container.TryGetComponent(out oldAttachment))
+						{
+							CoreUtils.Destroy(oldAttachment);
+						}
+					}
+					var attachment = strandGroupInstance.sceneObjects.rootMeshAttachment;
+					if (attachment == null)
+					{
+						if (container != null && container.TryGetComponent(out attachment) == false)
+						{
+							attachment = strandGroupInstances[i].sceneObjects.rootMeshAttachment = HairInstanceBuilder.CreateComponent<SkinAttachmentMesh>(container, container.hideFlags);
+							attachment.attachmentType = SkinAttachmentMesh.MeshAttachmentType.Mesh;
+						}
+					}
+
+					if (attachment != null)
+					{
+						SkinAttachmentDataStorage dataStorage = GetAttachmentDataStorage(ref strandGroupInstance);
+						attachment.DataStorage = dataStorage;
+						bool buildTargetChanged = attachment.ExplicitTargetBakeMesh !=
+						                          settingsSkinning.explicitRootsAttachMesh;
+					
+						bool dataStorageNeedsRefresh = attachment.common.HasDataStorageChanged() ||
+						                               attachment.DataStorage == null;
+
+						attachment.ExplicitTargetBakeMesh = settingsSkinning.explicitRootsAttachMesh;
+						
+						if (attachment != null && (attachment.Target != settingsSkinning.rootsAttachTarget || attachment.IsAttached != settingsSkinning.rootsAttach || dataStorageNeedsRefresh || buildTargetChanged))
+						{
+							attachment.Target = settingsSkinning.rootsAttachTarget;
+						
+							if (attachment.Target != null && settingsSkinning.rootsAttach)
+							{
+								attachment.Detach(revertPositionRotation: false);
+								attachment.Attach(storePositionRotation: false);
+							}
+							else
+							{
+								attachment.Detach(revertPositionRotation: false);
+							}
+#if UNITY_EDITOR
+							UnityEditor.EditorUtility.SetDirty(attachment);
+#endif
+						}
+					}
+				}
+			}
+#else
+			
 			using (var attachmentsChangedMask = new UnsafeBitArray(1 + (strandGroupSettings?.Length ?? 0), Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
 				for (int i = 0; i != strandGroupInstances.Length; i++)
@@ -1021,6 +1190,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 			}
+#endif
 #endif
 		}
 

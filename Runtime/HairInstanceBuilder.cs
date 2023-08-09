@@ -107,9 +107,20 @@ namespace Unity.DemoTeam.Hair
 						strandGroupInstance.sceneObjects.rootMeshFilter.sharedMesh = strandGroups[j].meshAssetRoots;
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-						strandGroupInstance.sceneObjects.rootMeshAttachment = CreateComponent<SkinAttachment>(strandGroupInstance.sceneObjects.rootMeshContainer, hideFlags);
-						strandGroupInstance.sceneObjects.rootMeshAttachment.attachmentType = SkinAttachment.AttachmentType.Mesh;
+						
+#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
+						strandGroupInstance.sceneObjects.rootMeshAttachment = CreateComponent<SkinAttachmentMesh>(strandGroupInstance.sceneObjects.rootMeshContainer, hideFlags);
+						strandGroupInstance.sceneObjects.rootMeshAttachment.attachmentType = SkinAttachmentMesh.MeshAttachmentType.Mesh;
+						strandGroupInstance.sceneObjects.rootMeshAttachment.SchedulingMode =
+							SkinAttachmentComponentCommon.SchedulingMode.GPU;
+#else
+
+						strandGroupInstance.sceneObjects.rootMeshAttachment =
+ CreateComponent<SkinAttachment>(strandGroupInstance.sceneObjects.rootMeshContainer, hideFlags);
+						strandGroupInstance.sceneObjects.rootMeshAttachment.attachmentType =
+ SkinAttachment.AttachmentType.Mesh;
 						strandGroupInstance.sceneObjects.rootMeshAttachment.forceRecalculateBounds = true;
+#endif
 #endif
 					}
 
@@ -312,13 +323,13 @@ namespace Unity.DemoTeam.Hair
 						//  :  .   :
 						//  |,     |
 						//  4------5
-						//  |    ,´|
-						//  |  ,´  |      etc.
-						//  |,´    |    
+						//  |    ,ï¿½|
+						//  |  ,ï¿½  |      etc.
+						//  |,ï¿½    |    
 						//  2------3    12----13
-						//  |    ,´|    |    ,´|
-						//  |  ,´  |    |  ,´  |
-						//  |,´    |    |,´    |
+						//  |    ,ï¿½|    |    ,ï¿½|
+						//  |  ,ï¿½  |    |  ,ï¿½  |
+						//  |,ï¿½    |    |,ï¿½    |
 						//  0------1    10----11
 						//  .
 						//  |
