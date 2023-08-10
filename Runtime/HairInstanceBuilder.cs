@@ -113,6 +113,7 @@ namespace Unity.DemoTeam.Hair
 						strandGroupInstance.sceneObjects.rootMeshAttachment.attachmentType = SkinAttachmentMesh.MeshAttachmentType.Mesh;
 						strandGroupInstance.sceneObjects.rootMeshAttachment.SchedulingMode =
 							SkinAttachmentComponentCommon.SchedulingMode.GPU;
+						strandGroupInstance.sceneObjects.rootMeshAttachment.common.bakedDataEntryName = hairInstance.name + "/" + strandGroupInstance.sceneObjects.rootMeshAttachment.name;
 #else
 
 						strandGroupInstance.sceneObjects.rootMeshAttachment =

@@ -591,7 +591,7 @@ namespace Unity.DemoTeam.Hair
 						ref readonly var settingsSkinning = ref GetSettingsSkinning(strandGroupInstances[i]);
 						if (settingsSkinning.rootsAttach)
 						{
-							if (rootAttachment != null && rootAttachment.isActiveAndEnabled  && rootAttachment.SchedulingMode == SkinAttachmentComponentCommon.SchedulingMode.GPU)
+							if (rootAttachment != null && rootAttachment.isActiveAndEnabled  && rootAttachment.SchedulingMode == SkinAttachmentComponentCommon.SchedulingMode.GPU && rootAttachment.IsAttachmentMeshValid() && rootAttachment.ValidateBakedData())
 							{
 								preqGPUAttachments.Add(rootAttachment);
 							}
@@ -1077,9 +1077,7 @@ namespace Unity.DemoTeam.Hair
 					
 					//remove old SkinAttachment
 					{
-						
-						SkinAttachment oldAttachment;
-						if (container != null && container.TryGetComponent(out oldAttachment))
+						if (container != null && container.TryGetComponent(out SkinAttachment oldAttachment))
 						{
 							CoreUtils.Destroy(oldAttachment);
 						}
@@ -1091,6 +1089,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							attachment = strandGroupInstances[i].sceneObjects.rootMeshAttachment = HairInstanceBuilder.CreateComponent<SkinAttachmentMesh>(container, container.hideFlags);
 							attachment.attachmentType = SkinAttachmentMesh.MeshAttachmentType.Mesh;
+							attachment.common.bakedDataEntryName = this.name + "/" + attachment.name;
 						}
 					}
 
@@ -1102,7 +1101,8 @@ namespace Unity.DemoTeam.Hair
 						                          settingsSkinning.explicitRootsAttachMesh;
 					
 						bool dataStorageNeedsRefresh = attachment.common.HasDataStorageChanged() ||
-						                               attachment.DataStorage == null;
+						                               attachment.DataStorage == null ||
+						                               !attachment.ValidateBakedData();
 
 						attachment.ExplicitTargetBakeMesh = settingsSkinning.explicitRootsAttachMesh;
 						
