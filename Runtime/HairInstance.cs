@@ -1027,33 +1027,6 @@ namespace Unity.DemoTeam.Hair
 
 			UpdateStrandGroupSettings();
 		}
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
-		SkinAttachmentDataStorage GetAttachmentDataStorage(ref GroupInstance groupInstance)
-		{
-			SkinAttachmentDataStorage storage = null;
-			if (groupInstance.sceneObjects.rootMeshAttachment != null)
-			{
-				storage = groupInstance.sceneObjects.rootMeshAttachment.DataStorage;
-			}
-			
-#if UNITY_EDITOR
-			if(storage == null)
-			{
-				HairAsset hairAsset = groupInstance.groupAssetReference.hairAsset;
-				string hairAssetPath = AssetDatabase.GetAssetPath(hairAsset);
-				string storagePath = Path.GetDirectoryName(hairAssetPath) + "/" + Path.GetFileNameWithoutExtension(hairAssetPath) + "_SkinAttachmentDataStorage" + ".asset";
-				storage = (SkinAttachmentDataStorage)AssetDatabase.LoadAssetAtPath(storagePath, typeof(SkinAttachmentDataStorage));
-				if(storage == null)
-				{
-					storage = ScriptableObject.CreateInstance<SkinAttachmentDataStorage>();
-					AssetDatabase.CreateAsset(storage, storagePath);
-				}
-			}
-			
-#endif
-			return storage;
-		}
-#endif
 		void UpdateAttachedState()
 		{
 			if (strandGroupInstances == null)
@@ -1089,20 +1062,16 @@ namespace Unity.DemoTeam.Hair
 						{
 							attachment = strandGroupInstances[i].sceneObjects.rootMeshAttachment = HairInstanceBuilder.CreateComponent<SkinAttachmentMesh>(container, container.hideFlags);
 							attachment.attachmentType = SkinAttachmentMesh.MeshAttachmentType.Mesh;
-							attachment.common.bakedDataEntryName = this.name + "/" + attachment.name;
+
 						}
 					}
 
 					if (attachment != null)
 					{
-						SkinAttachmentDataStorage dataStorage = GetAttachmentDataStorage(ref strandGroupInstance);
-						attachment.DataStorage = dataStorage;
 						bool buildTargetChanged = attachment.ExplicitTargetBakeMesh !=
 						                          settingsSkinning.explicitRootsAttachMesh;
 					
-						bool dataStorageNeedsRefresh = attachment.common.HasDataStorageChanged() ||
-						                               attachment.DataStorage == null ||
-						                               !attachment.ValidateBakedData();
+						bool dataStorageNeedsRefresh = !attachment.ValidateBakedData();
 
 						attachment.ExplicitTargetBakeMesh = settingsSkinning.explicitRootsAttachMesh;
 						
