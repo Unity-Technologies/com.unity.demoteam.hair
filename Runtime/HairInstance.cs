@@ -13,6 +13,7 @@ using Unity.Collections.LowLevel.Unsafe;
 
 #if UNITY_EDITOR 
 using UnityEditor;
+using UnityEditor.SceneManagement;
 #endif
 
 #if HAS_PACKAGE_UNITY_HDRP
@@ -1043,16 +1044,28 @@ namespace Unity.DemoTeam.Hair
 			{
 				storage = groupInstance.sceneObjects.rootMeshAttachment.DataStorage;
 			}
-
+			
 #if UNITY_EDITOR
 			
 			if(storage == null)
 			{
 				string assetPath;
-				var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
+				
+#if UNITY_2021_2_OR_NEWER
+				var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+#else
+				var prefabStage = UnityEditor.Experimental.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+#endif
+				
+				var isPrefabInstance =  PrefabUtility.IsPartOfPrefabInstance(this);
+				var isPartOfPrefabScene = prefabStage.IsPartOfPrefabContents(gameObject);
 				if (isPrefabInstance)
 				{
 					assetPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+				}
+				else if (isPartOfPrefabScene)
+				{
+					assetPath = prefabStage.assetPath;
 				}
 				else
 				{
@@ -1062,7 +1075,11 @@ namespace Unity.DemoTeam.Hair
 				
 				
 				string storagePath = Path.GetDirectoryName(assetPath) + "/" + Path.GetFileNameWithoutExtension(assetPath) + "_SkinAttachmentDataStorage" + ".asset";
-				storage = (SkinAttachmentDataStorage)AssetDatabase.LoadAssetAtPath(storagePath, typeof(SkinAttachmentDataStorage));
+				if (AssetDatabase.AssetPathExists(storagePath))
+				{
+					storage = (SkinAttachmentDataStorage)AssetDatabase.LoadAssetAtPath(storagePath, typeof(SkinAttachmentDataStorage));
+				}
+				
 				if(storage == null)
 				{
 					storage = ScriptableObject.CreateInstance<SkinAttachmentDataStorage>();
@@ -1115,29 +1132,35 @@ namespace Unity.DemoTeam.Hair
 
 					if (attachment != null)
 					{
-						SkinAttachmentDataStorage dataStorage = GetAttachmentDataStorage(settingsSkinning, ref strandGroupInstance);
-						attachment.DataStorage = dataStorage;
+						
 						bool buildTargetChanged = attachment.ExplicitTargetBakeMesh !=
 						                          settingsSkinning.explicitRootsAttachMesh;
 					
-						bool dataStorageNeedsRefresh = attachment.common.HasDataStorageChanged() ||
-						                               attachment.DataStorage == null ||
-						                               !attachment.ValidateBakedData();
+						
 
 						attachment.ExplicitTargetBakeMesh = settingsSkinning.explicitRootsAttachMesh;
 						
-						if (attachment != null && (attachment.Target != settingsSkinning.rootsAttachTarget || attachment.IsAttached != settingsSkinning.rootsAttach || dataStorageNeedsRefresh || buildTargetChanged))
+						if (attachment != null && (attachment.Target != settingsSkinning.rootsAttachTarget || (attachment.IsAttached != settingsSkinning.rootsAttach && settingsSkinning.rootsAttachTarget != null)))
 						{
-							attachment.Target = settingsSkinning.rootsAttachTarget;
+							SkinAttachmentDataStorage dataStorage = GetAttachmentDataStorage(settingsSkinning, ref strandGroupInstance);
+							attachment.DataStorage = dataStorage;
+							bool dataStorageNeedsRefresh = attachment.common.HasDataStorageChanged() ||
+							                               attachment.DataStorage == null ||
+							                               !attachment.ValidateBakedData();
+							
+							if (dataStorageNeedsRefresh || buildTargetChanged)
+							{
+								attachment.Target = settingsSkinning.rootsAttachTarget;
 						
-							if (attachment.Target != null && settingsSkinning.rootsAttach)
-							{
-								attachment.Detach(revertPositionRotation: false);
-								attachment.Attach(storePositionRotation: false);
-							}
-							else
-							{
-								attachment.Detach(revertPositionRotation: false);
+								if (attachment.Target != null && settingsSkinning.rootsAttach)
+								{
+									attachment.Detach(revertPositionRotation: false);
+									attachment.Attach(storePositionRotation: false);
+								}
+								else
+								{
+									attachment.Detach(revertPositionRotation: false);
+								}
 							}
 #if UNITY_EDITOR
 							UnityEditor.EditorUtility.SetDirty(attachment);
