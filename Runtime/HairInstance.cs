@@ -281,7 +281,10 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
 			[ToggleGroupItem]
 			public Renderer rootsAttachTarget;
+			[Tooltip("Optional mesh to use baking data (useful if the mesh in attach target has unwanted deformation)")]
 			public Mesh explicitRootsAttachMesh;
+			[Tooltip("Optional data storage used for baked attachment data. Default will create bake either next to 1) prefab this instance is part of, or if not prefab b) hair assets used in this hair instance ")]
+			public SkinAttachmentDataStorage explicitDataStorage;
 #else
 			[ToggleGroupItem]
 			public SkinAttachmentTarget rootsAttachTarget;
@@ -1028,20 +1031,37 @@ namespace Unity.DemoTeam.Hair
 			UpdateStrandGroupSettings();
 		}
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
-		SkinAttachmentDataStorage GetAttachmentDataStorage(ref GroupInstance groupInstance)
+		SkinAttachmentDataStorage GetAttachmentDataStorage(in SettingsSkinning settings, ref GroupInstance groupInstance)
 		{
+			if (settings.explicitDataStorage)
+			{
+				return settings.explicitDataStorage;
+			}
+			
 			SkinAttachmentDataStorage storage = null;
 			if (groupInstance.sceneObjects.rootMeshAttachment != null)
 			{
 				storage = groupInstance.sceneObjects.rootMeshAttachment.DataStorage;
 			}
-			
+
 #if UNITY_EDITOR
+			
 			if(storage == null)
 			{
-				HairAsset hairAsset = groupInstance.groupAssetReference.hairAsset;
-				string hairAssetPath = AssetDatabase.GetAssetPath(hairAsset);
-				string storagePath = Path.GetDirectoryName(hairAssetPath) + "/" + Path.GetFileNameWithoutExtension(hairAssetPath) + "_SkinAttachmentDataStorage" + ".asset";
+				string assetPath;
+				var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
+				if (isPrefabInstance)
+				{
+					assetPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+				}
+				else
+				{
+					HairAsset hairAsset = groupInstance.groupAssetReference.hairAsset;
+					assetPath = AssetDatabase.GetAssetPath(hairAsset);
+				}
+				
+				
+				string storagePath = Path.GetDirectoryName(assetPath) + "/" + Path.GetFileNameWithoutExtension(assetPath) + "_SkinAttachmentDataStorage" + ".asset";
 				storage = (SkinAttachmentDataStorage)AssetDatabase.LoadAssetAtPath(storagePath, typeof(SkinAttachmentDataStorage));
 				if(storage == null)
 				{
@@ -1095,7 +1115,7 @@ namespace Unity.DemoTeam.Hair
 
 					if (attachment != null)
 					{
-						SkinAttachmentDataStorage dataStorage = GetAttachmentDataStorage(ref strandGroupInstance);
+						SkinAttachmentDataStorage dataStorage = GetAttachmentDataStorage(settingsSkinning, ref strandGroupInstance);
 						attachment.DataStorage = dataStorage;
 						bool buildTargetChanged = attachment.ExplicitTargetBakeMesh !=
 						                          settingsSkinning.explicitRootsAttachMesh;
