@@ -519,10 +519,7 @@ namespace Unity.DemoTeam.Hair
 
 									HairSim.BindSolverData(previewMaterial, previewData[i]);
 
-									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_LINES", true);
-									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_ID_STRIPS", false);
-									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_SOLVER", true);
-									CoreUtils.SetKeyword(previewMaterial, "HAIR_VERTEX_SRC_STAGING", false);
+									previewMaterial.SetInt("_DecodeVertexCount", 1);
 
 									previewRenderer.BeginPreview(rect, GUIStyle.none);
 									previewRenderer.DrawMesh(meshLines, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
@@ -602,6 +599,12 @@ namespace Unity.DemoTeam.Hair
 								previewData[i].cbuffer._StrandParticleStride = 1;
 								break;
 						}
+
+						previewData[i].cbuffer._StagingSubdivision = 0;
+						previewData[i].cbuffer._StagingVertexCount = previewData[i].cbuffer._StrandParticleCount;
+						previewData[i].cbuffer._StagingVertexOffset = previewData[i].cbuffer._StrandParticleOffset;
+						previewData[i].cbuffer._StagingBufferFormat = 3;
+						previewData[i].cbuffer._StagingBufferStride = sizeof(float) * 4;
 					}
 
 					using (var stagingData = new NativeArray<Vector4>(strandGroup.particlePosition.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
@@ -617,6 +620,7 @@ namespace Unity.DemoTeam.Hair
 					previewData[i].lodGuideCount.SetData(strandGroup.lodGuideCount);
 					previewData[i].lodGuideIndex.SetData(strandGroup.lodGuideIndex);
 					previewData[i].lodGuideCarry.SetData(strandGroup.lodGuideCarry);
+
 					previewData[i].cbuffer._LODCount = (uint)strandGroup.lodCount;
 					previewData[i].cbuffer._LODIndexLo = previewData[i].cbuffer._LODCount - 1;
 					previewData[i].cbuffer._LODIndexHi = previewData[i].cbuffer._LODCount - 1;

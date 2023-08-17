@@ -1,20 +1,6 @@
 #ifndef __HAIRVERTEX_HLSL__
 #define __HAIRVERTEX_HLSL__
 
-/* required pragmas
-#pragma multi_compile __ STAGING_COMPRESSION
-// 0 == staging data full precision
-// 1 == staging data compressed
-
-#pragma multi_compile HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS
-// *_LINES == render as line segments
-// *_STRIPS == render as view facing strips
-
-#pragma multi_compile HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
-// *_SOLVER == source vertex from solver data
-// *_STAGING == source vertex data from staging data
-*/
-
 #ifndef HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR
 #define HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(x) GetWorldSpaceNormalizeViewDir(x)
 #endif
@@ -36,23 +22,8 @@
 #define UNITY_PREV_MATRIX_I_M UNITY_MATRIX_I_M
 #endif
 
-/* UNITY_VERSION < 202120
-#ifndef UNITY_SHADER_VARIABLES_INCLUDED
-float4x4 unity_MatrixPreviousMI;
-#endif
-
-#ifndef UNITY_PREV_MATRIX_I_M
-#define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
-#endif
-*/
-
-#if HAIR_VERTEX_SRC_STAGING
 #define STRAND_PARTICLE_COUNT	_StagingVertexCount
 #define STRAND_PARTICLE_OFFSET	_StagingVertexOffset
-#else
-#define STRAND_PARTICLE_COUNT	_StrandParticleCount
-#define STRAND_PARTICLE_OFFSET	_StrandParticleOffset
-#endif
 
 #define DECLARE_STRAND(x)													\
 	const uint strandIndex = x;												\
@@ -62,20 +33,12 @@ float4x4 unity_MatrixPreviousMI;
 
 float3 LoadPosition(uint i)
 {
-#if HAIR_VERTEX_SRC_STAGING
 	return LoadStagingPosition(i);
-#else
-	return _ParticlePosition[i].xyz;
-#endif
 }
 
 float3 LoadPositionPrev(uint i)
 {
-#if HAIR_VERTEX_SRC_STAGING
 	return LoadStagingPositionPrev(i);
-#else
-	return _ParticlePositionPrev[i].xyz;
-#endif
 }
 
 struct HairVertexWS
@@ -126,13 +89,11 @@ float3 GetStrandDebugColor(in int strandIndex)
 	return lerp(strandColorLo, strandColorHi, _LODBlendFraction);
 }
 
+int _DecodeVertexCount;
+
 HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 {
-#if HAIR_VERTEX_ID_STRIPS
-	uint linearParticleIndex = vertexID >> 1;
-#else
-	uint linearParticleIndex = vertexID;
-#endif
+	uint linearParticleIndex = (vertexID / _DecodeVertexCount);
 
 	DECLARE_STRAND(linearParticleIndex / STRAND_PARTICLE_COUNT);
 	const uint i = strandParticleBegin + (linearParticleIndex % STRAND_PARTICLE_COUNT) * strandParticleStride;
@@ -156,11 +117,7 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 	float3 vertexTangentWS = normalize_safe(cross(vertexBitangentWS, HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS)));
 	float3 vertexNormalWS = cross(vertexTangentWS, vertexBitangentWS);
 
-#if HAIR_VERTEX_ID_STRIPS
 	float3 vertexOffsetWS = vertexTangentWS * (_GroupMaxParticleDiameter * (vertexUV.x - 0.5));
-#else
-	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
-#endif
 	float3 vertexPositionWS = curvePositionRWS + vertexOffsetWS;
 	float3 vertexPositionWSPrev = curvePositionRWSPrev + vertexOffsetWS;
 
@@ -224,11 +181,10 @@ HairVertex GetHairVertex(
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS)
 {
-#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS)
-	return GetHairVertex_Live(in_vertexID, in_vertexUV);
-#else
-	return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
-#endif
+	if (_DecodeVertexCount > 0)
+		return GetHairVertex_Live(in_vertexID, in_vertexUV);
+	else
+		return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 }
 
 void HairVertex_float(

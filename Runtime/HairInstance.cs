@@ -1129,18 +1129,17 @@ namespace Unity.DemoTeam.Hair
 
 					if (HairSim.PrepareSolverStaging(ref solverData[i], stagingCompression, stagingSubdivision))
 					{
-						HairSim.PushSolverStaging(cmd, ref solverData[i], stagingCompression, stagingSubdivision, volumeData);
-						HairSim.PushSolverStaging(cmd, ref solverData[i], stagingCompression, stagingSubdivision, volumeData);
+						HairSim.PushSolverStaging(cmd, ref solverData[i], true, stagingCompression, stagingSubdivision, volumeData);
+						HairSim.PushSolverStaging(cmd, ref solverData[i], true, stagingCompression, stagingSubdivision, volumeData);
 					}
 					else
 					{
-						HairSim.PushSolverStaging(cmd, ref solverData[i], stagingCompression, stagingSubdivision, volumeData);
+						HairSim.PushSolverStaging(cmd, ref solverData[i], true, stagingCompression, stagingSubdivision, volumeData);
 					}
 				}
 				else
 				{
-					solverData[i].cbuffer._StagingSubdivision = 0;// forces re-init after enable (see HairSim.PrepareSolverStaging)
-					solverData[i].cbuffer._StagingVertexCount = 0;// ...
+					HairSim.PushSolverStaging(cmd, ref solverData[i], false, false, 0, volumeData);
 				}
 			}
 
@@ -1321,11 +1320,16 @@ namespace Unity.DemoTeam.Hair
 			materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
 			materialInstance.SetTexture("_UntypedVolumeScattering", volumeData.volumeScattering);
 
-			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_LINES", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinLines || settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
-			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_ID_STRIPS", settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.BuiltinStrips);
+			switch (settingsSystem.strandRenderer)
+			{
+				case SettingsSystem.StrandRenderer.BuiltinStrips:
+					materialInstance.SetInt("_DecodeVertexCount", 2);
+					break;
 
-			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_SOLVER", !settingsStrands.staging);
-			CoreUtils.SetKeyword(materialInstance, "HAIR_VERTEX_SRC_STAGING", settingsStrands.staging);
+				default:
+					materialInstance.SetInt("_DecodeVertexCount", 1);
+					break;
+			}
 		}
 
 		public static Bounds GetRootBounds(in GroupInstance strandGroupInstance, Matrix4x4? worldTransform = null)

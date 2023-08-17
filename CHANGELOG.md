@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improved shader compilation time for all hair materials (removed use of multi_compile in HairVertex.hlsl).
 - Improved tooltips in the HairWind component.
 - Renamed various fields.
 
