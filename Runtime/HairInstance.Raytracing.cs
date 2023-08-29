@@ -127,11 +127,8 @@ namespace Unity.DemoTeam.Hair
                 rayTracingMaterial.CopyPropertiesFromMaterial(materialInstance);
                 
                 // override whatever is being rasterized to use the tube geo representation. 
-                {
-                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_LINES",  false);
-                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_STRIPS", false);
-                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_TUBES",  true);
-                }
+                rayTracingMaterial.SetInt("_DecodeVertexCount", 4);
+                rayTracingMaterial.SetInt("_DecodeVertexWidth", 2);
 
                 // this will force disable the renderer for all rendering passes but still cause it to be present 
                 // in the acceleration structure. it's a hack.
@@ -159,7 +156,7 @@ namespace Unity.DemoTeam.Hair
                 {
                     mesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
 
-                    var streamIndex  = mesh.GetVertexAttributeStream(VertexAttribute.Position);
+                    var streamIndex   = mesh.GetVertexAttributeStream(VertexAttribute.Position);
                     var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord1);
 
                     if (streamIndex != -1 && streamIndexUV != -1)
@@ -180,12 +177,6 @@ namespace Unity.DemoTeam.Hair
                     const int kernelIndex = 0;
                     
                     // not the greatest way to do this, but not really possible to do any better unless it is done on the native side.
-                    foreach (var keywordName in s_updateMeshPositionsCS.enabledKeywords)
-                    {
-                        cmd.SetKeyword(s_updateMeshPositionsCS, keywordName, false);
-                    }
-                    
-                    // not the greatest way to do this, but not really possible to do any better unless it is done on the native side.
                     foreach (var keywordName in rayTracingMaterial.shaderKeywords)
                     {
                         var keyword = s_updateMeshPositionsCS.keywordSpace.FindKeyword(keywordName);
@@ -195,18 +186,8 @@ namespace Unity.DemoTeam.Hair
                     }
 
                     // override whatever is being rasterized to use the tube geo representation. 
-                    {
-                        var vertexIDKeywords = new LocalKeyword[]
-                        {
-                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_LINES"),
-                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_STRIPS"),
-                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_TUBES"),
-                        };
-
-                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[0], false);
-                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[1], false);
-                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[2], true);
-                    }
+                    s_updateMeshPositionsCS.SetInt("_DecodeVertexCount", 4);
+                    s_updateMeshPositionsCS.SetInt("_DecodeVertexWidth", 2);
                     
                     // Also need to bind these matrices manually. (TODO: Is it cross-SRP safe?)
                     cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_ObjectToWorld", rayTracingObjects.container.transform.localToWorldMatrix);

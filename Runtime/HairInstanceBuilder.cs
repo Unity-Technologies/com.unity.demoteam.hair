@@ -540,7 +540,7 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// apply to mesh
-				ApplyRenderMeshData(meshStrips, MeshTopology.Triangles, data, bounds);
+				ApplyRenderMeshData(meshTubes, MeshTopology.Triangles, data, bounds);
 			}
 		}
 		
