@@ -1,21 +1,6 @@
 #ifndef __HAIRVERTEX_HLSL__
 #define __HAIRVERTEX_HLSL__
 
-/* required pragmas
-#pragma multi_compile __ STAGING_COMPRESSION
-// 0 == staging data full precision
-// 1 == staging data compressed
-
-#pragma multi_compile HAIR_VERTEX_ID_LINES HAIR_VERTEX_ID_STRIPS HAIR_VERTEX_ID_TUBES
-// *_LINES == render as line segments
-// *_STRIPS == render as view facing strips
-// *_TUBES == render as tubes
-
-#pragma multi_compile HAIR_VERTEX_SRC_SOLVER HAIR_VERTEX_SRC_STAGING
-// *_SOLVER == source vertex from solver data
-// *_STAGING == source vertex data from staging data
-*/
-
 #ifndef HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR
 #define HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(x) GetWorldSpaceNormalizeViewDir(x)
 #endif
@@ -30,22 +15,6 @@
 #define normalize_safe(x) (x * rsqrt(max(1e-7, dot(x, x))))
 #endif
 
-#ifndef HAIR_VERTEX_ID_LINES
-#define HAIR_VERTEX_ID_LINES 0
-#endif
-#ifndef HAIR_VERTEX_ID_STRIPS
-#define HAIR_VERTEX_ID_STRIPS 0
-#endif
-#ifndef HAIR_VERTEX_ID_TUBES
-#define HAIR_VERTEX_ID_TUBES 0
-#endif
-#ifndef HAIR_VERTEX_SRC_SOLVER
-#define HAIR_VERTEX_SRC_SOLVER 0
-#endif
-#ifndef HAIR_VERTEX_SRC_STAGING
-#define HAIR_VERTEX_SRC_STAGING 0
-#endif
-
 #include "HairSimData.hlsl"
 #include "HairSimDebugDrawUtility.hlsl"
 
@@ -53,23 +22,8 @@
 #define UNITY_PREV_MATRIX_I_M UNITY_MATRIX_I_M
 #endif
 
-/* UNITY_VERSION < 202120
-#ifndef UNITY_SHADER_VARIABLES_INCLUDED
-float4x4 unity_MatrixPreviousMI;
-#endif
-
-#ifndef UNITY_PREV_MATRIX_I_M
-#define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
-#endif
-*/
-
-#if HAIR_VERTEX_SRC_STAGING
 #define STRAND_PARTICLE_COUNT	_StagingVertexCount
 #define STRAND_PARTICLE_OFFSET	_StagingVertexOffset
-#else
-#define STRAND_PARTICLE_COUNT	_StrandParticleCount
-#define STRAND_PARTICLE_OFFSET	_StrandParticleOffset
-#endif
 
 #define DECLARE_STRAND(x)													\
 	const uint strandIndex = x;												\
@@ -79,20 +33,56 @@ float4x4 unity_MatrixPreviousMI;
 
 float3 LoadPosition(uint i)
 {
-#if HAIR_VERTEX_SRC_STAGING
 	return LoadStagingPosition(i);
-#else
-	return _ParticlePosition[i].xyz;
-#endif
 }
 
 float3 LoadPositionPrev(uint i)
 {
-#if HAIR_VERTEX_SRC_STAGING
 	return LoadStagingPositionPrev(i);
-#else
-	return _ParticlePositionPrev[i].xyz;
-#endif
+}
+
+int _DecodeVertexCount;
+int _DecodeVertexWidth;
+int _DecodeVertexComponentValue;
+int _DecodeVertexComponentWidth;
+
+float3 GetStrandDebugColor(in uint strandIndex)
+{
+	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
+	uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
+	float3 strandColorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODCount - 1]);
+	float3 strandColorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODCount - 1]);
+	return lerp(strandColorLo, strandColorHi, _LODBlendFraction);
+}
+
+float3 GetSurfaceNormalTS(in float2 tubularUV)
+{
+	float3 surfaceNormalTS;
+	{
+		if (_DecodeVertexCount == 2)
+		{
+			surfaceNormalTS.x = 4.0 * saturate(tubularUV.x) - 1.0;
+			surfaceNormalTS.y = 0.0;
+			surfaceNormalTS.z = sqrt(max(1e-5, 1.0 - surfaceNormalTS.x * surfaceNormalTS.x));
+		}
+		else
+		{
+			surfaceNormalTS = float3(0.0, 0.0, 1.0);
+		}
+	}
+	return surfaceNormalTS;
+}
+
+float2 GetSurfaceUV(in float2 tubularUV)
+{
+	float2 surfaceUV = tubularUV;
+	{
+		if (_DecodeVertexCount >= 2)
+		{
+			surfaceUV.x *= 2.0;
+		}
+	}
+	return surfaceUV;
 }
 
 struct HairVertexWS
@@ -123,85 +113,102 @@ struct HairVertex
 	float3 strandDebugColor;
 };
 
-float3 GetStrandNormalTangentSpace(in float2 strandVertexUV)
+HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 {
-	float3 strandNormalTS;
+	uint decodedStrandIndex;
+	uint decodedVertexIndex;
+	uint decodedVertexFacet;
+	float decodedVertexSign;
+	float2 decodedTubularUV;
 	{
-		strandNormalTS.x = 2.0 * saturate(strandVertexUV.x) - 1.0;
-		strandNormalTS.y = 0.0;
-		strandNormalTS.z = sqrt(max(1e-5, 1.0 - strandNormalTS.x * strandNormalTS.x));
+		if (_DecodeVertexComponentWidth == 32)//TODO replace runtime compatibility with asset versioning / upgrade
+		{
+			uint linearParticleIndex = packedID.x / _DecodeVertexCount;
+		
+			decodedStrandIndex = linearParticleIndex / STRAND_PARTICLE_COUNT;
+			decodedVertexIndex = linearParticleIndex % STRAND_PARTICLE_COUNT;
+			decodedVertexSign = -1.0;
+
+			if (_DecodeVertexCount == 1)
+				decodedTubularUV = packedUV;
+			else
+				decodedTubularUV = packedUV * float2(0.5, 1.0);
+		}
+		else
+		{
+			uint4 unpack = round(packedID * _DecodeVertexComponentValue);
+
+			decodedStrandIndex = (unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
+								 (unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
+								 (unpack.y >> _DecodeVertexWidth);
+			decodedVertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
+			decodedVertexIndex = unpack.x;
+			decodedVertexSign = 1.0;
+			
+			//uint decodedStrandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
+			//uint decodedVertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
+			//uint decodedVertexIndex = packedID.x * _DecodeStrandIndex.w
+
+			if (_DecodeVertexCount == 1)
+			{
+				decodedTubularUV.x = 0.5;
+				decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
+			}
+			else
+			{
+				decodedTubularUV.x = frac(packedID.y * (_DecodeVertexComponentValue / (float)(1 << _DecodeVertexWidth))) * ((1 << _DecodeVertexWidth) / (float)_DecodeVertexCount);
+				decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
+			}
+		}
 	}
-	return strandNormalTS;
-}
 
-float3 GetStrandDebugColor(in int strandIndex)
-{
-	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
-	uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
-	float3 strandColorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODCount - 1]);
-	float3 strandColorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODCount - 1]);
-	return lerp(strandColorLo, strandColorHi, _LODBlendFraction);
-}
-
-void UnpackTubeOffsets(float texcoord, out float offsetU, out float offsetV)
-{
-	// Unpack the UV back into a 16-bit uint.
-	const uint unpacked = (uint)(texcoord * ((1u << 16u) - 1u) + 0.5);
-
-	// Then just check the first bit in the 8-bit partitions. 
-	offsetU = (unpacked & (1 << 8u)) != 0;
-	offsetV = (unpacked & (1 << 0u)) != 0;
-}
-
-HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
-{
-#if HAIR_VERTEX_ID_STRIPS
-	uint linearParticleIndex = vertexID >> 1;
-#elif HAIR_VERTEX_ID_TUBES
-	uint linearParticleIndex = vertexID >> 2;
-#else
-	uint linearParticleIndex = vertexID;
-#endif
-
-	DECLARE_STRAND(linearParticleIndex / STRAND_PARTICLE_COUNT);
-	const uint i = strandParticleBegin + (linearParticleIndex % STRAND_PARTICLE_COUNT) * strandParticleStride;
+	DECLARE_STRAND(decodedStrandIndex);
+	const uint i = strandParticleBegin + decodedVertexIndex * strandParticleStride;
 	const uint i_next = i + strandParticleStride;
 	const uint i_prev = i - strandParticleStride;
 	const uint i_head = strandParticleBegin;
 	const uint i_tail = strandParticleEnd - strandParticleStride;
 
 	float3 p = LoadPosition(i);
-	float3 r0 = (i == i_head)
-		? LoadPosition(i_next) - p
-		: p - LoadPosition(i_prev);
-	float3 r1 = (i == i_tail)
-		? r0
-		: LoadPosition(i_next) - p;
+	float3 r0 = (i == i_head) ? LoadPosition(i_next) - p : p - LoadPosition(i_prev);
+	float3 r1 = (i == i_tail) ? r0 /* ............... */ : LoadPosition(i_next) - p;
 
 	float3 curvePositionRWS = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(p);
 	float3 curvePositionRWSPrev = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(LoadPositionPrev(i));
 
 	float3 vertexBitangentWS = (r0 + r1);// approx tangent to curve
-	float3 vertexTangentWS = normalize_safe(cross(vertexBitangentWS, HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS)));
-	float3 vertexNormalWS = cross(vertexTangentWS, vertexBitangentWS);
+	float3 vertexTangentWS = decodedVertexSign * normalize_safe(cross(HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS), vertexBitangentWS));
+	float3 vertexNormalWS = decodedVertexSign * normalize_safe(cross(vertexBitangentWS, vertexTangentWS));
 
-#if HAIR_VERTEX_ID_STRIPS
-	float3 vertexOffsetWS = vertexTangentWS * (_GroupMaxParticleDiameter * (vertexUV.x - 0.5));
-#elif HAIR_VERTEX_ID_TUBES
-	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
+	float2 vertexOffset2D = 0;
+	float3 vertexOffsetWS = 0;
 	{
-		// Normal requires normalization for tube offset to work.
-		vertexNormalWS = normalize_safe(vertexNormalWS);
-		
-		float offsetU, offsetV;
-		UnpackTubeOffsets(vertexUV.x, offsetU, offsetV);
-		
-		vertexOffsetWS += vertexTangentWS * (_GroupMaxParticleDiameter * (offsetU - 0.5));
-		vertexOffsetWS += vertexNormalWS  * (_GroupMaxParticleDiameter * (offsetV - 0.5));
+		if (_DecodeVertexCount > 1)
+		{
+			// calc offset in plane
+			sincos((0.5 - decodedTubularUV.x) * 6.2831853, vertexOffset2D.y, vertexOffset2D.x);
+
+			// calc offset in world space
+			float radius = 0.5 * _GroupMaxParticleDiameter;
+
+			if (_DecodeVertexCount == 2)
+			{
+				vertexOffsetWS =
+					(radius * vertexOffset2D.x) * vertexTangentWS +
+					(radius * vertexOffset2D.y) * vertexNormalWS;
+			}
+			else
+			{
+				vertexNormalWS =
+					(vertexOffset2D.x) * vertexTangentWS +
+					(vertexOffset2D.y) * vertexNormalWS;
+				
+				vertexOffsetWS =
+					(radius) * vertexNormalWS;
+			}
+		}
 	}
-#else
-	float3 vertexOffsetWS = float3(0.0, 0.0, 0.0);
-#endif
+
 	float3 vertexPositionWS = curvePositionRWS + vertexOffsetWS;
 	float3 vertexPositionWSPrev = curvePositionRWSPrev + vertexOffsetWS;
 
@@ -213,17 +220,17 @@ HairVertexWS GetHairVertexWS_Live(in uint vertexID, in float2 vertexUV)
 		x.tangentWS = vertexTangentWS;
 		x.bitangentWS = vertexBitangentWS;
 		x.rootUV = _RootUV[strandIndex];
-		x.strandUV = vertexUV * float2(1.0, _RootScale[strandIndex]);
+		x.strandUV = GetSurfaceUV(decodedTubularUV) * float2(1.0, _RootScale[strandIndex]);//TODO scroll to handle twist / change in view direction
 		x.strandIndex = strandIndex;
-		x.strandNormalTS = GetStrandNormalTangentSpace(vertexUV);
-		x.strandDebugColor = GetStrandDebugColor(strandIndex);
+		x.strandNormalTS = GetSurfaceNormalTS(decodedTubularUV);
+		x.strandDebugColor = GetStrandDebugColor(decodedStrandIndex);
 	}
 	return x;
 }
 
-HairVertex GetHairVertex_Live(in uint vertexID, in float2 vertexUV)
+HairVertex GetHairVertex_Live(in float4 packedID, in float2 packedUV)
 {
-	HairVertexWS x = GetHairVertexWS_Live(vertexID, vertexUV);
+	HairVertexWS x = GetHairVertexWS_Live(packedID, packedUV);
 	HairVertex v;
 	{
 		v.positionOS = mul(UNITY_MATRIX_I_M, float4(x.positionWS, 1.0)).xyz;
@@ -259,22 +266,21 @@ HairVertex GetHairVertex_Static(in float3 positionOS, in float3 normalOS, in flo
 }
 
 HairVertex GetHairVertex(
-	in uint in_vertexID,
-	in float2 in_vertexUV,
+	in float4 in_packedID,
+	in float2 in_packedUV,
 	in float3 in_staticPositionOS,
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS)
 {
-#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS || HAIR_VERTEX_ID_TUBES)
-	return GetHairVertex_Live(in_vertexID, in_vertexUV);
-#else
-	return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
-#endif
+	if (_DecodeVertexCount > 0)
+		return GetHairVertex_Live(in_packedID, in_packedUV);
+	else
+		return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 }
 
 void HairVertex_float(
-	in uint in_vertexID,
-	in float2 in_vertexUV,
+	in float4 in_packedID,
+	in float2 in_packedUV,
 	in float3 in_staticPositionOS,
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS,
@@ -285,11 +291,11 @@ void HairVertex_float(
 	out float3 out_bitangentOS,
 	out float2 out_rootUV,
 	out float2 out_strandUV,
-	out uint out_strandIndex,
+	out float out_strandIndex,
 	out float3 out_strandNormalTS,
 	out float3 out_strandDebugColor)
 {
-	HairVertex v = GetHairVertex(in_vertexID, in_vertexUV, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
+	HairVertex v = GetHairVertex(in_packedID, in_packedUV, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 	{
 		out_positionOS = v.positionOS;
 		out_motionOS = v.positionOS - v.positionOSPrev;
