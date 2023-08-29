@@ -316,7 +316,7 @@ namespace Unity.DemoTeam.Hair
 			return data;
 		}
 
-		static unsafe void ApplyRenderMeshData(Mesh mesh, MeshTopology topology, RenderMeshData data, in Bounds bounds)
+		static unsafe void ApplyRenderMeshData(Mesh mesh, MeshTopology topology, RenderMeshData data, in Bounds bounds, bool accelerationStructureCompatible = false)
 		{
 			/*
 			if (topology == MeshTopology.Triangles)
@@ -362,12 +362,36 @@ namespace Unity.DemoTeam.Hair
 
 			var meshUpdateFlags = MESH_UPDATE_UNCHECKED;
 			{
-				mesh.SetVertexBufferParams(data.vertexCount, new VertexAttributeDescriptor(VertexAttribute.TexCoord0, data.vertexFormat, dimension: 4, stream: 0));
+				if (!accelerationStructureCompatible)
 				{
+					mesh.SetVertexBufferParams(data.vertexCount, new VertexAttributeDescriptor(VertexAttribute.TexCoord0, data.vertexFormat, dimension: 4, stream: 0));
+					{
+						switch (data.vertexFormat)
+						{
+							case VertexAttributeFormat.UNorm8: mesh.SetVertexBufferData(data.vertices.Reinterpret<byte, uint>(), dataStart: 0, meshBufferStart: 0, data.vertexCount, stream: 0, meshUpdateFlags); break;
+							case VertexAttributeFormat.UNorm16: mesh.SetVertexBufferData(data.vertices.Reinterpret<byte, ulong>(), dataStart: 0, meshBufferStart: 0, data.vertexCount, stream: 0, meshUpdateFlags); break;
+						}
+					}
+				}
+				else
+				{
+					mesh.SetVertexBufferParams(data.vertexCount, attributes: new [] 
+					{
+						// for ray tracing, we need an explicit position, normal, and tangent stream to update. 
+						// additionally, the renderer will be rejected by the acceleration structure if there is no position stream.
+						new VertexAttributeDescriptor(VertexAttribute.Position, dimension: 3, stream: 0),
+						new VertexAttributeDescriptor(VertexAttribute.Normal,   dimension: 3, stream: 0),
+						new VertexAttributeDescriptor(VertexAttribute.Tangent,  dimension: 4, stream: 0),
+							
+						// still need these original streams for UVs etc.
+						new VertexAttributeDescriptor(VertexAttribute.TexCoord0, data.vertexFormat, dimension: 4, stream: 1)
+					});
+						
+					// still need to set the uv data
 					switch (data.vertexFormat)
 					{
-						case VertexAttributeFormat.UNorm8: mesh.SetVertexBufferData(data.vertices.Reinterpret<byte, uint>(), dataStart: 0, meshBufferStart: 0, data.vertexCount, stream: 0, meshUpdateFlags); break;
-						case VertexAttributeFormat.UNorm16: mesh.SetVertexBufferData(data.vertices.Reinterpret<byte, ulong>(), dataStart: 0, meshBufferStart: 0, data.vertexCount, stream: 0, meshUpdateFlags); break;
+						case VertexAttributeFormat.UNorm8:  mesh.SetVertexBufferData(data.vertices.Reinterpret<byte, uint>(),  dataStart: 0, meshBufferStart: 0, data.vertexCount, stream: 1, meshUpdateFlags); break;
+						case VertexAttributeFormat.UNorm16: mesh.SetVertexBufferData(data.vertices.Reinterpret<byte, ulong>(), dataStart: 0, meshBufferStart: 0, data.vertexCount, stream: 1, meshUpdateFlags); break;
 					}
 				}
 
@@ -462,7 +486,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshTubes(Mesh meshTubes, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds, bool buildForRaytracing = false)
+		public static unsafe void BuildMeshTubes(Mesh meshTubes, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds, bool accelerationStructureCompatible = false)
 		{
 			const int numSides = 4;
 			
@@ -540,7 +564,7 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// apply to mesh
-				ApplyRenderMeshData(meshTubes, MeshTopology.Triangles, data, bounds);
+				ApplyRenderMeshData(meshTubes, MeshTopology.Triangles, data, bounds, accelerationStructureCompatible);
 			}
 		}
 		

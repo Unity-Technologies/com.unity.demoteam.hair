@@ -18,7 +18,7 @@ namespace Unity.DemoTeam.Hair
             {
                 meshTubes.hideFlags = hideFlags;
                 meshTubes.name = "X-RaytracedTubes";
-                BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds, buildForRaytracing: true);
+                BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds, accelerationStructureCompatible: true);
             }
             return meshTubes;
         }
@@ -157,7 +157,7 @@ namespace Unity.DemoTeam.Hair
                     mesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
 
                     var streamIndex   = mesh.GetVertexAttributeStream(VertexAttribute.Position);
-                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord1);
+                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord0);
 
                     if (streamIndex != -1 && streamIndexUV != -1)
                     {
