@@ -537,10 +537,10 @@
     },
     "m_Slots": [
         {
-            "m_Id": "7a2cb8900a074d35bda27ea2ba7c1b7c"
+            "m_Id": "e9ad063d8e7a433ab72b40683be6242d"
         },
         {
-            "m_Id": "a9f9d444277f4908b77239ef9c2505f6"
+            "m_Id": "91ead6b4e4a441d296c5112db671b443"
         },
         {
             "m_Id": "2e20ff62401b4ee1b469c3ae3a2d91ed"
@@ -827,21 +827,6 @@
 
 {
     "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
-    "m_ObjectId": "7a2cb8900a074d35bda27ea2ba7c1b7c",
-    "m_Id": 0,
-    "m_DisplayName": "vertexID",
-    "m_SlotType": 0,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "vertexID",
-    "m_StageCapability": 3,
-    "m_Value": 0.0,
-    "m_DefaultValue": 0.0,
-    "m_Labels": []
-}
-
-{
-    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.StickyNoteData",
     "m_ObjectId": "8331e992bf384bccbcc056026365ccb9",
     "m_Title": "Static preview",
@@ -902,6 +887,27 @@
         "x": 0.0,
         "y": 0.0,
         "z": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector2MaterialSlot",
+    "m_ObjectId": "91ead6b4e4a441d296c5112db671b443",
+    "m_Id": 13,
+    "m_DisplayName": "packedUV",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "packedUV",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0
     },
     "m_Labels": []
 }
@@ -1003,27 +1009,6 @@
         "m_SerializableColors": []
     },
     "m_OutputChannel": 1
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector2MaterialSlot",
-    "m_ObjectId": "a9f9d444277f4908b77239ef9c2505f6",
-    "m_Id": 13,
-    "m_DisplayName": "vertexUV",
-    "m_SlotType": 0,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "vertexUV",
-    "m_StageCapability": 3,
-    "m_Value": {
-        "x": 0.0,
-        "y": 0.0
-    },
-    "m_DefaultValue": {
-        "x": 0.0,
-        "y": 0.0
-    },
-    "m_Labels": []
 }
 
 {
@@ -1197,6 +1182,31 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector4MaterialSlot",
+    "m_ObjectId": "e9ad063d8e7a433ab72b40683be6242d",
+    "m_Id": 0,
+    "m_DisplayName": "packedID",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "packedID",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.NormalVectorNode",
     "m_ObjectId": "ef6dd66ac24042b184978d4a9a325284",
     "m_Group": {
@@ -1232,7 +1242,7 @@
     "m_Type": "UnityEditor.ShaderGraph.StickyNoteData",
     "m_ObjectId": "f84496d497874313b7f614bbcb8c4c5d",
     "m_Title": "Strand mesh",
-    "m_Content": "UV0.x = vertexID\nUV1.xy = (u,v)",
+    "m_Content": "UV0.xyzw = packedID\nUV1.xy = (u,v) [deprecated]",
     "m_TextSize": 0,
     "m_Theme": 0,
     "m_Position": {

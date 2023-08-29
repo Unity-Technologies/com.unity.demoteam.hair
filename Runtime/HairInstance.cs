@@ -1157,45 +1157,6 @@ namespace Unity.DemoTeam.Hair
 		{
 			ref readonly var settingsStrands = ref GetSettingsStrands(strandGroupInstance);
 
-			// update material instance
-			ref var materialInstance = ref strandGroupInstance.sceneObjects.materialInstance;
-			{
-				var materialAsset = GetStrandMaterial(strandGroupInstance);
-				if (materialAsset != null && materialAsset.shader != null)
-				{
-					if (materialInstance == null)
-					{
-						materialInstance = new Material(materialAsset.shader);
-						materialInstance.hideFlags = HideFlags.HideAndDontSave;
-						materialInstance.name = materialAsset.name + "(Instance)";
-					}
-					else
-					{
-						if (materialInstance.shader != materialAsset.shader)
-						{
-							materialInstance.shader = materialAsset.shader;
-							materialInstance.name = materialAsset.name + "(Instance)";
-						}
-					}
-
-					materialInstance.CopyPropertiesFromMaterial(materialAsset);
-				}
-
-				if (materialInstance != null)
-				{
-					UpdateMaterialState(materialInstance, settingsSystem, settingsStrands, solverData, volumeData);
-
-#if UNITY_EDITOR
-					var materialInstancePendingPasses = HairMaterialUtility.TryCompileCountPassesPending(materialInstance);
-					if (materialInstancePendingPasses > 0)
-					{
-						materialInstance.shader = HairMaterialUtility.GetReplacementShader(HairMaterialUtility.ReplacementType.Async);
-						UpdateMaterialState(materialInstance, settingsSystem, settingsStrands, solverData, volumeData);
-					}
-#endif
-				}
-			}
-
 			// select mesh
 			var mesh = null as Mesh;
 			{
@@ -1261,6 +1222,45 @@ namespace Unity.DemoTeam.Hair
 					meshFilter.sharedMesh = mesh;
 			}
 
+			// update material instance
+			ref var materialInstance = ref strandGroupInstance.sceneObjects.materialInstance;
+			{
+				var materialAsset = GetStrandMaterial(strandGroupInstance);
+				if (materialAsset != null && materialAsset.shader != null)
+				{
+					if (materialInstance == null)
+					{
+						materialInstance = new Material(materialAsset.shader);
+						materialInstance.hideFlags = HideFlags.HideAndDontSave;
+						materialInstance.name = materialAsset.name + "(Instance)";
+					}
+					else
+					{
+						if (materialInstance.shader != materialAsset.shader)
+						{
+							materialInstance.shader = materialAsset.shader;
+							materialInstance.name = materialAsset.name + "(Instance)";
+						}
+					}
+
+					materialInstance.CopyPropertiesFromMaterial(materialAsset);
+				}
+
+				if (materialInstance != null)
+				{
+					UpdateMaterialState(materialInstance, settingsSystem, settingsStrands, solverData, volumeData, mesh);
+
+#if UNITY_EDITOR
+					var materialInstancePendingPasses = HairMaterialUtility.TryCompileCountPassesPending(materialInstance);
+					if (materialInstancePendingPasses > 0)
+					{
+						materialInstance.shader = HairMaterialUtility.GetReplacementShader(HairMaterialUtility.ReplacementType.Async);
+						UpdateMaterialState(materialInstance, settingsSystem, settingsStrands, solverData, volumeData, mesh);
+					}
+#endif
+				}
+			}
+
 			// update mesh renderer
 			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandMeshRenderer;
 			{
@@ -1311,7 +1311,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		static void UpdateMaterialState(Material materialInstance, in SettingsSystem settingsSystem, in SettingsStrands settingsStrands, in HairSim.SolverData solverData, in HairSim.VolumeData volumeData)
+		static void UpdateMaterialState(Material materialInstance, in SettingsSystem settingsSystem, in SettingsStrands settingsStrands, in HairSim.SolverData solverData, in HairSim.VolumeData volumeData, Mesh mesh)
 		{
 			HairSim.BindSolverData(materialInstance, solverData);
 			HairSim.BindVolumeData(materialInstance, volumeData);
@@ -1324,10 +1324,29 @@ namespace Unity.DemoTeam.Hair
 			{
 				case SettingsSystem.StrandRenderer.BuiltinStrips:
 					materialInstance.SetInt("_DecodeVertexCount", 2);
+					materialInstance.SetInt("_DecodeVertexWidth", 1);
 					break;
 
 				default:
 					materialInstance.SetInt("_DecodeVertexCount", 1);
+					materialInstance.SetInt("_DecodeVertexWidth", 0);
+					break;
+			}
+
+			switch (mesh?.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+			{
+				case VertexAttributeFormat.Float32://TODO replace runtime compatibility with asset versioning / upgrade
+					materialInstance.SetInt("_DecodeVertexComponentWidth", 32);
+					break;
+
+				case VertexAttributeFormat.UNorm16:
+					materialInstance.SetInt("_DecodeVertexComponentValue", ushort.MaxValue);
+					materialInstance.SetInt("_DecodeVertexComponentWidth", 16);
+					break;
+
+				case VertexAttributeFormat.UNorm8:
+					materialInstance.SetInt("_DecodeVertexComponentValue", byte.MaxValue);
+					materialInstance.SetInt("_DecodeVertexComponentWidth", 8);
 					break;
 			}
 		}

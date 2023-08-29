@@ -33,8 +33,8 @@
 
 struct UnlitAttribs
 {
-	float vertexID : TEXCOORD0;
-	float2 vertexUV : TEXCOORD1;
+	float4 packedID : TEXCOORD0;
+	float2 packedUV : TEXCOORD1;
 	float3 staticPositionOS : POSITION;
 	float3 staticNormalOS : NORMAL;
 	float3 staticTangentOS : TANGENT;
@@ -52,7 +52,7 @@ struct UnlitVaryings
 
 UnlitVaryings UnlitVert(UnlitAttribs IN)
 {
-	HairVertex hair = GetHairVertex((uint)IN.vertexID, IN.vertexUV, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
+	HairVertex hair = GetHairVertex(IN.packedID, IN.packedUV, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
 	{
 		UnlitVaryings OUT;
 		OUT.positionCS = TransformObjectToHClip(hair.positionOS);

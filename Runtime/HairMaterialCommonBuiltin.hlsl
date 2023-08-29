@@ -50,8 +50,8 @@
 
 struct appdata_hair
 {
-	float vertexID : TEXCOORD0;
-	float2 vertexUV : TEXCOORD1;
+	float4 packedID : TEXCOORD0;
+	float2 packedUV : TEXCOORD1;
 #if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS)
 	float4 vertex : COLOR;
 #else
@@ -74,7 +74,7 @@ struct Input
 void BuiltinVert(inout appdata_hair v, out Input o)
 {
 #if !SHADER_TARGET_SURFACE_ANALYSIS
-	HairVertex hair = GetHairVertex((uint)v.vertexID, v.vertexUV, v.vertex.xyz, v.normal.xyz, v.tangent.xyz);
+	HairVertex hair = GetHairVertex(v.packedID, v.packedUV, v.vertex.xyz, v.normal.xyz, v.tangent.xyz);
 	{
 		v.vertex = float4(hair.positionOS, 1.0);
 		v.normal = float4(hair.normalOS, 1.0);
@@ -95,7 +95,7 @@ void BuiltinVert(inout appdata_hair v, out Input o)
 void BuiltinSurf(Input IN, inout SurfaceOutput o)
 {
 #if !SHADER_TARGET_SURFACE_ANALYSIS
-	float3 normalTS = GetStrandNormalTangentSpace(IN.strandUV);
+	float3 normalTS = GetSurfaceNormalTS(IN.strandUV);
 #else
 	float3 normalTS = float3(0.0, 0.0, 1.0);
 #endif

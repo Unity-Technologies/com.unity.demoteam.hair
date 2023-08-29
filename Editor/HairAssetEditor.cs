@@ -520,6 +520,24 @@ namespace Unity.DemoTeam.Hair
 									HairSim.BindSolverData(previewMaterial, previewData[i]);
 
 									previewMaterial.SetInt("_DecodeVertexCount", 1);
+									previewMaterial.SetInt("_DecodeVertexWidth", 0);
+
+									switch (meshLines?.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+									{
+										case VertexAttributeFormat.Float32://TODO replace runtime compatibility with asset versioning / upgrade
+											previewMaterial.SetInt("_DecodeVertexComponentWidth", 32);
+											break;
+
+										case VertexAttributeFormat.UNorm16:
+											previewMaterial.SetInt("_DecodeVertexComponentValue", ushort.MaxValue);
+											previewMaterial.SetInt("_DecodeVertexComponentWidth", 16);
+											break;
+
+										case VertexAttributeFormat.UNorm8:
+											previewMaterial.SetInt("_DecodeVertexComponentValue", byte.MaxValue);
+											previewMaterial.SetInt("_DecodeVertexComponentWidth", 8);
+											break;
+									}
 
 									previewRenderer.BeginPreview(rect, GUIStyle.none);
 									previewRenderer.DrawMesh(meshLines, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
