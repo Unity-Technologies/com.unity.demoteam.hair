@@ -147,11 +147,11 @@ namespace Unity.DemoTeam.Hair
 
 			public enum StrandRenderer
 			{
-				Disabled,
-				BuiltinLines,
-				BuiltinStrips,
-				BuiltinTubes,
-				HDRPHighQualityLines,
+				Disabled = 0,
+				BuiltinLines = 1,
+				BuiltinStrips = 2,
+				BuiltinTubes = 4,
+				HDRPHighQualityLines = 3,
 			}
 
 			public enum UpdateMode
@@ -1216,6 +1216,7 @@ namespace Unity.DemoTeam.Hair
 							}
 						}
 						break;
+
 					case SettingsSystem.StrandRenderer.BuiltinTubes:
 						{
 							if (subdivision > 0)
