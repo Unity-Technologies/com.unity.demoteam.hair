@@ -59,7 +59,7 @@ float3 GetSurfaceNormalTS(in float2 tubularUV)
 {
 	float3 surfaceNormalTS;
 	{
-		if (_DecodeVertexCount >= 2)
+		if (_DecodeVertexCount == 2)
 		{
 			surfaceNormalTS.x = 4.0 * saturate(tubularUV.x) - 1.0;
 			surfaceNormalTS.y = 0.0;
@@ -191,9 +191,21 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 			// calc offset in world space
 			float radius = 0.5 * _GroupMaxParticleDiameter;
 
-			vertexOffsetWS =
-				(radius * vertexOffset2D.x) * vertexTangentWS +
-				(radius * vertexOffset2D.y) * vertexNormalWS;
+			if (_DecodeVertexCount == 2)
+			{
+				vertexOffsetWS =
+					(radius * vertexOffset2D.x) * vertexTangentWS +
+					(radius * vertexOffset2D.y) * vertexNormalWS;
+			}
+			else
+			{
+				vertexNormalWS =
+					(vertexOffset2D.x) * vertexTangentWS +
+					(vertexOffset2D.y) * vertexNormalWS;
+				
+				vertexOffsetWS =
+					(radius) * vertexNormalWS;
+			}
 		}
 	}
 
