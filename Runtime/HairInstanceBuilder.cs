@@ -35,6 +35,7 @@ namespace Unity.DemoTeam.Hair
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
 				}
 			}
 
@@ -453,6 +454,88 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public static unsafe void BuildMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			const int numSides = 4;
+			
+			var perTubeVertices = strandParticleCount * numSides;
+			var perTubeSegments = strandParticleCount - 1;
+			var perTubeTriangles = (perTubeSegments * numSides * 2) + 4;
+			var perTubeIndices = perTubeTriangles * 3;
+			
+			using (var data = CreateRenderMeshData(strandCount, strandParticleCount, strandParticleVertexCount: numSides, indexCount: strandCount * perTubeIndices, Allocator.Temp))
+			{
+				void CreateTriangle(ref uint* indicesPtr, uint offset, uint i0, uint i1, uint i2)
+				{
+					*(indicesPtr++) = offset + i0;
+					*(indicesPtr++) = offset + i1;
+					*(indicesPtr++) = offset + i2;
+				}
+
+				// write indices
+				{
+					var indicesPtr = (uint*)data.indices.GetUnsafePtr();
+
+					for (uint i = 0, segmentBase = 0; i != strandCount; i++, segmentBase += 4)
+					{
+						// end cap a
+						{
+							CreateTriangle(ref indicesPtr, segmentBase, 0, 2, 3);
+							CreateTriangle(ref indicesPtr, segmentBase, 0, 1, 2);
+						}
+
+						for (uint j = 0; j != perTubeSegments; j++, segmentBase += 4)
+						{
+							//     :      :
+							//     7------6
+							//   ,´:    ,´|        4------5------6------7------4
+							//  4------5  |        |    ,´|    ,´|    ,´|    ,´|
+							//  |  :   |  |   =>   |  ,´  |  ,´  |  ,´  |  ,´  |
+							//  |  3 - |- 2        |,´    |,´    |,´    |,´    |
+							//  |,´    |,´         0------1------2------3------0
+							//  0------1
+							//  .
+							//  |
+							//  '--- segmentBase
+
+							// side a
+							{
+								CreateTriangle(ref indicesPtr, segmentBase, 0, 5, 1);
+								CreateTriangle(ref indicesPtr, segmentBase, 0, 4, 5);
+							}
+
+							// side b
+							{
+								CreateTriangle(ref indicesPtr, segmentBase, 1, 6, 2);
+								CreateTriangle(ref indicesPtr, segmentBase, 1, 5, 6);
+							}
+
+							// side c
+							{
+								CreateTriangle(ref indicesPtr, segmentBase, 2, 7, 3);
+								CreateTriangle(ref indicesPtr, segmentBase, 2, 6, 7);
+							}
+
+							// side d
+							{
+								CreateTriangle(ref indicesPtr, segmentBase, 3, 4, 0);
+								CreateTriangle(ref indicesPtr, segmentBase, 3, 7, 4);
+							}
+						}
+
+						// end cap b
+						{
+							CreateTriangle(ref indicesPtr, segmentBase, 0, 2, 1);
+							CreateTriangle(ref indicesPtr, segmentBase, 0, 3, 2);
+						}
+					}
+				}
+
+				// apply to mesh
+				ApplyRenderMeshData(meshStrips, MeshTopology.Triangles, data, bounds);
+			}
+		}
+		
 		public static Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
 		{
 			var meshRoots = new Mesh();
@@ -508,6 +591,25 @@ namespace Unity.DemoTeam.Hair
 				meshStrips = CreateMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshStrips;
+		}
+		
+		public static Mesh CreateMeshTubes(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			var meshTubes = new Mesh();
+			{
+				meshTubes.hideFlags = hideFlags;
+				meshTubes.name = "X-Tubes";
+				BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
+			}
+			return meshTubes;
+		}
+
+		public static Mesh CreateMeshTubesIfNull(ref Mesh meshTubes, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		{
+			if (meshTubes == null)
+				meshTubes = CreateMeshTubes(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+
+			return meshTubes;
 		}
 
 		public static Mesh CreateMeshInstance(Mesh original, HideFlags hideFlags)

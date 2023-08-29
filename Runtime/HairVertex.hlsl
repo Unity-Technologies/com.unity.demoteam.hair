@@ -77,7 +77,7 @@ float2 GetSurfaceUV(in float2 tubularUV)
 {
 	float2 surfaceUV = tubularUV;
 	{
-		if (_DecodeVertexCount == 2)
+		if (_DecodeVertexCount >= 2)
 		{
 			surfaceUV.x *= 2.0;
 		}
@@ -178,7 +178,7 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 
 	float3 vertexBitangentWS = (r0 + r1);// approx tangent to curve
 	float3 vertexTangentWS = decodedVertexSign * normalize_safe(cross(HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS), vertexBitangentWS));
-	float3 vertexNormalWS = decodedVertexSign * cross(vertexBitangentWS, vertexTangentWS);
+	float3 vertexNormalWS = decodedVertexSign * normalize_safe(cross(vertexBitangentWS, vertexTangentWS));
 
 	float2 vertexOffset2D = 0;
 	float3 vertexOffsetWS = 0;
@@ -191,9 +191,21 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 			// calc offset in world space
 			float radius = 0.5 * _GroupMaxParticleDiameter;
 
-			vertexOffsetWS =
-				(radius * vertexOffset2D.x) * vertexTangentWS +
-				(radius * vertexOffset2D.y) * vertexNormalWS;
+			if (_DecodeVertexCount == 2)
+			{
+				vertexOffsetWS =
+					(radius * vertexOffset2D.x) * vertexTangentWS +
+					(radius * vertexOffset2D.y) * vertexNormalWS;
+			}
+			else
+			{
+				vertexNormalWS =
+					(vertexOffset2D.x) * vertexTangentWS +
+					(vertexOffset2D.y) * vertexNormalWS;
+				
+				vertexOffsetWS =
+					(radius) * vertexNormalWS;
+			}
 		}
 	}
 
