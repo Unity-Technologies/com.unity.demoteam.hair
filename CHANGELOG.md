@@ -14,12 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduced size of topology meshes used for rendering. This is the result of a data format change, and affects meshes built at runtime (e.g. when changing subdivision setting), as well as meshes built within hair assets stored on disk. Existing hair assets in existing projects are still usable as-is, but they will need to be rebuilt if one wants to benefit from the reduction in size.
 - Improved shader compilation time for all hair materials (removed use of multi_compile in HairVertex.hlsl).
 - Improved tooltips in the HairWind component.
 - Renamed various fields.
 
 ### Fixed
 
+- Fixed a precision issue that potentially could cause degenerate segments and skipped vertices when rendering very large groups of strands.
 - Fixed an issue with the HairAsset inspector capturing mouse when clicking outside inspector after long progress bar (was triggering rebuild with the 'auto' option enabled).
 
 
