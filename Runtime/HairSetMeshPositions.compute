@@ -17,24 +17,32 @@ RWByteAddressBuffer _VertexBuffer;
 void Main(uint3 dispatchID : SV_DispatchThreadID)
 {
     // We need to manually handle the UNORM since we are in a compute shader. 
-    float4 normalizedPackedID;
+    float4 packedID;
     {
     #if 1
-        uint packedValue = _VertexBufferUV.Load(dispatchID.x << 2);
+        const uint unnormalizedPackedID = _VertexBufferUV.Load(dispatchID.x << 2);
         
-        normalizedPackedID = float4
+        packedID = float4
         (
-            ((packedValue >>  0) & 0xFF) / 255.0,
-            ((packedValue >>  8) & 0xFF) / 255.0,
-            ((packedValue >> 16) & 0xFF) / 255.0,
-            ((packedValue >> 24) & 0xFF) / 255.0
+            ((unnormalizedPackedID >>  0) & 0xFF) / 255.0,
+            ((unnormalizedPackedID >>  8) & 0xFF) / 255.0,
+            ((unnormalizedPackedID >> 16) & 0xFF) / 255.0,
+            ((unnormalizedPackedID >> 24) & 0xFF) / 255.0
         );
     #else
-        // TODO: Handle the UNORM16 Case.
+        const uint2 unnormalizedPackedID = _VertexBufferUV.Load2(dispatchID.x << 3);
+        
+        packedID = float4
+        (
+            ((unnormalizedPackedID.x >>  0) & 0xFFFF) / 65535.0,
+            ((unnormalizedPackedID.x >> 16) & 0xFFFF) / 65535.0,
+            ((unnormalizedPackedID.y >>  0) & 0xFFFF) / 65535.0,
+            ((unnormalizedPackedID.y >> 16) & 0xFFFF) / 65535.0
+        );
     #endif
     }
     
-    const HairVertex v = GetHairVertex(normalizedPackedID, 0, 0, 0, 0);
+    const HairVertex v = GetHairVertex(packedID, 0, 0, 0, 0);
     {
         // temp hack: un-do some translations
         const float3 x = TransformObjectToWorld(v.positionOS);
