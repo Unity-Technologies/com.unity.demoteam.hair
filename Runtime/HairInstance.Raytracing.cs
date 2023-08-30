@@ -18,7 +18,7 @@ namespace Unity.DemoTeam.Hair
             {
                 meshTubes.hideFlags = hideFlags;
                 meshTubes.name = "X-RaytracedTubes";
-                BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds, buildForRaytracing: true);
+                BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds, accelerationStructureCompatible: true);
             }
             return meshTubes;
         }
@@ -127,11 +127,8 @@ namespace Unity.DemoTeam.Hair
                 rayTracingMaterial.CopyPropertiesFromMaterial(materialInstance);
                 
                 // override whatever is being rasterized to use the tube geo representation. 
-                {
-                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_LINES",  false);
-                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_STRIPS", false);
-                    CoreUtils.SetKeyword(rayTracingMaterial, "HAIR_VERTEX_ID_TUBES",  true);
-                }
+                rayTracingMaterial.SetInt("_DecodeVertexCount", 4);
+                rayTracingMaterial.SetInt("_DecodeVertexWidth", 2);
 
                 // this will force disable the renderer for all rendering passes but still cause it to be present 
                 // in the acceleration structure. it's a hack.
@@ -154,18 +151,32 @@ namespace Unity.DemoTeam.Hair
                 else
                     mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetRaytracedTubes;
                 
+                // There are two kernels depending on the format of the texture coordinate buffer (UNORM 8 or 16). 
+                int kernelIndex = 0;
+                
                 CoreUtils.SafeRelease(rayTracingObjects.buffer);
                 CoreUtils.SafeRelease(rayTracingObjects.bufferUV);
                 {
                     mesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
 
-                    var streamIndex  = mesh.GetVertexAttributeStream(VertexAttribute.Position);
-                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord1);
+                    var streamIndex   = mesh.GetVertexAttributeStream(VertexAttribute.Position);
+                    var streamIndexUV = mesh.GetVertexAttributeStream(VertexAttribute.TexCoord0);
 
                     if (streamIndex != -1 && streamIndexUV != -1)
                     {
                         rayTracingObjects.buffer   = mesh.GetVertexBuffer(streamIndex);
                         rayTracingObjects.bufferUV = mesh.GetVertexBuffer(streamIndexUV);
+
+                        // Select the compute kernel to decode the vertex stream properly.
+                        switch (mesh.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+                        {
+                            case VertexAttributeFormat.UNorm8:
+                                kernelIndex = 0;
+                                break;
+                            case VertexAttributeFormat.UNorm16:
+                                kernelIndex = 1;
+                                break;
+                        }
                     }
                     else
                     {
@@ -177,14 +188,6 @@ namespace Unity.DemoTeam.Hair
                 // update mesh vertex positions in the acceleration structure
                 if (mesh.vertexCount > 0)
                 {
-                    const int kernelIndex = 0;
-                    
-                    // not the greatest way to do this, but not really possible to do any better unless it is done on the native side.
-                    foreach (var keywordName in s_updateMeshPositionsCS.enabledKeywords)
-                    {
-                        cmd.SetKeyword(s_updateMeshPositionsCS, keywordName, false);
-                    }
-                    
                     // not the greatest way to do this, but not really possible to do any better unless it is done on the native side.
                     foreach (var keywordName in rayTracingMaterial.shaderKeywords)
                     {
@@ -195,24 +198,21 @@ namespace Unity.DemoTeam.Hair
                     }
 
                     // override whatever is being rasterized to use the tube geo representation. 
-                    {
-                        var vertexIDKeywords = new LocalKeyword[]
-                        {
-                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_LINES"),
-                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_STRIPS"),
-                            new(s_updateMeshPositionsCS, "HAIR_VERTEX_ID_TUBES"),
-                        };
-
-                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[0], false);
-                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[1], false);
-                        cmd.SetKeyword(s_updateMeshPositionsCS, vertexIDKeywords[2], true);
-                    }
+                    s_updateMeshPositionsCS.SetInt("_DecodeVertexCount", 4);
+                    s_updateMeshPositionsCS.SetInt("_DecodeVertexWidth", 2);
                     
                     // Also need to bind these matrices manually. (TODO: Is it cross-SRP safe?)
                     cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_ObjectToWorld", rayTracingObjects.container.transform.localToWorldMatrix);
                     cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_WorldToObject", rayTracingObjects.container.transform.worldToLocalMatrix);
                     
+                    if (solverData.stagingPosition == null)
+                    {
+                        // In rare cases the staging position will be uninitialized and an error will throw that it is not bound.
+                        // So just bind the original particle buffer here to stop the assert from failing (it won't be used anyways). 
+                        rayTracingMaterial.SetBuffer("_StagingPosition", solverData.particlePosition);
+                    }
                     cmd.SetComputeParamsFromMaterial(s_updateMeshPositionsCS, kernelIndex, rayTracingMaterial);
+
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBuffer",   rayTracingObjects.buffer);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferUV", rayTracingObjects.bufferUV);
                     cmd.DispatchCompute(s_updateMeshPositionsCS, kernelIndex, (mesh.vertexCount + 1024 - 1) / 1024, 1, 1);

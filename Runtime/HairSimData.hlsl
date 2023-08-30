@@ -50,13 +50,19 @@ HAIRSIM_SOLVERDATA<float> _LODGuideCarry;			// f: lod index * strand count + str
 //----------------
 // solver staging
 
-#if STAGING_COMPRESSION
-HAIRSIM_SOLVERDATA<uint2> _StagingPosition;			// xy: encoded position
-HAIRSIM_SOLVERDATA<uint2> _StagingPositionPrev;		// ...
+#if HAIRSIM_WRITEABLE_SOLVERDATA
+#define HAIRSIM_RENDERDATA RWByteAddressBuffer
 #else
-HAIRSIM_SOLVERDATA<float3> _StagingPosition;		// xyz: position
-HAIRSIM_SOLVERDATA<float3> _StagingPositionPrev;	// ...
+#define HAIRSIM_RENDERDATA ByteAddressBuffer
 #endif
+
+HAIRSIM_RENDERDATA _StagingPosition;
+HAIRSIM_RENDERDATA _StagingPositionPrev;
+
+#define STAGINGFORMAT_UNDEFINED (0)
+#define STAGINGFORMAT_COMPRESSED (1)
+#define STAGINGFORMAT_UNCOMPRESSED (2)
+#define STAGINGFORMAT_UNCOMPRESSED_PASSTHROUGH (3)
 
 //-------------
 // volume data
@@ -183,30 +189,51 @@ float3 DecodePosition(uint2 p_enc, float4 originExtent)
 
 float3 LoadStagingPosition(uint i)
 {
-#if STAGING_COMPRESSION
-	return DecodePosition(_StagingPosition[i], _StagingOriginExtent);
-#else
-	return _StagingPosition[i].xyz;
-#endif
+	switch (_StagingBufferFormat)
+	{
+		case STAGINGFORMAT_COMPRESSED:
+			return DecodePosition(asuint(_StagingPosition.Load2(i * _StagingBufferStride)), _StagingOriginExtent);
+		
+		case STAGINGFORMAT_UNCOMPRESSED:
+			return asfloat(_StagingPosition.Load3(i * _StagingBufferStride));
+		
+		case STAGINGFORMAT_UNCOMPRESSED_PASSTHROUGH:
+			return _ParticlePosition[i].xyz;
+		
+		default:
+			return 0;
+	}
 }
 
 float3 LoadStagingPositionPrev(uint i)
 {
-#if STAGING_COMPRESSION
-	return DecodePosition(_StagingPositionPrev[i], _StagingOriginExtentPrev);
-#else
-	return _StagingPositionPrev[i].xyz;
-#endif
+	switch (_StagingBufferFormat)
+	{
+		case STAGINGFORMAT_COMPRESSED:
+			return DecodePosition(asuint(_StagingPositionPrev.Load2(i * _StagingBufferStride)), _StagingOriginExtentPrev);
+		
+		case STAGINGFORMAT_UNCOMPRESSED:
+			return asfloat(_StagingPositionPrev.Load3(i * _StagingBufferStride));
+		
+		case STAGINGFORMAT_UNCOMPRESSED_PASSTHROUGH:
+			return _ParticlePositionPrev[i].xyz;
+		
+		default:
+			return 0;
+	}
 }
 
 void StoreStagingPosition(uint i, float3 p)
 {
 #if HAIRSIM_WRITEABLE_SOLVERDATA
-#if STAGING_COMPRESSION
-	_StagingPosition[i] = EncodePosition(p, _StagingOriginExtent);
-#else
-	_StagingPosition[i].xyz = p;
-#endif
+	switch (_StagingBufferFormat)
+	{
+		case STAGINGFORMAT_COMPRESSED:
+			_StagingPosition.Store2(i * _StagingBufferStride, EncodePosition(p, _StagingOriginExtent)); break;
+		
+		case STAGINGFORMAT_UNCOMPRESSED:
+			_StagingPosition.Store3(i * _StagingBufferStride, asuint(p)); break;
+	}
 #endif
 }
 

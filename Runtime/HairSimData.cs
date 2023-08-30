@@ -80,7 +80,6 @@ namespace Unity.DemoTeam.Hair
 			public bool LIVE_POSITIONS_2;
 			public bool LIVE_POSITIONS_1;
 			public bool LIVE_ROTATIONS_2;
-			public bool STAGING_COMPRESSION;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
@@ -123,8 +122,10 @@ namespace Unity.DemoTeam.Hair
 			public uint _StagingSubdivision;			// staging segment subdivision samples
 			public uint _StagingVertexCount;			// staging strand vertex count
 			public uint _StagingVertexOffset;			// staging strand vertex offset
+			public uint _StagingBufferFormat;
+			public uint _StagingBufferStride;
 
-			// 57
+			// 59
 			public float _DT;
 			public uint _Substeps;
 			public uint _Iterations;
@@ -145,17 +146,17 @@ namespace Unity.DemoTeam.Hair
 			public float _LocalShape;
 			public float _LocalShapeBias;
 
-			// 74
+			// 76
 			public float _GlobalPosition;
 			public float _GlobalPositionInterval;
 			public float _GlobalRotation;
 			public float _GlobalFadeOffset;
 			public float _GlobalFadeExtent;
 
-			// 79 --> 80 (pad to 16 byte boundary)
+			// 81 --> 84 (pad to 16 byte boundary)
 			public float _scbpad1;
-			//public float _scbpad2;
-			//public float _scbpad3;
+			public float _scbpad2;
+			public float _scbpad3;
 		}
 
 		/*
@@ -230,8 +231,8 @@ namespace Unity.DemoTeam.Hair
 
 		public struct VolumeKeywords
 		{
-			public bool VOLUME_SUPPORT_CONTRACTION;
 			public bool VOLUME_SPLAT_CLUSTERS;
+			public bool VOLUME_SUPPORT_CONTRACTION;
 			public bool VOLUME_TARGET_INITIAL_POSE;
 			public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
 		}

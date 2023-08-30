@@ -729,11 +729,12 @@ namespace Unity.DemoTeam.Hair
 				var vertexCount = (int)(solverData.cbuffer._StrandCount * (segmentCountStaging + 1));
 				var vertexStridePosition = stagingCompression ? sizeof(Vector2) : sizeof(Vector3);
 
-				changed |= CreateBuffer(ref solverData.stagingPosition, "StagingPosition_0", vertexCount, vertexStridePosition);
-				changed |= CreateBuffer(ref solverData.stagingPositionPrev, "StagingPosition_1", vertexCount, vertexStridePosition);
+				changed |= CreateBuffer(ref solverData.stagingPosition, "StagingPosition_0", vertexCount, vertexStridePosition, ComputeBufferType.Raw);
+				changed |= CreateBuffer(ref solverData.stagingPositionPrev, "StagingPosition_1", vertexCount, vertexStridePosition, ComputeBufferType.Raw);
 
 				changed |= (solverData.cbuffer._StagingSubdivision != stagingSubdivision);
 				changed |= (solverData.cbuffer._StagingVertexCount == 0);
+				changed |= (solverData.cbuffer._StagingBufferFormat == 3u);
 
 				return changed;
 			}
@@ -934,7 +935,6 @@ namespace Unity.DemoTeam.Hair
 			target.BindKeyword("LIVE_POSITIONS_2", solverData.keywords.LIVE_POSITIONS_2);
 			target.BindKeyword("LIVE_POSITIONS_1", solverData.keywords.LIVE_POSITIONS_1);
 			target.BindKeyword("LIVE_ROTATIONS_2", solverData.keywords.LIVE_ROTATIONS_2);
-			target.BindKeyword("STAGING_COMPRESSION", solverData.keywords.STAGING_COMPRESSION);
 		}
 
 		public static void BindVolumeData(Material mat, in VolumeData volumeData) => BindVolumeData(new BindTargetMaterial(mat), volumeData);
@@ -981,8 +981,8 @@ namespace Unity.DemoTeam.Hair
 
 			target.BindComputeBuffer(UniformIDs._WindEmitter, volumeData.windEmitter);
 
-			target.BindKeyword("VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
 			target.BindKeyword("VOLUME_SPLAT_CLUSTERS", volumeData.keywords.VOLUME_SPLAT_CLUSTERS);
+			target.BindKeyword("VOLUME_SUPPORT_CONTRACTION", volumeData.keywords.VOLUME_SUPPORT_CONTRACTION);
 			target.BindKeyword("VOLUME_TARGET_INITIAL_POSE", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE);
 			target.BindKeyword("VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES", volumeData.keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES);
 		}
@@ -1245,56 +1245,72 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void PushSolverStaging(CommandBuffer cmd, ref SolverData solverData, bool stagingCompression, uint stagingSubdivisions, in VolumeData volumeData)
+		public static void PushSolverStaging(CommandBuffer cmd, ref SolverData solverData, bool stagingActive, bool stagingCompression, uint stagingSubdivision, in VolumeData volumeData)
 		{
 			ref var cbuffer = ref solverData.cbuffer;
 			ref var keywords = ref solverData.keywords;
 
-			// derive constants
-			var stagingOrigin = GetVolumeCenter(volumeData);
-			var stagingExtent = GetVolumeExtent(volumeData).Abs().CMax();
-
-			cbuffer._StagingOriginExtentPrev = cbuffer._StagingOriginExtent;
-			cbuffer._StagingOriginExtent = new Vector4(stagingOrigin.x, stagingOrigin.y, stagingOrigin.z, stagingExtent);
-
-			var segmentCount = (cbuffer._StrandParticleCount - 1);
-			var segmentCountStaging = segmentCount * (1 + stagingSubdivisions);
-
-			cbuffer._StagingSubdivision = stagingSubdivisions;
-			cbuffer._StagingVertexCount = segmentCountStaging + 1;
-
-			switch (solverData.memoryLayout)
+			if (stagingActive)
 			{
-				case HairAsset.MemoryLayout.Interleaved:
-					cbuffer._StagingVertexOffset = 1;
-					break;
+				// derive constants
+				var stagingOrigin = GetVolumeCenter(volumeData);
+				var stagingExtent = GetVolumeExtent(volumeData).Abs().CMax();
 
-				case HairAsset.MemoryLayout.Sequential:
-					cbuffer._StagingVertexOffset = cbuffer._StagingVertexCount;
-					break;
+				cbuffer._StagingOriginExtentPrev = cbuffer._StagingOriginExtent;
+				cbuffer._StagingOriginExtent = new Vector4(stagingOrigin.x, stagingOrigin.y, stagingOrigin.z, stagingExtent);
+
+				var segmentCount = (cbuffer._StrandParticleCount - 1);
+				var segmentCountStaging = segmentCount * (1 + stagingSubdivision);
+
+				cbuffer._StagingSubdivision = stagingSubdivision;
+				cbuffer._StagingVertexCount = segmentCountStaging + 1;
+
+				switch (solverData.memoryLayout)
+				{
+					case HairAsset.MemoryLayout.Interleaved:
+						cbuffer._StagingVertexOffset = 1;
+						break;
+
+					case HairAsset.MemoryLayout.Sequential:
+						cbuffer._StagingVertexOffset = cbuffer._StagingVertexCount;
+						break;
+				}
+
+				cbuffer._StagingBufferFormat = stagingCompression ? 1u : 2u;
+				cbuffer._StagingBufferStride = stagingCompression ? sizeof(uint) * 2u : sizeof(float) * 3u;
+
+				// update cbuffer
+				PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
+
+				// staging
+				int numX = ((int)cbuffer._StrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
+				int numY = 1;
+				int numZ = 1;
+
+				int kernelStaging = (cbuffer._StagingSubdivision == 0)
+					? SolverKernels.KStaging
+					: SolverKernels.KStagingSubdivision;
+
+				using (new ProfilingScope(cmd, MarkersGPU.Solver_Staging))
+				{
+					CoreUtils.Swap(ref solverData.stagingPosition, ref solverData.stagingPositionPrev);
+
+					BindSolverData(cmd, s_solverCS, kernelStaging, solverData);
+					cmd.DispatchCompute(s_solverCS, kernelStaging, numX, numY, numZ);
+				}
 			}
-
-			// derive keywords
-			keywords.STAGING_COMPRESSION = stagingCompression;
-
-			// update cbuffer
-			PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
-
-			// staging
-			int numX = ((int)cbuffer._StrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
-			int numY = 1;
-			int numZ = 1;
-
-			int kernelStaging = (cbuffer._StagingSubdivision == 0)
-				? SolverKernels.KStaging
-				: SolverKernels.KStagingSubdivision;
-
-			using (new ProfilingScope(cmd, MarkersGPU.Solver_Staging))
+			else
 			{
-				CoreUtils.Swap(ref solverData.stagingPosition, ref solverData.stagingPositionPrev);
+				// derive constants
+				cbuffer._StagingSubdivision = 0;
+				cbuffer._StagingVertexCount = cbuffer._StrandParticleCount;
+				cbuffer._StagingVertexOffset = cbuffer._StrandParticleOffset;
 
-				BindSolverData(cmd, s_solverCS, kernelStaging, solverData);
-				cmd.DispatchCompute(s_solverCS, kernelStaging, numX, numY, numZ);
+				cbuffer._StagingBufferFormat = 3;
+				cbuffer._StagingBufferStride = sizeof(float) * 4;
+
+				// update cbuffer
+				PushConstantBufferData(cmd, solverData.cbufferStorage, solverData.cbuffer);
 			}
 		}
 
@@ -1363,8 +1379,8 @@ namespace Unity.DemoTeam.Hair
 			cbuffer._VolumeFeatures = (uint)features;
 
 			// derive keywords
-			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
 			keywords.VOLUME_SPLAT_CLUSTERS = (volumeSettings.splatClusters);
+			keywords.VOLUME_SUPPORT_CONTRACTION = (volumeSettings.pressureSolution == VolumeSettings.PressureSolution.DensityEquals);
 			keywords.VOLUME_TARGET_INITIAL_POSE = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPose);
 			keywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES = (volumeSettings.targetDensity == VolumeSettings.TargetDensity.InitialPoseInParticles);
 
