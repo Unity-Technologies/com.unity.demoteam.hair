@@ -205,7 +205,14 @@ namespace Unity.DemoTeam.Hair
                     cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_ObjectToWorld", rayTracingObjects.container.transform.localToWorldMatrix);
                     cmd.SetComputeMatrixParam(s_updateMeshPositionsCS, "unity_WorldToObject", rayTracingObjects.container.transform.worldToLocalMatrix);
                     
+                    if (solverData.stagingPosition == null)
+                    {
+                        // In rare cases the staging position will be uninitialized and an error will throw that it is not bound.
+                        // So just bind the original particle buffer here to stop the assert from failing (it won't be used anyways). 
+                        rayTracingMaterial.SetBuffer("_StagingPosition", solverData.particlePosition);
+                    }
                     cmd.SetComputeParamsFromMaterial(s_updateMeshPositionsCS, kernelIndex, rayTracingMaterial);
+
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBuffer",   rayTracingObjects.buffer);
                     cmd.SetComputeBufferParam(s_updateMeshPositionsCS, kernelIndex, "_VertexBufferUV", rayTracingObjects.bufferUV);
                     cmd.DispatchCompute(s_updateMeshPositionsCS, kernelIndex, (mesh.vertexCount + 1024 - 1) / 1024, 1, 1);

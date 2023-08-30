@@ -50,7 +50,6 @@ void Main(uint3 dispatchID : SV_DispatchThreadID)
         const float3 y = GetAbsolutePositionWS(x);
         const float3 z = TransformWorldToObject(y);
 
-        // todo: the stride + offset should probably not be hard coded
         _VertexBuffer.Store3((40u * dispatchID.x) + 0u,  asuint(z));
         _VertexBuffer.Store3((40u * dispatchID.x) + 12u, asuint(v.normalOS));
         _VertexBuffer.Store4((40u * dispatchID.x) + 24u, asuint(float4(v.tangentOS, 1.0)));
