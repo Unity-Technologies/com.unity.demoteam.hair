@@ -55,6 +55,8 @@ CBUFFER_START(SolverCBuffer)
     uint _StagingSubdivision;
     uint _StagingVertexCount;
     uint _StagingVertexOffset;
+    uint _StagingBufferFormat;
+    uint _StagingBufferStride;
     float _DT;
     uint _Substeps;
     uint _Iterations;
@@ -78,6 +80,8 @@ CBUFFER_START(SolverCBuffer)
     float _GlobalFadeOffset;
     float _GlobalFadeExtent;
     float _scbpad1;
+    float _scbpad2;
+    float _scbpad3;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

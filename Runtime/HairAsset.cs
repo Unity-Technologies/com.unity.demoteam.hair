@@ -459,6 +459,7 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Mesh meshAssetRoots;
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetStrips;
+			[HideInInspector] public Mesh meshAssetTubes;
 
 			public int version;
 			public const int VERSION = 2;

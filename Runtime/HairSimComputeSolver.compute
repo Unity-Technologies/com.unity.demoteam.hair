@@ -17,17 +17,13 @@
 //----------
 // features
 
-#pragma multi_compile __ STAGING_COMPRESSION
-// 0 == staging data full precision
-// 1 == staging data compressed
-
 #pragma multi_compile __ LIVE_POSITIONS_3 LIVE_POSITIONS_2 LIVE_POSITIONS_1
 // 0 == no live positions
-// 1 == num. live positions denoted by suffix
+// N == num. live positions denoted by suffix
 
 #pragma multi_compile __ LIVE_ROTATIONS_2
 // 0 == no live rotations
-// 1 == num. live rotations denoted by suffix
+// N == num. live rotations denoted by suffix
 
 //------------------
 // features derived

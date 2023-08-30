@@ -105,7 +105,7 @@
 	if (x >= _StrandCount * _StrandParticleCount) return;
 #endif
 
-#if LAYOUT_INTERLEAVED && VOLUME_SPLAT_CLUSTERS
+#if VOLUME_SPLAT_CLUSTERS && LAYOUT_INTERLEAVED
   #define DECLARE_SPLAT_PARTICLE_UNCHECKED(x)	\
 	const uint particleIndex = _StrandCount * (x / _SolverStrandCount) + (x % _SolverStrandCount);
 #else

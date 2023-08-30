@@ -3,17 +3,7 @@
     "m_Type": "UnityEditor.ShaderGraph.GraphData",
     "m_ObjectId": "d1afb942372c49b6be7e6f382d135a78",
     "m_Properties": [],
-    "m_Keywords": [
-        {
-            "m_Id": "713b1bf6463c468aba186a6346036b5c"
-        },
-        {
-            "m_Id": "d1c902dcc9e34d99beeea82b65e1dd5d"
-        },
-        {
-            "m_Id": "8ecf9c27dc314aa891635892143b8f36"
-        }
-    ],
+    "m_Keywords": [],
     "m_Nodes": [
         {
             "m_Id": "05907e129e0b4526858a9d2d669f647a"
@@ -547,10 +537,10 @@
     },
     "m_Slots": [
         {
-            "m_Id": "7a2cb8900a074d35bda27ea2ba7c1b7c"
+            "m_Id": "e9ad063d8e7a433ab72b40683be6242d"
         },
         {
-            "m_Id": "a9f9d444277f4908b77239ef9c2505f6"
+            "m_Id": "91ead6b4e4a441d296c5112db671b443"
         },
         {
             "m_Id": "2e20ff62401b4ee1b469c3ae3a2d91ed"
@@ -782,41 +772,6 @@
 
 {
     "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
-    "m_ObjectId": "713b1bf6463c468aba186a6346036b5c",
-    "m_Guid": {
-        "m_GuidSerialized": "3450c46d-7b7d-4872-a758-78bdb3a478b2"
-    },
-    "m_Name": "HAIR_VERTEX_ID",
-    "m_DefaultReferenceName": "ENUM_713B1BF6463C468ABA186A6346036B5C",
-    "m_OverrideReferenceName": "HAIR_VERTEX_ID",
-    "m_GeneratePropertyBlock": true,
-    "m_KeywordType": 1,
-    "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_Entries": [
-        {
-            "id": 1,
-            "displayName": "_",
-            "referenceName": "_"
-        },
-        {
-            "id": 2,
-            "displayName": "LINES",
-            "referenceName": "LINES"
-        },
-        {
-            "id": 3,
-            "displayName": "STRIPS",
-            "referenceName": "STRIPS"
-        }
-    ],
-    "m_Value": 0,
-    "m_IsEditable": true
-}
-
-{
-    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
     "m_ObjectId": "74ab0201ea674934923073b77509e252",
     "m_Id": 0,
@@ -868,21 +823,6 @@
         "m_SerializableColors": []
     },
     "m_Space": 0
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
-    "m_ObjectId": "7a2cb8900a074d35bda27ea2ba7c1b7c",
-    "m_Id": 0,
-    "m_DisplayName": "vertexID",
-    "m_SlotType": 0,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "vertexID",
-    "m_StageCapability": 3,
-    "m_Value": 0.0,
-    "m_DefaultValue": 0.0,
-    "m_Labels": []
 }
 
 {
@@ -953,21 +893,23 @@
 
 {
     "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
-    "m_ObjectId": "8ecf9c27dc314aa891635892143b8f36",
-    "m_Guid": {
-        "m_GuidSerialized": "d83a58eb-f324-4362-8f11-c7011df85a27"
+    "m_Type": "UnityEditor.ShaderGraph.Vector2MaterialSlot",
+    "m_ObjectId": "91ead6b4e4a441d296c5112db671b443",
+    "m_Id": 13,
+    "m_DisplayName": "packedUV",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "packedUV",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0
     },
-    "m_Name": "STAGING_COMPRESSION",
-    "m_DefaultReferenceName": "BOOLEAN_8ECF9C27DC314AA891635892143B8F36_ON",
-    "m_OverrideReferenceName": "STAGING_COMPRESSION",
-    "m_GeneratePropertyBlock": true,
-    "m_KeywordType": 0,
-    "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_Entries": [],
-    "m_Value": 0,
-    "m_IsEditable": true
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "m_Labels": []
 }
 
 {
@@ -1067,27 +1009,6 @@
         "m_SerializableColors": []
     },
     "m_OutputChannel": 1
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector2MaterialSlot",
-    "m_ObjectId": "a9f9d444277f4908b77239ef9c2505f6",
-    "m_Id": 13,
-    "m_DisplayName": "vertexUV",
-    "m_SlotType": 0,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "vertexUV",
-    "m_StageCapability": 3,
-    "m_Value": {
-        "x": 0.0,
-        "y": 0.0
-    },
-    "m_DefaultValue": {
-        "x": 0.0,
-        "y": 0.0
-    },
-    "m_Labels": []
 }
 
 {
@@ -1238,36 +1159,6 @@
 
 {
     "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
-    "m_ObjectId": "d1c902dcc9e34d99beeea82b65e1dd5d",
-    "m_Guid": {
-        "m_GuidSerialized": "90c8d22c-4b07-4d5e-9820-db234d2764ea"
-    },
-    "m_Name": "HAIR_VERTEX_SRC",
-    "m_DefaultReferenceName": "ENUM_D1C902DCC9E34D99BEEEA82B65E1DD5D",
-    "m_OverrideReferenceName": "HAIR_VERTEX_SRC",
-    "m_GeneratePropertyBlock": true,
-    "m_KeywordType": 1,
-    "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_Entries": [
-        {
-            "id": 1,
-            "displayName": "SOLVER",
-            "referenceName": "SOLVER"
-        },
-        {
-            "id": 2,
-            "displayName": "STAGING",
-            "referenceName": "STAGING"
-        }
-    ],
-    "m_Value": 0,
-    "m_IsEditable": true
-}
-
-{
-    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
     "m_ObjectId": "de2852bb66784c618a8fad459141fbcd",
     "m_Id": 1,
@@ -1285,6 +1176,31 @@
         "x": 0.0,
         "y": 0.0,
         "z": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector4MaterialSlot",
+    "m_ObjectId": "e9ad063d8e7a433ab72b40683be6242d",
+    "m_Id": 0,
+    "m_DisplayName": "packedID",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "packedID",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.0
     },
     "m_Labels": []
 }
@@ -1326,7 +1242,7 @@
     "m_Type": "UnityEditor.ShaderGraph.StickyNoteData",
     "m_ObjectId": "f84496d497874313b7f614bbcb8c4c5d",
     "m_Title": "Strand mesh",
-    "m_Content": "UV0.x = vertexID\nUV1.xy = (u,v)",
+    "m_Content": "UV0.xyzw = packedID\nUV1.xy = (u,v) [deprecated]",
     "m_TextSize": 0,
     "m_Theme": 0,
     "m_Position": {
