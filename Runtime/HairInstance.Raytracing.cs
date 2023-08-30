@@ -151,6 +151,9 @@ namespace Unity.DemoTeam.Hair
                 else
                     mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetRaytracedTubes;
                 
+                // There are two kernels depending on the format of the texture coordinate buffer (UNORM 8 or 16). 
+                int kernelIndex = 0;
+                
                 CoreUtils.SafeRelease(rayTracingObjects.buffer);
                 CoreUtils.SafeRelease(rayTracingObjects.bufferUV);
                 {
@@ -163,6 +166,17 @@ namespace Unity.DemoTeam.Hair
                     {
                         rayTracingObjects.buffer   = mesh.GetVertexBuffer(streamIndex);
                         rayTracingObjects.bufferUV = mesh.GetVertexBuffer(streamIndexUV);
+
+                        // Select the compute kernel to decode the vertex stream properly.
+                        switch (mesh.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+                        {
+                            case VertexAttributeFormat.UNorm8:
+                                kernelIndex = 0;
+                                break;
+                            case VertexAttributeFormat.UNorm16:
+                                kernelIndex = 1;
+                                break;
+                        }
                     }
                     else
                     {
@@ -174,8 +188,6 @@ namespace Unity.DemoTeam.Hair
                 // update mesh vertex positions in the acceleration structure
                 if (mesh.vertexCount > 0)
                 {
-                    const int kernelIndex = 0;
-                    
                     // not the greatest way to do this, but not really possible to do any better unless it is done on the native side.
                     foreach (var keywordName in rayTracingMaterial.shaderKeywords)
                     {
