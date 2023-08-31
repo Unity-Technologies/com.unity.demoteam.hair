@@ -43,7 +43,7 @@ void Main(uint3 dispatchID : SV_DispatchThreadID)
     #endif
     }
     
-    const HairVertex v = GetHairVertex(packedID, 0, 0, 0, 0);
+    const HairVertex v = GetHairVertex(packedID, 0, 0, float3(0, 1, 0), float3(1, 0, 0));
     {
         // temp hack: un-do some translations
         const float3 x = TransformObjectToWorld(v.positionOS);

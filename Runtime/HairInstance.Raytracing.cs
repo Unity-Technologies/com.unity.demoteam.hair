@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
@@ -40,9 +36,9 @@ namespace Unity.DemoTeam.Hair
         
         static void BuildRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance, int index, HideFlags hideFlags = HideFlags.NotEditable)
         {
-            strandGroupInstance.sceneObjects.rayTracingObjects.container = CreateContainer("RaytracedStrands:" + index, strandGroupInstance.sceneObjects.groupContainer,        hideFlags);
-            strandGroupInstance.sceneObjects.rayTracingObjects.filter    = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.rayTracingObjects.container,   hideFlags);
-            strandGroupInstance.sceneObjects.rayTracingObjects.renderer  = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.rayTracingObjects.container, hideFlags);
+            strandGroupInstance.sceneObjects.rayTracingObjects.container = CreateContainer("RaytracedStrands:" + index, strandGroupInstance.sceneObjects.groupContainer,   hideFlags);
+            strandGroupInstance.sceneObjects.rayTracingObjects.renderer  = CreateComponent<MeshRenderer>(strandGroupInstance.sceneObjects.rayTracingObjects.container,          hideFlags);
+            strandGroupInstance.sceneObjects.rayTracingObjects.filter    = CreateComponent<MeshFilter>(strandGroupInstance.sceneObjects.rayTracingObjects.container,            hideFlags);
         }
 
         public static void BuildRayTracingObjectsIfNeeded(ref HairInstance.GroupInstance strandGroupInstance, HideFlags hideFlags = HideFlags.NotEditable)
@@ -55,9 +51,9 @@ namespace Unity.DemoTeam.Hair
 
         public static void DestroyRayTracingObjects(ref HairInstance.GroupInstance strandGroupInstance)
         {
+            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.filter);
+            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.renderer);
             CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.container);
-            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.material);
-            CoreUtils.Destroy(strandGroupInstance.sceneObjects.rayTracingObjects.mesh);
         }
     }
 
@@ -101,18 +97,32 @@ namespace Unity.DemoTeam.Hair
         
         void UpdateRayTracingState(ref GroupInstance strandGroupInstance, HairSim.SolverData solverData, ref Material materialInstance, CommandBuffer cmd)
         {
-            if (!settingsSystem.raytracing)
+            var hdrp = (HDRenderPipelineAsset)GraphicsSettings.currentRenderPipeline;
+
+            if (!hdrp.currentPlatformRenderPipelineSettings.supportRayTracing)
             {
                 HairInstanceBuilder.DestroyRayTracingObjects(ref strandGroupInstance);
                 return;
             }
-            
+                
             HairInstanceBuilder.BuildRayTracingObjectsIfNeeded(ref strandGroupInstance);
             
             ref var rayTracingObjects         = ref strandGroupInstance.sceneObjects.rayTracingObjects;
             ref var rayTracingMesh            = ref rayTracingObjects.mesh;
+            ref var rayTracingMeshFilter      = ref rayTracingObjects.filter;
             ref var rayTracingSubdivision = ref rayTracingObjects.meshInstanceSubdivision;
             
+            if (!settingsSystem.raytracing)
+            {
+                // Unload mesh from the memory. 
+                rayTracingMeshFilter.sharedMesh = null; 
+
+                // Disable any other contribution the renderer might have.
+                rayTracingObjects.renderer.forceRenderingOff = true; 
+                
+                return;
+            }
+
             // update material instance
             ref var rayTracingMaterial = ref rayTracingObjects.material;
             {
@@ -234,6 +244,7 @@ namespace Unity.DemoTeam.Hair
                 meshRenderer.shadowCastingMode = settingsSystem.strandShadows;
                 meshRenderer.renderingLayerMask = (uint)settingsSystem.strandLayers;
                 meshRenderer.motionVectorGenerationMode = settingsSystem.motionVectors;
+                meshRenderer.forceRenderingOff = false; 
                 
                 // this flag is required for the acceleration structure to catch updates made by the compute kernel.
                 meshRenderer.rayTracingMode = RayTracingMode.DynamicGeometry;
