@@ -1303,6 +1303,13 @@ namespace Unity.DemoTeam.Hair
 			// update mesh renderer
 			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandMeshRenderer;
 			{
+				if (solverData.stagingPosition == null)
+				{
+					// In rare cases the staging position will be uninitialized and an error will throw that it is not bound.
+					// So just bind the original particle buffer here to stop the assert from failing (it won't be used anyways). 
+					materialInstance.SetBuffer("_StagingPosition", solverData.particlePosition);
+				}
+				
 				meshRenderer.enabled = (settingsSystem.strandRenderer != SettingsSystem.StrandRenderer.Disabled);
 				meshRenderer.sharedMaterial = materialInstance;
 				meshRenderer.shadowCastingMode = settingsSystem.strandShadows;
