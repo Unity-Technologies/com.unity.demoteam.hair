@@ -1158,6 +1158,11 @@ namespace Unity.DemoTeam.Hair
 								{
 									attachment.Detach(revertPositionRotation: false);
 									attachment.Attach(storePositionRotation: false);
+
+									if (strandGroupInstance.settingsIndex == -1)
+										strandGroupDefaults.settingsSkinning.rootsAttachTargetBone = new PrimarySkinningBone(settingsSkinning.rootsAttachTarget.transform);
+									else
+										strandGroupSettings[strandGroupInstance.settingsIndex].settingsSkinning.rootsAttachTargetBone = new PrimarySkinningBone(settingsSkinning.rootsAttachTarget.transform);
 								}
 								else
 								{
