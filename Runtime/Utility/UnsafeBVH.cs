@@ -16,8 +16,8 @@ namespace Unity.DemoTeam.Hair
 	{
 		int GetLeafCount();
 		void BuildLeafData(Leaf* leafPtr, int leafCount);
-		float DistanceLeafPoint(uint leafIndex, in float3 p);
-		float DistanceLeafTrace(uint leafIndex, in float3 p, in float3 r);
+		float SqDistanceLeafPoint(uint leafIndex, in float3 p);
+		float SqDistanceLeafTrace(uint leafIndex, in float3 p, in float3 r);
 	}
 
 	public unsafe struct UnsafeBVH : IDisposable
@@ -170,7 +170,7 @@ namespace Unity.DemoTeam.Hair
 
 	public static unsafe class UnsafeBVHQueries
 	{
-		public static float DistanceNodePoint(Node* nodePtr, in float3 p)
+		public static float SqDistanceNodePoint(Node* nodePtr, in float3 p)
 		{
 			// see: "distance functions" by Inigo Quilez
 			// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
@@ -178,8 +178,9 @@ namespace Unity.DemoTeam.Hair
 			var b = 0.5f * (nodePtr->data.max - nodePtr->data.min);
 			var c = 0.5f * (nodePtr->data.max + nodePtr->data.min);
 			var q = abs(p - c) - b;
+			var d = length(max(q, 0.0f)) + min(max(q.x, max(q.y, q.z)), 0.0f);
 
-			return length(max(q, 0.0f)) + min(max(q.x, max(q.y, q.z)), 0.0f);
+			return (d * d);
 		}
 
 		public static uint FindClosestLeaf<T>(in T context, in UnsafeBVH bvh, in float3 p) where T : IUnsafeBVHContext
@@ -194,31 +195,30 @@ namespace Unity.DemoTeam.Hair
 
 		static void FindClosestLeaf<T>(in T context, Node* nodePtr, in float3 p, float* bestDistPtr, uint* bestIndexPtr) where T : IUnsafeBVHContext
 		{
-			if (DistanceNodePoint(nodePtr, p) < *bestDistPtr)
+			// examine leaf data
+			var leafIndex = nodePtr->data.index;
+			if (leafIndex != uint.MaxValue)
 			{
-				// examine leaf
-				var leafIndex = nodePtr->data.index;
-				if (leafIndex != uint.MaxValue)
+				var distSq = context.SqDistanceLeafPoint(leafIndex, p);
+				if (distSq < *bestDistPtr)
 				{
-					var dist = context.DistanceLeafPoint(leafIndex, p);
-					if (dist < *bestDistPtr)
-					{
-						*bestDistPtr = dist;
-						*bestIndexPtr = leafIndex;
-					}
+					*bestDistPtr = distSq;
+					*bestIndexPtr = leafIndex;
 				}
+			}
 
-				// examine left subtree
-				if (nodePtr->stepL != 0)
-				{
-					FindClosestLeaf(context, nodePtr + nodePtr->stepL, p, bestDistPtr, bestIndexPtr);
-				}
-
-				// examine right subtree
-				if (nodePtr->stepR != 0)
-				{
-					FindClosestLeaf(context, nodePtr + nodePtr->stepR, p, bestDistPtr, bestIndexPtr);
-				}
+			// examine subtrees (closest first)
+			var distL = (nodePtr->stepL != 0) ? SqDistanceNodePoint(nodePtr + nodePtr->stepL, p) : float.PositiveInfinity;
+			var distR = (nodePtr->stepR != 0) ? SqDistanceNodePoint(nodePtr + nodePtr->stepR, p) : float.PositiveInfinity;
+			if (distR < distL)
+			{
+				if (distR < *bestDistPtr) FindClosestLeaf(context, nodePtr + nodePtr->stepR, p, bestDistPtr, bestIndexPtr);
+				if (distL < *bestDistPtr) FindClosestLeaf(context, nodePtr + nodePtr->stepL, p, bestDistPtr, bestIndexPtr);
+			}
+			else
+			{
+				if (distL < *bestDistPtr) FindClosestLeaf(context, nodePtr + nodePtr->stepL, p, bestDistPtr, bestIndexPtr);
+				if (distR < *bestDistPtr) FindClosestLeaf(context, nodePtr + nodePtr->stepR, p, bestDistPtr, bestIndexPtr);
 			}
 		}
 	}
