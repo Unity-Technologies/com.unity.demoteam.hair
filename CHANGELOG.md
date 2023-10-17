@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added support for tube rendering.
 - Added support for noise-based timing jitter in wind emitters (HairWind) to reduce uniformity of pulses.
 - Added support for automatic LOD selection based on size of bounds in viewport.
 
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a bug in triangle BVH lookup that was causing incorrect and slow root UV resolve on more elaborate meshes. 
 - Fixed a precision issue that potentially could cause degenerate segments and skipped vertices when rendering very large groups of strands.
 - Fixed an issue with the HairAsset inspector capturing mouse when clicking outside inspector after long progress bar (was triggering rebuild with the 'auto' option enabled).
 

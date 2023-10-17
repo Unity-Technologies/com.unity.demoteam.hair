@@ -41,7 +41,7 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			public float DistanceLeafPoint(uint leafIndex, in float3 p)
+			public float SqDistanceLeafPoint(uint leafIndex, in float3 p)
 			{
 				var j0 = triangleVertexIndicesPtr[leafIndex * 3 + 0];
 				var j1 = triangleVertexIndicesPtr[leafIndex * 3 + 1];
@@ -54,7 +54,7 @@ namespace Unity.DemoTeam.Hair
 				return TriMeshQueriesUtility.SqDistTriangle(p0, p1, p2, p);
 			}
 
-			public float DistanceLeafTrace(uint leafIndex, in float3 p, in float3 r)
+			public float SqDistanceLeafTrace(uint leafIndex, in float3 p, in float3 r)
 			{
 				return float.PositiveInfinity;//TODO
 			}
