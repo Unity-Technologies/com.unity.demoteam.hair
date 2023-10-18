@@ -12,9 +12,13 @@ namespace Unity.DemoTeam.Hair
 		public static readonly GUIStyle statusBox;
 		public static readonly GUIStyle statusBoxVertical;
 
-		public static readonly GUIContent miniButtoniconEdit;
+		public static readonly GUIContent miniButtonIconEdit;
 		public static readonly GUIContent miniButtonIconAdd;
 		public static readonly GUIContent miniButtonIconSub;
+
+		public static readonly GUIContent miniButtonIconPlay;
+		public static readonly GUIContent miniButtonIconPause;
+		public static readonly GUIContent miniButtonIconRewind;
 
 		static HairGUIStyles()
 		{
@@ -39,9 +43,13 @@ namespace Unity.DemoTeam.Hair
 			statusBoxVertical.fontSize = 8;
 			statusBoxVertical.wordWrap = true;
 
-			miniButtoniconEdit = EditorGUIUtility.IconContent("editicon.sml");
+			miniButtonIconEdit = EditorGUIUtility.IconContent("editicon.sml");
 			miniButtonIconAdd = new GUIContent("+");// EditorGUIUtility.IconContent("Toolbar Plus");
 			miniButtonIconSub = new GUIContent("-");// EditorGUIUtility.IconContent("Toolbar Minus");
+
+			miniButtonIconPlay = EditorGUIUtility.IconContent("Animation.Play");
+			miniButtonIconPause = EditorGUIUtility.IconContent("PauseButton");
+			miniButtonIconRewind = EditorGUIUtility.IconContent("Animation.PrevKey");
 		}
 	}
 }

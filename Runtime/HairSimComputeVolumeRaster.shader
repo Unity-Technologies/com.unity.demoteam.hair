@@ -4,10 +4,6 @@
 
 	#pragma target 5.0
 
-	#pragma multi_compile __ POINT_RASTERIZATION_NEEDS_PSIZE
-	// 0 == when platform does not require explicit psize
-	// 1 == when platform requires explicit psize
-
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 	#include "HairSimData.hlsl"
@@ -20,9 +16,7 @@
 		uint volumeSlice : SV_RenderTargetArrayIndex;
 		nointerpolation float2 valuePos : TEXCOORD0;
 		nointerpolation float4 value : TEXCOORD1;// xyz = velocity, w = density
-#if POINT_RASTERIZATION_NEEDS_PSIZE
 		float pointSize : PSIZE;
-#endif
 	};
 
 	SliceVaryings MakeVertex(float2 pos, float4 value, float2 valuePos, uint slice)
@@ -32,9 +26,7 @@
 		output.volumeSlice = slice;
 		output.valuePos = valuePos;
 		output.value = value;
-#if POINT_RASTERIZATION_NEEDS_PSIZE
 		output.pointSize = 1.0;
-#endif
 		return output;
 	}
 
@@ -65,10 +57,12 @@
 		//   C = cell centers
 		//   x = particle
 
-		const float3 localPos = VolumeWorldToLocal(_ParticlePosition[vertexID[0]].xyz) - 0.5;// subtract offset to cell center
+		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+
+		const float3 localPos = VolumeWorldToLocal(lodDesc, _ParticlePosition[vertexID[0]].xyz) - 0.5;// subtract offset to cell center
 		const float3 localPosFloor = floor(localPos);
 
-		const float2 uvCellSize = 1.0 / _VolumeCells.xy;
+		const float2 uvCellSize = 1.0 / lodDesc.volumeCellCount.xy;
 		const float2 uv0 = uvCellSize * localPosFloor.xy;
 		const float2 uvH = uvCellSize * 2.0;
 
@@ -108,16 +102,18 @@
 		// j          0  0  0  0    1  1  1  1    0  0  0  0    1  1  1  1    (vertexID >> 2) & 1
 		// uvID       0  1  2  3    0  1  2  3    0  1  2  3    0  1  2  3    (vertexID & 3)
 
+		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+
 		const uint i = (vertexID >> 3);
 		const uint j = (vertexID >> 2) & 1;
 
 		const uint uvID = (vertexID & 3);
 		const float2 uv = float2(((uvID >> 1) ^ uvID) & 1, uvID >> 1);
 
-		const float3 localPos = VolumeWorldToLocal(_ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
+		const float3 localPos = VolumeWorldToLocal(lodDesc, _ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
 		const float3 localPosFloor = floor(localPos);
 
-		const float2 uvCellSize = 1.0 / _VolumeCells.xy;
+		const float2 uvCellSize = 1.0 / lodDesc.volumeCellCount.xy;
 		const float2 uv0 = uvCellSize * localPosFloor.xy;
 		const float2 uvH = uvCellSize * 2.0;
 
@@ -134,9 +130,7 @@
 		output.volumeSlice = localPosFloor.z + j;
 		output.valuePos = localPos.xy;
 		output.value = float4((v.xyz * v.w), v.w) * lerp(w0, w1, j);
-#if POINT_RASTERIZATION_NEEDS_PSIZE
 		output.pointSize = 1.0;
-#endif
 		return output;
 	}
 

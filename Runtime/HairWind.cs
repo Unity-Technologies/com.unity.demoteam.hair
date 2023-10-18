@@ -8,7 +8,7 @@ namespace Unity.DemoTeam.Hair
 	[ExecuteAlways]
 	public class HairWind : MonoBehaviour
 	{
-		public static HashSet<HairWind> s_winds = new HashSet<HairWind>();
+		public static HashSet<HairWind> s_emitters = new HashSet<HairWind>();
 
 		[Serializable]
 		public struct SettingsEmitter
@@ -121,12 +121,12 @@ namespace Unity.DemoTeam.Hair
 
 		private void OnEnable()
 		{
-			s_winds.Add(this);
+			s_emitters.Add(this);
 		}
 
 		private void OnDisable()
 		{
-			s_winds.Remove(this);
+			s_emitters.Remove(this);
 		}
 
 		//-----------------------
@@ -369,10 +369,10 @@ namespace Unity.DemoTeam.Hair
 
 		public void OnDrawGizmosSelected()
 		{
-			DrawGizmos(selected: true);
+			DrawGizmos(Time.time, Time.deltaTime, selected: true);
 		}
 
-		public void DrawGizmos(bool selected = false)
+		public void DrawGizmos(float t, float dt, bool selected = false)
 		{
 			var data = new RuntimeData();
 
@@ -384,7 +384,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					if (isActiveAndEnabled)
 					{
-						DrawGizmosRuntimeEmitterFlow(data, selected ? 1.0f : 0.5f, 256, Time.time, Time.deltaTime);
+						DrawGizmosRuntimeEmitterFlow(data, selected ? 1.0f : 0.5f, 256, t, dt);
 					}
 
 					//DrawGizmosRuntimeEmitterGrid(data, 16);

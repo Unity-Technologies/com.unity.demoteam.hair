@@ -7,6 +7,7 @@ using Unity.Mathematics;
 
 #if HAS_PACKAGE_UNITY_HDRP
 using UnityEngine.Rendering.HighDefinition;
+using ICSharpCode.NRefactory.Ast;
 #endif
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
@@ -140,22 +141,36 @@ namespace Unity.DemoTeam.Hair
 
 		public const MeshUpdateFlags MESH_UPDATE_UNCHECKED = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds;
 
-		public static unsafe void BuildMeshRoots(Mesh meshRoots, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		public static unsafe void BuildMeshRoots(Mesh meshRoots, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, Vector3[] particlePosition)
 		{
-			using (var tangent = new NativeArray<Vector4>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var rootMeshPosition = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var rootMeshTangent = new NativeArray<Vector4>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var rootMeshNormal = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			using (var indices = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
-				var tangentPtr = (Vector4*)tangent.GetUnsafePtr();
+				var rootMeshPositionPtr = (Vector3*)rootMeshPosition.GetUnsafePtr();
+				var rootMeshTangentPtr = (Vector4*)rootMeshTangent.GetUnsafePtr();
+				var rootMeshNormalPtr = (Vector3*)rootMeshNormal.GetUnsafePtr();
 				var indicesPtr = (int*)indices.GetUnsafePtr();
 
-				// write tangent
+				// write attributes
 				for (int i = 0; i != strandCount; i++)
 				{
-					var localRootFrame = Quaternion.FromToRotation(Vector3.up, rootDirection[i]);
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i,
+						out var strandParticleBegin,
+						out var strandParticleStride,
+						out var strandParticleEnd);
+
+					ref readonly var p0 = ref particlePosition[strandParticleBegin + strandParticleStride * 0];
+					ref readonly var p1 = ref particlePosition[strandParticleBegin + strandParticleStride * 1];
+
+					var localRootDir = Vector3.Normalize(p1 - p0);
+					var localRootFrame = Quaternion.FromToRotation(Vector3.up, localRootDir);
 					var localRootPerp = localRootFrame * Vector3.right;
-					{
-						*(tangentPtr++) = new Vector4(localRootPerp.x, localRootPerp.y, localRootPerp.z, 1.0f);
-					}
+
+					*(rootMeshPositionPtr++) = p0;
+					*(rootMeshTangentPtr++) = new Vector4(localRootPerp.x, localRootPerp.y, localRootPerp.z, 1.0f);
+					*(rootMeshNormalPtr++) = localRootDir;
 				}
 
 				// write indices
@@ -174,9 +189,9 @@ namespace Unity.DemoTeam.Hair
 						new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, dimension: 4, stream: 2)
 					);
 
-					meshRoots.SetVertexBufferData(rootPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
-					meshRoots.SetVertexBufferData(rootDirection, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
-					meshRoots.SetVertexBufferData(tangent, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
+					meshRoots.SetVertexBufferData(rootMeshPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+					meshRoots.SetVertexBufferData(rootMeshNormal, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+					meshRoots.SetVertexBufferData(rootMeshTangent, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
 
 					meshRoots.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
 					meshRoots.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
@@ -536,21 +551,21 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 		
-		public static Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		public static Mesh CreateMeshRoots(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, Vector3[] particlePosition)
 		{
 			var meshRoots = new Mesh();
 			{
 				meshRoots.hideFlags = hideFlags;
 				meshRoots.name = "Roots";
-				BuildMeshRoots(meshRoots, strandCount, rootPosition, rootDirection);
+				BuildMeshRoots(meshRoots, memoryLayout, strandCount, strandParticleCount, particlePosition);
 			}
 			return meshRoots;
 		}
 
-		public static Mesh CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		public static Mesh CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, Vector3[] particlePosition)
 		{
 			if (meshRoots == null)
-				meshRoots = CreateMeshRoots(hideFlags, strandCount, rootPosition, rootDirection);
+				meshRoots = CreateMeshRoots(hideFlags, memoryLayout, strandCount, strandParticleCount, particlePosition);
 
 			return meshRoots;
 		}

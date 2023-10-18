@@ -23,6 +23,7 @@
 // constraint functions
 
 void SolveCollisionConstraint(
+	const float margin,
 	const float w,
 	const float3 p,
 	inout float3 d)
@@ -40,16 +41,17 @@ void SolveCollisionConstraint(
 	if (w > 0.0)
 	{
 		float depth = BoundaryDistance(p);
-		if (depth < (_BoundaryWorldMargin + 0.5 * _GroupMaxParticleDiameter))
+		if (depth < (_BoundaryWorldMargin + margin))
 		{
 			float3 normal = BoundaryNormal(p, depth);
 
-			d += normal * (depth - (_BoundaryWorldMargin + 0.5 * _GroupMaxParticleDiameter));
+			d += normal * (depth - (_BoundaryWorldMargin + margin));
 		}
 	}
 }
 
 void SolveCollisionFrictionConstraint(
+	const float margin,
 	const float friction,
 	const float3 x0,
 	const float w,
@@ -76,12 +78,12 @@ void SolveCollisionFrictionConstraint(
 	if (w > 0.0)
 	{
 		float depth = BoundaryDistance(p);
-		if (depth < (_BoundaryWorldMargin + 0.5 * _GroupMaxParticleDiameter))
+		if (depth < (_BoundaryWorldMargin + margin))
 		{
 			uint index = BoundarySelect(p, depth);
 			float3 normal = BoundaryNormal(p, depth);
 
-			depth -= (_BoundaryWorldMargin + 0.5 * _GroupMaxParticleDiameter);
+			depth -= (_BoundaryWorldMargin + margin);
 
 			//... float4x4 M_prev = mul(_BoundaryMatrixPrev[index], _BoundaryMatrixInv[index]);
 			const float3x4 M_prev = (float3x4)_BoundaryMatrixW2PrevW[index];
@@ -371,19 +373,21 @@ void SolveMaterialFrameStretchShearConstraint(
 // constraint shortcuts: weight in fourth component
 
 void SolveCollisionConstraint(
+	const float margin,
 	const float4 p,
 	inout float3 d)
 {
-	SolveCollisionConstraint(p.w, p.xyz, d);
+	SolveCollisionConstraint(margin, p.w, p.xyz, d);
 }
 
 void SolveCollisionFrictionConstraint(
+	const float margin,
 	const float friction,
 	const float3 x0,
 	const float4 p,
 	inout float3 d)
 {
-	SolveCollisionFrictionConstraint(friction, x0, p.w, p.xyz, d);
+	SolveCollisionFrictionConstraint(margin, friction, x0, p.w, p.xyz, d);
 }
 
 void SolveDistanceConstraint(
@@ -453,17 +457,17 @@ void SolveDualEdgeVectorConstraint(
 //------------------------------------------------------------
 // constraint shortcuts: apply directly to position variables
 
-void ApplyCollisionConstraint(inout float3 p)
+void ApplyCollisionConstraint(const float margin, inout float3 p)
 {
 	float3 d = 0.0;
-	SolveCollisionConstraint(1.0, p, d);
+	SolveCollisionConstraint(margin, 1.0, p, d);
 	p += d;
 }
 
-void ApplyCollisionFrictionConstraint(const float friction, const float3 x0, inout float3 p)
+void ApplyCollisionFrictionConstraint(const float margin, const float friction, const float3 x0, inout float3 p)
 {
 	float3 d = 0.0;
-	SolveCollisionFrictionConstraint(friction, x0, 1.0, p, d);
+	SolveCollisionFrictionConstraint(margin, friction, x0, 1.0, p, d);
 	p += d;
 }
 

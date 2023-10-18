@@ -2,7 +2,6 @@
 #define __HAIRSIMCOMPUTEBOUNDARIES_HLSL__
 
 #include "HairSimData.hlsl"
-#include "HairSimComputeVolumeUtility.hlsl"
 
 //-----------------
 // boundary shapes
@@ -10,7 +9,7 @@
 float SdDiscrete(const float3 p, const float4x4 invM, Texture3D<float> sdf)
 {
 	float3 uvw = mul(invM, float4(p, 1.0)).xyz;
-	return VolumeSampleScalar(sdf, uvw, _Volume_trilinear_clamp);
+	return sdf.SampleLevel(_Volume_trilinear_clamp, uvw, 0);
 }
 
 float SdCapsule(const float3 p, const float3 centerA, const float3 centerB, const float radius)

@@ -53,7 +53,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static List<HairBoundary.RuntimeData> Gather(HairBoundary[] resident, bool volumeSort, bool volumeQuery, in Bounds volumeBounds, in Quaternion volumeOrientation, bool includeColliders, Allocator allocator = Allocator.Temp)
+		public static List<HairBoundary.RuntimeData> Gather(HairBoundary[] resident, bool capture, in Bounds captureBounds, LayerMask captureLayer, bool captureSort, bool includeColliders, Allocator allocator = Allocator.Temp)
 		{
 			var item = new HairBoundary.RuntimeData();
 
@@ -70,12 +70,12 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			// gather from volume
-			if (volumeQuery)
+			// gather from bounds
+			if (capture)
 			{
 				var boundaryBuffer = s_managedBoundaries;
 				var colliderBuffer = s_managedColliders;
-				var colliderCount = Physics.OverlapBoxNonAlloc(volumeBounds.center, volumeBounds.extents, colliderBuffer, volumeOrientation);
+				var colliderCount = Physics.OverlapBoxNonAlloc(captureBounds.center, captureBounds.extents, colliderBuffer, Quaternion.identity, captureLayer, QueryTriggerInteraction.Collide);
 
 				// filter bound / standalone
 				for (int i = 0; i != colliderCount; i++)
@@ -104,15 +104,15 @@ namespace Unity.DemoTeam.Hair
 					{
 						var sortedIndicesPtr = (ulong*)sortedIndices.GetUnsafePtr();
 
-						var volumeOrigin = volumeBounds.center;
-						var volumeExtent = volumeBounds.extents.Abs().CMax();
+						var captureOrigin = captureBounds.center;
+						var captureExtent = captureBounds.extents.Abs().CMax();
 
 						for (int i = 0; i != s_gatherListVolume.Count; i++)
 						{
 							var volumeSortValue = 0u;
-							if (volumeSort)
+							if (captureSort)
 							{
-								var sdClippedDoubleExtent = Mathf.Clamp(SdBoundary(volumeOrigin, s_gatherListVolume[i]) / volumeExtent, -1.0f, 1.0f);
+								var sdClippedDoubleExtent = Mathf.Clamp(SdBoundary(captureOrigin, s_gatherListVolume[i]) / captureExtent, -1.0f, 1.0f);
 								var udClippedDoubleExtent = Mathf.Clamp01(sdClippedDoubleExtent * 0.5f + 0.5f);
 								{
 									volumeSortValue = (uint)(udClippedDoubleExtent * UInt16.MaxValue);
@@ -144,8 +144,8 @@ namespace Unity.DemoTeam.Hair
 			return s_gatherList;
 		}
 
-		//---------------------------
-		// signed distance functions
+		//-----------------
+		// signed distance
 
 		public static float SdBoundary(in Vector3 p, in HairBoundary.RuntimeData data)
 		{

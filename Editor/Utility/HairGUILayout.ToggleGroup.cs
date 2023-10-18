@@ -230,6 +230,44 @@ namespace Unity.DemoTeam.Hair
 								}
 								break;
 
+							case SerializedPropertyType.Vector2:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var value = property.vector2Value;
+									{
+										using (new EditorGUI.DisabledScope(evClickRight))
+										{
+											value = EditorGUI.Vector2Field(position, label, value);
+										}
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.vector2Value = value;
+									}
+								}
+								break;
+
+							case SerializedPropertyType.Vector3:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var value = property.vector3Value;
+									{
+										using (new EditorGUI.DisabledScope(evClickRight))
+										{
+											value = EditorGUI.Vector3Field(position, label, value);
+										}
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.vector3Value = value;
+									}
+								}
+								break;
+
 							case SerializedPropertyType.ObjectReference:
 								{
 									EditorGUI.BeginChangeCheck();

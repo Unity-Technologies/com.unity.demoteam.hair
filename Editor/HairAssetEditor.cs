@@ -125,18 +125,18 @@ namespace Unity.DemoTeam.Hair
 
 			EditorGUILayout.BeginVertical(EditorStyles.inspectorFullWidthMargins);
 			{
-				EditorGUILayout.LabelField("Importer", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.LabelField("Strand Declaration", EditorStyles.centeredGreyMiniLabel);
 				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 				{
-					DrawImporterGUI();
+					DrawStrandDataDeclGUI();
 				}
 				EditorGUILayout.EndVertical();
 
 				EditorGUILayout.Space();
-				EditorGUILayout.LabelField("Strand Groups", EditorStyles.centeredGreyMiniLabel);
+				EditorGUILayout.LabelField("Strand Data", EditorStyles.centeredGreyMiniLabel);
 				EditorGUILayout.BeginVertical(HairGUIStyles.settingsBox);
 				{
-					DrawStrandGroupsGUI();
+					DrawStrandDataGUI();
 				}
 				EditorGUILayout.EndVertical();
 
@@ -172,7 +172,7 @@ namespace Unity.DemoTeam.Hair
 			var hairAsset = userData as HairAsset;
 			if (hairAsset != null)
 			{
-				if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Mesh)
+				if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementMode.Mesh)
 				{
 					WarnIfNotAssigned(hairAsset.settingsProcedural.placementMesh, LabelName(nameof(HairAsset.SettingsProcedural.placementMesh)));
 					WarnIfNotReadable(hairAsset.settingsProcedural.mappedDensity, LabelName(nameof(HairAsset.SettingsProcedural.mappedDensity)));
@@ -180,7 +180,7 @@ namespace Unity.DemoTeam.Hair
 					WarnIfNotReadable(hairAsset.settingsProcedural.mappedParameters, LabelName(nameof(HairAsset.SettingsProcedural.mappedParameters)));
 				}
 
-				if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementType.Custom)
+				if (hairAsset.settingsProcedural.placement == HairAsset.SettingsProcedural.PlacementMode.Custom)
 				{
 					WarnIfNotAssigned(hairAsset.settingsProcedural.placementProvider, LabelName(nameof(HairAsset.SettingsProcedural.placementProvider)));
 				}
@@ -258,7 +258,7 @@ namespace Unity.DemoTeam.Hair
 			return StructValidation.Pass;
 		}
 
-		public void DrawImporterGUI()
+		public void DrawStrandDataDeclGUI()
 		{
 			var hairAsset = target as HairAsset;
 			if (hairAsset == null)
@@ -288,13 +288,13 @@ namespace Unity.DemoTeam.Hair
 							StructPropertyFieldsWithHeader(_settingsProcedural, ValidationGUIProcedural, hairAsset);
 
 							var placementType = hairAsset.settingsProcedural.placement;
-							if (placementType == HairAsset.SettingsProcedural.PlacementType.Custom)
+							if (placementType == HairAsset.SettingsProcedural.PlacementMode.Custom)
 							{
 								var placementProvider = hairAsset.settingsProcedural.placementProvider;
 								if (placementProvider != null)
 								{
 									EditorGUILayout.Space();
-									if (StructHeader("Settings Custom Placement"))
+									if (StructHeader("Settings Procedural Placement"))
 									{
 										using (new EditorGUI.IndentLevelScope())
 										{
@@ -419,7 +419,7 @@ namespace Unity.DemoTeam.Hair
 			EditorGUILayout.EndHorizontal();
 		}
 
-		public void DrawStrandGroupsGUI()
+		public void DrawStrandDataGUI()
 		{
 			var hairAsset = target as HairAsset;
 			if (hairAsset == null)
@@ -599,30 +599,35 @@ namespace Unity.DemoTeam.Hair
 				{
 					ref var strandGroup = ref strandGroups[i];
 
+					ref var previewBuffers = ref previewData[i].buffers;
+					ref var previewConstants = ref previewData[i].constants;
+
 					HairSim.PrepareSolverData(ref previewData[i], strandGroup.strandCount, strandGroup.strandParticleCount, strandGroup.lodCount);
 					{
 						previewData[i].memoryLayout = strandGroup.particleMemoryLayout;
-						previewData[i].cbuffer._StrandCount = (uint)strandGroup.strandCount;
-						previewData[i].cbuffer._StrandParticleCount = (uint)strandGroup.strandParticleCount;
+
+						previewConstants._StrandCount = (uint)strandGroup.strandCount;
+						previewConstants._StrandParticleCount = (uint)strandGroup.strandParticleCount;
 
 						switch (previewData[i].memoryLayout)
 						{
 							case HairAsset.MemoryLayout.Interleaved:
-								previewData[i].cbuffer._StrandParticleOffset = 1;
-								previewData[i].cbuffer._StrandParticleStride = previewData[i].cbuffer._StrandCount;
+								previewConstants._StrandParticleOffset = 1;
+								previewConstants._StrandParticleStride = previewConstants._StrandCount;
 								break;
 
 							case HairAsset.MemoryLayout.Sequential:
-								previewData[i].cbuffer._StrandParticleOffset = previewData[i].cbuffer._StrandParticleCount;
-								previewData[i].cbuffer._StrandParticleStride = 1;
+								previewConstants._StrandParticleOffset = previewConstants._StrandParticleCount;
+								previewConstants._StrandParticleStride = 1;
 								break;
 						}
 
-						previewData[i].cbuffer._StagingSubdivision = 0;
-						previewData[i].cbuffer._StagingVertexCount = previewData[i].cbuffer._StrandParticleCount;
-						previewData[i].cbuffer._StagingVertexOffset = previewData[i].cbuffer._StrandParticleOffset;
-						previewData[i].cbuffer._StagingBufferFormat = 3;
-						previewData[i].cbuffer._StagingBufferStride = sizeof(float) * 4;
+						previewConstants._StagingSubdivision = 0;
+						previewConstants._StagingVertexFormat = (uint)HairSim.StagingVertexFormat.Uncompressed;
+						previewConstants._StagingVertexStride = sizeof(float) * 4;
+
+						previewConstants._StagingStrandVertexCount = previewConstants._StrandParticleCount;
+						previewConstants._StagingStrandVertexOffset = previewConstants._StrandParticleOffset;
 					}
 
 					using (var stagingData = new NativeArray<Vector4>(strandGroup.particlePosition.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
@@ -632,28 +637,28 @@ namespace Unity.DemoTeam.Hair
 							UnsafeUtility.MemCpyStride(stagingData.GetUnsafePtr(), sizeof(Vector4), sourcePtr, sizeof(Vector3), sizeof(Vector3), stagingData.Length);
 						}
 
-						previewData[i].particlePosition.SetData(stagingData);
+						previewBuffers._ParticlePosition.SetData(stagingData);
 					}
 
-					previewData[i].lodGuideCount.SetData(strandGroup.lodGuideCount);
-					previewData[i].lodGuideIndex.SetData(strandGroup.lodGuideIndex);
-					previewData[i].lodGuideCarry.SetData(strandGroup.lodGuideCarry);
+					previewBuffers._LODGuideCount.SetData(strandGroup.lodGuideCount);
+					previewBuffers._LODGuideIndex.SetData(strandGroup.lodGuideIndex);
+					previewBuffers._LODGuideCarry.SetData(strandGroup.lodGuideCarry);
+					previewBuffers._LODGuideReach.SetData(strandGroup.lodGuideReach);
 
-					previewData[i].cbuffer._LODCount = (uint)strandGroup.lodCount;
-					previewData[i].cbuffer._LODIndexLo = previewData[i].cbuffer._LODCount - 1;
-					previewData[i].cbuffer._LODIndexHi = previewData[i].cbuffer._LODCount - 1;
+					//previewConstants._RenderLODIndexLo = (uint)strandGroup.lodCount - 1;
+					//previewConstants._RenderLODIndexHi = (uint)strandGroup.lodCount - 1;
+					//previewConstants._RenderLODBlendFraction = 1.0f;
 				}
 
-				var cmd = CommandBufferPool.Get();
+				using (var cmd = HairSimUtility.ScopedCommandBuffer.Get())
 				{
 					for (int i = 0; i != previewData.Length; i++)
 					{
-						HairSim.PushSolverParams(cmd, ref previewData[i], HairSim.SolverSettings.defaults, Matrix4x4.identity, Quaternion.identity, 1.0f, 1.0f, 0.0f, 1.0f);
+						HairSim.PushSolverSettings(cmd, ref previewData[i], HairSim.SettingsPhysics.defaults, 1.0f);
 					}
 
 					Graphics.ExecuteCommandBuffer(cmd);
 				}
-				CommandBufferPool.Release(cmd);
 
 				previewDataChecksum = hairAsset.checksum;
 			}

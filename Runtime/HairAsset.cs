@@ -1,6 +1,4 @@
-﻿#define SUPPORT_CONTENT_UPGRADE
-
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Serialization;
 #if UNITY_2021_2_OR_NEWER
@@ -16,444 +14,44 @@ using UnityEngine.Formats.Alembic.Importer;
 namespace Unity.DemoTeam.Hair
 {
 	[CreateAssetMenu(menuName = "Hair/Hair Asset", order = 350), PreferBinarySerialization]
-	public class HairAsset : ScriptableObject, ISerializationCallbackReceiver
+	public partial class HairAsset : ScriptableObject, ISerializationCallbackReceiver
 	{
-		public enum Type
-		{
-			Procedural,
-			Alembic,
-			Custom,
-		}
-
-		public enum MemoryLayout
-		{
-			Interleaved,
-			Sequential,
-		}
-
-		public enum StrandClusterMode
-		{
-			Roots,
-			Strands,
-			Strands3pt,
-		}
-
-		[Serializable]
-		public struct SettingsBasic
-		{
-			[Tooltip("Type of generator")]
-			public Type type;
-			[Tooltip("Memory layout for the generated strands")]
-			public MemoryLayout memoryLayout;
-			[ToggleGroup, Tooltip("Build LOD clusters for the generated strands (allows optionally reducing cost of rendering and/or simulation)")]
-			public bool kLODClusters;
-			[ToggleGroupItem(withLabel = true), Tooltip("Choose how the generated strands are clustered (where Roots == by 3-D root positions, Strands == by n-D strand positions, Strands 3pt == by 9-D quantized strand positions)")]
-			public StrandClusterMode kLODClustersClustering;
-
-			public static readonly SettingsBasic defaults = new SettingsBasic()
-			{
-				type = Type.Procedural,
-				memoryLayout = MemoryLayout.Interleaved,
-				kLODClusters = false,
-				kLODClustersClustering = StrandClusterMode.Strands,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsProcedural
-		{
-			public enum PlacementType
-			{
-				Primitive,
-				Custom,
-				Mesh,
-			}
-
-			public enum PrimitiveType
-			{
-				Curtain,
-				Brush,
-				Cap,
-				StratifiedCurtain,
-			}
-
-			[Flags]
-			public enum SubmeshMask
-			{
-				Submesh0 = 1 << 0,
-				Submesh1 = 1 << 1,
-				Submesh2 = 1 << 2,
-				Submesh3 = 1 << 3,
-				Submesh4 = 1 << 4,
-				Submesh5 = 1 << 5,
-				Submesh6 = 1 << 6,
-				Submesh7 = 1 << 7,
-			}
-
-			public enum CurlSamplingStrategy
-			{
-				RelaxStrandLength,
-				RelaxCurlSlope,
-			}
-
-			[LineHeader("Roots")]
-
-			[Tooltip("Root placement method")]
-			public PlacementType placement;
-			[VisibleIf(nameof(placement), PlacementType.Primitive), Tooltip("Place strands using builtin primitive generator")]
-			public PrimitiveType placementPrimitive;
-			[VisibleIf(nameof(placement), PlacementType.Custom), Tooltip("Place strands using specified custom generator"), FormerlySerializedAs("placementGenerator")]
-			public HairAssetCustomPlacement placementProvider;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on specified triangle mesh")]
-			public Mesh placementMesh;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Included submesh indices"), FormerlySerializedAs("placementMeshInclude")]
-			public SubmeshMask placementMeshGroups;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Place strands on mesh according to specified density map (where 0 == Empty region, 1 == Fully populated region)"), FormerlySerializedAs("placementDensity")]
-			public Texture2D mappedDensity;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Obtain strand direction from specified object-space direction map"), FormerlySerializedAs("paintedDirection")]
-			public Texture2D mappedDirection;
-			[VisibleIf(nameof(placement), PlacementType.Mesh), Tooltip("Obtain normalized strand parameters from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)"), FormerlySerializedAs("paintedParameters")]
-			public Texture2D mappedParameters;
-
-			//[ToggleGroup, Tooltip("Initial seed")]
-			//public bool seed;
-			//[ToggleGroupItem, Min(1)]
-			//public uint seedValue;
-
-			[LineHeader("Strands")]
-
-			[Range(HairSim.MIN_STRAND_COUNT, HairSim.MAX_STRAND_COUNT), Tooltip("Number of strands")]
-			public int strandCount;
-			[Range(HairSim.MIN_STRAND_PARTICLE_COUNT, HairSim.MAX_STRAND_PARTICLE_COUNT), Tooltip("Number of equidistant particles along each strand")]
-			public int strandParticleCount;
-			[Range(0.001f, 5.0f), Tooltip("Strand length (in meters)")]
-			public float strandLength;
-			[ToggleGroup, Tooltip("Enable this to vary the strand lengths")]
-			public bool strandLengthVariation;
-			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Amount of variation as fraction of strand length")]
-			public float strandLengthVariationAmount;
-
-			[LineHeader("Curls")]
-
-			[ToggleGroup, Tooltip("Enable this to curl the strands")]
-			public bool curl;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 10.0f), Tooltip("Curl radius (in centimeters)")]
-			public float curlRadius;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Curl slope")]
-			public float curlSlope;
-			[ToggleGroup, Tooltip("Enable this to vary the curls")]
-			public bool curlVariation;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Amount of variation as fraction of curl radius")]
-			public float curlVariationRadius;
-			[ToggleGroupItem(withLabel = true), Range(0.0f, 1.0f), Tooltip("Amount of variation as fraction of curl slope")]
-			public float curlVariationSlope;
-			[Tooltip("Choose which parameter to relax if the curls become undersampled (due to a combination of particle count, strand length, curl radius and slope)")]
-			public CurlSamplingStrategy curlSamplingStrategy;
-
-			public static readonly SettingsProcedural defaults = new SettingsProcedural()
-			{
-				placement = PlacementType.Primitive,
-				placementPrimitive = PrimitiveType.Curtain,
-				placementProvider = null,
-				placementMesh = null,
-				placementMeshGroups = (SubmeshMask)(-1),
-				mappedDensity = null,
-				mappedDirection = null,
-				mappedParameters = null,
-				//seed = false,
-				//seedValue = 1,
-
-				strandCount = 64,
-				strandParticleCount = 32,
-
-				strandLength = 0.25f,
-				strandLengthVariation = false,
-				strandLengthVariationAmount = 0.2f,
-
-				curl = false,
-				curlRadius = 1.0f,
-				curlSlope = 0.3f,
-				curlVariation = false,
-				curlVariationRadius = 0.1f,
-				curlVariationSlope = 0.3f,
-				curlSamplingStrategy = CurlSamplingStrategy.RelaxStrandLength,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsAlembic
-		{
-			public enum Groups
-			{
-				Combine,
-				Preserve,
-			}
-
-			[LineHeader("Curves")]
-
-#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
-			[Tooltip("Alembic asset containing at least one set of curves")]
-#if UNITY_2021_2_OR_NEWER
-			[SearchContext("p: ext:abc t:AlembicStreamPlayer", "asset",
-				SearchViewFlags.CompactView |
-				SearchViewFlags.HideSearchBar |
-				SearchViewFlags.DisableInspectorPreview |
-				SearchViewFlags.DisableSavedSearchQuery)]
-#endif
-			public AlembicStreamPlayer alembicAsset;
-#endif
-			[Tooltip("Whether to combine or preserve subsequent sets of curves with same vertex count")]
-			public Groups alembicAssetGroups;
-
-			[VisibleIf(false)] public SettingsResolve settingsResolve;
-
-			public static readonly SettingsAlembic defaults = new SettingsAlembic()
-			{
-#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
-				alembicAsset = null,
-#endif
-				alembicAssetGroups = Groups.Combine,
-
-				settingsResolve = SettingsResolve.defaults,
-			};
-
-#if SUPPORT_CONTENT_UPGRADE
-			[HideInInspector, FormerlySerializedAs("rootUV")] public SettingsResolve.RootUV OLD__rootUV;
-			[HideInInspector, FormerlySerializedAs("rootUVConstant")] public Vector2 OLD__rootUVConstant;
-			[HideInInspector, FormerlySerializedAs("rootUVMesh")] public Mesh OLD__rootUVMesh;
-			[HideInInspector, FormerlySerializedAs("resampleCurves")] public bool OLD__resampleCurves;
-			[HideInInspector, FormerlySerializedAs("resampleParticleCount")] public int OLD__resampleParticleCount;
-			[HideInInspector, FormerlySerializedAs("resampleQuality")] public int OLD__resampleQuality;
-			[HideInInspector] public bool OLD__transferred;
-#endif
-		}
-
-		[Serializable]
-		public struct SettingsCustom
-		{
-			[LineHeader("Curves")]
-
-			public HairAssetCustomData dataProvider;
-
-			[VisibleIf(false)] public SettingsResolve settingsResolve;
-
-			public static readonly SettingsCustom defaults = new SettingsCustom()
-			{
-				dataProvider = null,
-
-				settingsResolve = SettingsResolve.defaults,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsResolve
-		{
-			public const int MIN_RESAMPLE_RESOLUTION = HairSim.MIN_STRAND_PARTICLE_COUNT;
-			public const int MAX_RESAMPLE_RESOLUTION = HairSim.MAX_STRAND_PARTICLE_COUNT;
-			public const int MIN_RESAMPLE_QUALITY = 1;
-			public const int MAX_RESAMPLE_QUALITY = 5;
-
-			public enum RootUV
-			{
-				Uniform,
-				ResolveFromMesh,
-				ResolveFromCurveUV,
-			}
-
-			[LineHeader("UV Resolve")]
-
-			public RootUV rootUV;
-			[VisibleIf(nameof(rootUV), RootUV.Uniform)]
-			public Vector2 rootUVConstant;
-			[VisibleIf(nameof(rootUV), RootUV.ResolveFromMesh)]
-			public Mesh rootUVMesh;
-
-			[LineHeader("Processing")]
-
-			[Tooltip("Resample curves to ensure a specific number of equidistant particles along each strand")]
-			public bool resampleCurves;
-			[Range(MIN_RESAMPLE_RESOLUTION, MAX_RESAMPLE_RESOLUTION), Tooltip("Number of equidistant particles along each strand")]
-			public int resampleParticleCount;
-			[Range(MIN_RESAMPLE_QUALITY, MAX_RESAMPLE_QUALITY), Tooltip("Number of resampling iterations")]
-			public int resampleQuality;
-
-			public static readonly SettingsResolve defaults = new SettingsResolve()
-			{
-				rootUV = RootUV.Uniform,
-				rootUVConstant = Vector2.zero,
-				rootUVMesh = null,
-
-				resampleCurves = true,
-				resampleParticleCount = 16,
-				resampleQuality = 1,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsLODClusters
-		{
-			[LineHeader("Clustering")]
-
-			//[Min(1), Tooltip("Initial seed (evolved with set)")]
-			//public int initialSeed;
-			[Tooltip("Cluster policy to apply to empty clusters")]
-			public ClusterVoid clusterVoid;
-			[Tooltip("Cluster allocation policy (where Global == Allocate and iterate within full set, Split Global == Allocate within select cluster but iterate within full set, Split Branching == Allocate and iterate solely within split cluster)")]
-			public ClusterAllocationPolicy clusterAllocation;
-			[VisibleIf(nameof(clusterAllocation), CompareOp.Neq, ClusterAllocationPolicy.Global), Tooltip("Cluster allocation order for split-type policies (decides the order in which existing clusters are selected to be split into smaller clusters)")]
-			public ClusterAllocationOrder clusterAllocationOrder;
-			[ToggleGroup, Tooltip("Enable cluster refinement by k-means iteration")]
-			public bool clusterRefinement;
-			[ToggleGroupItem, Range(1, 200), Tooltip("Number of k-means iterations (upper bound, may finish earlier)")]
-			public int clusterRefinementIterations;
-
-			public enum BaseLODMode
-			{
-				Generated,
-				UVMapped,
-			}
-
-			public enum BaseLODClusterMapFormat
-			{
-				OneClusterPerColor,
-				OneClusterPerVisualCluster,
-			}
-
-			[Serializable]
-			public struct BaseLOD
-			{
-				[LineHeader("Base LOD")]
-
-				[Tooltip("Choose build path for the lower level clusters (where Generated == Intialize witk k-means++, UV Mapped == Import from cluster maps")]
-				public BaseLODMode baseLOD;
-			}
-
-			[Serializable]
-			public struct BaseLODParamsGenerated
-			{
-				[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands")]
-				public float baseLODClusterQuantity;
-			}
-
-			[Serializable]
-			public struct BaseLODParamsUVMapped
-			{
-				[Tooltip("Cluster map format (controls how specified cluster maps are interpreted)")]
-				public BaseLODClusterMapFormat baseLODClusterFormat;
-				[NonReorderable, Tooltip("Cluster map chain (higher indices must provide increasing level of detail)")]
-				public Texture2D[] baseLODClusterMaps;
-			}
-
-			public enum HighLODMode
-			{
-				Automatic,
-				Manual,
-			}
-
-			[Serializable]
-			public struct HighLOD
-			{
-				[LineHeader("High LOD")]
-
-				[ToggleGroup, Tooltip("Enable upper level clusters (will be built using lower level clusters as basis)")]
-				public bool highLOD;
-				[ToggleGroupItem, Tooltip("Choose build path for the upper level clusters")]
-				public HighLODMode highLODMode;
-			}
-
-			[Serializable]
-			public struct HighLODParamsAutomatic
-			{
-				[Range(0.0f, 1.0f), Tooltip("Number of clusters as fraction of all strands")]
-				public float highLODClusterQuantity;
-				[Range(1.2f, 8.0f), Tooltip("Upper bound on multiplier for number of clusters per level incremenent")]
-				public float highLODClusterExpansion;
-			}
-
-			[Serializable]
-			public struct HighLODParamsManual
-			{
-				[Range(0.0f, 1.0f), NonReorderable, Tooltip("Numbers of clusters as fractions of all strands")]
-				public float[] highLODClusterQuantities;
-			}
-
-			[VisibleIf(false)] public BaseLOD baseLOD;
-			[VisibleIf(false)] public BaseLODParamsGenerated baseLODParamsGenerated;
-			[VisibleIf(false)] public BaseLODParamsUVMapped baseLODParamsUVMapped;
-
-			[VisibleIf(false)] public HighLOD highLOD;
-			[VisibleIf(false)] public HighLODParamsAutomatic highLODParamsAutomatic;
-			[VisibleIf(false)] public HighLODParamsManual highLODParamsManual;
-
-			public static readonly SettingsLODClusters defaults = new SettingsLODClusters()
-			{
-				//initialSeed = 7,
-				clusterVoid = ClusterVoid.Preserve,
-				clusterAllocation = ClusterAllocationPolicy.SplitBranching,
-				clusterAllocationOrder = ClusterAllocationOrder.ByHighestError,
-				clusterRefinement = true,
-				clusterRefinementIterations = 100,
-
-				baseLOD = new BaseLOD
-				{
-					baseLOD = BaseLODMode.Generated,
-				},
-				baseLODParamsGenerated = new BaseLODParamsGenerated
-				{
-					baseLODClusterQuantity = 0.0f,
-				},
-				baseLODParamsUVMapped = new BaseLODParamsUVMapped
-				{
-					baseLODClusterFormat = BaseLODClusterMapFormat.OneClusterPerColor,
-				},
-
-				highLOD = new HighLOD
-				{
-					highLOD = true,
-				},
-				highLODParamsAutomatic = new HighLODParamsAutomatic
-				{
-					highLODClusterQuantity = 1.0f,
-					highLODClusterExpansion = 2.0f,
-				},
-				highLODParamsManual = new HighLODParamsManual
-				{
-					highLODClusterQuantities = new float[]
-					{
-						0.25f,
-						0.5f,
-						0.75f,
-						1.0f,
-					},
-				},
-			};
-		}
-
 		[Serializable]
 		public struct StrandGroup
 		{
+			[Flags]
+			public enum ParticleFeatures
+			{
+				Position = 1 << 0,
+				TexCoord = 1 << 1,
+				Diameter = 1 << 2,
+			}
+
 			public int strandCount;
 			public int strandParticleCount;
 
+			public float sumStrandLength;
 			public float maxStrandLength;
-			public float maxParticleInterval;
-
-			public float totalLength;
+			public float maxStrandDiameter;
+			public float avgStrandDiameter;
 
 			[HideInInspector] public Bounds bounds;
 
 			[HideInInspector] public Vector2[] rootUV;
-			[HideInInspector] public float[] rootScale;
-			[HideInInspector] public Vector3[] rootPosition;
-			[HideInInspector] public Vector3[] rootDirection;
+			[HideInInspector] public Vector4[] rootScale;
 
-			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
+			[HideInInspector] public ParticleFeatures particleFeatures;
+			[HideInInspector] public Vector3[] particlePosition;
+			[HideInInspector] public Vector2[] particleTexCoord;
+			[HideInInspector] public float[] particleDiameter;
 
 			public int lodCount;
+
 			[NonReorderable] public int[] lodGuideCount;	// n: lod index -> num. guides
 			[HideInInspector] public int[] lodGuideIndex;	// i: lod index * strand count + strand index -> guide index
 			[HideInInspector] public float[] lodGuideCarry;	// f: lod index * strand count + strand index -> guide carry
+			[HideInInspector] public float[] lodGuideReach;	// f: lod index * strand count + strand index -> guide reach (approximate cluster extent)
 			[HideInInspector] public float[] lodThreshold;	// f: lod index -> relative guide count [0..1]
 
 			[HideInInspector] public Mesh meshAssetRoots;
@@ -479,19 +77,6 @@ namespace Unity.DemoTeam.Hair
 		void ISerializationCallbackReceiver.OnBeforeSerialize() { }
 		void ISerializationCallbackReceiver.OnAfterDeserialize()
 		{
-#if SUPPORT_CONTENT_UPGRADE
-			if (settingsAlembic.OLD__transferred == false)
-			{
-				settingsAlembic.settingsResolve.rootUV = settingsAlembic.OLD__rootUV;
-				settingsAlembic.settingsResolve.rootUVConstant = settingsAlembic.OLD__rootUVConstant;
-				settingsAlembic.settingsResolve.rootUVMesh = settingsAlembic.OLD__rootUVMesh;
-				settingsAlembic.settingsResolve.resampleCurves = settingsAlembic.OLD__resampleCurves;
-				settingsAlembic.settingsResolve.resampleParticleCount = settingsAlembic.OLD__resampleParticleCount;
-				settingsAlembic.settingsResolve.resampleQuality = settingsAlembic.OLD__resampleQuality;
-				settingsAlembic.OLD__transferred = true;
-			}
-#endif
-
 			if (strandGroups == null)
 				return;
 
@@ -528,6 +113,75 @@ namespace Unity.DemoTeam.Hair
 						strandGroup.version = 2;
 						return true;
 
+					// 2->3: add LOD guide reach
+					case 77:
+						/*
+						unsafe
+						{
+							strandGroup.lodGuideReach = new float[strandGroup.lodGuideCarry.Length];
+
+							using (var sumCenter = new UnsafeList<Vector3>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+							using (var sumWeight = new UnsafeList<float>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+							{
+								var sumCenterPtr = sumCenter.Ptr;
+								var sumWeightPtr = sumWeight.Ptr;
+
+								for (int lodIndex = 0; lodIndex != strandGroup.lodCount; lodIndex++)
+								{
+									var lodOffset = lodIndex * strandGroup.strandCount;
+
+									// calc centers
+									for (int i = 0; i != strandGroup.strandCount; i++)
+									{
+										sumCenterPtr[i] = Vector3.zero;
+										sumWeightPtr[i] = 0.0f;
+									}
+
+									for (int i = 0; i != strandGroup.strandCount; i++)
+									{
+										HairAssetUtility.DeclareStrandIterator(strandGroup, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+										var j = strandGroup.lodGuideIndex[lodOffset + i];
+										{
+											sumCenterPtr[j] += strandGroup.rootScale[i] * strandGroup.particlePosition[strandParticleBegin];
+											sumWeightPtr[j] += strandGroup.rootScale[i];
+										}
+									}
+
+									for (int i = 0; i != strandGroup.strandCount; i++)
+									{
+										sumCenterPtr[i] /= sumWeightPtr[i];
+									}
+
+									// calc radii
+									for (int i = 0; i != strandGroup.strandCount; i++)
+									{
+										HairAssetUtility.DeclareStrandIterator(strandGroup, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+										var j = strandGroup.lodGuideIndex[lodOffset + i];
+										{
+											var dd = Vector3.SqrMagnitude(strandGroup.particlePosition[strandParticleBegin] - sumCenterPtr[j]);
+											if (dd > strandGroup.lodGuideReach[lodOffset + j])
+											{
+												strandGroup.lodGuideReach[lodOffset + j] = dd;
+											}
+										}
+									}
+
+									for (int i = 0; i != strandGroup.strandCount; i++)
+									{
+										if (strandGroup.lodGuideIndex[lodOffset + i] == i)
+											strandGroup.lodGuideReach[lodOffset + i] = Mathf.Sqrt(strandGroup.lodGuideReach[lodOffset + i]);
+									}
+
+									//Debug.Log("lod " + lodIndex + ", first guide radius = " + strandGroup.lodGuideRadii[lodIndex * strandGroup.strandCount]);
+								}
+							}
+						}
+						//strandGroup.version = 3;
+						return false;
+						*/
+
 					// done
 					default:
 						return false;
@@ -539,13 +193,6 @@ namespace Unity.DemoTeam.Hair
 				while (PerformVersionBump(ref strandGroups[i])) { };
 			}
 		}
-
-#if SUPPORT_CONTENT_UPGRADE
-		void Reset()
-		{
-			settingsAlembic.OLD__transferred = true;
-		}
-#endif
 	}
 
 	public static class HairAssetProvisional
@@ -604,28 +251,40 @@ namespace Unity.DemoTeam.Hair
 		{
 			public int strandCount;
 			public int strandParticleCount;
+			public NativeArray<Vector4> rootScale;
 			public NativeArray<Vector3> particlePosition;
 
 			public ProceduralStrands(int strandCount, int strandParticleCount, Allocator allocator = Allocator.Temp)
 			{
 				this.strandCount = strandCount;
 				this.strandParticleCount = strandParticleCount;
+				this.rootScale = new NativeArray<Vector4>(strandCount, allocator, NativeArrayOptions.UninitializedMemory);
 				this.particlePosition = new NativeArray<Vector3>(strandCount * strandParticleCount, allocator, NativeArrayOptions.UninitializedMemory);
 			}
 
-			public unsafe void GetUnsafePtrs(out Vector3* particlePositionPtr)
+			public unsafe void GetUnsafePtrs(out Vector4* rootScalePtr, out Vector3* particlePositionPtr)
 			{
+				rootScalePtr = (Vector4*)rootScale.GetUnsafePtr();
 				particlePositionPtr = (Vector3*)particlePosition.GetUnsafePtr();
 			}
 
 			public void Dispose()
 			{
+				rootScale.Dispose();
 				particlePosition.Dispose();
 			}
 		}
 
 		public struct CurveSet : IDisposable
 		{
+			[Flags]
+			public enum CurveFeatures
+			{
+				TexCoord = 1 << 0,
+				Diameter = 1 << 1,
+				Tapering = 1 << 2,
+			}
+
 			[Flags]
 			public enum VertexFeatures
 			{
@@ -634,14 +293,26 @@ namespace Unity.DemoTeam.Hair
 				Diameter = 1 << 2,
 			}
 
+			public struct Tip
+			{
+				public float tipScaleOffset;	// tip offset (where along curve to begin tapering)
+				public float tipScale;			// tip scale
+			}
+
 			public int curveCount;							// number of curves in set
 			public UnsafeList<int> curveVertexCount;		// i: curve index -> number of vertices in curve
+			public UnsafeList<Vector2> curveDataTexCoord;	// i: curve index -> curve root texcoord
+			public UnsafeList<float> curveDataDiameter;		// i: curve index -> curve root diameter
+			public UnsafeList<Tip> curveDataTapering;		// i: curve index -> curve tapering
+			public CurveFeatures curveFeatures;				// m: curve feature flags
 			public UnsafeList<Vector3> vertexDataPosition;	// j: vertex index -> curve vertex position
 			public UnsafeList<Vector2> vertexDataTexCoord;	// j: vertex index -> curve vertex texcoord
 			public UnsafeList<float> vertexDataDiameter;	// j: vertex index -> curve vertex diameter
 			public VertexFeatures vertexFeatures;			// m: vertex feature flags
+			public float unitScalePosition;					// scale of position data in meters
+			public float unitScaleDiameter;					// scale of diameter data in meters
 
-			// vertex data must laid out sequentially, e.g. for two curves a and b:
+			// vertex data must be laid out sequentially, e.g. for two curves a and b with 4 and 2 vertices respectively:
 			//		curveVertexCount	[ 4 2 ]
 			//		vertexData*			[ a a a a b b ]
 			//
@@ -649,24 +320,38 @@ namespace Unity.DemoTeam.Hair
 			//		j <- sum( curveVertexCount, 0..i-1 )
 			//
 			// vertex feature flags are used during processing:
-			//		- position is expected (required, not tested)
-			//		- texcoord is optional (if not specified, the "resolve from curve uv" setting will show a warning)
-			//		- diameter is optional (if not specified, the strand diameter will default to a sensible non-zero value)
+			//		- vertex position is expected (stream required, flag not tested)
+			//		- vertex texcoord is optional and is used to export material attribute and/or resolve root uv
+			//		- vertex diameter is optional and is used to export material attribute and/or resolve strand diameter and tapering
+			//
+			// curve feature flags are also used during processing:
+			//		- curve texcoord is optional and is used to resolve root uv (takes precedence over vertex texcoord)
+			//		- curve diameter is optional and is used to resolve strand diameter (unless vertex diameter is present)
+			//		- curve tapering is optional and is used to resolve strand tapering (unless vertex diameter is present)
 
 			public CurveSet(Allocator allocator) : this(0, 0, allocator) { }
 			public CurveSet(int initialCurveCapacity, int initialVertexCapacity, Allocator allocator)
 			{
 				this.curveCount = 0;
 				this.curveVertexCount = new UnsafeList<int>(initialCurveCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.curveDataTexCoord = new UnsafeList<Vector2>(initialCurveCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.curveDataDiameter = new UnsafeList<float>(initialCurveCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.curveDataTapering = new UnsafeList<Tip>(initialCurveCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+				this.curveFeatures = (CurveFeatures)0;
 				this.vertexDataPosition = new UnsafeList<Vector3>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 				this.vertexDataTexCoord = new UnsafeList<Vector2>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 				this.vertexDataDiameter = new UnsafeList<float>(initialVertexCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 				this.vertexFeatures = VertexFeatures.Position;
+				this.unitScalePosition = 1.0f;
+				this.unitScaleDiameter = 1.0f;
 			}
 
 			public void Dispose()
 			{
 				curveVertexCount.Dispose();
+				curveDataTexCoord.Dispose();
+				curveDataDiameter.Dispose();
+				curveDataTapering.Dispose();
 				vertexDataPosition.Dispose();
 				vertexDataTexCoord.Dispose();
 				vertexDataDiameter.Dispose();

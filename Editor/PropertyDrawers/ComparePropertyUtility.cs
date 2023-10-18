@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
@@ -36,16 +37,22 @@ namespace Unity.DemoTeam.Hair
 							break;
 
 						case TypeCode.Byte:
+						case TypeCode.UInt16:
+						case TypeCode.UInt32:
+							result = Compare(attrib.cmpOp, searchProperty.intValue, (int)((uint)attrib.cmpValue));
+							break;
+
+						case TypeCode.UInt64:
+							result = Compare(attrib.cmpOp, searchProperty.longValue, (long)((ulong)attrib.cmpValue));
+							break;
+
 						case TypeCode.SByte:
 						case TypeCode.Int16:
 						case TypeCode.Int32:
-						case TypeCode.UInt16:
-						case TypeCode.UInt32:
 							result = Compare(attrib.cmpOp, searchProperty.intValue, (int)attrib.cmpValue);
 							break;
 
 						case TypeCode.Int64:
-						case TypeCode.UInt64:
 							result = Compare(attrib.cmpOp, searchProperty.longValue, (long)attrib.cmpValue);
 							break;
 
