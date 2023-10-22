@@ -97,6 +97,7 @@ struct HairVertexWS
 	uint strandIndex;
 	float3 strandNormalTS;
 	float3 strandDebugColor;
+	float3 particleUserData;
 };
 
 struct HairVertex
@@ -111,6 +112,7 @@ struct HairVertex
 	uint strandIndex;
 	float3 strandNormalTS;
 	float3 strandDebugColor;
+	float3 particleUserData;
 };
 
 HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
@@ -243,6 +245,7 @@ HairVertex GetHairVertex_Live(in float4 packedID, in float2 packedUV)
 		v.strandIndex = x.strandIndex;
 		v.strandNormalTS = x.strandNormalTS;
 		v.strandDebugColor = x.strandDebugColor;
+		v.particleUserData = x.particleUserData;
 	}
 	return v;
 }
@@ -261,6 +264,7 @@ HairVertex GetHairVertex_Static(in float3 positionOS, in float3 normalOS, in flo
 		v.strandIndex = 0;
 		v.strandNormalTS = float3(0.0, 0.0, 1.0);
 		v.strandDebugColor = float3(0.5, 0.5, 0.5);
+		v.particleUserData = 0.0;
 	}
 	return v;
 }
@@ -293,7 +297,8 @@ void HairVertex_float(
 	out float2 out_strandUV,
 	out float out_strandIndex,
 	out float3 out_strandNormalTS,
-	out float3 out_strandDebugColor)
+	out float3 out_strandDebugColor,
+	out float3 out_strandParticleUserData)
 {
 	HairVertex v = GetHairVertex(in_packedID, in_packedUV, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 	{
@@ -307,6 +312,7 @@ void HairVertex_float(
 		out_strandIndex = v.strandIndex;
 		out_strandNormalTS = v.strandNormalTS;
 		out_strandDebugColor = v.strandDebugColor;
+		out_strandParticleUserData = v.particleUserData;
 	}
 }
 

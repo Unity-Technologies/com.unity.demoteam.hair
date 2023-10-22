@@ -1,0 +1,57 @@
+﻿#pragma kernel Main UNORM8=1
+#pragma kernel Main UNORM8=0
+
+//----------
+// includes
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
+#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
+#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariablesFunctions.hlsl"
+
+#include "HairVertex.hlsl"
+
+ByteAddressBuffer   _VertexBufferUV;
+RWByteAddressBuffer _VertexBuffer;
+
+[numthreads(1024, 1, 1)]
+void Main(uint3 dispatchID : SV_DispatchThreadID)
+{
+    // We need to manually handle the UNORM since we are in a compute shader. 
+    float4 packedID;
+    {
+    #if UNORM8
+        const uint unnormalizedPackedID = _VertexBufferUV.Load(dispatchID.x << 2);
+        
+        packedID = float4
+        (
+            ((unnormalizedPackedID >>  0) & 0xFF) / 255.0,
+            ((unnormalizedPackedID >>  8) & 0xFF) / 255.0,
+            ((unnormalizedPackedID >> 16) & 0xFF) / 255.0,
+            ((unnormalizedPackedID >> 24) & 0xFF) / 255.0
+        );
+    #else
+        const uint2 unnormalizedPackedID = _VertexBufferUV.Load2(dispatchID.x << 3);
+        
+        packedID = float4
+        (
+            ((unnormalizedPackedID.x >>  0) & 0xFFFF) / 65535.0,
+            ((unnormalizedPackedID.x >> 16) & 0xFFFF) / 65535.0,
+            ((unnormalizedPackedID.y >>  0) & 0xFFFF) / 65535.0,
+            ((unnormalizedPackedID.y >> 16) & 0xFFFF) / 65535.0
+        );
+    #endif
+    }
+    
+    const HairVertex v = GetHairVertex(packedID, 0, 0, float3(0, 1, 0), float3(1, 0, 0));
+    {
+        // temp hack: un-do some translations
+        const float3 x = TransformObjectToWorld(v.positionOS);
+        const float3 y = GetAbsolutePositionWS(x);
+        const float3 z = TransformWorldToObject(y);
+
+        _VertexBuffer.Store3((40u * dispatchID.x) + 0u,  asuint(z));
+        _VertexBuffer.Store3((40u * dispatchID.x) + 12u, asuint(v.normalOS));
+        _VertexBuffer.Store4((40u * dispatchID.x) + 24u, asuint(float4(v.tangentOS, 1.0)));
+    }
+}

@@ -108,6 +108,10 @@ namespace Unity.DemoTeam.Hair
 			public static int _ParticlePositionCorr;
 			public static int _ParticleVelocity;
 			public static int _ParticleVelocityPrev;
+			
+			public static int _ParticleDiameter;
+			public static int _ParticleTexCoord;
+			public static int _ParticleUserData;
 
 			public static int _LODGuideCount;
 			public static int _LODGuideIndex;
@@ -704,7 +708,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverData.particlePositionPrevPrev, "ParticlePosition_2", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocity, "ParticleVelocity_0", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverData.particleVelocityPrev, "ParticleVelocity_1", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector4);
-
+				
 				changed |= CreateBuffer(ref solverData.lodGuideCount, "LODGuideCount", Mathf.Max(1, lodCount), particleStrideIndex);
 				changed |= CreateBuffer(ref solverData.lodGuideIndex, "LODGuideIndex", Mathf.Max(1, lodCount) * strandCount, particleStrideIndex);
 				changed |= CreateBuffer(ref solverData.lodGuideCarry, "LODGuideCarry", Mathf.Max(1, lodCount) * strandCount, particleStrideScalar);
@@ -820,6 +824,10 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverData.particlePositionCorr);
 			ReleaseBuffer(ref solverData.particleVelocity);
 			ReleaseBuffer(ref solverData.particleVelocityPrev);
+			
+			ReleaseBuffer(ref solverData.particleDiameter);
+			ReleaseBuffer(ref solverData.particleTexCoord);
+			ReleaseBuffer(ref solverData.particleUserData);
 
 			ReleaseBuffer(ref solverData.lodGuideCount);
 			ReleaseBuffer(ref solverData.lodGuideIndex);
@@ -907,6 +915,13 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(UniformIDs._ParticlePositionCorr, solverData.particlePositionCorr);
 			target.BindComputeBuffer(UniformIDs._ParticleVelocity, solverData.particleVelocity);
 			target.BindComputeBuffer(UniformIDs._ParticleVelocityPrev, solverData.particleVelocityPrev);
+			
+			// optional vertex data	
+			{
+				target.BindComputeBuffer(UniformIDs._ParticleDiameter, solverData.particleDiameter);
+				target.BindComputeBuffer(UniformIDs._ParticleTexCoord, solverData.particleTexCoord);
+				target.BindComputeBuffer(UniformIDs._ParticleUserData, solverData.particleUserData);
+			}
 
 			target.BindComputeBuffer(UniformIDs._LODGuideCount, solverData.lodGuideCount);
 			target.BindComputeBuffer(UniformIDs._LODGuideIndex, solverData.lodGuideIndex);
