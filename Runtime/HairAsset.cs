@@ -495,7 +495,7 @@ namespace Unity.DemoTeam.Hair
 			if (strandGroups == null)
 				return;
 
-			bool PerformVersionBump(ref StrandGroup strandGroup)
+            static bool PerformVersionBump(ref StrandGroup strandGroup)
 			{
 				switch (strandGroup.version)
 				{
