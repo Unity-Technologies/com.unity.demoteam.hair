@@ -1,9 +1,19 @@
 {
-    "m_SGVersion": 2,
+    "m_SGVersion": 3,
     "m_Type": "UnityEditor.ShaderGraph.GraphData",
     "m_ObjectId": "d1afb942372c49b6be7e6f382d135a78",
     "m_Properties": [],
-    "m_Keywords": [],
+    "m_Keywords": [
+        {
+            "m_Id": "6cb299f2ad4546df9dceccc4aa8b0f69"
+        }
+    ],
+    "m_Dropdowns": [],
+    "m_CategoryData": [
+        {
+            "m_Id": "8b6845941163439e8eae72d9873bd033"
+        }
+    ],
     "m_Nodes": [
         {
             "m_Id": "05907e129e0b4526858a9d2d669f647a"
@@ -266,10 +276,12 @@
         "serializedMesh": {
             "m_SerializedMesh": "{\"mesh\":{\"instanceID\":0}}",
             "m_Guid": ""
-        }
+        },
+        "preventRotation": false
     },
     "m_Path": "Hair",
-    "m_ConcretePrecision": 0,
+    "m_GraphPrecision": 0,
+    "m_PreviewMode": 2,
     "m_OutputNode": {
         "m_Id": "05907e129e0b4526858a9d2d669f647a"
     },
@@ -350,6 +362,8 @@
     "synonyms": [],
     "m_Precision": 0,
     "m_PreviewExpanded": true,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 0,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
@@ -518,21 +532,21 @@
 }
 
 {
-    "m_SGVersion": 0,
+    "m_SGVersion": 1,
     "m_Type": "UnityEditor.ShaderGraph.CustomFunctionNode",
     "m_ObjectId": "1f91cf420025464eaead59f9d50b1e80",
     "m_Group": {
         "m_Id": ""
     },
-    "m_Name": "Custom Function",
+    "m_Name": "HairVertex (Custom Function)",
     "m_DrawState": {
         "m_Expanded": true,
         "m_Position": {
             "serializedVersion": "2",
-            "x": -75.00003814697266,
-            "y": -182.00001525878907,
-            "width": 244.0,
-            "height": 262.0
+            "x": -78.00003814697266,
+            "y": -182.5,
+            "width": 269.0000305175781,
+            "height": 494.0000305175781
         }
     },
     "m_Slots": [
@@ -584,7 +598,9 @@
     ],
     "synonyms": [],
     "m_Precision": 0,
-    "m_PreviewExpanded": false,
+    "m_PreviewExpanded": true,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 0,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
@@ -733,6 +749,42 @@
 }
 
 {
+    "m_SGVersion": 1,
+    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
+    "m_ObjectId": "6cb299f2ad4546df9dceccc4aa8b0f69",
+    "m_Guid": {
+        "m_GuidSerialized": "33f241b1-3718-4374-804c-604b92518759"
+    },
+    "m_Name": "HAIR_VERTEX",
+    "m_DefaultRefNameVersion": 1,
+    "m_RefNameGeneratedByDisplayName": "HAIR_VERTEX",
+    "m_DefaultReferenceName": "_HAIR_VERTEX",
+    "m_OverrideReferenceName": "HAIR_VERTEX",
+    "m_GeneratePropertyBlock": true,
+    "m_UseCustomSlotLabel": false,
+    "m_CustomSlotLabel": "",
+    "m_DismissedVersion": 0,
+    "m_KeywordType": 1,
+    "m_KeywordDefinition": 1,
+    "m_KeywordScope": 1,
+    "m_KeywordStages": 63,
+    "m_Entries": [
+        {
+            "id": 2,
+            "displayName": "STATIC",
+            "referenceName": "STATIC"
+        },
+        {
+            "id": 3,
+            "displayName": "LIVE",
+            "referenceName": "LIVE"
+        }
+    ],
+    "m_Value": 0,
+    "m_IsEditable": true
+}
+
+{
     "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
     "m_ObjectId": "6d15fe48cebe45f690ab036cb09ae41f",
@@ -819,10 +871,13 @@
     "synonyms": [],
     "m_Precision": 1,
     "m_PreviewExpanded": false,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 2,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
-    "m_Space": 0
+    "m_Space": 0,
+    "m_PositionSource": 0
 }
 
 {
@@ -889,6 +944,18 @@
         "z": 0.0
     },
     "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.CategoryData",
+    "m_ObjectId": "8b6845941163439e8eae72d9873bd033",
+    "m_Name": "",
+    "m_ChildObjectList": [
+        {
+            "m_Id": "6cb299f2ad4546df9dceccc4aa8b0f69"
+        }
+    ]
 }
 
 {
@@ -1005,6 +1072,8 @@
     "synonyms": [],
     "m_Precision": 0,
     "m_PreviewExpanded": false,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 0,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
@@ -1037,6 +1106,8 @@
     "synonyms": [],
     "m_Precision": 0,
     "m_PreviewExpanded": false,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 0,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
@@ -1084,6 +1155,8 @@
     "synonyms": [],
     "m_Precision": 0,
     "m_PreviewExpanded": false,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 2,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
@@ -1231,6 +1304,8 @@
     "synonyms": [],
     "m_Precision": 0,
     "m_PreviewExpanded": false,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 2,
     "m_CustomColors": {
         "m_SerializableColors": []
     },

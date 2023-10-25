@@ -516,6 +516,9 @@ namespace Unity.DemoTeam.Hair
 
 										previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
 									}
+									
+									// Enable the variant that will read from the simulation buffers.
+									previewMaterial.EnableKeyword("HAIR_VERTEX_LIVE");
 
 									HairSim.BindSolverData(previewMaterial, previewData[i]);
 

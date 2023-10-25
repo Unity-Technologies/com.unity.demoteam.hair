@@ -4,6 +4,8 @@ Shader "Hair/Hidden/HairMaterialReplaceAsync"
 
 	#pragma target 5.0
 	#pragma editor_sync_compilation
+	
+	#pragma multi_compile HAIR_VERTEX_STATIC HAIR_VERTEX_LIVE
 
 	#include "HairMaterialCommonUnlit.hlsl"
 

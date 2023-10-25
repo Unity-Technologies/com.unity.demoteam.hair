@@ -3,6 +3,8 @@ Shader "Hair/Default/HairMaterialDefaultUnlit"
 	HLSLINCLUDE
 
 	#pragma target 5.0
+	
+	#pragma multi_compile HAIR_VERTEX_STATIC HAIR_VERTEX_LIVE
 
 	#include "HairMaterialCommonUnlit.hlsl"
 
