@@ -191,12 +191,16 @@ float4 QDecomposeTwist(float4 q, float3 axis)
 	float4 r = float4(p.x, p.y, p.z, q.w);
 
 	if (dot(r, r) < 1e-5)
-		return MakeQuaternionIdentity();
-
-	if (dn < 0.0)
-		return normalize(-r);
+		r = MakeQuaternionIdentity();
 	else
-		return normalize(r);
+	{
+		if (dn < 0.0)
+			r = normalize(-r);
+		else
+			r = normalize(r);
+	}
+
+	return r;
 }
 
 #endif//__HAIRSIMCOMPUTEQUATERNION_HLSL__
