@@ -272,10 +272,11 @@ HairVertex GetHairVertex(
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS)
 {
-	if (_DecodeVertexCount > 0)
+#if HAIR_VERTEX_LIVE
 		return GetHairVertex_Live(in_packedID, in_packedUV);
-	else
+#else
 		return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
+#endif
 }
 
 void HairVertex_float(

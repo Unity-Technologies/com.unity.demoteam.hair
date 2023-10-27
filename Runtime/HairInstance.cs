@@ -1335,6 +1335,11 @@ namespace Unity.DemoTeam.Hair
 		{
 			HairSim.BindSolverData(materialInstance, solverData);
 			HairSim.BindVolumeData(materialInstance, volumeData);
+			
+		#if UNITY_EDITOR
+			// Enable the editor-only variant compiled with the simulation buffers. 
+			materialInstance.EnableKeyword("HAIR_VERTEX_LIVE");
+		#endif
 
 			materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.volumeDensity);
 			materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.volumeVelocity);
