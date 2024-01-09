@@ -7,7 +7,6 @@ using Unity.Mathematics;
 
 #if HAS_PACKAGE_UNITY_HDRP
 using UnityEngine.Rendering.HighDefinition;
-using ICSharpCode.NRefactory.Ast;
 #endif
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
