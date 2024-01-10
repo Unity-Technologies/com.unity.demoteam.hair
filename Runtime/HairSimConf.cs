@@ -7,7 +7,7 @@ namespace Unity.DemoTeam.Hair
 		[GenerateHLSL]
 		public struct Conf
 		{
-			public const int MAX_BOUNDARIES = 8;
+			public const int MAX_BOUNDARIES = 12;
 			// N == max number of boundary shapes
 
 			public const int MAX_WINDS = 8;
