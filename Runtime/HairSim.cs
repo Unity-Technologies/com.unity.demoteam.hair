@@ -1576,8 +1576,8 @@ namespace Unity.DemoTeam.Hair
 
 			// derive keywords
 			volumeKeywords.VOLUME_SPLAT_CLUSTERS = (settingsVolume.splatClusters);
-			volumeKeywords.VOLUME_TARGET_INITIAL_POSE = (settingsVolume.restDensity == SettingsVolume.TargetDensity.InitialPose);
-			volumeKeywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES = (settingsVolume.restDensity == SettingsVolume.TargetDensity.InitialPoseInParticles);
+			volumeKeywords.VOLUME_TARGET_INITIAL_POSE = (settingsVolume.restDensity == SettingsVolume.RestDensity.InitialPose);
+			volumeKeywords.VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES = (settingsVolume.restDensity == SettingsVolume.RestDensity.InitialPoseInParticles);
 			volumeKeywords.VOLUME_SUPPORT_CONTRACTION = (settingsVolume.pressureSolution == SettingsVolume.PressureSolution.DensityEquals);
 
 			// update cbuffer

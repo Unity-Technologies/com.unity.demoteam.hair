@@ -274,9 +274,9 @@ namespace Unity.DemoTeam.Hair
 		{
 			//public enum PerVertexData
 			//{
-			//	Disregard,
-			//	UploadAndApply,
-			//	Upload,
+			//	Disregard		= 0,
+			//	Upload			= 1,
+			//	UploadAndApply	= 2,
 			//}
 
 			public enum Renderer
@@ -284,8 +284,8 @@ namespace Unity.DemoTeam.Hair
 				Disabled				= 0,
 				BuiltinLines			= 1,
 				BuiltinStrips			= 2,
-				BuiltinTubes			= 4,
-				HDRPHighQualityLines	= 3,
+				BuiltinTubes			= 3,
+				HDRPHighQualityLines	= 4,
 			}
 
 			[LineHeader("Material")]
@@ -354,14 +354,14 @@ namespace Unity.DemoTeam.Hair
 		{
 			public enum EmitterCaptureMode
 			{
-				JustTagged = 0,
-				IncludeWindZones = 1,
+				JustTagged			= 0,
+				IncludeWindZones	= 1,
 			}
 
 			public enum BoundaryCaptureMode
 			{
-				JustTagged = 0,
-				IncludeColliders = 1,
+				JustTagged			= 0,
+				IncludeColliders	= 1,
 			}
 
 			[LineHeader("Gravity")]
@@ -425,6 +425,12 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsVolume
 		{
+			public enum GridPrecision
+			{
+				Full	= 0,
+				Half	= 1,
+			}
+
 			public enum SplatMethod
 			{
 				None				= 0,
@@ -434,19 +440,13 @@ namespace Unity.DemoTeam.Hair
 				RasterizationNoGS	= 4,
 			}
 
-			public enum GridPrecision
-			{
-				Full = 0,
-				Half = 1,
-			}
-
 			public enum PressureSolution
 			{
 				DensityEquals	= 0,
 				DensityLessThan	= 1,
 			}
 
-			public enum TargetDensity
+			public enum RestDensity
 			{
 				Uniform					= 0,
 				InitialPose				= 1,
@@ -479,7 +479,7 @@ namespace Unity.DemoTeam.Hair
 			[Tooltip("Pressure solve can either target an exact density (causing both compression and decompression), or a maximum density (causing just decompression)")]
 			public PressureSolution pressureSolution;
 			[Tooltip("Target density can be uniform (based on physical strand diameter), based on the initial pose, or based on initial pose carried in particles (a runtime average)")]
-			public TargetDensity restDensity;
+			public RestDensity restDensity;
 			[Min(0.01f)]
 			public float restDensityScale;
 			[Range(0.0f, 1.0f), Tooltip("Influence of rest density vs. an always-present incompressibility term")]
@@ -528,7 +528,7 @@ namespace Unity.DemoTeam.Hair
 
 				pressureIterations = 3,
 				pressureSolution = PressureSolution.DensityLessThan,
-				restDensity = TargetDensity.Uniform,
+				restDensity = RestDensity.Uniform,
 				restDensityScale = 1.0f,
 				restDensityInfluence = 1.0f,
 

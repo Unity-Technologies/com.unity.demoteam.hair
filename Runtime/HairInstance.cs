@@ -183,6 +183,8 @@ namespace Unity.DemoTeam.Hair
 
 		void OnValidate()
 		{
+			VersionedDataUtility.HandleVersionChange(this);
+
 			settingsVolumetrics.gridResolution = (uint)(Mathf.Max(8, (int)settingsVolumetrics.gridResolution) / 8) * 8;
 		}
 
@@ -290,7 +292,7 @@ namespace Unity.DemoTeam.Hair
 							if (prefabStage != null && prefabStage.assetPath == prefabPath)
 								return;// do nothing if prefab is already open
 
-							Debug.LogFormat(this, "{0}: rebuilding governing prefab '{1}'...", this.name, prefabPath);
+							Debug.Log(string.Format("{0}: rebuilding governing prefab '{1}'...", this.name, prefabPath), this);
 
 							var prefabContainer = UnityEditor.PrefabUtility.LoadPrefabContents(prefabPath);
 							if (prefabContainer != null)

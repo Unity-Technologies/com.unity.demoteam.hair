@@ -276,7 +276,7 @@ namespace Unity.DemoTeam.Hair
 				}
 				concatProgressSymbols.Append(']');
 
-				Debug.LogFormat("{0} --- {1} --- {2}", title, status, concatProgressSymbols.Value);
+				Debug.Log(string.Format("{0} --- {1} --- {2}", title, status, concatProgressSymbols.Value));
 			},
 			hide = () => { },
 		};

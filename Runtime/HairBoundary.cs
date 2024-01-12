@@ -4,7 +4,7 @@ using UnityEngine.Serialization;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class HairBoundary : MonoBehaviour
+	public partial class HairBoundary : MonoBehaviour
 	{
 		static readonly Vector3[] s_normal =
 		{
@@ -19,131 +19,6 @@ namespace Unity.DemoTeam.Hair
 			new Vector3(1.0f, 0.0f, 1.0f),
 			new Vector3(1.0f, 1.0f, 0.0f),
 		};
-
-		public enum Axis
-		{
-			XAxis = 0,
-			YAxis = 1,
-			ZAxis = 2,
-		};
-
-		[Serializable]
-		public struct Settings
-		{
-			public enum Mode
-			{
-				BindToComponent,
-				Standalone,
-			}
-
-			public enum Type
-			{
-				DiscreteSDF,// binds to component -> SDFTexture (requires Unity.DemoTeam.MeshToSDF)
-				Capsule,    // binds to component -> CapsuleCollider
-				Sphere,     // binds to component -> SphereCollider
-				Torus,
-				Cube,       // binds to component -> BoxCollider
-				Any,
-			}
-
-			public Mode mode;
-			public Type type;
-
-			public static readonly Settings defaults = new Settings
-			{
-				mode = Mode.BindToComponent,
-				type = Type.Any,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsCapsule
-		{
-			public Axis direction;
-			public float radius;
-			public float height;
-
-			public static readonly SettingsCapsule defaults = new SettingsCapsule
-			{
-				direction = Axis.YAxis,
-				radius = 0.5f,
-				height = 2.0f,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsSphere
-		{
-			public float radius;
-
-			public static readonly SettingsSphere defaults = new SettingsSphere
-			{
-				radius = 0.5f,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsTorus
-		{
-			public Axis axis;
-			public float radiusAxis;
-			public float radiusRing;
-
-			public static readonly SettingsTorus defaults = new SettingsTorus
-			{
-				axis = Axis.YAxis,
-				radiusAxis = 0.5f,
-				radiusRing = 0.125f,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsCube
-		{
-			public Vector3 size;
-
-			public static readonly SettingsCube defaults = new SettingsCube
-			{
-				size = Vector3.one,
-			};
-		}
-
-		[Serializable]
-		public struct SettingsSDF
-		{
-			public enum SDFSource
-			{
-				Texture,
-				SDFComponent,
-			}
-
-			public SDFSource source;
-			[VisibleIf(nameof(source), SDFSource.Texture), FormerlySerializedAs("kSDF")]
-			public Texture kSDFTexture;
-			[VisibleIf(nameof(source), SDFSource.Texture)]
-			public Bounds kSDFWorldBounds;
-#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-			[VisibleIf(nameof(source), SDFSource.SDFComponent)]
-			public SDFTexture kSDFComponent;
-#endif
-
-			[ToggleGroup, Tooltip("Enable this if the SDF will undergo rigid transformation (e.g. if the entire field will be translated, rotated, or scaled)")]
-			public bool kSDFRigidTransform;
-			[ToggleGroupItem(withLabel = true), Tooltip("Rigid transform origin -- this is used specifically to improve friction calculations when strands collide with a moving field")]
-			public Transform kSDFRigidTransformOrigin;
-
-			public static readonly SettingsSDF defaults = new SettingsSDF
-			{
-				source = SDFSource.Texture,
-				kSDFTexture = null,
-				kSDFWorldBounds = new Bounds(Vector3.zero, Vector3.one),
-#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-				kSDFComponent = null,
-#endif
-				kSDFRigidTransform = false,
-				kSDFRigidTransformOrigin = null,
-			};
-		}
 
 		public Settings settings = Settings.defaults;
 		public SettingsCapsule settingsCapsule = SettingsCapsule.defaults;
@@ -389,6 +264,26 @@ namespace Unity.DemoTeam.Hair
 		//-----------
 		// accessors
 
+		public static bool TryGetData(HairBoundary boundary, ref RuntimeData data)
+		{
+			if (boundary.settings.mode == Settings.Mode.BindToComponent)
+			{
+				if (TryGetMatchingComponent(boundary, out var component))
+				{
+					return
+						TryGetComponentShape(component, ref data) ||
+						TryGetComponentSDF(component, ref data, sourceTransform: boundary.settingsSDF.kSDFRigidTransform ? boundary.settingsSDF.kSDFRigidTransformOrigin : null);
+				}
+			}
+			else
+			{
+				return
+					TryGetStandaloneShape(boundary, ref data) ||
+					TryGetStandaloneSDF(boundary, ref data, sourceTransform: boundary.settingsSDF.kSDFRigidTransform ? boundary.settingsSDF.kSDFRigidTransformOrigin : null);
+			}
+			return false;
+		}
+
 		public static bool TryGetMatchingComponent(HairBoundary boundary, Settings.Type type, out Component component)
 		{
 			switch (type)
@@ -502,160 +397,6 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 			return false;
-		}
-
-		public static bool TryGetData(HairBoundary boundary, ref RuntimeData data)
-		{
-			if (boundary.settings.mode == Settings.Mode.BindToComponent)
-			{
-				if (TryGetMatchingComponent(boundary, out var component))
-				{
-					return
-						TryGetComponentShape(component, ref data) ||
-						TryGetComponentSDF(component, ref data, sourceTransform: boundary.settingsSDF.kSDFRigidTransform ? boundary.settingsSDF.kSDFRigidTransformOrigin : null);
-				}
-			}
-			else
-			{
-				return
-					TryGetStandaloneShape(boundary, ref data) ||
-					TryGetStandaloneSDF(boundary, ref data, sourceTransform: boundary.settingsSDF.kSDFRigidTransform ? boundary.settingsSDF.kSDFRigidTransformOrigin : null);
-			}
-			return false;
-		}
-
-		//------------------
-		// debugging gizmos
-
-		public void OnDrawGizmosSelected()
-		{
-			var data = new RuntimeData();
-
-			if (TryGetData(this, ref data))
-			{
-				switch (data.type)
-				{
-					case RuntimeData.Type.Shape: DrawGizmosRuntimeShape(data); break;
-					case RuntimeData.Type.SDF: DrawGizmosRuntimeSDF(data); break;
-				}
-			}
-		}
-
-		void DrawGizmosRuntimeShape(in RuntimeData data)
-		{
-			Gizmos.color = Color.red;
-			Gizmos.matrix = data.xform.matrix;
-			Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
-
-			Gizmos.color = Color.yellow;
-			Gizmos.matrix = Matrix4x4.identity;
-
-			switch (data.shape.type)
-			{
-				case RuntimeShape.Type.Capsule:
-					{
-						var worldCenterA = data.shape.data.pA;
-						var worldCenterB = data.shape.data.pB;
-						var worldRadius = data.shape.data.tA;
-						{
-							Gizmos.DrawWireSphere(worldCenterA, worldRadius);
-							Gizmos.DrawWireSphere(worldCenterB, worldRadius);
-							Gizmos.DrawLine(worldCenterA, worldCenterB);
-						}
-					}
-					break;
-				case RuntimeShape.Type.Sphere:
-					{
-						var worldCenter = data.shape.data.pA;
-						var worldRadius = data.shape.data.tA;
-						{
-							Gizmos.DrawWireSphere(worldCenter, worldRadius);
-						}
-					}
-					break;
-				case RuntimeShape.Type.Torus:
-					{
-						var worldCenter = data.shape.data.pA;
-						var worldAxis = data.shape.data.pB;
-						var worldRadiusAxis = data.shape.data.tA;
-						var worldRadiusRing = data.shape.data.tB;
-						{
-							var basisX = (Mathf.Abs(worldAxis.y) > 1.0f - 1e-4f) ? Vector3.right : Vector3.Normalize(Vector3.Cross(worldAxis, Vector3.up));
-							var basisY = worldAxis;
-							var basisZ = Vector3.Cross(basisX, worldAxis);
-
-							var axisSteps = 11;
-							var axisStep = Quaternion.AngleAxis(360.0f / axisSteps, basisY);
-							var axisVec = worldRadiusAxis * basisX;
-
-							var ringSteps = 5;
-							var ringStep = Quaternion.AngleAxis(360.0f / ringSteps, basisZ);
-							var ringVec = worldRadiusRing * basisX;
-
-							var axisRot = Quaternion.identity;
-							var axisPos = axisRot * axisVec + worldCenter;
-
-							unsafe
-							{
-								var ring_0 = stackalloc Vector3[ringSteps];
-								var ring_i = stackalloc Vector3[ringSteps];
-
-								for (int i = 0; i != axisSteps; i++)
-								{
-									var ringRot = axisRot;
-									var ringPos = axisPos + ringRot * ringVec;
-
-									for (int j = 0; j != ringSteps; j++)
-									{
-										var ringPosPrev = ringPos;
-
-										ringRot = ringRot * ringStep;
-										ringPos = axisPos + ringRot * ringVec;
-
-										Gizmos.DrawLine(ringPosPrev, ringPos);
-
-										if (i == 0)
-										{
-											ring_0[j] = ringPos;
-											ring_i[j] = ringPos;
-										}
-										else
-										{
-											Gizmos.DrawLine(ring_i[j], ringPos);
-											ring_i[j] = ringPos;
-										}
-									}
-
-									axisRot = axisRot * axisStep;
-									axisPos = axisRot * axisVec + worldCenter;
-								}
-
-								for (int j = 0; j != ringSteps; j++)
-								{
-									Gizmos.DrawLine(ring_0[j], ring_i[j]);
-								}
-							}
-						}
-					}
-					break;
-				case RuntimeShape.Type.Cube:
-					{
-						var localCenter = Vector3.zero;
-						var localExtent = Vector3.one;
-						{
-							Gizmos.matrix = data.xform.matrix;
-							Gizmos.DrawWireCube(localCenter, localExtent);
-						}
-					}
-					break;
-			}
-		}
-
-		void DrawGizmosRuntimeSDF(in RuntimeData data)
-		{
-			Gizmos.color = Color.red;
-			Gizmos.matrix = Matrix4x4.Inverse(data.sdf.worldToUVW);
-			Gizmos.DrawWireCube(Vector3.one * 0.5f, Vector3.one);
 		}
 	}
 }

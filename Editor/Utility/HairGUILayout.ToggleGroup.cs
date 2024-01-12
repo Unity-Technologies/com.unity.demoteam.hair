@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Reflection;
 using UnityEngine;
 using UnityEditor;
@@ -134,14 +135,19 @@ namespace Unity.DemoTeam.Hair
 								{
 									EditorGUI.BeginChangeCheck();
 
-									var enumValue = (Enum)Enum.GetValues(field.FieldType).GetValue(property.enumValueIndex);
+									var enumValueArray = Enum.GetValues(field.FieldType);
+									var enumValueIndex = property.enumValueIndex;
+									if (enumValueIndex == -1 || enumValueIndex >= enumValueArray.Length)
+										enumValueIndex = 0;
+
+									var enumValue = (Enum)enumValueArray.GetValue(enumValueIndex);
 									{
 										enumValue = EditorGUI.EnumPopup(position, label, enumValue, EditorStyles.popup);
 									}
 
 									if (EditorGUI.EndChangeCheck())
 									{
-										property.enumValueIndex = Convert.ToInt32(enumValue);
+										property.enumValueIndex = Array.IndexOf(enumValueArray, enumValue);
 									}
 								}
 								break;

@@ -3,7 +3,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class HairInstanceUpdater
+	public class HairInstanceEditorRefresh
 	{
 		static bool s_initialized = false;
 

@@ -259,9 +259,12 @@ namespace Unity.DemoTeam.Hair
 
 				var simState = (simAllowed && simActive) ? "Running" : (simAllowed ? "Paused" : "Stopped");
 				var simTime = hairInstance.execState.accumulatedTimeSession;
-				var simTxt = string.Format(System.Globalization.CultureInfo.InvariantCulture, "Simulation state: {0} (Elapsed time: {1:F3}s)", simState, simTime);
+				var simTxt = string.Format(System.Globalization.CultureInfo.InvariantCulture, "Simulation state: {0}\nElapsed time: {1:F3}s", simState, simTime);
 
-				EditorGUILayout.LabelField(simTxt, HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
+				using (new ColorScope(simActive ? Color.green : Color.yellow, simAllowed ? ColorType.BackgroundColor : ColorType.None))
+				{
+					EditorGUILayout.LabelField(simTxt, HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
+				}
 
 				EditorGUILayout.BeginHorizontal();
 				{

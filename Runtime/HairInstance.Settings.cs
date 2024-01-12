@@ -14,17 +14,17 @@ namespace Unity.DemoTeam.Hair
 		{
 			public enum UpdateMode
 			{
-				BuiltinEvent = 0,
-				ExternalCall = 1,
+				BuiltinEvent	= 0,
+				ExternalCall	= 1,
 			}
 
 			public enum UpdateRate
 			{
-				Fixed30Hz = 0,
-				Fixed60Hz = 1,
-				Fixed90Hz = 4,
-				Fixed120Hz = 2,
-				CustomTimeStep = 3,
+				Fixed30Hz		= 0,
+				Fixed60Hz		= 1,
+				Fixed90Hz		= 2,
+				Fixed120Hz		= 3,
+				CustomTimeStep	= 4,
 			}
 
 			[LineHeader("Scheduling")]
