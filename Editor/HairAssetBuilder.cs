@@ -1031,9 +1031,6 @@ namespace Unity.DemoTeam.Hair
 						strandGroup.bounds);
 				}
 			}
-
-			// append version
-			strandGroup.version = HairAsset.StrandGroup.VERSION;
 		}
 
 		// STRATEGY 1: solve base lod first, and then split towards high lod <--- EQ. divisive aproach

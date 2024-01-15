@@ -1267,14 +1267,13 @@ namespace Unity.DemoTeam.Hair
 
 		public static void PushVolumeObservers(CommandBuffer cmd, ref VolumeData volumeData, CameraType cameraType)
 		{
-			ref var volumeConstantsScene = ref volumeData.constantsEnvironment;
+			ref var volumeConstantsEnvironment = ref volumeData.constantsEnvironment;
 
 			// capture frustums
 			using (var frustums = AcquireLODFrustums(CameraType.Game | CameraType.SceneView, Allocator.Temp))
 			{
 				// derive constants
-				volumeConstantsScene._LODFrustumCount = (uint)frustums.Length;
-
+				volumeConstantsEnvironment._LODFrustumCount = (uint)frustums.Length;
 				//int i = 0;
 				//foreach (var frustum in frustums)
 				//{
@@ -1296,7 +1295,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// update cbuffer
-			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsScene);
+			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsEnvironment);
 		}
 
 		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, float time)

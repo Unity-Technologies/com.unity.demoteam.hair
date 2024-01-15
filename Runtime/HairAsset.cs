@@ -14,7 +14,7 @@ using UnityEngine.Formats.Alembic.Importer;
 namespace Unity.DemoTeam.Hair
 {
 	[CreateAssetMenu(menuName = "Hair/Hair Asset", order = 350), PreferBinarySerialization]
-	public partial class HairAsset : ScriptableObject, ISerializationCallbackReceiver
+	public partial class HairAsset : ScriptableObject
 	{
 		[Serializable]
 		public struct StrandGroup
@@ -40,11 +40,11 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector2[] rootUV;
 			[HideInInspector] public Vector4[] rootScale;
 
-			[HideInInspector] public MemoryLayout particleMemoryLayout;
-			[HideInInspector] public ParticleFeatures particleFeatures;
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public Vector2[] particleTexCoord;
 			[HideInInspector] public float[] particleDiameter;
+			[HideInInspector] public ParticleFeatures particleFeatures;
+			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
 			public int lodCount;
 
@@ -58,9 +58,6 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Mesh meshAssetLines;
 			[HideInInspector] public Mesh meshAssetStrips;
 			[HideInInspector] public Mesh meshAssetTubes;
-
-			public int version;
-			public const int VERSION = 2;
 		}
 
 		public SettingsBasic settingsBasic = SettingsBasic.defaults;
@@ -74,124 +71,10 @@ namespace Unity.DemoTeam.Hair
 
 		public string checksum;
 
-		void ISerializationCallbackReceiver.OnBeforeSerialize() { }
-		void ISerializationCallbackReceiver.OnAfterDeserialize()
+		void Reset() => version = VERSION;
+		void OnValidate()
 		{
-			if (strandGroups == null)
-				return;
-
-			bool PerformVersionBump(ref StrandGroup strandGroup)
-			{
-				switch (strandGroup.version)
-				{
-					// 0->1: add LOD data
-					case 0:
-						{
-							strandGroup.lodCount = 1;
-							strandGroup.lodGuideCount = new int[1] { strandGroup.strandCount };
-							strandGroup.lodGuideIndex = new int[strandGroup.strandCount];
-							strandGroup.lodThreshold = new float[1] { 1.0f };
-
-							for (int i = 0; i != strandGroup.strandCount; i++)
-							{
-								strandGroup.lodGuideIndex[i] = i;
-							}
-						}
-						strandGroup.version = 1;
-						return true;
-
-					// 1->2: add LOD guide carry
-					case 1:
-						{
-							strandGroup.lodGuideCarry = new float[strandGroup.lodGuideIndex.Length];
-
-							for (int i = 0; i != strandGroup.lodGuideCarry.Length; i++)
-							{
-								strandGroup.lodGuideCarry[i] = 1.0f;
-							}
-						}
-						strandGroup.version = 2;
-						return true;
-
-					// 2->3: add LOD guide reach
-					case 77:
-						/*
-						unsafe
-						{
-							strandGroup.lodGuideReach = new float[strandGroup.lodGuideCarry.Length];
-
-							using (var sumCenter = new UnsafeList<Vector3>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-							using (var sumWeight = new UnsafeList<float>(strandGroup.strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-							{
-								var sumCenterPtr = sumCenter.Ptr;
-								var sumWeightPtr = sumWeight.Ptr;
-
-								for (int lodIndex = 0; lodIndex != strandGroup.lodCount; lodIndex++)
-								{
-									var lodOffset = lodIndex * strandGroup.strandCount;
-
-									// calc centers
-									for (int i = 0; i != strandGroup.strandCount; i++)
-									{
-										sumCenterPtr[i] = Vector3.zero;
-										sumWeightPtr[i] = 0.0f;
-									}
-
-									for (int i = 0; i != strandGroup.strandCount; i++)
-									{
-										HairAssetUtility.DeclareStrandIterator(strandGroup, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-										var j = strandGroup.lodGuideIndex[lodOffset + i];
-										{
-											sumCenterPtr[j] += strandGroup.rootScale[i] * strandGroup.particlePosition[strandParticleBegin];
-											sumWeightPtr[j] += strandGroup.rootScale[i];
-										}
-									}
-
-									for (int i = 0; i != strandGroup.strandCount; i++)
-									{
-										sumCenterPtr[i] /= sumWeightPtr[i];
-									}
-
-									// calc radii
-									for (int i = 0; i != strandGroup.strandCount; i++)
-									{
-										HairAssetUtility.DeclareStrandIterator(strandGroup, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
-										var j = strandGroup.lodGuideIndex[lodOffset + i];
-										{
-											var dd = Vector3.SqrMagnitude(strandGroup.particlePosition[strandParticleBegin] - sumCenterPtr[j]);
-											if (dd > strandGroup.lodGuideReach[lodOffset + j])
-											{
-												strandGroup.lodGuideReach[lodOffset + j] = dd;
-											}
-										}
-									}
-
-									for (int i = 0; i != strandGroup.strandCount; i++)
-									{
-										if (strandGroup.lodGuideIndex[lodOffset + i] == i)
-											strandGroup.lodGuideReach[lodOffset + i] = Mathf.Sqrt(strandGroup.lodGuideReach[lodOffset + i]);
-									}
-
-									//Debug.Log("lod " + lodIndex + ", first guide radius = " + strandGroup.lodGuideRadii[lodIndex * strandGroup.strandCount]);
-								}
-							}
-						}
-						//strandGroup.version = 3;
-						return false;
-						*/
-
-					// done
-					default:
-						return false;
-				}
-			}
-
-			for (int i = 0; i != strandGroups.Length; i++)
-			{
-				while (PerformVersionBump(ref strandGroups[i])) { };
-			}
+			VersionedDataUtility.HandleVersionChange(this);
 		}
 	}
 

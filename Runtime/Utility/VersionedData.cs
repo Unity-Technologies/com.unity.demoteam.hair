@@ -2,39 +2,46 @@ using UnityEngine;
 
 namespace Unity.DemoTeam.Hair
 {
-	public interface IVersionedDataContainer
+	public interface IVersionedDataContext
 	{
-		// must return version of data
+		// should return version of data
 		int version { get; }
 
-		// must return version of implementation (code)
+		// should return version of implementation (constant)
 		int VERSION { get; }
 
-		// must attempt to increment version of data towards version of implementation
-		void TryIncrementVersion();
+		// should increment version of data towards version of implementation
+		void PerformMigrationStep();
 	}
 
 	public static class VersionedDataUtility
 	{
-		public static void HandleVersionChange<T>(T ctx) where T : UnityEngine.Object, IVersionedDataContainer
+		public static void HandleVersionChange<T>(T ctx) where T : UnityEngine.Object, IVersionedDataContext
 		{
 			var versionInitial = ctx.version;
+			if (versionInitial != ctx.VERSION)
+			{
+				Debug.Log(string.Format("{0} ({1}): starting migration...", ctx.GetType().Name, ctx.name, ctx.version, ctx.VERSION), ctx);
+			}
 			while (ctx.VERSION > ctx.version)
 			{
-				Debug.Log(string.Format("{0}: migrating from version {1}...", ctx.name, ctx.version), ctx);
+				Debug.Log(string.Format("{0} ({1}): migrating from version {2}...", ctx.GetType().Name, ctx.name, ctx.version), ctx);
 				var versionCurrent = ctx.version;
 				{
-					ctx.TryIncrementVersion();
+					ctx.PerformMigrationStep();
 				}
 				if (versionCurrent == ctx.version)
 				{
-					Debug.LogError(string.Format("{0}: failed to migrate from version {1} -> {2} (asset remains at version {1})", ctx.name, ctx.version, ctx.VERSION), ctx);
+					Debug.LogError(string.Format("{0} ({1}): failed to migrate from version {2} -> {3} (asset remains at version {2})", ctx.GetType().Name, ctx.name, ctx.version, ctx.VERSION), ctx);
 					break;
 				}
 			}
 			if (versionInitial != ctx.version)
 			{
-				// data version changed, force re-serialization?
+				Debug.Log(string.Format("{0} ({1}): completed migration", ctx.GetType().Name, ctx.name), ctx);
+#if UNITY_EDITOR
+				UnityEditor.EditorUtility.SetDirty(ctx);
+#endif
 			}
 		}
 	}

@@ -232,7 +232,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[GenerateHLSL, Flags]
-		public enum SolverFeatures : uint
+		public enum SolverFeatures
 		{
 			Boundary			= 1 << 0,
 			BoundaryFriction	= 1 << 1,
@@ -484,7 +484,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[GenerateHLSL, Flags]
-		public enum VolumeFeatures : uint
+		public enum VolumeFeatures
 		{
 			Scattering			= 1 << 0,
 			ScatteringFastpath	= 1 << 1,

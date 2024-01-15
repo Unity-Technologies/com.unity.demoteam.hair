@@ -181,6 +181,7 @@ namespace Unity.DemoTeam.Hair
 		public event Action<CommandBuffer> onSimulationStateChanged;
 		public event Action<CommandBuffer> onRenderingStateChanged;
 
+		void Reset() => version = VERSION;
 		void OnValidate()
 		{
 			VersionedDataUtility.HandleVersionChange(this);

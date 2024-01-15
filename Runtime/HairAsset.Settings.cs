@@ -12,22 +12,22 @@ namespace Unity.DemoTeam.Hair
 	{
 		public enum Type
 		{
-			Procedural,
-			Alembic,
-			Custom,
+			Procedural	= 0,
+			Alembic		= 1,
+			Custom		= 2,
 		}
 
 		public enum MemoryLayout
 		{
-			Interleaved,
-			Sequential,
+			Interleaved	= 0,
+			Sequential	= 1,
 		}
 
 		public enum StrandClusterMode
 		{
-			Roots,
-			Strands,
-			Strands3pt,
+			Roots		= 0,
+			Strands		= 1,
+			Strands3pt	= 2,
 		}
 
 		[Serializable]
@@ -56,17 +56,17 @@ namespace Unity.DemoTeam.Hair
 		{
 			public enum PlacementMode
 			{
-				Primitive,
-				Custom,
-				Mesh,
+				Primitive	= 0,
+				Custom		= 1,
+				Mesh		= 2,
 			}
 
 			public enum PrimitiveType
 			{
-				Curtain,
-				Brush,
-				Cap,
-				StratifiedCurtain,
+				Curtain				= 0,
+				Brush				= 1,
+				Cap					= 2,
+				StratifiedCurtain	= 3,
 			}
 
 			[Flags]
@@ -84,8 +84,8 @@ namespace Unity.DemoTeam.Hair
 
 			public enum CurlSamplingStrategy
 			{
-				RelaxStrandLength,
-				RelaxCurlSlope,
+				RelaxStrandLength	= 0,
+				RelaxCurlSlope		= 1,
 			}
 
 			[LineHeader("Roots")]
@@ -94,17 +94,17 @@ namespace Unity.DemoTeam.Hair
 			public PlacementMode placement;
 			[VisibleIf(nameof(placement), PlacementMode.Primitive), Tooltip("Place strands using builtin primitive generator")]
 			public PrimitiveType placementPrimitive;
-			[VisibleIf(nameof(placement), PlacementMode.Custom), Tooltip("Place strands using specified custom generator"), FormerlySerializedAs("placementGenerator")]
+			[VisibleIf(nameof(placement), PlacementMode.Custom), Tooltip("Place strands using specified custom generator")]
 			public HairAssetCustomPlacement placementProvider;
 			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Place strands on specified triangle mesh")]
 			public Mesh placementMesh;
-			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Included submesh indices"), FormerlySerializedAs("placementMeshInclude")]
+			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Included submesh indices")]
 			public SubmeshMask placementMeshGroups;
-			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Place strands on mesh according to specified density map (where 0 == Empty region, 1 == Fully populated region)"), FormerlySerializedAs("placementDensity")]
+			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Place strands on mesh according to specified density map (where 0 == Empty region, 1 == Fully populated region)")]
 			public Texture2D mappedDensity;
-			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Obtain strand direction from specified object-space direction map"), FormerlySerializedAs("paintedDirection")]
+			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Obtain strand direction from specified object-space direction map")]
 			public Texture2D mappedDirection;
-			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Obtain normalized strand parameters from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)"), FormerlySerializedAs("paintedParameters")]
+			[VisibleIf(nameof(placement), PlacementMode.Mesh), Tooltip("Obtain normalized strand parameters from specified 4-channel mask map (where R,G,B,A == Strand length, Strand diameter, Curl radius, Curl slope)")]
 			public Texture2D mappedParameters;
 
 			//[ToggleGroup, Tooltip("Initial seed")]
@@ -195,8 +195,8 @@ namespace Unity.DemoTeam.Hair
 		{
 			public enum Groups
 			{
-				Combine,
-				Preserve,
+				Combine		= 0,
+				Preserve	= 1,
 			}
 
 			//static float SourceUnitToUnitScale(HairAsset.SettingsAlembic.SourceUnit sourceUnit, float sourceUnitFallback = 1.0f)
@@ -368,14 +368,14 @@ namespace Unity.DemoTeam.Hair
 
 			public enum BaseLODMode
 			{
-				Generated,
-				UVMapped,
+				Generated	= 0,
+				UVMapped	= 1,
 			}
 
 			public enum BaseLODClusterMapFormat
 			{
-				OneClusterPerColor,
-				OneClusterPerVisualCluster,
+				OneClusterPerColor			= 0,
+				OneClusterPerVisualCluster	= 1,
 			}
 
 			[Serializable]
@@ -405,8 +405,8 @@ namespace Unity.DemoTeam.Hair
 
 			public enum HighLODMode
 			{
-				Automatic,
-				Manual,
+				Automatic	= 0,
+				Manual		= 1,
 			}
 
 			[Serializable]

@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Rendering;
@@ -10,12 +9,24 @@ using Unity.DemoTeam.DigitalHuman;
 
 namespace Unity.DemoTeam.Hair
 {
+	// data migration impl. checklist:
+	//
+	//	- block renamed: capture and migrate all fields
+	//	- field(s) renamed: capture and migrate renamed fields
+	//	- field(s) changed: capture and migrate changed fields
+	//	- field(s) removed: no action
+	//
+	// data migration is then a simple two-step process:
+	//
+	//	1. capture old data into trimmed copies of old structures (via FormerlySerializedAs)
+	//	2. migrate old data from trimmed copies
+	//
+	// (old structures are unfortunately also re-serialized)
+
 	using __1__SettingsExecutive = HairInstance.SettingsExecutive;
-	using __1__SettingsDebugging = HairSim.SettingsDebugging;
 	using __1__SettingsEnvironment = HairSim.SettingsEnvironment;
 	using __1__SettingsVolumetrics = HairSim.SettingsVolume;
 
-	using __1__SettingsSkinning = HairInstance.SettingsSkinning;
 	using __1__SettingsGeometry = HairSim.SettingsGeometry;
 	using __1__SettingsRendering = HairSim.SettingsRendering;
 	using __1__SettingsPhysics = HairSim.SettingsPhysics;
@@ -24,32 +35,21 @@ namespace Unity.DemoTeam.Hair
 
 	public partial class HairInstance
 	{
-		// data migration follows a simple two step process:
-		//
-		//	1. capture old data into trimmed copies of old structures (via FormerlySerializedAs)
-		//	2. migrate old data from trimmed copies
-		//
-		// (old structures are not re-serialized)
-
-		[FormerlySerializedAs("settingsSystem")]
+		[SerializeField, FormerlySerializedAs("settingsSystem")]
 		__0__SettingsSystem data_0_settingsSystem = __0__SettingsSystem.defaults;
 
-		[FormerlySerializedAs("settingsVolume"), FormerlySerializedAs("volumeSettings")]
+		[SerializeField, FormerlySerializedAs("settingsVolume"), FormerlySerializedAs("volumeSettings")]
 		__0__VolumeSettings data_0_settingsVolume = __0__VolumeSettings.defaults;
 
-		[FormerlySerializedAs("settingsDebug"), FormerlySerializedAs("debugSettings")]
-		__0__DebugSettings data_0_settingsDebug = __0__DebugSettings.defaults;
+		[SerializeField, FormerlySerializedAs("strandGroupDefaults")]
+		__0__GroupSettings data_0_strandGroupDefaults = __0__GroupSettings.defaults;
 
-		[FormerlySerializedAs("strandGroupDefaults")]
-		__0__GroupSettings__Partial data_0_strandGroupDefaults = __0__GroupSettings__Partial.defaults;
-
-		[FormerlySerializedAs("strandGroupSettings")]
-		__0__GroupSettings__Partial[] data_0_strandGroupSettings;
+		[SerializeField, FormerlySerializedAs("strandGroupSettings")]
+		__0__GroupSettings[] data_0_strandGroupSettings;
 
 		void PerformMigration_0()
 		{
 			ref var data_1_settingsExecutive = ref this.settingsExecutive;
-			ref var data_1_settingsDebugging = ref this.settingsDebugging;
 			ref var data_1_settingsEnvironment = ref this.settingsEnvironment;
 			ref var data_1_settingsVolumetrics = ref this.settingsVolumetrics;
 
@@ -107,7 +107,7 @@ namespace Unity.DemoTeam.Hair
 
 					TransferSettingsSystem(in_0, ref data_1_strandGroupDefaults.settingsGeometry);
 					
-					for (int i = 0; i != data_1_strandGroupSettings?.Length; i++)
+					for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
 					{
 						TransferSettingsSystem(in_0, ref data_1_strandGroupSettings[i].settingsGeometry);
 					}
@@ -134,7 +134,7 @@ namespace Unity.DemoTeam.Hair
 
 					TransferSettingsSystem(in_0, ref data_1_strandGroupDefaults.settingsPhysics);
 					
-					for (int i = 0; i != data_1_strandGroupSettings?.Length; i++)
+					for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
 					{
 						TransferSettingsSystem(in_0, ref data_1_strandGroupSettings[i].settingsPhysics);
 					}
@@ -169,7 +169,7 @@ namespace Unity.DemoTeam.Hair
 
 					TransferSettingsSystem(in_0, ref data_1_strandGroupDefaults.settingsRendering);
 
-					for (int i = 0; i != data_1_strandGroupSettings?.Length; i++)
+					for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
 					{
 						TransferSettingsSystem(in_0, ref data_1_strandGroupSettings[i].settingsRendering);
 					}
@@ -254,7 +254,7 @@ namespace Unity.DemoTeam.Hair
 
 						TransferSettingsStrands(data_0_strandGroupDefaults.settingsStrands, ref data_1_strandGroupDefaults.settingsRendering);
 
-						for (int i = 0; i != data_1_strandGroupSettings?.Length; i++)
+						for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
 						{
 							TransferSettingsStrands(data_0_strandGroupSettings[i].settingsStrands, ref data_1_strandGroupSettings[i].settingsRendering);
 							data_1_strandGroupSettings[i].settingsRenderingToggle = data_0_strandGroupSettings[i].settingsStrandsToggle;
@@ -276,12 +276,12 @@ namespace Unity.DemoTeam.Hair
 
 							out_1.stagingPrecision = TranslateStagingPrecision(in_0.stagingPrecision);
 							out_1.stagingSubdivision = (in_0.stagingSubdivision > 0);
-							out_1.stagingSubdivisionCount = in_0.stagingSubdivision;
+							out_1.stagingSubdivisionCount = (in_0.stagingSubdivision > 0) ? in_0.stagingSubdivision : 1;
 						}
 
 						TransferSettingsStrands(data_0_strandGroupDefaults.settingsStrands, ref data_1_strandGroupDefaults.settingsGeometry);
 
-						for (int i = 0; i != data_1_strandGroupSettings?.Length; i++)
+						for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
 						{
 							TransferSettingsStrands(data_0_strandGroupSettings[i].settingsStrands, ref data_1_strandGroupSettings[i].settingsGeometry);
 							data_1_strandGroupSettings[i].settingsGeometryToggle = data_0_strandGroupSettings[i].settingsStrandsToggle;
@@ -345,7 +345,7 @@ namespace Unity.DemoTeam.Hair
 
 						TransferSettingsSolver(data_0_strandGroupDefaults.settingsSolver, ref data_1_strandGroupDefaults.settingsPhysics);
 
-						for (int i = 0; i != data_1_strandGroupSettings?.Length; i++)
+						for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
 						{
 							TransferSettingsSolver(data_0_strandGroupSettings[i].settingsSolver, ref data_1_strandGroupSettings[i].settingsPhysics);
 							data_1_strandGroupSettings[i].settingsPhysicsToggle = data_0_strandGroupSettings[i].settingsSolverToggle;
@@ -517,14 +517,10 @@ namespace Unity.DemoTeam.Hair
 			public GridPrecision gridPrecision;
 			[FormerlySerializedAs("volumeGridResolution")]
 			public int gridResolution;
-			public bool gridStaggered;
-			public bool gridSquare;
 
 			[FormerlySerializedAs("volumeSplatMethod")]
 			public SplatMethod splatMethod;
 			public bool splatClusters;
-			public bool splatDebug;
-			public float splatDebugWidth;
 
 			public int pressureIterations;
 			public PressureSolution pressureSolution;
@@ -561,13 +557,9 @@ namespace Unity.DemoTeam.Hair
 			{
 				splatMethod = SplatMethod.Compute,
 				splatClusters = true,
-				splatDebug = false,
-				splatDebugWidth = 1.0f,
 
 				gridResolution = 32,
 				gridPrecision = GridPrecision.Full,
-				gridStaggered = false,
-				gridSquare = true,
 
 				pressureIterations = 3,
 				pressureSolution = PressureSolution.DensityLessThan,
@@ -598,91 +590,21 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
-		struct __0__DebugSettings
+		struct __0__GroupSettings
 		{
-			public bool drawStrandRoots;
-			public bool drawStrandParticles;
-			public bool drawStrandVelocities;
-			public bool drawStrandClusters;
-			public int specificCluster;
-
-			public bool drawCellDensity;
-			public bool drawCellGradient;
-			public bool drawIsosurface;
-			public float drawIsosurfaceDensity;
-			public int drawIsosurfaceSubsteps;
-
-			public bool drawSliceX;
-			public float drawSliceXOffset;
-			public bool drawSliceY;
-			public float drawSliceYOffset;
-			public bool drawSliceZ;
-			public float drawSliceZOffset;
-			public float drawSliceDivider;
-
-			public static readonly __0__DebugSettings defaults = new __0__DebugSettings()
-			{
-				drawStrandRoots = false,
-				drawStrandParticles = false,
-				drawStrandVelocities = false,
-				drawStrandClusters = false,
-				specificCluster = -1,
-
-				drawCellDensity = false,
-				drawCellGradient = false,
-				drawIsosurface = false,
-				drawIsosurfaceDensity = 0.5f,
-				drawIsosurfaceSubsteps = 4,
-
-				drawSliceX = false,
-				drawSliceXOffset = 0.5f,
-				drawSliceY = false,
-				drawSliceYOffset = 0.5f,
-				drawSliceZ = false,
-				drawSliceZOffset = 0.5f,
-				drawSliceDivider = 0.0f,
-			};
-		}
-
-		[Serializable]
-		struct __0__GroupSettings__Partial
-		{
-			public __0__SettingsSkinning settingsSkinning;
-			public bool settingsSkinningToggle;
-
 			public __0__SettingsStrands settingsStrands;
 			public bool settingsStrandsToggle;
 
 			public __0__SolverSettings settingsSolver;
 			public bool settingsSolverToggle;
 
-			public static __0__GroupSettings__Partial defaults => new __0__GroupSettings__Partial()
+			public static __0__GroupSettings defaults => new __0__GroupSettings()
 			{
-				settingsSkinning = __0__SettingsSkinning.defaults,
-				settingsSkinningToggle = false,
-
 				settingsStrands = __0__SettingsStrands.defaults,
 				settingsStrandsToggle = false,
 
 				settingsSolver = __0__SolverSettings.defaults,
 				settingsSolverToggle = false,
-			};
-		}
-
-		[Serializable]
-		struct __0__SettingsSkinning
-		{
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-			public bool rootsAttach;
-			public SkinAttachmentTarget rootsAttachTarget;
-			public PrimarySkinningBone rootsAttachTargetBone;
-#endif
-			public static readonly __0__SettingsSkinning defaults = new __0__SettingsSkinning()
-			{
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-				rootsAttach = false,
-				rootsAttachTarget = null,
-#endif
 			};
 		}
 
@@ -712,7 +634,6 @@ namespace Unity.DemoTeam.Hair
 			public float strandMargin;
 
 			public StagingPrecision stagingPrecision;
-			public bool staging;
 			public uint stagingSubdivision;
 
 			public static readonly __0__SettingsStrands defaults = new __0__SettingsStrands()
@@ -724,7 +645,6 @@ namespace Unity.DemoTeam.Hair
 				strandDiameter = 1.0f,
 				strandMargin = 0.0f,
 
-				staging = true,
 				stagingSubdivision = 0,
 				stagingPrecision = StagingPrecision.Half,
 			};
