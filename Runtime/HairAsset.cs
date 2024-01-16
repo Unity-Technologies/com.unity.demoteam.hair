@@ -37,8 +37,8 @@ namespace Unity.DemoTeam.Hair
 
 			[HideInInspector] public Bounds bounds;
 
-			[HideInInspector] public Vector2[] rootUV;
-			[HideInInspector] public Vector4[] rootScale;
+			[HideInInspector] public Vector2[] rootUV;		// root uv
+			[HideInInspector] public Vector4[] rootScale;	// root scale (length, diameter normalized to maximum within group), z: tip scale offset, w: tip scale
 
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public Vector2[] particleTexCoord;
@@ -179,7 +179,7 @@ namespace Unity.DemoTeam.Hair
 			public struct Tip
 			{
 				public float tipScaleOffset;	// tip offset (where along curve to begin tapering)
-				public float tipScale;			// tip scale
+				public float tipScale;			// tip scale (tip diameter relative to root)
 			}
 
 			public int curveCount;							// number of curves in set

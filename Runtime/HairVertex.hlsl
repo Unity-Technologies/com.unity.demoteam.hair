@@ -48,11 +48,13 @@ float GetStrandParticleOffset(in uint strandParticleNumber)
 	return strandParticleNumber / (float)(STRAND_PARTICLE_COUNT - 1);
 }
 
-float GetStrandParticleTaper(in uint strandParticleNumber, in float2 strandTipOffsetScale)
+float GetStrandParticleTaper(in uint strandParticleNumber, in float2 strandTaperParams)
 {
+	// strandTaperParams.x = tip scale offset
+	// strandTaperParams.y = tip scale
 	float strandParticleOffset = GetStrandParticleOffset(strandParticleNumber);
-	float strandParticleTipT = saturate((strandParticleOffset - strandTipOffsetScale.x) / (1.0 - strandTipOffsetScale.x));
-	return lerp(1.0, strandTipOffsetScale.y, strandParticleTipT);
+	float strandParticleTipT = saturate((strandParticleOffset - strandTaperParams.x) / (1.0 - strandTaperParams.x));
+	return lerp(1.0, strandTaperParams.y, strandParticleTipT);
 }
 
 float3 GetStrandDebugColor(in uint strandIndex)
@@ -136,44 +138,28 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 	float decodedVertexSign;
 	float2 decodedTubularUV;
 	{
-		if (_DecodeVertexComponentWidth == 32)//TODO replace runtime compatibility with asset versioning / upgrade
-		{
-			uint linearParticleIndex = packedID.x / _DecodeVertexCount;
-		
-			decodedStrandIndex = linearParticleIndex / STRAND_PARTICLE_COUNT;
-			decodedVertexIndex = linearParticleIndex % STRAND_PARTICLE_COUNT;
-			decodedVertexSign = -1.0;
+		uint4 unpack = round(packedID * _DecodeVertexComponentValue);
 
-			if (_DecodeVertexCount == 1)
-				decodedTubularUV = packedUV;
-			else
-				decodedTubularUV = packedUV * float2(0.5, 1.0);
+		decodedStrandIndex = (unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
+								(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
+								(unpack.y >> _DecodeVertexWidth);
+		decodedVertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
+		decodedVertexIndex = unpack.x;
+		decodedVertexSign = 1.0;
+			
+		//uint decodedStrandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
+		//uint decodedVertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
+		//uint decodedVertexIndex = packedID.x * _DecodeStrandIndex.w
+
+		if (_DecodeVertexCount == 1)
+		{
+			decodedTubularUV.x = 0.5;
+			decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
 		}
 		else
 		{
-			uint4 unpack = round(packedID * _DecodeVertexComponentValue);
-
-			decodedStrandIndex = (unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
-								 (unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
-								 (unpack.y >> _DecodeVertexWidth);
-			decodedVertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
-			decodedVertexIndex = unpack.x;
-			decodedVertexSign = 1.0;
-			
-			//uint decodedStrandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
-			//uint decodedVertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
-			//uint decodedVertexIndex = packedID.x * _DecodeStrandIndex.w
-
-			if (_DecodeVertexCount == 1)
-			{
-				decodedTubularUV.x = 0.5;
-				decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
-			}
-			else
-			{
-				decodedTubularUV.x = frac(packedID.y * (_DecodeVertexComponentValue / (float)(1 << _DecodeVertexWidth))) * ((1 << _DecodeVertexWidth) / (float)_DecodeVertexCount);
-				decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
-			}
+			decodedTubularUV.x = frac(packedID.y * (_DecodeVertexComponentValue / (float)(1 << _DecodeVertexWidth))) * ((1 << _DecodeVertexWidth) / (float)_DecodeVertexCount);
+			decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
 		}
 	}
 

@@ -46,7 +46,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				type = Type.Procedural,
 				memoryLayout = MemoryLayout.Interleaved,
-				kLODClusters = false,
+				kLODClusters = true,
 				kLODClustersClustering = StrandClusterMode.Strands,
 			};
 		}
@@ -174,11 +174,11 @@ namespace Unity.DemoTeam.Hair
 				strandLength = 0.25f,
 				strandLengthVariation = false,
 				strandLengthVariationAmount = 0.2f,
-				strandDiameter = 1.0f,
+				strandDiameter = SharedDefaults.defaultStrandDiameter,
 				strandDiameterVariation = false,
 				strandDiameterVariationAmount = 0.2f,
-				tipScale = 0.1f,
-				tipScaleOffset = 0.8f,
+				tipScale = SharedDefaults.defaultTipScale,
+				tipScaleOffset = SharedDefaults.defaultTipScaleOffset,
 
 				curl = false,
 				curlRadius = 1.0f,
@@ -313,7 +313,7 @@ namespace Unity.DemoTeam.Hair
 			public StrandDiameter strandDiameter;
 			[VisibleIf(nameof(strandDiameter), StrandDiameter.ResolveFromCurves), Min(0.0f)]
 			public float strandDiameterScale;
-			[Range(0.01f, 100.0f), Tooltip("Strand root diameter (in millimeters)")]
+			[Range(0.01f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
 			public float strandDiameterFallback;
 			[Range(0.0f, 1.0f)]
 			public float tipScaleFallback;
@@ -339,9 +339,9 @@ namespace Unity.DemoTeam.Hair
 
 				strandDiameter = StrandDiameter.ResolveFromCurves,
 				strandDiameterScale = 1.0f,
-				strandDiameterFallback = 1.0f,
-				tipScaleFallback = 0.1f,
-				tipScaleFallbackOffset = 0.8f,
+				strandDiameterFallback = SharedDefaults.defaultStrandDiameter,
+				tipScaleFallback = SharedDefaults.defaultTipScale,
+				tipScaleFallbackOffset = SharedDefaults.defaultTipScaleOffset,
 
 				exportAttributes = false,
 				exportAttributesMask = TransferAttributes.All,
@@ -486,6 +486,13 @@ namespace Unity.DemoTeam.Hair
 					},
 				},
 			};
+		}
+
+		public struct SharedDefaults
+		{
+			public static readonly float defaultStrandDiameter = 1.0f;
+			public static readonly float defaultTipScaleOffset = 0.8f;
+			public static readonly float defaultTipScale = 0.1f;
 		}
 	}
 }

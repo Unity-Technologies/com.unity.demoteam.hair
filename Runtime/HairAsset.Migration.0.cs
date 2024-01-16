@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -68,6 +69,9 @@ namespace Unity.DemoTeam.Hair
 						out_1.mappedDensity = in_0.mappedDensity;
 						out_1.mappedDirection = in_0.mappedDirection;
 						out_1.mappedParameters = in_0.mappedParameters;
+
+						out_1.tipScale = 1.0f;
+						out_1.tipScaleOffset = HairAsset.SharedDefaults.defaultTipScaleOffset;
 					}
 
 					TransferSettingsProcedural(in_0, ref data_1_settingsProcedural);
@@ -97,9 +101,12 @@ namespace Unity.DemoTeam.Hair
 						out_1.rootUVFallback = in_0.rootUVConstant;
 
 						out_1.strandDiameter = __1__SettingsResolve.StrandDiameter.UseFallback;
-						out_1.strandDiameterFallback = 1.0f;
+						out_1.strandDiameterScale = 1.0f;
+						out_1.strandDiameterFallback = HairAsset.SharedDefaults.defaultStrandDiameter;
 						out_1.tipScaleFallback = 1.0f;
-						out_1.tipScaleFallbackOffset = 1.0f;
+						out_1.tipScaleFallbackOffset = HairAsset.SharedDefaults.defaultTipScaleOffset;
+
+						out_1.exportAttributes = false;
 					}
 
 					TransferSettingsResolve(data_0_settingsAlembic.settingsResolve, ref data_1_settingsAlembic.settingsResolve);
@@ -131,6 +138,7 @@ namespace Unity.DemoTeam.Hair
 							out_1.rootUV = TranslateRootUV(in_0.OLD__rootUV);
 							out_1.rootUVFallback = in_0.OLD__rootUVConstant;
 							out_1.rootUVMesh = in_0.OLD__rootUVMesh;
+
 							out_1.resampleCurves = in_0.OLD__resampleCurves;
 							out_1.resampleResolution = in_0.OLD__resampleParticleCount;
 							out_1.resampleQuality = in_0.OLD__resampleQuality;
@@ -145,11 +153,11 @@ namespace Unity.DemoTeam.Hair
 			{
 				// => data_1_strandGroups[]
 				{
-					static void TransferStrandGroup(in __0__StrandGroup in_0, ref __1__StrandGroup out_1)
+					static void TransferStrandGroup(in __0__StrandGroup in_0, ref __1__StrandGroup out_1, HairAsset hairAsset)
 					{
 						out_1.sumStrandLength = in_0.totalLength;
-						out_1.avgStrandDiameter = 1.0f * 0.001f;
-						out_1.maxStrandDiameter = 1.0f * 0.001f;
+						out_1.avgStrandDiameter = HairAsset.SharedDefaults.defaultStrandDiameter * 0.001f;
+						out_1.maxStrandDiameter = HairAsset.SharedDefaults.defaultStrandDiameter * 0.001f;
 
 						out_1.rootScale = new Vector4[in_0.rootScale.Length];
 						{
@@ -157,7 +165,7 @@ namespace Unity.DemoTeam.Hair
 							{
 								out_1.rootScale[i].x = in_0.rootScale[i];
 								out_1.rootScale[i].y = 1.0f;
-								out_1.rootScale[i].z = 1.0f;
+								out_1.rootScale[i].z = HairAsset.SharedDefaults.defaultTipScaleOffset;
 								out_1.rootScale[i].w = 1.0f;
 							}
 						}
@@ -166,7 +174,7 @@ namespace Unity.DemoTeam.Hair
 						out_1.particleDiameter = null;
 						out_1.particleFeatures = __1__StrandGroup.ParticleFeatures.Position;
 
-						// placeholder data for lod fields
+						// ensure valid lod data (note: only meant as placeholder until asset is rebuilt)
 						{
 							if (out_1.lodCount == 0)
 							{
@@ -199,15 +207,39 @@ namespace Unity.DemoTeam.Hair
 							}
 						}
 
-						// placeholder data for mesh fields
+						// ensure valid mesh assets
 						{
-							HairInstanceBuilder.CreateMeshTubesIfNull(ref out_1.meshAssetTubes, HideFlags.HideInHierarchy, out_1.particleMemoryLayout, out_1.strandCount, out_1.strandParticleCount, out_1.bounds);
+							static void ValidateRenderMesh(__1__StrandGroup out_1, HairAsset hairAsset, ref Mesh meshAsset, HairInstanceBuilder.FnCreateRenderMesh fnCreateRenderMesh)
+							{
+								var meshAssetHideFlags = (meshAsset != null ? meshAsset.hideFlags : HideFlags.HideInHierarchy);
+								var meshAssetObsolete = (meshAsset != null && (meshAsset.GetVertexAttributeFormat(VertexAttribute.TexCoord0) == VertexAttributeFormat.Float32));
+								if (meshAssetObsolete)
+								{
+#if UNITY_EDITOR
+									UnityEditor.AssetDatabase.RemoveObjectFromAsset(meshAsset);
+									UnityEngine.Object.DestroyImmediate(meshAsset);
+#endif
+									meshAsset = null;
+								}
+
+								if (meshAsset == null)
+								{
+									meshAsset = fnCreateRenderMesh(meshAssetHideFlags, out_1.particleMemoryLayout, out_1.strandCount, out_1.strandParticleCount, out_1.bounds);
+#if UNITY_EDITOR
+									UnityEditor.AssetDatabase.AddObjectToAsset(meshAsset, hairAsset);
+#endif
+								}
+							}
+
+							ValidateRenderMesh(out_1, hairAsset, ref out_1.meshAssetLines, HairInstanceBuilder.CreateRenderMeshLines);
+							ValidateRenderMesh(out_1, hairAsset, ref out_1.meshAssetStrips, HairInstanceBuilder.CreateRenderMeshStrips);
+							ValidateRenderMesh(out_1, hairAsset, ref out_1.meshAssetTubes, HairInstanceBuilder.CreateRenderMeshTubes);
 						}
 					}
 
 					for (int i = 0; i != (data_1_strandGroups?.Length ?? 0); i++)
 					{
-						TransferStrandGroup(data_0_strandGroups[i], ref data_1_strandGroups[i]);
+						TransferStrandGroup(data_0_strandGroups[i], ref data_1_strandGroups[i], this);
 					}
 				}
 			}
@@ -287,7 +319,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
-		public struct __0__SettingsResolve
+		struct __0__SettingsResolve
 		{
 			public enum RootUV
 			{

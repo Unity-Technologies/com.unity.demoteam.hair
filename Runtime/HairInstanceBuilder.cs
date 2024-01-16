@@ -391,7 +391,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshLines(Mesh meshLines, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static unsafe void BuildRenderMeshLines(Mesh meshLines, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var perLineVertices = strandParticleCount;
 			var perLineSegments = perLineVertices - 1;
@@ -418,7 +418,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshStrips(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static unsafe void BuildRenderMeshStrips(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var perStripVertices = strandParticleCount * 2;
 			var perStripSegments = strandParticleCount - 1;
@@ -468,7 +468,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static unsafe void BuildRenderMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			const int numSides = 4;
 			
@@ -549,7 +549,7 @@ namespace Unity.DemoTeam.Hair
 				ApplyRenderMeshData(meshStrips, MeshTopology.Triangles, data, bounds);
 			}
 		}
-		
+
 		public static Mesh CreateMeshRoots(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, Vector3[] particlePosition)
 		{
 			var meshRoots = new Mesh();
@@ -569,59 +569,62 @@ namespace Unity.DemoTeam.Hair
 			return meshRoots;
 		}
 
-		public static Mesh CreateMeshLines(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public delegate Mesh FnCreateRenderMesh(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds);
+		public delegate void FnCreateRenderMeshIfNull(ref Mesh mesh, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds);
+
+		public static Mesh CreateRenderMeshLines(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var meshLines = new Mesh();
 			{
 				meshLines.hideFlags = hideFlags;
 				meshLines.name = "X-Lines";
-				BuildMeshLines(meshLines, memoryLayout, strandCount, strandParticleCount, bounds);
+				BuildRenderMeshLines(meshLines, memoryLayout, strandCount, strandParticleCount, bounds);
 			}
 			return meshLines;
 		}
 
-		public static Mesh CreateMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshLines == null)
-				meshLines = CreateMeshLines(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+				meshLines = CreateRenderMeshLines(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshLines;
 		}
 
-		public static Mesh CreateMeshStrips(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshStrips(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var meshStrips = new Mesh();
 			{
 				meshStrips.hideFlags = hideFlags;
 				meshStrips.name = "X-Strips";
-				BuildMeshStrips(meshStrips, memoryLayout, strandCount, strandParticleCount, bounds);
+				BuildRenderMeshStrips(meshStrips, memoryLayout, strandCount, strandParticleCount, bounds);
 			}
 			return meshStrips;
 		}
 
-		public static Mesh CreateMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshStrips == null)
-				meshStrips = CreateMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+				meshStrips = CreateRenderMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshStrips;
 		}
 		
-		public static Mesh CreateMeshTubes(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshTubes(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var meshTubes = new Mesh();
 			{
 				meshTubes.hideFlags = hideFlags;
 				meshTubes.name = "X-Tubes";
-				BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
+				BuildRenderMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
 			}
 			return meshTubes;
 		}
 
-		public static Mesh CreateMeshTubesIfNull(ref Mesh meshTubes, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshTubesIfNull(ref Mesh meshTubes, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshTubes == null)
-				meshTubes = CreateMeshTubes(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+				meshTubes = CreateRenderMeshTubes(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshTubes;
 		}

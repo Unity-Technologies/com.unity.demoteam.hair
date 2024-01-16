@@ -274,6 +274,8 @@ namespace Unity.DemoTeam.Hair
 		void UpdateStrandGroupInstances()
 		{
 			var status = CheckStrandGroupInstances();
+			if (status == StrandGroupInstancesStatus.Valid)
+				return;
 
 #if UNITY_EDITOR
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
@@ -285,6 +287,8 @@ namespace Unity.DemoTeam.Hair
 					case StrandGroupInstancesStatus.RequireRebuild:
 						{
 							var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+
+							//TODO revisit this, seems reentrant
 #if UNITY_2021_2_OR_NEWER
 							var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
 #else
@@ -293,20 +297,17 @@ namespace Unity.DemoTeam.Hair
 							if (prefabStage != null && prefabStage.assetPath == prefabPath)
 								return;// do nothing if prefab is already open
 
-							Debug.Log(string.Format("{0}: rebuilding governing prefab '{1}'...", this.name, prefabPath), this);
+							Debug.Log(string.Format("{0} ({1}): rebuilding governing prefab '{1}'...", this.GetType().Name, this.name, prefabPath), this);
 
-							var prefabContainer = UnityEditor.PrefabUtility.LoadPrefabContents(prefabPath);
-							if (prefabContainer != null)
+							using (var prefabEditScope = new UnityEditor.PrefabUtility.EditPrefabContentsScope(prefabPath))
 							{
-								foreach (var prefabHairInstance in prefabContainer.GetComponentsInChildren<HairInstance>(includeInactive: true))
+								foreach (var prefabHairInstance in prefabEditScope.prefabContentsRoot.GetComponentsInChildren<HairInstance>(includeInactive: true))
 								{
 									prefabHairInstance.UpdateStrandGroupInstances();
 								}
-
-								UnityEditor.PrefabUtility.SaveAsPrefabAsset(prefabContainer, prefabPath);
-								UnityEditor.PrefabUtility.UnloadPrefabContents(prefabContainer);
 							}
 
+							// ensure that certain properties are not overridden
 							var serializedObject = new UnityEditor.SerializedObject(this);
 							{
 								var property_strandGroupProviders = serializedObject.FindProperty(nameof(strandGroupChecksums));
@@ -837,7 +838,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							if (subdivision > 0)
 							{
-								mesh = HairInstanceBuilder.CreateMeshLinesIfNull(ref meshInstanceLines, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
+								mesh = HairInstanceBuilder.CreateRenderMeshLinesIfNull(ref meshInstanceLines, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
 							}
 							else
 							{
@@ -853,7 +854,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							if (subdivision > 0)
 							{
-								mesh = HairInstanceBuilder.CreateMeshStripsIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
+								mesh = HairInstanceBuilder.CreateRenderMeshStripsIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
 							}
 							else
 							{
@@ -869,7 +870,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							if (subdivision > 0)
 							{
-								mesh = HairInstanceBuilder.CreateMeshTubesIfNull(ref meshInstanceTubes, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
+								mesh = HairInstanceBuilder.CreateRenderMeshTubesIfNull(ref meshInstanceTubes, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
 							}
 							else
 							{
@@ -981,10 +982,6 @@ namespace Unity.DemoTeam.Hair
 			HairSim.BindSolverData(materialInstance, solverData);
 			HairSim.BindVolumeData(materialInstance, volumeData);
 
-			materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.textures._VolumeDensity);
-			materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.textures._VolumeVelocity);
-			materialInstance.SetTexture("_UntypedVolumeScattering", volumeData.textures._VolumeScattering);
-
 			switch (settingsRendering.renderer)
 			{
 				case HairSim.SettingsRendering.Renderer.BuiltinTubes:
@@ -1003,22 +1000,25 @@ namespace Unity.DemoTeam.Hair
 					break;
 			}
 
-			switch (mesh?.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+			if (mesh != null)
 			{
-				case VertexAttributeFormat.Float32://TODO replace runtime compatibility with asset versioning / upgrade
-					materialInstance.SetInt("_DecodeVertexComponentWidth", 32);
-					break;
+				switch (mesh.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+				{
+					case VertexAttributeFormat.UNorm16:
+						materialInstance.SetInt("_DecodeVertexComponentValue", ushort.MaxValue);
+						materialInstance.SetInt("_DecodeVertexComponentWidth", 16);
+						break;
 
-				case VertexAttributeFormat.UNorm16:
-					materialInstance.SetInt("_DecodeVertexComponentValue", ushort.MaxValue);
-					materialInstance.SetInt("_DecodeVertexComponentWidth", 16);
-					break;
-
-				case VertexAttributeFormat.UNorm8:
-					materialInstance.SetInt("_DecodeVertexComponentValue", byte.MaxValue);
-					materialInstance.SetInt("_DecodeVertexComponentWidth", 8);
-					break;
+					case VertexAttributeFormat.UNorm8:
+						materialInstance.SetInt("_DecodeVertexComponentValue", byte.MaxValue);
+						materialInstance.SetInt("_DecodeVertexComponentWidth", 8);
+						break;
+				}
 			}
+
+			materialInstance.SetTexture("_UntypedVolumeDensity", volumeData.textures._VolumeDensity);
+			materialInstance.SetTexture("_UntypedVolumeVelocity", volumeData.textures._VolumeVelocity);
+			materialInstance.SetTexture("_UntypedVolumeScattering", volumeData.textures._VolumeScattering);
 		}
 
 		public bool GetSimulationActive()

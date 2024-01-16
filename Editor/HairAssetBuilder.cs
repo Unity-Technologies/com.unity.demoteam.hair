@@ -294,7 +294,6 @@ namespace Unity.DemoTeam.Hair
 			FinalizeStrandGroup(ref strandGroup, hairAsset);
 		}
 
-
 		// resolve root scale
 		public static unsafe void BuildStrandGroupResolved(ref HairAsset.StrandGroup strandGroup, in HairAsset hairAsset, in HairAsset.SettingsResolve settingsResolve, in HairAssetProvisional.CurveSet curveSet)
 		{
@@ -615,11 +614,11 @@ namespace Unity.DemoTeam.Hair
 
 									// find tip
 									var tipDiameter = uniformVertexDataDiameterPtr[(i + 1) * uniformVertexCount - 1];
-									var tipOffset = maxDiameterVertexIndex / (float)(uniformVertexCount - 1);
+									var tipScaleOffset = maxDiameterVertexIndex / (float)(uniformVertexCount - 1);
 									var tipScale = Mathf.Min(tipDiameter, maxDiameter) / maxDiameter;
 
 									strandGroup.rootScale[i].y = maxDiameter * uniformCurveSet.unitScaleDiameter * settings.strandDiameterScale;
-									strandGroup.rootScale[i].z = tipOffset;
+									strandGroup.rootScale[i].z = tipScaleOffset;
 									strandGroup.rootScale[i].w = tipScale;
 								}
 							}
@@ -1009,21 +1008,21 @@ namespace Unity.DemoTeam.Hair
 						strandGroup.strandParticleCount,
 						strandGroup.particlePosition);
 
-					strandGroup.meshAssetLines = HairInstanceBuilder.CreateMeshLines(
+					strandGroup.meshAssetLines = HairInstanceBuilder.CreateRenderMeshLines(
 						hideFlags,
 						strandGroup.particleMemoryLayout,
 						strandGroup.strandCount,
 						strandGroup.strandParticleCount,
 						strandGroup.bounds);
 
-					strandGroup.meshAssetStrips = HairInstanceBuilder.CreateMeshStrips(
+					strandGroup.meshAssetStrips = HairInstanceBuilder.CreateRenderMeshStrips(
 						hideFlags,
 						strandGroup.particleMemoryLayout,
 						strandGroup.strandCount,
 						strandGroup.strandParticleCount,
 						strandGroup.bounds);
 
-					strandGroup.meshAssetTubes = HairInstanceBuilder.CreateMeshTubes(
+					strandGroup.meshAssetTubes = HairInstanceBuilder.CreateRenderMeshTubes(
 						hideFlags,
 						strandGroup.particleMemoryLayout,
 						strandGroup.strandCount,
