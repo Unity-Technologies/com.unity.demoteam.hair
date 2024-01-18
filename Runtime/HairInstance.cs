@@ -184,13 +184,15 @@ namespace Unity.DemoTeam.Hair
 		void Reset() => version = VERSION;
 		void OnValidate()
 		{
-			VersionedDataUtility.HandleVersionChange(this);
+			VersionedDataUtility.HandleVersionChangeOnValidate(this);
 
 			settingsVolumetrics.gridResolution = (uint)(Mathf.Max(8, (int)settingsVolumetrics.gridResolution) / 8) * 8;
 		}
 
 		void OnEnable()
 		{
+			VersionedDataUtility.HandleVersionChange(this);
+
 			UpdateStrandGroupInstances();
 			UpdateStrandGroupHideFlags();
 			UpdateStrandGroupSettings();
@@ -278,80 +280,60 @@ namespace Unity.DemoTeam.Hair
 				return;
 
 #if UNITY_EDITOR
+			// if this is part of a prefab instance, then we need to handle content changes in underlying prefab
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(this);
 			if (isPrefabInstance)
 			{
-				// did the asset change since the prefab was built?
+				// ensure that all content-related properties are inherited from underlying prefab (these are also marked "prefab" and not-editable in UI)
+				{
+					var serializedObject = new UnityEditor.SerializedObject(this);
+
+					var property_strandGroupProviders = serializedObject.FindProperty(nameof(strandGroupChecksums));
+					var property_strandGroupChecksums = serializedObject.FindProperty(nameof(strandGroupProviders));
+					var property_strandGroupDefaults = serializedObject.FindProperty(nameof(strandGroupDefaults));
+					var property_strandGroupSettings = serializedObject.FindProperty(nameof(strandGroupSettings));
+
+					UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupProviders, UnityEditor.InteractionMode.AutomatedAction);
+					UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupChecksums, UnityEditor.InteractionMode.AutomatedAction);
+					UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupDefaults.FindPropertyRelative(nameof(GroupSettings.settingsSkinning)), UnityEditor.InteractionMode.AutomatedAction);
+
+					for (int i = 0; i != property_strandGroupSettings.arraySize; i++)
+					{
+						UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupSettings.GetArrayElementAtIndex(i).FindPropertyRelative(nameof(GroupSettings.settingsSkinning)), UnityEditor.InteractionMode.AutomatedAction);
+					}
+				}
+
+				// handle content changes in underlying prefab
+				Debug.Log(string.Format("{0} ({1}): rebuilding contents in governing prefab...", this.GetType().Name, this.name), this);
+
+				PrefabContentsUtility.UpdateUnderlyingPrefabContents(this, (GameObject prefabContentsRoot) =>
+				{
+					foreach (var prefabHairInstance in prefabContentsRoot.GetComponentsInChildren<HairInstance>(includeInactive: true))
+					{
+						prefabHairInstance.UpdateStrandGroupInstances();
+					}
+				});
+			}
+			else
+#endif
+			{
+				// handle content changes
+				Debug.Log(string.Format("{0} ({1}): rebuilding contents", this.GetType().Name, this.name), this);
+
 				switch (status)
 				{
 					case StrandGroupInstancesStatus.RequireRebuild:
-						{
-							var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
-
-							//TODO revisit this, seems reentrant
-#if UNITY_2021_2_OR_NEWER
-							var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
-#else
-							var prefabStage = UnityEditor.Experimental.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
-#endif
-							if (prefabStage != null && prefabStage.assetPath == prefabPath)
-								return;// do nothing if prefab is already open
-
-							Debug.Log(string.Format("{0} ({1}): rebuilding governing prefab '{1}'...", this.GetType().Name, this.name, prefabPath), this);
-
-							using (var prefabEditScope = new UnityEditor.PrefabUtility.EditPrefabContentsScope(prefabPath))
-							{
-								foreach (var prefabHairInstance in prefabEditScope.prefabContentsRoot.GetComponentsInChildren<HairInstance>(includeInactive: true))
-								{
-									prefabHairInstance.UpdateStrandGroupInstances();
-								}
-							}
-
-							// ensure that certain properties are not overridden
-							var serializedObject = new UnityEditor.SerializedObject(this);
-							{
-								var property_strandGroupProviders = serializedObject.FindProperty(nameof(strandGroupChecksums));
-								var property_strandGroupChecksums = serializedObject.FindProperty(nameof(strandGroupProviders));
-								var property_strandGroupDefaults = serializedObject.FindProperty(nameof(strandGroupDefaults));
-								var property_strandGroupSettings = serializedObject.FindProperty(nameof(strandGroupSettings));
-
-								UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupProviders, UnityEditor.InteractionMode.AutomatedAction);
-								UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupChecksums, UnityEditor.InteractionMode.AutomatedAction);
-								UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupDefaults.FindPropertyRelative(nameof(GroupSettings.settingsSkinning)), UnityEditor.InteractionMode.AutomatedAction);
-
-								for (int i = 0; i != property_strandGroupSettings.arraySize; i++)
-								{
-									UnityEditor.PrefabUtility.RevertPropertyOverride(property_strandGroupSettings.GetArrayElementAtIndex(i).FindPropertyRelative(nameof(GroupSettings.settingsSkinning)), UnityEditor.InteractionMode.AutomatedAction);
-								}
-							}
-
-							serializedObject.ApplyModifiedProperties();
-						}
-
-						ReleaseRuntimeData();
+						HairInstanceBuilder.BuildHairInstance(this, strandGroupProviders, HideFlags.NotEditable);
 						break;
 
 					case StrandGroupInstancesStatus.RequireRelease:
-						ReleaseRuntimeData();
+						HairInstanceBuilder.ClearHairInstance(this);
 						break;
 				}
-
-				return;
 			}
-#endif
 
-			switch (status)
-			{
-				case StrandGroupInstancesStatus.RequireRebuild:
-					HairInstanceBuilder.BuildHairInstance(this, strandGroupProviders, HideFlags.NotEditable);
-					ReleaseRuntimeData();
-					break;
-
-				case StrandGroupInstancesStatus.RequireRelease:
-					HairInstanceBuilder.ClearHairInstance(this);
-					ReleaseRuntimeData();
-					break;
-			}
+			// release runtime data
+			ReleaseRuntimeData();
 		}
 
 		void UpdateStrandGroupHideFlags(HideFlags hideFlags = HideFlags.NotEditable)
@@ -1346,13 +1328,13 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			HairSim.ReleaseVolumeData(ref volumeData);
+
+			execState = ExecutiveState.defaults;
 		}
 
 		public void ResetSimulationState()
 		{
 			ReleaseRuntimeData();
-
-			execState = ExecutiveState.defaults;
 		}
 	}
 }

@@ -74,7 +74,7 @@ namespace Unity.DemoTeam.Hair
 		void Reset() => version = VERSION;
 		void OnValidate()
 		{
-			VersionedDataUtility.HandleVersionChange(this);
+			VersionedDataUtility.HandleVersionChangeOnValidate(this);
 		}
 	}
 

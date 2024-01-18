@@ -16,65 +16,78 @@ namespace Unity.DemoTeam.Hair
 
 	public static class VersionedDataUtility
 	{
+		static readonly string versionPropertyPath = string.Format("<{0}>k__BackingField", nameof(IVersionedDataContext.version));
+
+		public static void HandleVersionChangeOnValidate<T>(T ctx) where T : UnityEngine.Object, IVersionedDataContext
+		{
+#if UNITY_EDITOR
+			UnityEditor.EditorApplication.delayCall += () => HandleVersionChange(ctx);
+#else
+			HandleVersionChange(ctx);
+#endif
+		}
+
 		public static void HandleVersionChange<T>(T ctx) where T : UnityEngine.Object, IVersionedDataContext
 		{
-			var versionInitial = ctx.version;
-			if (versionInitial < ctx.VERSION)
-			{
-				Debug.Log(string.Format("{0} ({1}): starting migration...", ctx.GetType().Name, ctx.name, ctx.version, ctx.VERSION), ctx);
-			}
-			else
-			{
+			var versionIni = ctx.version;
+			if (versionIni == ctx.VERSION)
 				return;
-			}
+
+			var nameType = ctx.GetType().Name;
+			var nameObject = ctx.name;
+
+			Debug.Log(string.Format("{0} ({1}): starting migration...", nameType, nameObject), ctx);
 
 #if UNITY_EDITOR
+			// if this is part of a prefab instance, then we need to first handle version changes in underlying prefab
 			var isPrefabInstance = UnityEditor.PrefabUtility.IsPartOfPrefabInstance(ctx);
 			if (isPrefabInstance)
 			{
-				var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(ctx);
+				// handle version changes in underlying prefab
+				Debug.Log(string.Format("{0} ({1}): migrating underlying prefab...", nameType, nameObject), ctx);
+
+				PrefabContentsUtility.UpdateUnderlyingPrefabContents(ctx, (GameObject prefabContentsRoot) =>
 				{
-					Debug.Log(string.Format("{0} ({1}): rebuilding governing prefab '{1}'...", ctx.GetType().Name, ctx.name, prefabPath), ctx);
-
-					using (var prefabEditScope = new UnityEditor.PrefabUtility.EditPrefabContentsScope(prefabPath))
+					foreach (var prefabVersionedDataContext in prefabContentsRoot.GetComponentsInChildren<T>(includeInactive: true))
 					{
-						foreach (var prefabVersionedData in prefabEditScope.prefabContentsRoot.GetComponentsInChildren<T>(includeInactive: true))
-						{
-							HandleVersionChange(prefabVersionedData);
-						}
+						HandleVersionChange(prefabVersionedDataContext);
 					}
-				}
+				});
 
-				// ensure that version is not fetched from prefab
+				// ensure that own version is not inherited from prefab
 				var serializedObject = new UnityEditor.SerializedObject(ctx);
 				{
-					serializedObject.FindProperty(nameof(ctx.version)).intValue = versionInitial;
+					serializedObject.FindProperty(versionPropertyPath).intValue = versionIni;
 					serializedObject.ApplyModifiedPropertiesWithoutUndo();
 				}
 			}
 #endif
 
+			// handle version changes
 			while (ctx.version < ctx.VERSION)
 			{
-				Debug.Log(string.Format("{0} ({1}): migrating data from version {2}...", ctx.GetType().Name, ctx.name, ctx.version), ctx);
-				var versionCurrent = ctx.version;
+				Debug.Log(string.Format("{0} ({1}): migrating data from version {2}...", nameType, nameObject, ctx.version), ctx);
+				var versionPre = ctx.version;
 				{
 					ctx.PerformMigrationStep();
 				}
-				if (versionCurrent == ctx.version)
+				if (versionPre == ctx.version)
 				{
-					Debug.LogError(string.Format("{0} ({1}): failed to migrate data from version {2} -> {3} (remains at version {2})", ctx.GetType().Name, ctx.name, ctx.version, ctx.VERSION), ctx);
+					Debug.LogError(string.Format("{0} ({1}): failed to migrate data from version {2} -> {3} (remains at version {2})", nameType, nameObject, ctx.version, ctx.VERSION), ctx);
 					break;
 				}
 			}
-
-			if (versionInitial < ctx.version)
+			
+			if (versionIni < ctx.version)
 			{
-				Debug.Log(string.Format("{0} ({1}): completed migration", ctx.GetType().Name, ctx.name, ctx.version), ctx);
 #if UNITY_EDITOR
 				UnityEditor.EditorUtility.SetDirty(ctx);
 				UnityEditor.PrefabUtility.RecordPrefabInstancePropertyModifications(ctx);
 #endif
+				if (ctx.version == ctx.VERSION)
+				{
+					Debug.Log(string.Format("{0} ({1}): completed migration (now at version {2})", nameType, nameObject, ctx.version), ctx);
+				}
 			}
 		}
 	}
