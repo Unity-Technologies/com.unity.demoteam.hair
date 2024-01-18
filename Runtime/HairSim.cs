@@ -184,6 +184,7 @@ namespace Unity.DemoTeam.Hair
 
 				InitializeStructFields(ref SolverData.s_bufferIDs, (string s) => Shader.PropertyToID(s));
 				InitializeStructFields(ref SolverData.s_textureIDs, (string s) => Shader.PropertyToID(s));
+				InitializeStructFields(ref SolverData.s_externalIDs, (string s) => Shader.PropertyToID(s));
 
 				InitializeStructFields(ref VolumeData.s_bufferIDs, (string s) => Shader.PropertyToID(s));
 				InitializeStructFields(ref VolumeData.s_textureIDs, (string s) => Shader.PropertyToID(s));
@@ -615,12 +616,12 @@ namespace Unity.DemoTeam.Hair
 			var normalOffset = rootMesh.GetVertexAttributeOffset(VertexAttribute.Normal);
 			var normalStride = rootMesh.GetVertexBufferStride(normalStream);
 
-			constants._RootMeshPositionOffset = vertexPositionOffset;
-			constants._RootMeshPositionStride = vertexPositionStride;
-			constants._RootMeshTangentOffset = vertexTangentOffset;
-			constants._RootMeshTangentStride = vertexTangentStride;
-			constants._RootMeshNormalOffset = normalOffset;
-			constants._RootMeshNormalStride = normalStride;
+			solverConstantsRoots._RootMeshPositionOffset = (uint)vertexPositionOffset;
+			solverConstantsRoots._RootMeshPositionStride = (uint)vertexPositionStride;
+			solverConstantsRoots._RootMeshTangentOffset = (uint)vertexTangentOffset;
+			solverConstantsRoots._RootMeshTangentStride = (uint)vertexTangentStride;
+			solverConstantsRoots._RootMeshNormalOffset = (uint)normalOffset;
+			solverConstantsRoots._RootMeshNormalStride = (uint)normalStride;
 #else
 			solverConstantsRoots._RootMeshTangentStride = rootMesh.HasVertexAttribute(VertexAttribute.Tangent) ? 1u : 0u;
 #endif
@@ -649,7 +650,7 @@ namespace Unity.DemoTeam.Hair
 				using (GraphicsBuffer vertexTangent = (vertexTangentStride != 0) ? rootMesh.GetVertexBuffer(vertexTangentStream) : null)
 				using (GraphicsBuffer vertexNormal = rootMesh.GetVertexBuffer(normalStream))
 				{
-					int numX = ((int)solverData.constants._StrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
+					int numX = ((int)solverData.constants._StrandCount + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
 					int numY = 1;
 					int numZ = 1;
 
@@ -1194,7 +1195,7 @@ namespace Unity.DemoTeam.Hair
 
 					if (manualBounds)
 					{
-						cmd.SetComputeBufferData(volumeData.buffers._BoundsMinMaxU, minMaxUBuffer);
+						PushComputeBufferData(cmd, volumeData.buffers._BoundsMinMaxU, minMaxUBuffer);
 					}
 					else
 					{
