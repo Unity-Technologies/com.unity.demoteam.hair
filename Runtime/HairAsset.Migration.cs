@@ -7,7 +7,7 @@ namespace Unity.DemoTeam.Hair
 		const int VERSION_IMPL = 1;
 
 		[field: SerializeField]
-		public int version { get; private set; } = 0;
+		public int version { get; private set; } = -1;
 		public int VERSION => VERSION_IMPL;
 
 		public void PerformMigrationStep()

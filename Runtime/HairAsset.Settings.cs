@@ -331,7 +331,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				resampleCurves = true,
 				resampleResolution = 16,
-				resampleQuality = 1,
+				resampleQuality = 3,
 
 				rootUV = RootUV.UseFallback,
 				rootUVMesh = null,
@@ -488,7 +488,7 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
-		public struct SharedDefaults
+		public static class SharedDefaults
 		{
 			public static readonly float defaultStrandDiameter = 1.0f;
 			public static readonly float defaultTipScaleOffset = 0.8f;

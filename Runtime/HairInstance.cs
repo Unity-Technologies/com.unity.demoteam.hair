@@ -181,9 +181,16 @@ namespace Unity.DemoTeam.Hair
 		public event Action<CommandBuffer> onSimulationStateChanged;
 		public event Action<CommandBuffer> onRenderingStateChanged;
 
-		void Reset() => version = VERSION;
+		void Reset()
+		{
+			version = VERSION;
+		}
+
 		void OnValidate()
 		{
+			if (version < 0)
+				version = 0;
+
 			VersionedDataUtility.HandleVersionChangeOnValidate(this);
 
 			settingsVolumetrics.gridResolution = (uint)(Mathf.Max(8, (int)settingsVolumetrics.gridResolution) / 8) * 8;
@@ -304,9 +311,9 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// handle content changes in underlying prefab
-				Debug.Log(string.Format("{0} ({1}): rebuilding contents in governing prefab...", this.GetType().Name, this.name), this);
+				Debug.Log(string.Format("{0} ({1}): rebuilding governing prefab...", this.GetType().Name, this.name), this);
 
-				PrefabContentsUtility.UpdateUnderlyingPrefabContents(this, (GameObject prefabContentsRoot) =>
+				PrefabContentsUtility.UpdateUnderlyingPrefabContents(this, verbose: false, (GameObject prefabContentsRoot) =>
 				{
 					foreach (var prefabHairInstance in prefabContentsRoot.GetComponentsInChildren<HairInstance>(includeInactive: true))
 					{
@@ -318,8 +325,6 @@ namespace Unity.DemoTeam.Hair
 #endif
 			{
 				// handle content changes
-				Debug.Log(string.Format("{0} ({1}): rebuilding contents", this.GetType().Name, this.name), this);
-
 				switch (status)
 				{
 					case StrandGroupInstancesStatus.RequireRebuild:

@@ -71,9 +71,16 @@ namespace Unity.DemoTeam.Hair
 
 		public string checksum;
 
-		void Reset() => version = VERSION;
+		void Reset()
+		{
+			version = VERSION;
+		}
+
 		void OnValidate()
 		{
+			if (version < 0)
+				version = 0;
+
 			VersionedDataUtility.HandleVersionChangeOnValidate(this);
 		}
 	}

@@ -8,13 +8,38 @@ namespace Unity.DemoTeam.Hair
 	{
 		public delegate void FnUpdatePrefabContents(GameObject prefabContentsRoot);
 
-		public static void UpdateUnderlyingPrefabContents(UnityEngine.Object prefabInstanceMember, FnUpdatePrefabContents fnUpdatePrefabContents)
+		struct UpdateUnderlyingPrefabScope : IDisposable
 		{
-			var prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(prefabInstanceMember);
+			public UnityEngine.Object prefabInstanceMember;
+			public string prefabPath;
+			public bool verbose;
+
+			public UpdateUnderlyingPrefabScope(UnityEngine.Object prefabInstanceMember, bool verbose)
 			{
-				Debug.Log(string.Format("{0} ({1}): entering prefab '{2}'...", prefabInstanceMember.GetType().Name, prefabInstanceMember.name, prefabPath), prefabInstanceMember);
-				UpdateUnderlyingPrefabContents(prefabPath, fnUpdatePrefabContents);
-				Debug.Log(string.Format("{0} ({1}): leaving prefab '{2}'...", prefabInstanceMember.GetType().Name, prefabInstanceMember.name, prefabPath), prefabInstanceMember);
+				this.prefabInstanceMember = prefabInstanceMember;
+				this.prefabPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(prefabInstanceMember);
+				this.verbose = verbose;
+
+				if (verbose)
+				{
+					Debug.Log(string.Format("{0} ({1}): entering prefab '{2}'...", prefabInstanceMember.GetType().Name, prefabInstanceMember.name, prefabPath), prefabInstanceMember);
+				}
+			}
+
+			public void Dispose()
+			{
+				if (verbose)
+				{
+					Debug.Log(string.Format("{0} ({1}): exiting prefab '{2}'...", prefabInstanceMember.GetType().Name, prefabInstanceMember.name, prefabPath), prefabInstanceMember);
+				}
+			}
+		}
+
+		public static void UpdateUnderlyingPrefabContents(UnityEngine.Object prefabInstanceMember, bool verbose, FnUpdatePrefabContents fnUpdatePrefabContents)
+		{
+			using (var prefabScope = new UpdateUnderlyingPrefabScope(prefabInstanceMember, verbose))
+			{
+				UpdateUnderlyingPrefabContents(prefabScope.prefabPath, fnUpdatePrefabContents);
 			}
 		}
 

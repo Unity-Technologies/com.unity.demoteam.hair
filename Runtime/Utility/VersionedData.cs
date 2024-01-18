@@ -4,7 +4,7 @@ namespace Unity.DemoTeam.Hair
 {
 	public interface IVersionedDataContext
 	{
-		// should return version of data
+		// should return version of data (should return negative value if version of data is still pending)
 		int version { get; }
 
 		// should return version of implementation (constant)
@@ -21,7 +21,13 @@ namespace Unity.DemoTeam.Hair
 		public static void HandleVersionChangeOnValidate<T>(T ctx) where T : UnityEngine.Object, IVersionedDataContext
 		{
 #if UNITY_EDITOR
-			UnityEditor.EditorApplication.delayCall += () => HandleVersionChange(ctx);
+			UnityEditor.EditorApplication.delayCall += () =>
+			{
+				if (ctx != null)
+				{
+					HandleVersionChange(ctx);
+				}
+			};
 #else
 			HandleVersionChange(ctx);
 #endif
@@ -30,7 +36,7 @@ namespace Unity.DemoTeam.Hair
 		public static void HandleVersionChange<T>(T ctx) where T : UnityEngine.Object, IVersionedDataContext
 		{
 			var versionIni = ctx.version;
-			if (versionIni == ctx.VERSION)
+			if (versionIni == ctx.VERSION || versionIni < 0)
 				return;
 
 			var nameType = ctx.GetType().Name;
@@ -46,7 +52,7 @@ namespace Unity.DemoTeam.Hair
 				// handle version changes in underlying prefab
 				Debug.Log(string.Format("{0} ({1}): migrating underlying prefab...", nameType, nameObject), ctx);
 
-				PrefabContentsUtility.UpdateUnderlyingPrefabContents(ctx, (GameObject prefabContentsRoot) =>
+				PrefabContentsUtility.UpdateUnderlyingPrefabContents(ctx, verbose: true, (GameObject prefabContentsRoot) =>
 				{
 					foreach (var prefabVersionedDataContext in prefabContentsRoot.GetComponentsInChildren<T>(includeInactive: true))
 					{

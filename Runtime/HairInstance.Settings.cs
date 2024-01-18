@@ -29,7 +29,7 @@ namespace Unity.DemoTeam.Hair
 
 			[LineHeader("Scheduling")]
 
-			[Tooltip("Specifies whether updates are scheduled and dispatched via builtin event, or scheduled via external call (caller is then also responsible for dispatch)")]
+			[Tooltip("Specifies whether updates are scheduled and dispatched via builtin event, or scheduled via external call (with caller being responsible for subsequent dispatch)")]
 			public UpdateMode updateMode;
 
 			[LineHeader("Simulation")]
@@ -62,7 +62,7 @@ namespace Unity.DemoTeam.Hair
 				updateStepsMin = false,
 				updateStepsMinValue = 1,
 				updateStepsMax = true,
-				updateStepsMaxValue = 1,
+				updateStepsMaxValue = 4,
 			};
 		}
 

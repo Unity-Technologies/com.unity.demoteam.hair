@@ -221,15 +221,15 @@ namespace Unity.DemoTeam.Hair
 			public static readonly SettingsPhysics defaults = new SettingsPhysics()
 			{
 				solver = Solver.GaussSeidel,
-				solverSubsteps = 1,
-				constraintIterations = 3,
-				constraintStiffness = 1.0f,
+				solverSubsteps = 2,
+				constraintIterations = 4,
+				constraintStiffness = 0.8f,
 				constraintSOR = 1.0f,
 
 				dampingLinear = false,
 				dampingLinearFactor = 0.5f,
 				dampingLinearInterval = TimeInterval.PerSecond,
-				dampingAngular = false,
+				dampingAngular = true,
 				dampingAngularFactor = 0.5f,
 				dampingAngularInterval = TimeInterval.PerSecond,
 				cellPressure = 1.0f,
@@ -526,7 +526,7 @@ namespace Unity.DemoTeam.Hair
 				splatMethod = SplatMethod.Compute,
 				splatClusters = true,
 
-				pressureIterations = 3,
+				pressureIterations = 5,
 				pressureSolution = PressureSolution.DensityLessThan,
 				restDensity = RestDensity.Uniform,
 				restDensityScale = 1.0f,
