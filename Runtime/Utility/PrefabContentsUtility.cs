@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace Unity.DemoTeam.Hair
 {
+#if UNITY_EDITOR
 	public static class PrefabContentsUtility
 	{
 		public delegate void FnUpdatePrefabContents(GameObject prefabContentsRoot);
@@ -71,4 +72,5 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 	}
+#endif
 }
