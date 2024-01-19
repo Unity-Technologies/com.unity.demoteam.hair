@@ -19,7 +19,7 @@ namespace Unity.DemoTeam.Hair
 			if (buffer != null)
 				buffer.Release();
 
-			buffer = new ComputeBuffer(count > 0 ? count : 1, stride, type, ComputeBufferMode.Dynamic);
+			buffer = new ComputeBuffer(count > 0 ? count : 1, stride, type);
 			buffer.name = name;
 			return true;
 		}

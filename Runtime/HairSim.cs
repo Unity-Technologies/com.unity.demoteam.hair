@@ -238,7 +238,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._RootFrameSubstep, "RootFrame_t", strandCount, particleStrideVector4);
 
 				changed |= CreateBuffer(ref solverBuffers._SolverLODStage, "SolverLODStage", (int)SolverLODStage.__COUNT, sizeof(LODIndices));
-				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT, sizeof(uint) * 4);
+				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT, sizeof(uint) * 4, ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
 
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStrideVector4);
@@ -295,7 +295,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref volumeBuffers._BoundsCoverage, "BoundsCoverage", boundsCount, particleStrideVector2);
 
 				changed |= CreateBuffer(ref volumeBuffers._VolumeLODStage, "VolumeLODStage", (int)VolumeLODStage.__COUNT__, sizeof(VolumeLODGrid));
-				changed |= CreateBuffer(ref volumeBuffers._VolumeLODDispatch, "VolumeLODDispatch", (int)VolumeLODDispatch.__COUNT__, sizeof(uint) * 4);
+				changed |= CreateBuffer(ref volumeBuffers._VolumeLODDispatch, "VolumeLODDispatch", (int)VolumeLODDispatch.__COUNT__, sizeof(uint) * 4, ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
 
 				if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsTextureAtomics))
 				{
