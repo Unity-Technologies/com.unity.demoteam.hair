@@ -526,9 +526,9 @@ void KRoots(
 {
 	DECLARE_STRAND(worldIdx.x);
 
-	float3 rootMeshPositionOS = asfloat(_RootMeshPosition.Load3(strandIndex * _RootMeshPositionOffset + _RootMeshPositionStride));
-	float4 rootMeshTangentOS = asfloat(_RootMeshTangent.Load4(strandIndex * _RootMeshTangentOffset + _RootMeshTangentStride));
-	float3 rootMeshNormalOS = asfloat(_RootMeshNormal.Load3(strandIndex * _RootMeshNormalOffset + _RootMeshNormalStride));
+	float3 rootMeshPositionOS = asfloat(_RootMeshPosition.Load3(strandIndex * _RootMeshPositionStride + _RootMeshPositionOffset));
+	float4 rootMeshTangentOS = asfloat(_RootMeshTangent.Load4(strandIndex * _RootMeshTangentStride + _RootMeshTangentOffset));
+	float3 rootMeshNormalOS = asfloat(_RootMeshNormal.Load3(strandIndex * _RootMeshNormalStride + _RootMeshNormalOffset));
 
 	RootResolve(
 		_RootPosition[strandIndex].xyz,
