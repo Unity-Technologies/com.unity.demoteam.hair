@@ -211,7 +211,9 @@ namespace Unity.DemoTeam.Hair
 						{
 							static void ValidateRenderMesh(__1__StrandGroup out_1, HairAsset hairAsset, ref Mesh meshAsset, HairInstanceBuilder.FnCreateRenderMesh fnCreateRenderMesh)
 							{
-								var meshAssetHideFlags = (meshAsset != null ? meshAsset.hideFlags : HideFlags.HideInHierarchy);
+								var prevName = (meshAsset != null) ? meshAsset.name : null;
+								var prevHideFlags = (meshAsset != null ? meshAsset.hideFlags : HideFlags.HideInHierarchy);
+
 								var meshAssetObsolete = (meshAsset != null && (meshAsset.GetVertexAttributeFormat(VertexAttribute.TexCoord0) == VertexAttributeFormat.Float32));
 								if (meshAssetObsolete)
 								{
@@ -224,7 +226,8 @@ namespace Unity.DemoTeam.Hair
 
 								if (meshAsset == null)
 								{
-									meshAsset = fnCreateRenderMesh(meshAssetHideFlags, out_1.particleMemoryLayout, out_1.strandCount, out_1.strandParticleCount, out_1.bounds);
+									meshAsset = fnCreateRenderMesh(prevHideFlags, out_1.particleMemoryLayout, out_1.strandCount, out_1.strandParticleCount, out_1.bounds);
+									meshAsset.name = prevName ?? meshAsset.name;
 #if UNITY_EDITOR
 									UnityEditor.AssetDatabase.AddObjectToAsset(meshAsset, hairAsset);
 #endif

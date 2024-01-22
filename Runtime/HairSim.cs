@@ -1273,8 +1273,6 @@ namespace Unity.DemoTeam.Hair
 			// capture frustums
 			using (var frustums = AcquireLODFrustums(CameraType.Game | CameraType.SceneView, Allocator.Temp))
 			{
-				// derive constants
-				volumeConstantsEnvironment._LODFrustumCount = (uint)frustums.Length;
 				//int i = 0;
 				//foreach (var frustum in frustums)
 				//{
@@ -1290,6 +1288,9 @@ namespace Unity.DemoTeam.Hair
 				//	Debug.Log("frustum.plane4 = " + frustum.plane4);
 				//	Debug.Log("frustum.plane5 = " + frustum.plane5);
 				//}
+
+				// derive constants
+				volumeConstantsEnvironment._LODFrustumCount = (uint)frustums.Length;
 
 				// update buffers
 				PushComputeBufferData(cmd, volumeData.buffers._LODFrustum, frustums.AsArray());

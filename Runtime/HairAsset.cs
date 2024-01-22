@@ -83,6 +83,11 @@ namespace Unity.DemoTeam.Hair
 
 			VersionedDataUtility.HandleVersionChangeOnValidate(this);
 		}
+
+		void OnEnable()
+		{
+			VersionedDataUtility.HandleVersionChange(this);
+		}
 	}
 
 	public static class HairAssetProvisional
