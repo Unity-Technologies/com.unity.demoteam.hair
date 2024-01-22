@@ -316,7 +316,7 @@ namespace Unity.DemoTeam.Hair
 							out_1.cellPressure = in_0.cellPressure;
 							out_1.cellVelocity = in_0.cellVelocity;
 							out_1.cellExternal = in_0.cellForces;
-							out_1.gravity = Mathf.Abs(in_0.gravity);// sign and rotation moves to data_1_settingsEnvironment
+							out_1.gravity = 1.0f;// global scale and rotation moves to data_1_settingsEnvironment
 
 							out_1.boundaryCollision = in_0.boundaryCollision;
 							out_1.boundaryCollisionFriction = in_0.boundaryCollisionFriction;
