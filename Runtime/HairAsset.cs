@@ -1,9 +1,6 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.Serialization;
-#if UNITY_2021_2_OR_NEWER
-using UnityEngine.Search;
-#endif
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 

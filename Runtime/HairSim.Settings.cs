@@ -305,7 +305,7 @@ namespace Unity.DemoTeam.Hair
 
 			public Renderer renderer;
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
-			[VisibleIf(nameof(renderer), RenderMode.HDRPHighQualityLines)]
+			[VisibleIf(nameof(renderer), Renderer.HDRPHighQualityLines)]
 			public LineRendering.RendererGroup rendererGroup;
 #endif
 			[RenderingLayerMask]
