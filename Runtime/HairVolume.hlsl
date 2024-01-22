@@ -20,15 +20,18 @@ void HairVolume_float(
 	out Texture3D out_volumeScattering,
 	out float3 out_volumeUVW)
 {
-	out_boundsMinWS = _VolumeWorldMin.xyz;
-	out_boundsMaxWS = _VolumeWorldMax.xyz;
-	out_cellCount = _VolumeCells.xyz;
-	out_cellSizeWS = VolumeWorldCellSize();
-	out_cellSizeUVW = 1.0f / _VolumeCells.xyz;
-	out_volumeDensity = _UntypedVolumeDensity;
-	out_volumeVelocity = _UntypedVolumeVelocity;
-	out_volumeScattering = _UntypedVolumeScattering;
-	out_volumeUVW = VolumeWorldToUVW(in_positionWS);
+	const VolumeLODGrid volumeDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+	{
+		out_boundsMinWS = volumeDesc.volumeWorldMin;
+		out_boundsMaxWS = volumeDesc.volumeWorldMax;
+		out_cellCount = volumeDesc.volumeCellCount;
+		out_cellSizeWS = VolumeWorldCellSize(volumeDesc);
+		out_cellSizeUVW = 1.0f / volumeDesc.volumeCellCount;
+		out_volumeDensity = _UntypedVolumeDensity;
+		out_volumeVelocity = _UntypedVolumeVelocity;
+		out_volumeScattering = _UntypedVolumeScattering;
+		out_volumeUVW = VolumeWorldToUVW(volumeDesc, in_positionWS);
+	}
 }
 
 #endif//__HAIRVOLUME_HLSL__
