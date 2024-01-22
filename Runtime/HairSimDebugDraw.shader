@@ -8,10 +8,6 @@
 	// 0 == uniform target density
 	// 1 == non uniform target density
 
-	#pragma multi_compile __ POINT_RASTERIZATION_NEEDS_PSIZE
-	// 0 == when platform does not require explicit psize
-	// 1 == when platform requires explicit psize
-
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 	#include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
 	#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
@@ -19,10 +15,10 @@
 	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
 	#include "HairSimComputeSolverBoundaries.hlsl"
+	#include "HairSimComputeSolverQuaternion.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
 	#include "HairSimComputeVolumeProbe.hlsl"
-	#include "HairSimDebugDrawConfig.hlsl"
-	#include "HairSimDebugDrawUtility.hlsl"
+	#include "HairSimDebugDrawColors.hlsl"
 
 	int _DebugCluster;
 	uint _DebugSliceAxis;
@@ -35,9 +31,7 @@
 	struct DebugVaryings
 	{
 		float4 positionCS : SV_POSITION;
-#if POINT_RASTERIZATION_NEEDS_PSIZE
 		float pointSize : PSIZE;
-#endif
 		float4 color : TEXCOORD0;
 	};
 
@@ -46,46 +40,79 @@
 		return TransformWorldToHClip(worldPos);
 	}
 
-	float4 FilterClusters(float4 worldPos, uint strandIndex)
+	float4 FilterClusters(float4 worldPos, uint strandIndex, in LODIndices lodDesc)
 	{
 		if (_DebugCluster >= 0)
 		{
-			int guideIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
-			int guideIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
+			int guideIndexLo = _LODGuideIndex[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
+			int guideIndexHi = _LODGuideIndex[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
 
 			if (guideIndexLo != _DebugCluster && guideIndexHi != _DebugCluster)
 			{
-				return sqrt(-1).xxxx;
+				return asfloat(0x7FC00000u);// => NaN
 			}
 		}
 
 		return worldPos;
 	}
 
-	DebugVaryings DebugVert_StrandParticle(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+	DebugVaryings DebugVert_StrandRootFrame(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
-		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
+		const LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
+
+		const uint strandIndex = instanceID;
+		const uint strandParticleBegin = strandIndex * _StrandParticleOffset;
 		const uint strandParticleStride = _StrandParticleStride;
 
-#if DEBUG_STRAND_31_32 == 2
-		if (vertexID > 1)
-			vertexID = 1;
-#endif
+		float3 worldPos = _RootPosition[strandIndex].xyz;
+
+		float4 rootFrame = _RootFrame[strandIndex];
+		float3 rootFrameAxis = float3(
+			(vertexID < 2) ? 1.0 : 0.0,
+			(vertexID & 2) ? 1.0 : 0.0,
+			(vertexID & 4) ? 1.0 : 0.0);
+
+		if (vertexID & 1)
+		{
+			worldPos += (0.25 * _GroupMaxParticleInterval * _RootScale[strandIndex].x) * QMul(rootFrame, rootFrameAxis);
+		}
+
+		DebugVaryings output;
+		{
+			output.positionCS = FilterClusters(WorldToClip(worldPos), strandIndex, lodDesc);
+			output.pointSize = 1.0;
+			output.color = float4(rootFrameAxis, 1.0);
+		}
+
+		return output;
+	}
+
+	DebugVaryings DebugVert_StrandParticlePosition(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+	{
+		const LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
+
+		const uint strandIndex = instanceID;
+		const uint strandParticleBegin = strandIndex * _StrandParticleOffset;
+		const uint strandParticleStride = _StrandParticleStride;
 
 		uint i = strandParticleBegin + strandParticleStride * vertexID;
 		float3 worldPos = _ParticlePosition[i].xyz;
 
 		DebugVaryings output;
-		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
-#if POINT_RASTERIZATION_NEEDS_PSIZE
-		output.pointSize = 1.0;
-#endif
-		output.color = float4(ColorCycle(instanceID, _StrandCount), 1.0);
+		{
+			output.positionCS = FilterClusters(WorldToClip(worldPos), strandIndex, lodDesc);
+			output.pointSize = 1.0;
+			output.color = float4(ColorCycle(strandIndex, _StrandCount), 1.0);
+		}
+
 		return output;
 	}
 
-	DebugVaryings DebugVert_StrandParticleWorldVelocity(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+	DebugVaryings DebugVert_StrandParticleVelocity(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
+		const LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
+
+		const uint strandIndex = instanceID;
 		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
 		const uint strandParticleStride = _StrandParticleStride;
 
@@ -114,10 +141,8 @@
 		}
 
 		DebugVaryings output;
-		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
-#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.positionCS = FilterClusters(WorldToClip(worldPos), strandIndex, lodDesc);
 		output.pointSize = 1.0;
-#endif
 		output.color = float4(0.0, vertexID & 1, vertexID & 2, 1.0);
 		return output;
 
@@ -125,24 +150,27 @@
 
 	DebugVaryings DebugVert_StrandParticleClusters(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
 	{
-		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
+		const LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
+
+		const uint strandIndex = instanceID;
+		const uint strandParticleBegin = strandIndex * _StrandParticleOffset;
 		const uint strandParticleStride = _StrandParticleStride;
 
 		uint i = strandParticleBegin + strandParticleStride * (vertexID >> 1);
 
-		uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + instanceID];
-		uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + instanceID];
+		uint strandIndexLo = _LODGuideIndex[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
+		uint strandIndexHi = _LODGuideIndex[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
 
 		const uint strandParticleBeginLo = strandIndexLo * _StrandParticleOffset;
 		const uint strandParticleBeginHi = strandIndexHi * _StrandParticleOffset;
 
 		float3 worldPosLo = _ParticlePosition[strandParticleBeginLo + strandParticleStride * (vertexID >> 1)].xyz;
 		float3 worldPosHi = _ParticlePosition[strandParticleBeginHi + strandParticleStride * (vertexID >> 1)].xyz;
-		float3 worldPos = lerp(worldPosLo, worldPosHi, _LODBlendFraction);
+		float3 worldPos = lerp(worldPosLo, worldPosHi, lodDesc.lodBlendFrac);
 
 		float3 colorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODCount - 1]);
 		float3 colorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODCount - 1]);
-		float3 color = lerp(colorLo, colorHi, _LODBlendFraction);
+		float3 color = lerp(colorLo, colorHi, lodDesc.lodBlendFrac);
 
 		if (vertexID & 1)
 		{
@@ -150,60 +178,34 @@
 		}
 
 		DebugVaryings output;
-		output.positionCS = FilterClusters(WorldToClip(worldPos), instanceID);
-#if POINT_RASTERIZATION_NEEDS_PSIZE
+		output.positionCS = FilterClusters(WorldToClip(worldPos), strandIndex, lodDesc);
 		output.pointSize = 1.0;
-#endif
 		output.color = float4(color, 1.0);
 		return output;
 	}
 
-	/*
-	DebugVaryings DebugVert_StrandParticleMotion(uint instanceID : SV_InstanceID, uint vertexID : SV_VertexID)
+	DebugVaryings DebugVert_VolumeCellDensity(uint vertexID : SV_VertexID)
 	{
-		const uint strandParticleBegin = instanceID * _StrandParticleOffset;
-		const uint strandParticleStride = _StrandParticleStride;
+		const VolumeLODGrid volumeDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
-		uint i = strandParticleBegin + strandParticleStride * vertexID;
-		float3 worldPos0 = _ParticlePositionPrev[i].xyz;
-		float3 worldPos1 = _ParticlePosition[i].xyz;
-
-		float4 clipPos0 = mul(UNITY_MATRIX_PREV_VP, float4(GetCameraRelativePositionWS(worldPos0), 1.0));
-		float4 clipPos1 = mul(UNITY_MATRIX_UNJITTERED_VP, float4(GetCameraRelativePositionWS(worldPos1), 1.0));
-
-		float2 ndc0 = clipPos0.xy / clipPos0.w;
-		float2 ndc1 = clipPos1.xy / clipPos1.w;
-
-		DebugVaryings output;
-		output.positionCS = WorldToClip(worldPos1);
-#if POINT_RASTERIZATION_NEEDS_PSIZE
-		output.pointSize = 1.0;
-#endif
-		output.color = float4(0.5 * (ndc1 - ndc0), 0, 0);
-		return output;
-	}
-	*/
-
-	DebugVaryings DebugVert_VolumeDensity(uint vertexID : SV_VertexID)
-	{
-		uint3 volumeIdx = VolumeFlatIndexToIndex(vertexID);
+		uint3 volumeIdx = VolumeFlatIndexToIndex(volumeDesc, vertexID);
 		float volumeDensity = _VolumeDensity[volumeIdx];
-		float3 worldPos = (volumeDensity == 0.0) ? 1e+7 : VolumeIndexToWorld(volumeIdx);
+		float3 worldPos = (volumeDensity == 0.0) ? 1e+7 : VolumeIndexToWorld(volumeDesc, volumeIdx);
 
 		DebugVaryings output;
 		output.positionCS = WorldToClip(worldPos);
-#if POINT_RASTERIZATION_NEEDS_PSIZE
 		output.pointSize = 1.0;
-#endif
 		output.color = float4(ColorDensity(volumeDensity), 1.0);
 		return output;
 	}
 
-	DebugVaryings DebugVert_VolumeGradient(uint vertexID : SV_VertexID)
+	DebugVaryings DebugVert_VolumeCellGradient(uint vertexID : SV_VertexID)
 	{
-		uint3 volumeIdx = VolumeFlatIndexToIndex(vertexID >> 1);
+		const VolumeLODGrid volumeDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+
+		uint3 volumeIdx = VolumeFlatIndexToIndex(volumeDesc, vertexID >> 1);
 		float3 volumeGradient = _VolumePressureGrad[volumeIdx];
-		float3 worldPos = VolumeIndexToWorld(volumeIdx);
+		float3 worldPos = VolumeIndexToWorld(volumeDesc, volumeIdx);
 
 		if (vertexID & 1)
 		{
@@ -212,27 +214,36 @@
 
 		DebugVaryings output;
 		output.positionCS = WorldToClip(worldPos);
-#if POINT_RASTERIZATION_NEEDS_PSIZE
 		output.pointSize = 1.0;
-#endif
 		output.color = float4(ColorGradient(volumeGradient), 1.0);
 		return output;
 	}
 
 	DebugVaryings DebugVert_VolumeSlice(uint vertexID : SV_VertexID)
 	{
+		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+
 		float3 uvw = float3(((vertexID >> 1) ^ vertexID) & 1, vertexID >> 1, _DebugSliceOffset);
 		float3 uvwWorld = (_DebugSliceAxis == 0) ? uvw.zxy : (_DebugSliceAxis == 1 ? uvw.xzy : uvw.xyz);
-		float3 worldPos = lerp(_VolumeWorldMin.xyz, _VolumeWorldMax.xyz, uvwWorld);
+		float3 worldPos = VolumeUVWToWorld(lodDesc, uvwWorld);
 
 		uvw = uvwWorld;
 
 		DebugVaryings output;
 		output.positionCS = WorldToClip(worldPos);
-#if POINT_RASTERIZATION_NEEDS_PSIZE
 		output.pointSize = 1.0;
-#endif
 		output.color = float4(uvw, 1);
+		return output;
+	}
+	
+	DebugVaryings DebugVert_VolumeIsosurface(float3 position : POSITION)
+	{
+		float3 worldPos = TransformObjectToWorld(position);
+
+		DebugVaryings output;
+		output.positionCS = WorldToClip(worldPos);
+		output.pointSize = 1.0;
+		output.color = float4(worldPos, 1);
 		return output;
 	}
 
@@ -243,9 +254,11 @@
 
 	float4 DebugFrag_VolumeSlice(DebugVaryings input) : SV_Target
 	{
+		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+
 		float3 uvw = input.color.xyz;
 
-		float3 localPos = VolumeUVWToLocal(uvw);
+		float3 localPos = VolumeUVWToLocal(lodDesc, uvw);
 		float3 localPosFloor = round(localPos + 0.5);
 
 		float3 gridNormal = float3(_DebugSliceAxis == 0, _DebugSliceAxis == 1, _DebugSliceAxis == 2);
@@ -274,7 +287,7 @@
 		float3 volumeImpulse = VolumeSampleVector(_VolumeImpulse, uvw);
 
 #if 0
-		float3 worldPos = lerp(_VolumeWorldMin.xyz, _VolumeWorldMax.xyz, uvw);
+		float3 worldPos = VolumeUVWToWorld(lodDesc, uvw);
 		float sd = BoundaryDistance(worldPos);
 		if (abs(sd) < 0.1)
 		{
@@ -312,7 +325,7 @@
 						uvw.y,
 						uvw.z + j * step.z);
 
-					float vol = abs(VolumeSampleScalar(_VolumeDensity, uvw_xz));
+					float vol = abs(VolumeSampleScalar(lodDesc, _VolumeDensity, uvw_xz));
 					if (vol > 0.0)
 					{
 						float vol_d = length(float2(i, j));
@@ -358,26 +371,18 @@
 			return float4(ColorVelocity(volumeImpulse), _DebugSliceOpacity);
 	}
 
-	DebugVaryings DebugVert_VolumeIsosurface(float3 position : POSITION)
-	{
-		float3 worldPos = TransformObjectToWorld(position);
-
-		DebugVaryings output;
-		output.positionCS = WorldToClip(worldPos);
-		output.color = float4(worldPos, 1);
-		return output;
-	}
-
 	float4 DebugFrag_VolumeIsosurface(DebugVaryings input) : SV_Target
 	{
+		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+
 		const float3 worldPos = input.color.xyz;
 		const float3 worldPosCamera = -GetCameraRelativePositionWS(float3(0, 0, 0));
 		const float3 worldDir = normalize(worldPos - worldPosCamera);
 
 		const int numStepsWithinCell = _DebugIsosurfaceSubsteps;
-		const int numSteps = _VolumeCells.x * numStepsWithinCell;
+		const int numSteps = lodDesc.volumeCellCount.x * numStepsWithinCell;
 
-		VolumeTraceState trace = VolumeTraceBegin(worldPos, worldDir, 0.5, numStepsWithinCell);
+		VolumeTraceState trace = VolumeTraceBegin(lodDesc, worldPos, worldDir, 0.5, numStepsWithinCell);
 
 		float3 accuDensity = 0;
 
@@ -412,47 +417,67 @@
 		ZTest LEqual
 		ZWrite On
 
-		Pass// 0 == STRAND PARTICLE POSITION
+		Pass// 0 == STRAND ROOT FRAME
 		{
 			HLSLPROGRAM
 
-			#pragma vertex DebugVert_StrandParticle
+			#pragma vertex DebugVert_StrandRootFrame
 			#pragma fragment DebugFrag
 
 			ENDHLSL
 		}
 
-		Pass// 1 == STRAND PARTICLE WORLD VELOCITY
+		Pass// 1 == STRAND PARTICLE POSITION
 		{
 			HLSLPROGRAM
 
-			#pragma vertex DebugVert_StrandParticleWorldVelocity
+			#pragma vertex DebugVert_StrandParticlePosition
 			#pragma fragment DebugFrag
 
 			ENDHLSL
 		}
 
-		Pass// 2 == VOLUME DENSITY
+		Pass// 1 == STRAND PARTICLE VELOCITY
 		{
 			HLSLPROGRAM
 
-			#pragma vertex DebugVert_VolumeDensity
+			#pragma vertex DebugVert_StrandParticleVelocity
 			#pragma fragment DebugFrag
 
 			ENDHLSL
 		}
 
-		Pass// 3 == VOLUME GRADIENT
+		Pass// 7 == STRAND PARTICLE CLUSTERS
 		{
 			HLSLPROGRAM
 
-			#pragma vertex DebugVert_VolumeGradient
+			#pragma vertex DebugVert_StrandParticleClusters
 			#pragma fragment DebugFrag
 
 			ENDHLSL
 		}
 
-		Pass// 4 == VOLUME SLICE
+		Pass// 2 == VOLUME CELL DENSITY
+		{
+			HLSLPROGRAM
+
+			#pragma vertex DebugVert_VolumeCellDensity
+			#pragma fragment DebugFrag
+
+			ENDHLSL
+		}
+
+		Pass// 3 == VOLUME CELL GRADIENT
+		{
+			HLSLPROGRAM
+
+			#pragma vertex DebugVert_VolumeCellGradient
+			#pragma fragment DebugFrag
+
+			ENDHLSL
+		}
+
+		Pass// 4 == VOLUME SLICE (ABOVE)
 		{
 			Blend SrcAlpha OneMinusSrcAlpha
 
@@ -489,16 +514,6 @@
 
 			#pragma vertex DebugVert_VolumeIsosurface
 			#pragma fragment DebugFrag_VolumeIsosurface
-
-			ENDHLSL
-		}
-
-		Pass// 7 == STRAND PARTICLE CLUSTERS
-		{
-			HLSLPROGRAM
-
-			#pragma vertex DebugVert_StrandParticleClusters
-			#pragma fragment DebugFrag
 
 			ENDHLSL
 		}

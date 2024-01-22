@@ -14,6 +14,16 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
+		public static Vector3 CMul(this Vector3 value, in Vector3 other)
+		{
+			return new Vector3
+			{
+				x = value.x * other.x,
+				y = value.y * other.y,
+				z = value.z * other.z,
+			};
+		}
+
 		public static float CMin(this Vector3 value)
 		{
 			return Mathf.Min(Mathf.Min(value.x, value.y), value.z);
@@ -32,6 +42,51 @@ namespace Unity.DemoTeam.Hair
 				y = 1.0f / value.y,
 				z = 1.0f / value.z,
 			};
+		}
+
+		public static Vector3 Sign(this Vector3 value)
+		{
+			return new Vector3
+			{
+				x = Mathf.Sign(value.x),
+				y = Mathf.Sign(value.y),
+				z = Mathf.Sign(value.z),
+			};
+		}
+
+		public static Plane ToPlane(this Vector3 value, float distance)
+		{
+			return new Plane(value, distance);
+		}
+	}
+
+	public static class Vector4Extensions
+	{
+		public static Vector4 Rcp(this Vector4 value)
+		{
+			return new Vector4
+			{
+				x = 1.0f / value.x,
+				y = 1.0f / value.y,
+				z = 1.0f / value.z,
+				w = 1.0f / value.w,
+			};
+		}
+
+		public static Vector4 Sign(this Vector4 value)
+		{
+			return new Vector4
+			{
+				x = Mathf.Sign(value.x),
+				y = Mathf.Sign(value.y),
+				z = Mathf.Sign(value.z),
+				w = Mathf.Sign(value.w),
+			};
+		}
+
+		public static Plane ToPlane(this Vector4 value)
+		{
+			return new Plane(value, value.w);
 		}
 	}
 
@@ -89,9 +144,46 @@ namespace Unity.DemoTeam.Hair
 			return b;
 		}
 
+		public static Bounds WithPadding(this Bounds bounds, float padding)
+		{
+			return new Bounds(bounds.center, bounds.size + new Vector3(2.0f * padding, 2.0f * padding, 2.0f * padding));
+		}
+
 		public static Bounds WithScale(this Bounds bounds, float scale)
 		{
 			return new Bounds(bounds.center, bounds.size * scale);
+		}
+
+		public static Bounds ToSquare(this Bounds bounds)
+		{
+			return new Bounds(bounds.center, bounds.size.Abs().CMax() * Vector3.one);
+		}
+	}
+
+	public static class PlaneExtensions
+	{
+		public static bool IsNaN(this Plane value)
+		{
+			var n = value.normal;
+			return (
+				float.IsNaN(n.x) ||
+				float.IsNaN(n.y) ||
+				float.IsNaN(n.z)
+			);
+		}
+
+		public static Vector4 ToVector4(this Plane value)
+		{
+			var n = value.normal;
+			var d = value.distance;
+
+			return new Vector4
+			{
+				x = n.x,
+				y = n.y,
+				z = n.z,
+				w = d,
+			};
 		}
 	}
 

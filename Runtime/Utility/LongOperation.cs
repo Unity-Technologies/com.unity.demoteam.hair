@@ -48,7 +48,7 @@ namespace Unity.DemoTeam.Hair
 
 		bool WaitForTime()
 		{
-			const int WAIT_TICKS = 125;// milliseconds
+			const int WAIT_TICKS = 200;// milliseconds
 			unchecked
 			{
 				var tick = Environment.TickCount;
@@ -276,7 +276,7 @@ namespace Unity.DemoTeam.Hair
 				}
 				concatProgressSymbols.Append(']');
 
-				Debug.LogFormat("{0} --- {1} --- {2}", title, status, concatProgressSymbols.Value);
+				Debug.Log(string.Format("{0} --- {1} --- {2}", title, status, concatProgressSymbols.Value));
 			},
 			hide = () => { },
 		};

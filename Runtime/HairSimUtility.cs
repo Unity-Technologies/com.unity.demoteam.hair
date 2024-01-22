@@ -33,6 +33,26 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public static bool CreateReadbackBuffer(ref AsyncReadbackBuffer bufferReadback, in ComputeBuffer buffer)
+		{
+			if (bufferReadback.buffer.IsCreated && bufferReadback.buffer.Length == (buffer.count * buffer.stride))
+				return false;
+
+			if (bufferReadback.buffer.IsCreated)
+				bufferReadback.buffer.Dispose();
+
+			//Debug.Log("creating readback buffer w/ length " + (buffer.count * buffer.stride) + " for buffer " + buffer.ToString());
+
+			bufferReadback.buffer = new NativeArray<byte>(buffer.count * buffer.stride, Allocator.Persistent);
+			return true;
+		}
+
+		public static void ReleaseReadbackBuffer(ref AsyncReadbackBuffer bufferReadback)
+		{
+			if (bufferReadback.buffer.IsCreated)
+				bufferReadback.buffer.Dispose();
+		}
+
 		public static RenderTextureDescriptor MakeVolumeDesc(int cellCount, RenderTextureFormat cellFormat)
 		{
 			return new RenderTextureDescriptor()
@@ -274,6 +294,58 @@ namespace Unity.DemoTeam.Hair
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => mat.SetBuffer(nameID, buffer);
 			public void BindComputeTexture(int nameID, RenderTexture texture) => mat.SetTexture(nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(mat, name, value);
+		}
+
+		//--------------
+		// gpu readback
+
+		public struct AsyncReadbackBuffer
+		{
+			public NativeArray<byte> buffer;
+
+			private void Callback(AsyncGPUReadbackRequest request)
+			{
+				//Debug.Log("callback with request.done = " + request.done + ", request.hasError " + request.hasError);
+				if (request.done && request.hasError == false)
+				{
+					var data = request.GetData<byte>();
+					if (data.IsCreated && buffer.IsCreated)
+					{
+						data.CopyTo(buffer);
+					}
+				}
+			}
+
+			public void ScheduleCopy(CommandBuffer cmd, ComputeBuffer buffer)
+			{
+				cmd.RequestAsyncReadback(buffer, Callback);
+			}
+
+			public void Sync()
+			{
+				AsyncGPUReadback.WaitAllRequests();
+			}
+
+			public NativeArray<T> GetData<T>(bool forceSync = false) where T : struct
+			{
+				if (forceSync)
+				{
+					Sync();
+				}
+
+				return buffer.Reinterpret<T>(sizeof(byte));
+			}
+		}
+
+		//--------------
+		// gpu commands
+
+		public struct ScopedCommandBuffer : IDisposable
+		{
+			public CommandBuffer cmd;
+			public void Dispose() => CommandBufferPool.Release(cmd);
+			public static ScopedCommandBuffer Get() => new ScopedCommandBuffer { cmd = CommandBufferPool.Get() };
+			public static implicit operator CommandBuffer(ScopedCommandBuffer scmd) => scmd.cmd;
 		}
 
 		//------------

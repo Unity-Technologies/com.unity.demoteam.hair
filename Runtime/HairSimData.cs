@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Collections;
@@ -9,51 +10,229 @@ namespace Unity.DemoTeam.Hair
 	{
 		public struct SolverData
 		{
+			public static SolverExternals<int> s_externalIDs;
+			public struct SolverExternals<T>
+			{
+				public T _RootMeshPosition;				// root mesh vertex buffer w/ positions
+				public T _RootMeshTangent;				// root mesh vertex buffer w/ tangents
+				public T _RootMeshNormal;				// root mesh vertex buffer w/ normals
+
+				public T _RootResolveDummyRT;			// render target when resolving via vertex stage
+			};
+
+			public static SolverBuffers<int> s_bufferIDs;
+			public struct SolverBuffers<T>
+			{
+				public T SolverCBufferRoots;			// constant buffer for root resolve
+				public T SolverCBuffer;					// constant buffer
+
+				public T _RootUV;						// xy: root uv
+				public T _RootScale;					// xy: root scale (length, diameter normalized to maximum within group), z: tip scale offset, w: tip scale
+
+				public T _RootPosition;					// xyz: strand root position, w: -
+				public T _RootPositionPrev;				// xyz: ...
+				public T _RootPositionSubstep;			// xyz: ...
+				public T _RootFrame;					// quat(xyz,w): strand root material frame where (0,1,0) is tangent to curve
+				public T _RootFramePrev;				// quat(xyz,w): ...
+				public T _RootFrameSubstep;				// quat(xyz,w): ...
+
+				public T _SolverLODStage;				// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
+				public T _SolverLODDispatch;			// xyz: num groups, w: num strands
+
+				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
+				public T _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
+
+				public T _ParticlePosition;				// xyz: position, w: initial local accumulated weight (gather)
+				public T _ParticlePositionPrev;			// xyz: ...
+				public T _ParticlePositionPrevPrev;		// xyz: ...
+				public T _ParticleVelocity;				// xyz: velocity, w: splatting weight
+				public T _ParticleVelocityPrev;			// xyz: ...
+				public T _ParticleCorrection;			// xyz: ftl distance correction, w: -
+
+				public T _ParticleExtTexCoord;			// xy: optional particle uv
+				public T _ParticleExtDiameter;			// x: optional particle diameter
+
+				public T _LODGuideCount;				// x: lod index -> num. guides
+				public T _LODGuideIndex;				// x: lod index * strand count + strand index -> guide index
+				public T _LODGuideCarry;				// x: lod index * strand count + strand index -> guide carry
+				public T _LODGuideReach;				// x: lod index * strand count + strand index -> guide reach (approximate cluster extent)
+
+				public T _StagingVertex;				// xyz: position (uncompressed) || xy: position (compressed)
+				public T _StagingVertexPrev;			// xyz: ...
+			}
+
+			public static SolverTextures<int> s_textureIDs;
+			public struct SolverTextures<T>
+			{
+				//public T _LODIndexLUT;				// TODO
+			}
+
+			public struct SolverKeywords
+			{
+				public bool LAYOUT_INTERLEAVED;
+				public bool LIVE_POSITIONS_3;
+				public bool LIVE_POSITIONS_2;
+				public bool LIVE_POSITIONS_1;
+				public bool LIVE_ROTATIONS_2;
+			}
+
+			// data accessible by GPU
+			public SolverBuffers<ComputeBuffer> buffers;
+			public SolverTextures<RenderTexture> textures;
+
+			// data accessible by GPU + CPU
+			public SolverCBufferRoots constantsRoots;
+			public SolverCBuffer constants;
 			public SolverKeywords keywords;
 
-			public SolverCBuffer cbuffer;
-			public ComputeBuffer cbufferStorage;		// constant buffer storage
+			// data accessible by CPU, updated via async readback
+			public SolverBuffers<HairSimUtility.AsyncReadbackBuffer> buffersReadback;
 
-			public ComputeBuffer rootUV;				// xy: strand root uv
-			public ComputeBuffer rootScale;				// x: relative strand length [0..1] (to maximum in group)
-			public ComputeBuffer rootPosition;			// xyz: strand root position, w: -
-			public ComputeBuffer rootPositionPrev;		// ...
-			public ComputeBuffer rootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent
-			public ComputeBuffer rootFramePrev;			// ...
-
-			public ComputeBuffer substepRootPosition;	// substep root data (pre-step blend)
-			public ComputeBuffer substepRootFrame;		// ...
-
-			public ComputeBuffer initialRootDirection;		// xyz: initial local root direction, w: -
-			public ComputeBuffer initialParticleOffset;		// xyz: initial particle offset from strand root, w: -
-			public ComputeBuffer initialParticleFrameDelta; // quat(xyz,w): initial particle material frame delta
-
-			public float initialMaxParticleInterval;
-			public float initialMaxParticleDiameter;
-			public float initialTotalLength;
-
-			public ComputeBuffer particlePosition;		// xyz: position, w: initial local accumulated weight (gather)
-			public ComputeBuffer particlePositionPrev;		// ...
-			public ComputeBuffer particlePositionPrevPrev;	// ...
-			public ComputeBuffer particlePositionCorr;	// xyz: ftl correction, w: -
-			public ComputeBuffer particleVelocity;		// xyz: velocity, w: splatting weight
-			public ComputeBuffer particleVelocityPrev;  // xyz: velocity, w: splatting weight
-
-			public ComputeBuffer lodGuideCount;			// n: lod index -> num. guides
-			public ComputeBuffer lodGuideIndex;			// i: lod index * strand count + strand index -> guide index
-			public ComputeBuffer lodGuideCarry;			// f: lod index * strand count + strand index -> guide carry
-
-			public NativeArray<int> lodGuideCountCPU;	// n: lod index -> num. guides
-			public NativeArray<float> lodThreshold;		// f: lod index -> relative guide count [0..1]
-
-			public ComputeBuffer stagingPosition;		// xy: encoded position | xyz: position
-			public ComputeBuffer stagingPositionPrev;	// ...
-
+			// data accessible by CPU
 			public HairAsset.MemoryLayout memoryLayout;
+
+			public float initialSumStrandLength;
+			public float initialMaxStrandLength;
+			public float initialMaxStrandDiameter;
+			public float initialAvgStrandDiameter;
+
+			public bool manualBounds;
+			public Vector3 manualBoundsMin;
+			public Vector3 manualBoundsMax;
+
+			public NativeArray<float> lodThreshold;		// lod index -> relative guide count [0..1]
 		}
 
-		[Flags, GenerateHLSL]
-		public enum SolverFeatures : uint
+		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
+		public struct SolverCBufferRoots
+		{
+			// NOTE: explicit end padding to 16 byte boundary required on some platforms, please update counts if modifying
+
+			// 0
+			#region Strand Roots (34 floats, 136 bytes)
+			public Matrix4x4 _RootMeshMatrix;			// float4x4: root mesh local to world
+
+			// +16
+			public Vector4 _RootMeshRotation;			// quat(xyz,w): root mesh rotation
+			public Vector4 _RootMeshRotationInv;		// quat(xyz,w): root mesh rotation inverse
+			public Vector4 _RootMeshSkinningRotation;	// quat(xyz,w): root mesh skinning rotation
+
+			// +28
+			public uint _RootMeshPositionOffset;		// x: position stream offset
+			public uint _RootMeshPositionStride;		// x: position stream stride
+			public uint _RootMeshTangentOffset;			// x: tangent ...
+			public uint _RootMeshTangentStride;			// x: tangent ...
+			public uint _RootMeshNormalOffset;			// x: normal ...
+			public uint _RootMeshNormalStride;			// x: normal ...
+
+			// +34
+			#endregion
+
+			// 34 --> 36 (pad to 16 byte boundary)
+			public float __rcbpad1;
+			public float __rcbpad2;
+			//public float __rcbpad3;
+		}
+
+		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
+		public struct SolverCBuffer
+		{
+			// NOTE: explicit end padding to 16 byte boundary required on some platforms, please update counts if modifying
+
+			// 0
+			#region Strand Geometry (12 floats, 48 bytes)
+			public uint _StrandCount;					// number of strands
+			public uint _StrandParticleCount;			// number of particles in strand
+			public uint _StrandParticleOffset;			// stride in particles between strands
+			public uint _StrandParticleStride;			// stride in particles between particles in strand
+			public uint _LODCount;						// group lod count
+
+			// +5
+			public float _GroupScale;					// group scale
+			public float _GroupMaxParticleVolume;		// (already scaled) max particle volume
+			public float _GroupMaxParticleInterval;		// (already scaled) max particle interval
+			public float _GroupMaxParticleDiameter;		// (already scaled) max particle diameter
+			public float _GroupAvgParticleDiameter;		// (already scaled) avg particle diameter
+			public float _GroupAvgParticleMargin;		// (already scaled) avg particle margin
+
+			// +10
+			public uint _GroupBoundsIndex;				// group bounds index
+			public float _GroupBoundsPadding;			// group bounds padding
+
+			// +12
+			#endregion
+
+			// 12
+			#region Strand Solver (28 floats, 112 bytes)
+			public uint _SolverLODMethod;				// solver lod method (for lod selection)
+			public float _SolverLODCeiling;				// solver lod ceiling
+			public float _SolverLODScale;				// solver lod scale
+			public float _SolverLODBias;				// solver lod bias
+
+			// +4
+			public uint _SolverFeatures;				// solver feature flags
+
+			// +5
+			public float _DT;							// solver time step
+			public uint _Substeps;						// solver substeps
+			public uint _Iterations;					// constraint iterations
+			public float _Stiffness;					// constraint stiffness
+			public float _SOR;							// constraint sor factor
+
+			// +10
+			public float _LinearDamping;				// linear damping factor (fraction to subtract per interval)
+			public float _LinearDampingInterval;		// linear damping interval
+			public float _AngularDamping;				// angular damping factor (fraction to subtract per interval)
+			public float _AngularDampingInterval;		// angular damping interval
+			public float _CellPressure;					// scale factor for cell-sampled pressure impulse [0..1]
+			public float _CellVelocity;					// scale factor for cell-sampled velocity impulse [0..1]
+			public float _CellExternal;					// scale factor for cell-sampled external impulse [0..1]
+			public float _GravityScale;					// scale factor for system gravity [0..1]
+
+			// +18
+			public float _BoundaryFriction;				// boundary collision constraint friction
+			public float _FTLCorrection;				// follow-the-leader constraint correction
+			public float _LocalCurvature;				// local curvature
+			public float _LocalShape;					// local shape constraint influence
+			public float _LocalShapeBias;				// local shape constraint bias
+
+			// +23
+			public float _GlobalPosition;
+			public float _GlobalPositionInterval;
+			public float _GlobalRotation;
+			public float _GlobalFadeOffset;
+			public float _GlobalFadeExtent;
+
+			// +28
+			#endregion
+
+			// 40
+			#region Strand Staging (10 floats, 40 bytes)
+			public uint _StagingSubdivision;			// staging subdivision count
+			public uint _StagingVertexFormat;			// staging buffer vertex format
+			public uint _StagingVertexStride;			// staging buffer vertex stride
+
+			public uint _StagingStrandVertexCount;		// staging strand vertex count
+			public uint _StagingStrandVertexOffset;		// staging strand vertex offset
+
+			// +5
+			public uint _RenderLODMethod;				// render lod method (for lod selection)
+			public float _RenderLODCeiling;				// render lod ceiling
+			public float _RenderLODScale;				// render lod scale
+			public float _RenderLODBias;				// render lod bias
+			public float _RenderLODClipThreshold;       // reclip threshold (min pixel coverage)
+
+			// +10
+			#endregion
+
+			// 50 --> 52 (pad to 16 byte boundary)
+			public float __scbpad1;
+			public float __scbpad2;
+			//public float __scbpad3;
+		}
+
+		[GenerateHLSL, Flags]
+		public enum SolverFeatures
 		{
 			Boundary			= 1 << 0,
 			BoundaryFriction	= 1 << 1,
@@ -69,206 +248,166 @@ namespace Unity.DemoTeam.Hair
 			PoseGlobalRotation	= 1 << 11,
 		}
 
-		public struct SolverKeywords
+		[GenerateHLSL]
+		public enum SolverLODStage
 		{
-			public bool LAYOUT_INTERLEAVED;
-			public bool LIVE_POSITIONS_3;
-			public bool LIVE_POSITIONS_2;
-			public bool LIVE_POSITIONS_1;
-			public bool LIVE_ROTATIONS_2;
+			Physics		= 0,
+			Rendering	= 1,
+			__COUNT
 		}
 
-		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
-		public struct SolverCBuffer
+		[GenerateHLSL]
+		public enum SolverLODDispatch
 		{
-			// NOTE: explicit padding to 16 byte boundary required on some platforms, please update counts if modifying
-
-			// 0
-			public Matrix4x4 _RootTransform;			// root mesh transform (local to world)
-			public Vector4 _RootRotation;				// quat(xyz,w): root mesh rotation
-			public Vector4 _RootRotationInv;			// quat(xyz,w): root mesh rotation inverse
-
-			// 24
-			public Vector4 _WorldRotation;				// quat(xyz,w): primary skinning bone rotation
-			public Vector4 _WorldGravity;				// xyz: gravity vector, w: -
-
-			// 32
-			public Vector4 _StagingOriginExtent;		// xyz: origin, w: scale
-			public Vector4 _StagingOriginExtentPrev;	// ...
-
-			// 40
-			public uint _StrandCount;					// number of strands
-			public uint _StrandParticleCount;			// number of particles per strand
-			public uint _StrandParticleOffset;			// offset in particles to reach the ith strand
-			public uint _StrandParticleStride;			// stride in particles between strand particles
-
-			public uint _SolverFeatures;				// bitmask with solver feature flags
-			public uint _SolverStrandCount;				// number of strands touched by solver
-
-			public float _GroupScale;					// group scale
-			public float _GroupMaxParticleInterval;		// (scaled) max particle interval
-			public float _GroupMaxParticleDiameter;		// (scaled) max particle diameter
-			public float _GroupMaxParticleFootprint;	// (scaled) max particle footprint
-
-			public uint _LODCount;						// lod count (total)
-			public uint _LODIndexLo;					// lod index (lower detail in blend)
-			public uint _LODIndexHi;					// lod index (higher detail in blend)
-			public float _LODBlendFraction;				// lod blend fraction (lo -> hi)
-
-			public uint _StagingSubdivision;			// staging segment subdivision samples
-			public uint _StagingVertexCount;			// staging strand vertex count
-			public uint _StagingVertexOffset;			// staging strand vertex offset
-			public uint _StagingBufferFormat;
-			public uint _StagingBufferStride;
-
-			// 59
-			public float _DT;
-			public uint _Substeps;
-			public uint _Iterations;
-			public float _Stiffness;
-			public float _SOR;
-
-			public float _Damping;
-			public float _DampingInterval;
-			public float _AngularDamping;
-			public float _AngularDampingInterval;
-			public float _CellPressure;
-			public float _CellVelocity;
-			public float _CellForces;
-
-			public float _BoundaryFriction;
-			public float _FTLDamping;
-			public float _LocalCurvature;
-			public float _LocalShape;
-			public float _LocalShapeBias;
-
-			// 76
-			public float _GlobalPosition;
-			public float _GlobalPositionInterval;
-			public float _GlobalRotation;
-			public float _GlobalFadeOffset;
-			public float _GlobalFadeExtent;
-
-			// 81 --> 84 (pad to 16 byte boundary)
-			public float _scbpad1;
-			public float _scbpad2;
-			public float _scbpad3;
+			Solve					= 0,	// thread group is 64 strands
+			SolveParallelParticles	= 1,	// thread group is 16|32|64|128 particles (one group = one strand)
+			Interpolate				= 2,	// thread group is 64 strands
+			InterpolateReentrant	= 3,	// thread group is 64 strands
+			Staging					= 4,	// thread group is 64 strands
+			StagingReentrant		= 5,	// thread group is 64 strands
+			Transfer				= 6,	// thread group is 64 particles
+			TransferAll				= 7,	// thread group is 64 particles
+			RasterPoints			= 8,	// -
+			RasterPointsAll			= 9,	// -
+			RasterQuads				= 10,	// -
+			RasterQuadsAll			= 11,	// -
+			__COUNT
 		}
 
-		/*
-		public static VolumeBuffers<uint> s_ID_VolumeBuffer;
-		public struct VolumeBuffers<T>
+		[GenerateHLSL]
+		public enum SolverLODSelection
 		{
-			//TODO
+			DerivePerGroup		= 0,
+			DerivePerVolume		= 1,
+			Manual				= 2,
 		}
 
-		public static VolumeTextures<uint> s_ID_VolumeTexture;
-		public struct VolumeTextures<T>
+		[GenerateHLSL, Flags]
+		public enum RenderFeatures
 		{
-			//TODO
+			Tapering			= 1 << 0,
+			PerVertexTexCoord	= 1 << 1,
+			PerVertexDiameter	= 1 << 2,
 		}
-		*/
+
+		[GenerateHLSL]
+		public enum RenderLODSelection
+		{
+			DerivePerStrand		= 0,
+			DerivePerGroup		= 1,
+			DerivePerVolume		= 2,
+			MatchPhysics		= 3,
+			Manual				= 4,
+		}
+
+		[GenerateHLSL]
+		public enum StagingVertexFormat
+		{
+			Undefined		= 0,
+			Compressed		= 1,
+			Uncompressed	= 2,
+			UncompressedPT	= 3,
+		}
 
 		public struct VolumeData
 		{
+			public static VolumeBuffers<int> s_bufferIDs;
+			public struct VolumeBuffers<T>
+			{
+				public T VolumeCBufferEnvironment;	// constant buffer for environment capture
+				public T VolumeCBuffer;				// constant buffer
+
+				public T _LODFrustum;				// array(LODFrustum): observer properties (camera properties and frustum planes)
+				
+				public T _BoundaryShape;			// array(HairBoundary.RuntimeShape.Data)
+				public T _BoundaryMatrix;			// array(float4x4): local to world
+				public T _BoundaryMatrixInv;		// array(float4x4): world to local
+				public T _BoundaryMatrixW2PrevW;	// array(float4x4): world to previous world
+
+				public T _WindEmitter;				// array(HairWind.RuntimeEmitter)
+
+				public T _BoundsMinMaxU;			// xyz: bounds min/max (unsigned sortable)
+				public T _Bounds;					// array(LODBounds): bounds (center, extent, radius)
+				public T _BoundsGeometry;			// array(LODGeometry): bounds geometry description (dimensions for coverage)
+				public T _BoundsCoverage;			// xy: bounds coverage (unbiased ceiling)
+
+				public T _VolumeLODStage;			// array(VolumeLODGrid): grid properties
+				public T _VolumeLODDispatch;		// xyz: num groups, w: num grid cells in one dimension
+
+				public T _AccuWeightBuffer;			// x: fp accumulated weight
+				public T _AccuWeight0Buffer;		// x: fp accumulated target weight
+				public T _AccuVelocityXBuffer;		// x: fp accumulated x-velocity
+				public T _AccuVelocityYBuffer;		// x: ... ... ... .. y-velocity
+				public T _AccuVelocityZBuffer;		// x: .. ... ... ... z-velocity
+			}
+
+			public static VolumeTextures<int> s_textureIDs;
+			public struct VolumeTextures<T>
+			{
+				public T _AccuWeight;				// x: fp accumulated weight
+				public T _AccuWeight0;				// x: fp accumulated target weight
+				public T _AccuVelocityX;			// x: fp accumulated x-velocity
+				public T _AccuVelocityY;			// x: ... ... ... .. y-velocity
+				public T _AccuVelocityZ;			// x: .. ... ... ... z-velocity
+
+				public T _VolumeDensity;			// x: density (cell fraction occupied)
+				public T _VolumeDensity0;			// x: density target
+				public T _VolumeDensityComp;		// (temp)
+				public T _VolumeDensityPreComp;		// (temp)
+
+				public T _VolumeVelocity;			// xyz: velocity, w: accumulated weight
+				public T _VolumeDivergence;			// x: velocity divergence + source term
+				public T _VolumePressure;			// x: pressure
+				public T _VolumePressureNext;		// x: pressure (output of iteration)
+				public T _VolumePressureGrad;		// xyz: pressure gradient, w: -
+
+				public T _VolumeScattering;			// xyzw: L1 spherical harmonic
+				public T _VolumeImpulse;			// xyz: accumulated external forces, w: -
+
+				public T _BoundarySDF;				// x: signed distance to arbitrary solid
+				public T _BoundarySDF_undefined;	// .. (placeholder for when inactive)
+			};
+
+			public struct VolumeKeywords
+			{
+				public bool VOLUME_SPLAT_CLUSTERS;
+				public bool VOLUME_SUPPORT_CONTRACTION;
+				public bool VOLUME_TARGET_INITIAL_POSE;
+				public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
+			}
+
+			// data accessible by GPU
+			public VolumeBuffers<ComputeBuffer> buffers;
+			public VolumeTextures<RenderTexture> textures;
+
+			// data accessible by GPU + CPU
+			public VolumeCBufferEnvironment constantsEnvironment;
+			public VolumeCBuffer constants;
 			public VolumeKeywords keywords;
 
-			public VolumeCBuffer cbuffer;
-			public ComputeBuffer cbufferStorage;		// constant buffer storage
+			// data accessible by CPU, updated via async readback
+			public VolumeBuffers<HairSimUtility.AsyncReadbackBuffer> buffersReadback;
 
-			public RenderTexture accuWeight;			// x: fp accumulated weight
-			public RenderTexture accuWeight0;			// x: fp accumulated target weight
-			public RenderTexture accuVelocityX;			// x: fp accumulated x-velocity
-			public RenderTexture accuVelocityY;			// x: ... ... ... .. y-velocity
-			public RenderTexture accuVelocityZ;			// x: .. ... ... ... z-velocity
-
-			public ComputeBuffer accuWeightBuffer;		// x: fp accumulated weight
-			public ComputeBuffer accuWeight0Buffer;		// x: fp accumulated target weight
-			public ComputeBuffer accuVelocityXBuffer;	// x: fp accumulated x-velocity
-			public ComputeBuffer accuVelocityYBuffer;	// x: ... ... ... .. y-velocity
-			public ComputeBuffer accuVelocityZBuffer;	// x: .. ... ... ... z-velocity
-
-			public RenderTexture volumeDensity;			// x: density (cell fraction occupied)
-			public RenderTexture volumeDensity0;		// x: density target
-			public RenderTexture volumeVelocity;		// xyz: velocity, w: accumulated weight
-
-			public RenderTexture volumeDivergence;		// x: velocity divergence + source term
-			public RenderTexture volumePressure;		// x: pressure
-			public RenderTexture volumePressureNext;	// x: pressure (output of iteration)
-			public RenderTexture volumePressureGrad;	// xyz: pressure gradient, w: -
-
-			public RenderTexture volumeScattering;		// xyzw: L1 spherical harmonic
-			public RenderTexture volumeImpulse;			// xyz: accumulated external forces, w: -
-
-			public RenderTexture boundarySDF;			// x: signed distance to arbitrary solid
-			public RenderTexture boundarySDF_undefined;	// .. (placeholder for when inactive)
-
-			public ComputeBuffer boundaryShape;			// array(HairBoundary.RuntimeShape.Data)
-			public ComputeBuffer boundaryMatrix;		// array(float4x4): local to world
-			public ComputeBuffer boundaryMatrixInv;		// array(float4x4): world to local
-			public ComputeBuffer boundaryMatrixW2PrevW; // array(float4x4): world to previous world
-
+			// data accessible by CPU
 			public NativeArray<HairBoundary.RuntimeTransform> boundaryPrevXform;
 			public int boundaryPrevCount;
 			public int boundaryPrevCountDiscard;
 			public int boundaryPrevCountUnknown;
-
-			public ComputeBuffer windEmitter;			// array(HairWind.RuntimeEmitter)
 		}
 
-		[Flags, GenerateHLSL]
-		public enum VolumeFeatures : uint
+		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
+		public struct VolumeCBufferEnvironment
 		{
-			Scattering			= 1 << 0,
-			ScatteringFastpath	= 1 << 1,
-			Wind				= 1 << 2,
-			WindFastpath		= 1 << 3,
-		}
-
-		public struct VolumeKeywords
-		{
-			public bool VOLUME_SPLAT_CLUSTERS;
-			public bool VOLUME_SUPPORT_CONTRACTION;
-			public bool VOLUME_TARGET_INITIAL_POSE;
-			public bool VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES;
-		}
-
-		[GenerateHLSL(needAccessors = false, generateCBuffer = true)]
-		public struct VolumeCBuffer
-		{
-			/*
-				_VolumeCells = (3, 3, 3)
-
-				          +---+---+---Q
-				     +---+---+---+    |
-				+---+---+---+    | ---+
-				|   |   |   | ---+    |
-				+---+---+---+    | ---+
-				|   |   |   | ---+    |
-				+---+---+---+    | ---+
-				|   |   |   | ---+
-				P---+---+---+
-
-				_VolumeWorldMin = P
-				_VolumeWorldMax = Q
-			*/
-
-			// NOTE: explicit padding to 16 byte boundary required on some platforms, please update counts if modifying
+			// NOTE: explicit end padding to 16 byte boundary required on some platforms, please update counts if modifying
 
 			// 0
-			public Vector4 _VolumeCells;
-			public Vector4 _VolumeWorldMin;
-			public Vector4 _VolumeWorldMax;
+			#region Volume Environment (14 floats, 56 bytes)
+			public Vector4 _WorldGravity;
 
-			// 12
-			public uint _VolumeFeatures;
+			// +4
+			public uint _LODFrustumCount;
 
-			// 13
-			public float _AllGroupsDebugWeight;
-			public float _AllGroupsMaxParticleVolume;
-			public float _TargetDensityFactor;
-
-			// 16
+			// +5
 			public uint _BoundaryCountDiscrete;
 			public uint _BoundaryCountCapsule;
 			public uint _BoundaryCountSphere;
@@ -277,7 +416,51 @@ namespace Unity.DemoTeam.Hair
 			public float _BoundaryWorldEpsilon;
 			public float _BoundaryWorldMargin;
 
-			// 23
+			// +12
+			public float _WindEmitterClock;
+			public uint _WindEmitterCount;
+
+			// +14
+			#endregion
+
+			// 14 --> 16 (pad to 16 byte boundary)
+			public float __ecbpad1;
+			public float __ecbpad2;
+			//public float __ecbpad3;
+		}
+
+		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
+		public struct VolumeCBuffer
+		{
+			// NOTE: explicit end padding to 16 byte boundary required on some platforms, please update counts if modifying
+	
+			// 0
+			#region Volume Geometry (6 floats, 24 bytes)
+			public uint _GridResolution;
+
+			// +1
+			public float _AllGroupsMaxParticleVolume;
+			public float _AllGroupsMaxParticleInterval;
+			public float _AllGroupsMaxParticleDiameter;
+			public float _AllGroupsAvgParticleDiameter;
+			public float _AllGroupsAvgParticleMargin;
+
+			// +5
+			public uint _CombinedBoundsIndex;
+
+			// +6
+			#endregion
+
+			// 6
+			#region Volume Resolve (14 float, 56 bytes)
+			public float _VolumeDT;
+			public uint _VolumeFeatures;
+
+			// +2
+			public float _TargetDensityScale;
+			public float _TargetDensityInfluence;
+
+			// +4
 			public float _ScatteringProbeUnitWidth;
 			public uint _ScatteringProbeSubsteps;
 			public uint _ScatteringProbeSamplesTheta;
@@ -285,18 +468,53 @@ namespace Unity.DemoTeam.Hair
 			public float _ScatteringProbeOccluderDensity;
 			public float _ScatteringProbeOccluderMargin;
 
-			// 29
-			public float _WindEmitterClock;
-			public uint _WindEmitterCount;
+			// +10
 			public uint _WindPropagationSubsteps;
 			public float _WindPropagationExtinction;
 			public float _WindPropagationOccluderDensity;
 			public float _WindPropagationOccluderMargin;
 
-			// 35 --> 36 (pad to 16 byte boundary)
-			public float _vcbpad1;
-			//public float _vcbpad2;
-			//public float _vcbpad3;
+			// +14
+			#endregion
+
+			// 20 --> 20 (pad to 16 byte boundary)
+			//public float __vcbpad1;
+			//public float __vcbpad2;
+			//public float __vcbpad3;
+		}
+
+		[GenerateHLSL, Flags]
+		public enum VolumeFeatures
+		{
+			Scattering			= 1 << 0,
+			ScatteringFastpath	= 1 << 1,
+			Wind				= 1 << 2,
+			WindFastpath		= 1 << 3,
+		}
+
+		[GenerateHLSL]
+		public enum VolumeLODStage
+		{
+			Resolve			= 0,
+			__COUNT__
+		}
+
+		[GenerateHLSL]
+		public enum VolumeLODDispatch
+		{
+			Resolve			= 0,
+			RasterPoints	= 1,
+			RasterVectors	= 2,
+			__COUNT__
+		}
+
+		[GenerateHLSL(needAccessors = false)]
+		public struct VolumeLODGrid
+		{
+			public Vector3 volumeWorldMin;
+			public Vector3 volumeWorldMax;
+			public Vector3 volumeCellCount;
+			public float volumeCellRadius;
 		}
 	}
 }

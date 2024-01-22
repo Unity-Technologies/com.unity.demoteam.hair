@@ -10,6 +10,7 @@ namespace Unity.DemoTeam.Hair
 			Color,
 			ContentColor,
 			BackgroundColor,
+			None,
 		}
 
 		static Color GetColor(ColorType colorType)
@@ -31,6 +32,7 @@ namespace Unity.DemoTeam.Hair
 				case ColorType.Color: GUI.color = color; break;
 				case ColorType.ContentColor: GUI.contentColor = color; break;
 				case ColorType.BackgroundColor: GUI.backgroundColor = color; break;
+				case ColorType.None: break;
 			}
 		}
 

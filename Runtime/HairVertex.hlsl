@@ -16,14 +16,16 @@
 #endif
 
 #include "HairSimData.hlsl"
-#include "HairSimDebugDrawUtility.hlsl"
+#include "HairSimDebugDrawColors.hlsl"
+#include "HairSimComputeVolumeUtility.hlsl"
+#include "HairSimComputeLOD.hlsl"
 
 #ifndef UNITY_PREV_MATRIX_I_M// not defined by e.g. URP graphs prior to 2021.2.x
 #define UNITY_PREV_MATRIX_I_M UNITY_MATRIX_I_M
 #endif
 
-#define STRAND_PARTICLE_COUNT	_StagingVertexCount
-#define STRAND_PARTICLE_OFFSET	_StagingVertexOffset
+#define STRAND_PARTICLE_COUNT	_StagingStrandVertexCount
+#define STRAND_PARTICLE_OFFSET	_StagingStrandVertexOffset
 
 #define DECLARE_STRAND(x)													\
 	const uint strandIndex = x;												\
@@ -41,19 +43,34 @@ float3 LoadPositionPrev(uint i)
 	return LoadStagingPositionPrev(i);
 }
 
+float GetStrandParticleOffset(in uint strandParticleNumber)
+{
+	return strandParticleNumber / (float)(STRAND_PARTICLE_COUNT - 1);
+}
+
+float GetStrandParticleTaper(in uint strandParticleNumber, in float2 strandTaperParams)
+{
+	// strandTaperParams.x = tip scale offset
+	// strandTaperParams.y = tip scale
+	float strandParticleOffset = GetStrandParticleOffset(strandParticleNumber);
+	float strandParticleTipT = saturate((strandParticleOffset - strandTaperParams.x) / (1.0 - strandTaperParams.x));
+	return lerp(1.0, strandTaperParams.y, strandParticleTipT);
+}
+
+float3 GetStrandDebugColor(in uint strandIndex)
+{
+	LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
+	uint guideIndexLo = _LODGuideIndex[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
+	uint guideIndexHi = _LODGuideIndex[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
+	float3 guideColorLo = ColorCycle(guideIndexLo, _LODGuideCount[_LODCount - 1]);
+	float3 guideColorHi = ColorCycle(guideIndexHi, _LODGuideCount[_LODCount - 1]);
+	return lerp(guideColorLo, guideColorHi, lodDesc.lodBlendFrac);
+}
+
 int _DecodeVertexCount;
 int _DecodeVertexWidth;
 int _DecodeVertexComponentValue;
 int _DecodeVertexComponentWidth;
-
-float3 GetStrandDebugColor(in uint strandIndex)
-{
-	uint strandIndexLo = _LODGuideIndex[(_LODIndexLo * _StrandCount) + strandIndex];
-	uint strandIndexHi = _LODGuideIndex[(_LODIndexHi * _StrandCount) + strandIndex];
-	float3 strandColorLo = ColorCycle(strandIndexLo, _LODGuideCount[_LODCount - 1]);
-	float3 strandColorHi = ColorCycle(strandIndexHi, _LODGuideCount[_LODCount - 1]);
-	return lerp(strandColorLo, strandColorHi, _LODBlendFraction);
-}
 
 float3 GetSurfaceNormalTS(in float2 tubularUV)
 {
@@ -121,44 +138,28 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 	float decodedVertexSign;
 	float2 decodedTubularUV;
 	{
-		if (_DecodeVertexComponentWidth == 32)//TODO replace runtime compatibility with asset versioning / upgrade
-		{
-			uint linearParticleIndex = packedID.x / _DecodeVertexCount;
-		
-			decodedStrandIndex = linearParticleIndex / STRAND_PARTICLE_COUNT;
-			decodedVertexIndex = linearParticleIndex % STRAND_PARTICLE_COUNT;
-			decodedVertexSign = -1.0;
+		uint4 unpack = round(packedID * _DecodeVertexComponentValue);
 
-			if (_DecodeVertexCount == 1)
-				decodedTubularUV = packedUV;
-			else
-				decodedTubularUV = packedUV * float2(0.5, 1.0);
+		decodedStrandIndex = (unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
+								(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
+								(unpack.y >> _DecodeVertexWidth);
+		decodedVertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
+		decodedVertexIndex = unpack.x;
+		decodedVertexSign = 1.0;
+			
+		//uint decodedStrandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
+		//uint decodedVertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
+		//uint decodedVertexIndex = packedID.x * _DecodeStrandIndex.w
+
+		if (_DecodeVertexCount == 1)
+		{
+			decodedTubularUV.x = 0.5;
+			decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
 		}
 		else
 		{
-			uint4 unpack = round(packedID * _DecodeVertexComponentValue);
-
-			decodedStrandIndex = (unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
-								 (unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
-								 (unpack.y >> _DecodeVertexWidth);
-			decodedVertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
-			decodedVertexIndex = unpack.x;
-			decodedVertexSign = 1.0;
-			
-			//uint decodedStrandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
-			//uint decodedVertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
-			//uint decodedVertexIndex = packedID.x * _DecodeStrandIndex.w
-
-			if (_DecodeVertexCount == 1)
-			{
-				decodedTubularUV.x = 0.5;
-				decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
-			}
-			else
-			{
-				decodedTubularUV.x = frac(packedID.y * (_DecodeVertexComponentValue / (float)(1 << _DecodeVertexWidth))) * ((1 << _DecodeVertexWidth) / (float)_DecodeVertexCount);
-				decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
-			}
+			decodedTubularUV.x = frac(packedID.y * (_DecodeVertexComponentValue / (float)(1 << _DecodeVertexWidth))) * ((1 << _DecodeVertexWidth) / (float)_DecodeVertexCount);
+			decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
 		}
 	}
 
@@ -185,12 +186,103 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 	{
 		if (_DecodeVertexCount > 1)
 		{
+			// calc radius in world space
+			float radius = (0.5 * _GroupMaxParticleDiameter) * _RootScale[strandIndex].y;
+
+			// apply cluster based level of detail
+			{
+				// get frustum
+				LODFrustum lodFrustum = MakeLODFrustumForCurrentCamera();
+
+				// get coverage
+				float curveSpan = 2.0 * radius;
+				float curveDepth = dot(lodFrustum.cameraForward, curvePositionRWS - lodFrustum.cameraPosition);
+				float curveCoverage = LODFrustumCoverage(lodFrustum, curveDepth, curveSpan);
+
+				// lod selection
+				LODIndices lodDesc;
+				{
+					switch (_RenderLODMethod)
+					{
+						case RENDERLODSELECTION_DERIVE_PER_STRAND:
+							lodDesc = ResolveLODIndices(ResolveLODQuantity(curveCoverage, _RenderLODCeiling, _RenderLODScale, _RenderLODBias));
+							break;
+
+						default:
+							lodDesc = _SolverLODStage[SOLVERLODSTAGE_RENDERING];
+							break;
+					}
+				}
+
+				// lod subpixel accumulation -> cluster centroid
+				{
+					float guideCarryLo = _LODGuideCarry[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
+					float guideCarryHi = _LODGuideCarry[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
+					float guideCarry = lerp(guideCarryLo, guideCarryHi, lodDesc.lodBlendFrac);
+
+					float guideReachLo = _LODGuideReach[(lodDesc.lodIndexLo * _StrandCount) + strandIndex] * _GroupScale;
+					float guideReachHi = _LODGuideReach[(lodDesc.lodIndexHi * _StrandCount) + strandIndex] * _GroupScale;
+					float guideReach = lerp(guideReachLo, guideReachHi, lodDesc.lodBlendFrac);
+
+					float guideProjectedCoverageLo = 1.0 - exp(-radius * guideCarryLo / guideReachLo);
+					float guideProjectedCoverageHi = 1.0 - exp(-radius * guideCarryHi / guideReachHi);
+					float guideProjectedCoverage = 1.0 - exp(-radius * guideCarry / guideReach);
+
+					switch (_RenderLODMethod)
+					{
+#define USE_PASSING_FRACTION 1
+#if USE_PASSING_FRACTION
+						case RENDERLODSELECTION_DERIVE_PER_STRAND:
+							//float lodThreshClip = lodClipThreshold;
+							//                    = unitSpanSubpixelDepth / unitSpanClippingDepth;
+							//float lodThreshClipCluster = unitSpanSubpixelDepth / (unitSpanClippingDepth + guideReach * 2);
+							//                           = unitSpanSubpixelDepth / ((unitSpanSubpixelDepth / lodClipThreshold) + guideReach * 2);
+							//                           = (unitSpanSubpixelDepth * lodClipThreshold) / (unitSpanSubpixelDepth + 2 * guideReach * lodClipThreshold);
+
+							float lodThresh = 1.0;
+							float lodThreshClip = max(_RenderLODClipThreshold, 1e-5);
+							float lodThreshClipCluster = (lodFrustum.unitSpanSubpixelDepth * lodThreshClip) / (lodFrustum.unitSpanSubpixelDepth + 2.0 * guideReach * lodThreshClip);
+
+							float farDepth = curveDepth + guideReach;
+							float farLod = saturate(lodDesc.lodValue * (curveDepth / farDepth));
+							float farLodT = saturate((farLod - lodThreshClipCluster) / (lodThresh - lodThreshClipCluster));
+
+#define USE_CIRCULAR_SECTION 1
+#if USE_CIRCULAR_SECTION
+							// replaces t with normalized area of circular section at height 2rt:
+							// A = (acos(1-2*x)-(1-2*x)*2*sqrt(x*(1-x)))/PI
+							farLodT = (acos(1.0 - 2.0 * farLodT) - (1.0 - 2.0 * farLodT) * 2 * sqrt(farLodT * (1.0 - farLodT))) / 3.14159;
+#endif
+
+							radius = lerp((radius + guideReach) * guideProjectedCoverage, radius, farLodT);
+							break;
+#endif
+
+						default:
+							radius = lerp((radius + guideReachLo) * guideProjectedCoverageLo, (radius + guideReachHi) * guideProjectedCoverageHi, lodDesc.lodBlendFrac);
+							break;
+					}
+
+					curveSpan = 2.0 * radius;
+					curveCoverage = LODFrustumCoverage(lodFrustum, curveDepth, curveSpan);
+				}
+
+				// apply subpixel discard
+				{
+					if (curveCoverage < _RenderLODClipThreshold)
+					{
+						curvePositionRWS = asfloat(0x7FC00000u);// => NaN
+					}
+				}
+			}
+
+			// apply tapering
+			radius *= GetStrandParticleTaper(decodedVertexIndex, _RootScale[strandIndex].zw);
+
 			// calc offset in plane
 			sincos((0.5 - decodedTubularUV.x) * 6.2831853, vertexOffset2D.y, vertexOffset2D.x);
 
 			// calc offset in world space
-			float radius = 0.5 * _GroupMaxParticleDiameter;
-
 			if (_DecodeVertexCount == 2)
 			{
 				vertexOffsetWS =
@@ -220,7 +312,7 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 		x.tangentWS = vertexTangentWS;
 		x.bitangentWS = vertexBitangentWS;
 		x.rootUV = _RootUV[strandIndex];
-		x.strandUV = GetSurfaceUV(decodedTubularUV) * float2(1.0, _RootScale[strandIndex]);//TODO scroll to handle twist / change in view direction
+		x.strandUV = GetSurfaceUV(decodedTubularUV) * float2(1.0, _RootScale[strandIndex].x);//TODO scroll to handle twist / change in view direction
 		x.strandIndex = strandIndex;
 		x.strandNormalTS = GetSurfaceNormalTS(decodedTubularUV);
 		x.strandDebugColor = GetStrandDebugColor(decodedStrandIndex);

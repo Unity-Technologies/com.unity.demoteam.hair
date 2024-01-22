@@ -109,7 +109,6 @@ namespace Unity.DemoTeam.Hair
 						strandGroupInstance.sceneObjects.rootMeshFilter.sharedMesh = strandGroups[j].meshAssetRoots;
 
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN
-						
 #if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
 						strandGroupInstance.sceneObjects.rootMeshAttachment = CreateComponent<SkinAttachmentMesh>(strandGroupInstance.sceneObjects.rootMeshContainer, hideFlags);
 						strandGroupInstance.sceneObjects.rootMeshAttachment.attachmentType = SkinAttachmentMesh.MeshAttachmentType.Mesh;
@@ -117,7 +116,6 @@ namespace Unity.DemoTeam.Hair
 							SkinAttachmentComponentCommon.SchedulingMode.GPU;
 						strandGroupInstance.sceneObjects.rootMeshAttachment.common.bakedDataEntryName = hairInstance.name + "/" + strandGroupInstance.sceneObjects.rootMeshAttachment.name;
 #else
-
 						strandGroupInstance.sceneObjects.rootMeshAttachment =
  CreateComponent<SkinAttachment>(strandGroupInstance.sceneObjects.rootMeshContainer, hideFlags);
 						strandGroupInstance.sceneObjects.rootMeshAttachment.attachmentType =
@@ -152,22 +150,36 @@ namespace Unity.DemoTeam.Hair
 
 		public const MeshUpdateFlags MESH_UPDATE_UNCHECKED = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds;
 
-		public static unsafe void BuildMeshRoots(Mesh meshRoots, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		public static unsafe void BuildMeshRoots(Mesh meshRoots, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, Vector3[] particlePosition)
 		{
-			using (var tangent = new NativeArray<Vector4>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var rootMeshPosition = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var rootMeshTangent = new NativeArray<Vector4>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var rootMeshNormal = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			using (var indices = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
-				var tangentPtr = (Vector4*)tangent.GetUnsafePtr();
+				var rootMeshPositionPtr = (Vector3*)rootMeshPosition.GetUnsafePtr();
+				var rootMeshTangentPtr = (Vector4*)rootMeshTangent.GetUnsafePtr();
+				var rootMeshNormalPtr = (Vector3*)rootMeshNormal.GetUnsafePtr();
 				var indicesPtr = (int*)indices.GetUnsafePtr();
 
-				// write tangent
+				// write attributes
 				for (int i = 0; i != strandCount; i++)
 				{
-					var localRootFrame = Quaternion.FromToRotation(Vector3.up, rootDirection[i]);
+					HairAssetUtility.DeclareStrandIterator(memoryLayout, strandCount, strandParticleCount, i,
+						out var strandParticleBegin,
+						out var strandParticleStride,
+						out var strandParticleEnd);
+
+					ref readonly var p0 = ref particlePosition[strandParticleBegin + strandParticleStride * 0];
+					ref readonly var p1 = ref particlePosition[strandParticleBegin + strandParticleStride * 1];
+
+					var localRootDir = Vector3.Normalize(p1 - p0);
+					var localRootFrame = Quaternion.FromToRotation(Vector3.up, localRootDir);
 					var localRootPerp = localRootFrame * Vector3.right;
-					{
-						*(tangentPtr++) = new Vector4(localRootPerp.x, localRootPerp.y, localRootPerp.z, 1.0f);
-					}
+
+					*(rootMeshPositionPtr++) = p0;
+					*(rootMeshTangentPtr++) = new Vector4(localRootPerp.x, localRootPerp.y, localRootPerp.z, 1.0f);
+					*(rootMeshNormalPtr++) = localRootDir;
 				}
 
 				// write indices
@@ -186,9 +198,9 @@ namespace Unity.DemoTeam.Hair
 						new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, dimension: 4, stream: 2)
 					);
 
-					meshRoots.SetVertexBufferData(rootPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
-					meshRoots.SetVertexBufferData(rootDirection, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
-					meshRoots.SetVertexBufferData(tangent, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
+					meshRoots.SetVertexBufferData(rootMeshPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+					meshRoots.SetVertexBufferData(rootMeshNormal, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+					meshRoots.SetVertexBufferData(rootMeshTangent, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
 
 					meshRoots.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
 					meshRoots.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
@@ -389,7 +401,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshLines(Mesh meshLines, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static unsafe void BuildRenderMeshLines(Mesh meshLines, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var perLineVertices = strandParticleCount;
 			var perLineSegments = perLineVertices - 1;
@@ -416,7 +428,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshStrips(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static unsafe void BuildRenderMeshStrips(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var perStripVertices = strandParticleCount * 2;
 			var perStripSegments = strandParticleCount - 1;
@@ -466,7 +478,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static unsafe void BuildRenderMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			const int numSides = 4;
 			
@@ -547,79 +559,82 @@ namespace Unity.DemoTeam.Hair
 				ApplyRenderMeshData(meshStrips, MeshTopology.Triangles, data, bounds);
 			}
 		}
-		
-		public static Mesh CreateMeshRoots(HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+
+		public static Mesh CreateMeshRoots(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, Vector3[] particlePosition)
 		{
 			var meshRoots = new Mesh();
 			{
 				meshRoots.hideFlags = hideFlags;
 				meshRoots.name = "Roots";
-				BuildMeshRoots(meshRoots, strandCount, rootPosition, rootDirection);
+				BuildMeshRoots(meshRoots, memoryLayout, strandCount, strandParticleCount, particlePosition);
 			}
 			return meshRoots;
 		}
 
-		public static Mesh CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, int strandCount, Vector3[] rootPosition, Vector3[] rootDirection)
+		public static Mesh CreateMeshRootsIfNull(ref Mesh meshRoots, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, Vector3[] particlePosition)
 		{
 			if (meshRoots == null)
-				meshRoots = CreateMeshRoots(hideFlags, strandCount, rootPosition, rootDirection);
+				meshRoots = CreateMeshRoots(hideFlags, memoryLayout, strandCount, strandParticleCount, particlePosition);
 
 			return meshRoots;
 		}
 
-		public static Mesh CreateMeshLines(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public delegate Mesh FnCreateRenderMesh(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds);
+		public delegate void FnCreateRenderMeshIfNull(ref Mesh mesh, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds);
+
+		public static Mesh CreateRenderMeshLines(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var meshLines = new Mesh();
 			{
 				meshLines.hideFlags = hideFlags;
 				meshLines.name = "X-Lines";
-				BuildMeshLines(meshLines, memoryLayout, strandCount, strandParticleCount, bounds);
+				BuildRenderMeshLines(meshLines, memoryLayout, strandCount, strandParticleCount, bounds);
 			}
 			return meshLines;
 		}
 
-		public static Mesh CreateMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshLinesIfNull(ref Mesh meshLines, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshLines == null)
-				meshLines = CreateMeshLines(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+				meshLines = CreateRenderMeshLines(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshLines;
 		}
 
-		public static Mesh CreateMeshStrips(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshStrips(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var meshStrips = new Mesh();
 			{
 				meshStrips.hideFlags = hideFlags;
 				meshStrips.name = "X-Strips";
-				BuildMeshStrips(meshStrips, memoryLayout, strandCount, strandParticleCount, bounds);
+				BuildRenderMeshStrips(meshStrips, memoryLayout, strandCount, strandParticleCount, bounds);
 			}
 			return meshStrips;
 		}
 
-		public static Mesh CreateMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshStripsIfNull(ref Mesh meshStrips, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshStrips == null)
-				meshStrips = CreateMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+				meshStrips = CreateRenderMeshStrips(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshStrips;
 		}
 		
-		public static Mesh CreateMeshTubes(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshTubes(HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			var meshTubes = new Mesh();
 			{
 				meshTubes.hideFlags = hideFlags;
 				meshTubes.name = "X-Tubes";
-				BuildMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
+				BuildRenderMeshTubes(meshTubes, memoryLayout, strandCount, strandParticleCount, bounds);
 			}
 			return meshTubes;
 		}
 
-		public static Mesh CreateMeshTubesIfNull(ref Mesh meshTubes, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static Mesh CreateRenderMeshTubesIfNull(ref Mesh meshTubes, HideFlags hideFlags, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			if (meshTubes == null)
-				meshTubes = CreateMeshTubes(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
+				meshTubes = CreateRenderMeshTubes(hideFlags, memoryLayout, strandCount, strandParticleCount, bounds);
 
 			return meshTubes;
 		}

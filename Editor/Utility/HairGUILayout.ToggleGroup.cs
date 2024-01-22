@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Reflection;
 using UnityEngine;
 using UnityEditor;
@@ -134,14 +135,19 @@ namespace Unity.DemoTeam.Hair
 								{
 									EditorGUI.BeginChangeCheck();
 
-									var enumValue = (Enum)Enum.GetValues(field.FieldType).GetValue(property.enumValueIndex);
+									var enumValueArray = Enum.GetValues(field.FieldType);
+									var enumValueIndex = property.enumValueIndex;
+									if (enumValueIndex == -1 || enumValueIndex >= enumValueArray.Length)
+										enumValueIndex = 0;
+
+									var enumValue = (Enum)enumValueArray.GetValue(enumValueIndex);
 									{
 										enumValue = EditorGUI.EnumPopup(position, label, enumValue, EditorStyles.popup);
 									}
 
 									if (EditorGUI.EndChangeCheck())
 									{
-										property.enumValueIndex = Convert.ToInt32(enumValue);
+										property.enumValueIndex = Array.IndexOf(enumValueArray, enumValue);
 									}
 								}
 								break;
@@ -226,6 +232,44 @@ namespace Unity.DemoTeam.Hair
 									if (EditorGUI.EndChangeCheck())
 									{
 										property.boolValue = toggle;
+									}
+								}
+								break;
+
+							case SerializedPropertyType.Vector2:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var value = property.vector2Value;
+									{
+										using (new EditorGUI.DisabledScope(evClickRight))
+										{
+											value = EditorGUI.Vector2Field(position, label, value);
+										}
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.vector2Value = value;
+									}
+								}
+								break;
+
+							case SerializedPropertyType.Vector3:
+								{
+									EditorGUI.BeginChangeCheck();
+
+									var value = property.vector3Value;
+									{
+										using (new EditorGUI.DisabledScope(evClickRight))
+										{
+											value = EditorGUI.Vector3Field(position, label, value);
+										}
+									}
+
+									if (EditorGUI.EndChangeCheck())
+									{
+										property.vector3Value = value;
 									}
 								}
 								break;

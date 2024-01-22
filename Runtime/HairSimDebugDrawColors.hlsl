@@ -1,5 +1,5 @@
-#ifndef __HAIRSIMDEBUGDRAWUTILITY_HLSL__
-#define __HAIRSIMDEBUGDRAWUTILITY_HLSL__
+#ifndef __HAIRSIMDEBUGDRAWCOLORS_HLSL__
+#define __HAIRSIMDEBUGDRAWCOLORS_HLSL__
 
 //----------------
 // colors generic
@@ -71,4 +71,4 @@ float3 ColorProbe(float3 s)
 	return s;
 }
 
-#endif//__HAIRSIMDEBUGDRAWUTILITY_HLSL__
+#endif//__HAIRSIMDEBUGDRAWCOLORS_HLSL__

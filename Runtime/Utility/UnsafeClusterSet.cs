@@ -42,6 +42,7 @@ namespace Unity.DemoTeam.Hair
 		public UnsafeList<int> clusterGuide;
 		public UnsafeList<int> clusterDepth;
 		public UnsafeList<float> clusterCarry;
+		public UnsafeList<float> clusterReach;
 
 		public UnsafeList<int> sampleCluster;
 
@@ -61,6 +62,7 @@ namespace Unity.DemoTeam.Hair
 			[NativeDisableUnsafePtrRestriction, NoAlias] public int* clusterGuidePtr;		// data valid after Commit
 			[NativeDisableUnsafePtrRestriction, NoAlias] public int* clusterDepthPtr;		// data valid after Commit
 			[NativeDisableUnsafePtrRestriction, NoAlias] public float* clusterCarryPtr;		// data valid after Commit
+			[NativeDisableUnsafePtrRestriction, NoAlias] public float* clusterReachPtr;		// data valid after Commit
 
 			public int clusterPositionOffset;
 			public int clusterPositionStride;
@@ -88,6 +90,7 @@ namespace Unity.DemoTeam.Hair
 			this.clusterGuide = new UnsafeList<int>(clusterCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 			this.clusterDepth = new UnsafeList<int>(clusterCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 			this.clusterCarry = new UnsafeList<float>(clusterCapacity, allocator, NativeArrayOptions.UninitializedMemory);
+			this.clusterReach = new UnsafeList<float>(clusterCapacity, allocator, NativeArrayOptions.UninitializedMemory);
 
 			this.sampleCluster = new UnsafeList<int>(sampleCount, allocator, NativeArrayOptions.UninitializedMemory);
 
@@ -105,6 +108,7 @@ namespace Unity.DemoTeam.Hair
 				this.dataDesc.clusterGuidePtr = this.clusterGuide.Ptr;
 				this.dataDesc.clusterDepthPtr = this.clusterDepth.Ptr;
 				this.dataDesc.clusterCarryPtr = this.clusterCarry.Ptr;
+				this.dataDesc.clusterReachPtr = this.clusterReach.Ptr;
 
 				this.dataDesc.clusterPositionOffset = samplePositionCount;
 				this.dataDesc.clusterPositionStride = 1;
@@ -143,6 +147,7 @@ namespace Unity.DemoTeam.Hair
 			clusterTally.Dispose();
 			clusterGuide.Dispose();
 			clusterCarry.Dispose();
+			clusterReach.Dispose();
 
 			sampleCluster.Dispose();
 		}
@@ -157,6 +162,7 @@ namespace Unity.DemoTeam.Hair
 				clusterGuide.Resize(clusterCapacity);
 				clusterDepth.Resize(clusterCapacity);
 				clusterCarry.Resize(clusterCapacity);
+				clusterReach.Resize(clusterCapacity);
 
 				dataDesc.clusterPositionPtr = clusterPosition.Ptr;
 				dataDesc.clusterWeightPtr = clusterWeight.Ptr;
@@ -164,6 +170,7 @@ namespace Unity.DemoTeam.Hair
 				dataDesc.clusterGuidePtr = clusterGuide.Ptr;
 				dataDesc.clusterDepthPtr = clusterDepth.Ptr;
 				dataDesc.clusterCarryPtr = clusterCarry.Ptr;
+				dataDesc.clusterReachPtr = clusterReach.Ptr;
 
 				dataDesc.clusterCapacity = clusterCapacity;
 
@@ -251,6 +258,7 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != dataDesc.sampleCount; i++)
 				{
 					var k = dataDesc.sampleClusterPtr[i];
+					if (k != -1)
 					{
 						var errorSq = PsDistanceSq(
 							dataDesc.clusterPositionPtr + dataDesc.clusterPositionOffset * k,
@@ -1433,6 +1441,20 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			// find cluster reach (maximum sample distance to centroid)
+			//TODO recompute & use actual (not snapped) cluster centroids as error origins
+			//TODO maybe replace with radius of planar convex hull?
+			using (var maxErrorSq = FindAllClustersMaxErrorSq(ref dataDesc, Allocator.Temp))
+			{
+				var maxErrorSqPtr = maxErrorSq.Ptr;
+				{
+					for (int k = 0; k != dataDesc.clusterCount; k++)
+					{
+						dataDesc.clusterReachPtr[k] = (maxErrorSqPtr[k] > 0.0f) ? Mathf.Sqrt(maxErrorSqPtr[k]) : 0.0f;
+					}
+				}
+			}
+
 			// reduce working set
 			dataDesc.clusterCountCommitted = dataDesc.clusterCount;
 		}
@@ -1480,6 +1502,7 @@ namespace Unity.DemoTeam.Hair
 							dataDesc.clusterGuidePtr[k] = dataDesc.clusterGuidePtr[kLive];
 							dataDesc.clusterDepthPtr[k] = dataDesc.clusterDepthPtr[kLive];
 							dataDesc.clusterCarryPtr[k] = dataDesc.clusterCarryPtr[kLive];
+							dataDesc.clusterReachPtr[k] = dataDesc.clusterReachPtr[kLive];
 
 							remappedClusterIndicesPtr[kLive] = k;
 							break;

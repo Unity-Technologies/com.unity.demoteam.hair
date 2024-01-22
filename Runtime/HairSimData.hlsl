@@ -2,7 +2,8 @@
 #define __HAIRSIMDATA_HLSL__
 
 #include "HairSimData.cs.hlsl"
-
+#include "HairSim.LOD.cs.hlsl"
+	
 //-------------
 // solver data
 
@@ -18,50 +19,54 @@
 #define HAIRSIM_SOLVERDATA StructuredBuffer
 #endif
 
-HAIRSIM_SOLVERINPUT<float2> _RootUV;				// xy: strand root uv
-HAIRSIM_SOLVERINPUT<float> _RootScale;				// x: relative strand length [0..1] (to maximum within group)
-HAIRSIM_SOLVERINPUT<float4> _RootPosition;			// xyz: strand root position, w: -
-HAIRSIM_SOLVERINPUT<float4> _RootPositionPrev;		// ...
-HAIRSIM_SOLVERINPUT<float4> _RootFrame;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent to curve
-HAIRSIM_SOLVERINPUT<float4> _RootFramePrev;			// ...
-
-HAIRSIM_SOLVERDATA<float4> _SubstepRootPosition;	// substep data
-HAIRSIM_SOLVERDATA<float4> _SubstepRootFrame;		// ...
-
-HAIRSIM_SOLVERDATA<float4> _InitialRootDirection;		// xyz: initial local root direction, w: -
-HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;		// xyz: initial local particle offset from strand root, w: -
-HAIRSIM_SOLVERDATA<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
-
-HAIRSIM_SOLVERDATA<float4> _ParticlePosition;		// xyz: position, w: initial local accumulated weight (gather)
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;		// ...
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrevPrev;	// ...
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionCorr;	// xyz: ftl correction, w: -
-HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;		// xyz: velocity, w: splatting weight
-HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;	// xyz: velocity, w: splatting weight
-
-HAIRSIM_SOLVERDATA<uint> _LODGuideCount;			// n: lod index -> num. guides
-HAIRSIM_SOLVERDATA<uint> _LODGuideIndex;			// i: lod index * strand count + strand index -> guide index
-HAIRSIM_SOLVERDATA<float> _LODGuideCarry;			// f: lod index * strand count + strand index -> guide carry
-
-//----------------
-// solver staging
-
 #if HAIRSIM_WRITEABLE_SOLVERDATA
 #define HAIRSIM_RENDERDATA RWByteAddressBuffer
 #else
 #define HAIRSIM_RENDERDATA ByteAddressBuffer
 #endif
 
-HAIRSIM_RENDERDATA _StagingPosition;
-HAIRSIM_RENDERDATA _StagingPositionPrev;
+StructuredBuffer<float2> _RootUV;						// xy: root uv
+StructuredBuffer<float4> _RootScale;					// xy: root scale (length, diameter normalized to maximum within group), z: tip scale offset, w: tip scale
 
-#define STAGINGFORMAT_UNDEFINED (0)
-#define STAGINGFORMAT_COMPRESSED (1)
-#define STAGINGFORMAT_UNCOMPRESSED (2)
-#define STAGINGFORMAT_UNCOMPRESSED_PASSTHROUGH (3)
+HAIRSIM_SOLVERINPUT<float4> _RootPosition;				// xyz: strand root position, w: -
+HAIRSIM_SOLVERINPUT<float4> _RootPositionPrev;			// xyz: ...
+HAIRSIM_SOLVERINPUT<float4> _RootPositionSubstep;		// xyz: ...
+HAIRSIM_SOLVERINPUT<float4> _RootFrame;					// quat(xyz,w): strand root material frame where (0,1,0) is tangent to curve
+HAIRSIM_SOLVERINPUT<float4> _RootFramePrev;				// quat(xyz,w): ...
+HAIRSIM_SOLVERINPUT<float4> _RootFrameSubstep;			// quat(xyz,w): ...
+
+HAIRSIM_SOLVERDATA<LODIndices> _SolverLODStage;			// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
+HAIRSIM_SOLVERDATA<uint4> _SolverLODDispatch;			// xyz: num groups, w: num strands
+
+HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
+HAIRSIM_SOLVERDATA<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
+
+HAIRSIM_SOLVERDATA<float4> _ParticlePosition;			// xyz: position, w: initial local accumulated weight (gather)
+HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;		// xyz: ...
+HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrevPrev;	// xyz: ...
+HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;			// xyz: velocity, w: splatting weight
+HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;		// xyz: ...
+HAIRSIM_SOLVERDATA<float4> _ParticleCorrection;			// xyz: ftl distance correction, w: -
+
+StructuredBuffer<float2> _ParticleExtTexCoord;			// xy: optional uv
+StructuredBuffer<float> _ParticleExtDiameter;			// x: optional diameter
+
+StructuredBuffer<uint> _LODGuideCount;					// x: lod index -> num. guides
+StructuredBuffer<uint> _LODGuideIndex;					// x: lod index * strand count + strand index -> guide index
+StructuredBuffer<float> _LODGuideCarry;					// x: lod index * strand count + strand index -> guide carry
+StructuredBuffer<float> _LODGuideReach;					// x: lod index * strand count + strand index -> guide reach (approximate cluster extent)
+
+HAIRSIM_RENDERDATA _StagingVertex;						// xyz: position (uncompressed) || xy: position (compressed)
+HAIRSIM_RENDERDATA _StagingVertexPrev;					// xyz: ...
 
 //-------------
 // volume data
+
+#if HAIRSIM_WRITEABLE_VOLUMEBOUNDS
+#define HAIRSIM_VOLUMEBOUNDS RWStructuredBuffer
+#else
+#define HAIRSIM_VOLUMEBOUNDS StructuredBuffer
+#endif
 
 #if SHADER_API_METAL
 #define PLATFORM_SUPPORTS_TEXTURE_ATOMICS 0
@@ -69,15 +74,15 @@ HAIRSIM_RENDERDATA _StagingPositionPrev;
 #define PLATFORM_SUPPORTS_TEXTURE_ATOMICS 1
 #endif
 
-#if HAIRSIM_WRITEABLE_VOLUMEACCU
 #if PLATFORM_SUPPORTS_TEXTURE_ATOMICS
+#if HAIRSIM_WRITEABLE_VOLUMEACCU
 #define HAIRSIM_VOLUMEACCU RWTexture3D
 #else
-#define HAIRSIM_VOLUMEACCU RWStructuredBuffer
+#define HAIRSIM_VOLUMEACCU Texture3D
 #endif
 #else
-#if PLATFORM_SUPPORTS_TEXTURE_ATOMICS
-#define HAIRSIM_VOLUMEACCU Texture3D
+#if HAIRSIM_WRITEABLE_VOLUMEACCU
+#define HAIRSIM_VOLUMEACCU RWStructuredBuffer
 #else
 #define HAIRSIM_VOLUMEACCU StructuredBuffer
 #endif
@@ -95,12 +100,21 @@ HAIRSIM_RENDERDATA _StagingPositionPrev;
 #define HAIRSIM_VOLUMEOPTS Texture3D
 #endif
 
+StructuredBuffer<LODFrustum> _LODFrustum;
+
+HAIRSIM_VOLUMEBOUNDS<uint3> _BoundsMinMaxU;			// xyz: bounds min/max (unsigned sortable)
+HAIRSIM_VOLUMEBOUNDS<LODBounds> _Bounds;			// array(LODBounds): bounds (center, extent, radius)
+HAIRSIM_VOLUMEBOUNDS<LODGeometry> _BoundsGeometry;	// array(LODGeometry): bounds geometry description (dimensions for coverage)
+HAIRSIM_VOLUMEBOUNDS<float2> _BoundsCoverage;		// xy: bounds coverage (unbiased ceiling)
+
+HAIRSIM_VOLUMEBOUNDS<VolumeLODGrid> _VolumeLODStage;// array(VolumeLODGrid): grid properties
+HAIRSIM_VOLUMEBOUNDS<uint4> _VolumeLODDispatch;		// xyz: num groups, w: num grid cells in one dimension
+
 HAIRSIM_VOLUMEACCU<int> _AccuWeight;				// x: fp accumulated weight
 HAIRSIM_VOLUMEACCU<int> _AccuWeight0;				// x: fp accumulated target weight
 HAIRSIM_VOLUMEACCU<int> _AccuVelocityX;				// x: fp accumulated x-velocity
 HAIRSIM_VOLUMEACCU<int> _AccuVelocityY;				// x: ... ... ... .. y-velocity
 HAIRSIM_VOLUMEACCU<int> _AccuVelocityZ;				// x: .. ... ... ... z-velocity
-//TODO this sure would be nice: https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 
 HAIRSIM_VOLUMEDATA<float> _VolumeDensity;			// x: density (cell fraction occupied)
 HAIRSIM_VOLUMEDATA<float> _VolumeDensity0;			// x: density target
@@ -140,8 +154,8 @@ StructuredBuffer<float4x4> _BoundaryMatrix;
 StructuredBuffer<float4x4> _BoundaryMatrixInv;
 StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;
 
-//--------------
-// volume winds
+//-------------
+// volume wind
 
 struct WindEmitter
 {
@@ -165,9 +179,9 @@ StructuredBuffer<WindEmitter> _WindEmitter;
 //---------
 // utility
 
-uint2 EncodePosition(float3 p, float4 originExtent)
+uint2 EncodePosition(float3 p, float4 bounds)
 {
-	uint3 p_f16 = f32tof16((p - originExtent.xyz) / originExtent.w);
+	uint3 p_f16 = f32tof16((p - bounds.xyz) / bounds.w);
 	uint2 p_enc;
 	{
 		p_enc.x = p_f16.x << 16 | p_f16.y;
@@ -176,24 +190,27 @@ uint2 EncodePosition(float3 p, float4 originExtent)
 	return p_enc;
 }
 
-float3 DecodePosition(uint2 p_enc, float4 originExtent)
+float3 DecodePosition(uint2 p_enc, float4 bounds)
 {
 	uint3 p_f16 = uint3(p_enc.x >> 16, p_enc.x & 0xffff, p_enc.y);
-	float3 p = f16tof32(p_f16) * originExtent.w + originExtent.xyz;
+	float3 p = f16tof32(p_f16) * bounds.w + bounds.xyz;
 	return p;
 }
 
-float3 LoadStagingPosition(uint i)
+float3 LoadStagingPosition(const uint i)
 {
-	switch (_StagingBufferFormat)
+	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
+	const float4 bounds = float4(lodBounds.center, max(lodBounds.extent.x, max(lodBounds.extent.y, lodBounds.extent.z)));
+
+	switch (_StagingVertexFormat)
 	{
-		case STAGINGFORMAT_COMPRESSED:
-			return DecodePosition(asuint(_StagingPosition.Load2(i * _StagingBufferStride)), _StagingOriginExtent);
+		case STAGINGVERTEXFORMAT_COMPRESSED:
+			return DecodePosition(asuint(_StagingVertex.Load2(i * _StagingVertexStride)), bounds);
 		
-		case STAGINGFORMAT_UNCOMPRESSED:
-			return asfloat(_StagingPosition.Load3(i * _StagingBufferStride));
-		
-		case STAGINGFORMAT_UNCOMPRESSED_PASSTHROUGH:
+		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
+			return asfloat(_StagingVertex.Load3(i * _StagingVertexStride));
+
+		case STAGINGVERTEXFORMAT_UNCOMPRESSED_PT:
 			return _ParticlePosition[i].xyz;
 		
 		default:
@@ -201,17 +218,20 @@ float3 LoadStagingPosition(uint i)
 	}
 }
 
-float3 LoadStagingPositionPrev(uint i)
+float3 LoadStagingPositionPrev(const uint i)
 {
-	switch (_StagingBufferFormat)
+	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
+	const float4 bounds = float4(lodBounds.center, max(lodBounds.extent.x, max(lodBounds.extent.y, lodBounds.extent.z)));
+
+	switch (_StagingVertexFormat)
 	{
-		case STAGINGFORMAT_COMPRESSED:
-			return DecodePosition(asuint(_StagingPositionPrev.Load2(i * _StagingBufferStride)), _StagingOriginExtentPrev);
+		case STAGINGVERTEXFORMAT_COMPRESSED:
+			return DecodePosition(asuint(_StagingVertexPrev.Load2(i * _StagingVertexStride)), bounds);
+
+		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
+			return asfloat(_StagingVertexPrev.Load3(i * _StagingVertexStride));
 		
-		case STAGINGFORMAT_UNCOMPRESSED:
-			return asfloat(_StagingPositionPrev.Load3(i * _StagingBufferStride));
-		
-		case STAGINGFORMAT_UNCOMPRESSED_PASSTHROUGH:
+		case STAGINGVERTEXFORMAT_UNCOMPRESSED_PT:
 			return _ParticlePositionPrev[i].xyz;
 		
 		default:
@@ -222,13 +242,30 @@ float3 LoadStagingPositionPrev(uint i)
 void StoreStagingPosition(uint i, float3 p)
 {
 #if HAIRSIM_WRITEABLE_SOLVERDATA
-	switch (_StagingBufferFormat)
+	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
+	const float4 bounds = float4(lodBounds.center, max(lodBounds.extent.x, max(lodBounds.extent.y, lodBounds.extent.z)));
+
+	switch (_StagingVertexFormat)
 	{
-		case STAGINGFORMAT_COMPRESSED:
-			_StagingPosition.Store2(i * _StagingBufferStride, EncodePosition(p, _StagingOriginExtent)); break;
+		case STAGINGVERTEXFORMAT_COMPRESSED:
+			_StagingVertex.Store2(i * _StagingVertexStride, EncodePosition(p, bounds)); break;
 		
-		case STAGINGFORMAT_UNCOMPRESSED:
-			_StagingPosition.Store3(i * _StagingBufferStride, asuint(p)); break;
+		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
+			_StagingVertex.Store3(i * _StagingVertexStride, asuint(p)); break;
+	}
+#endif
+}
+
+void ResetStagingPositionPrev(uint i)
+{
+#if HAIRSIM_WRITEABLE_SOLVERDATA
+	switch (_StagingVertexFormat)
+	{
+		case STAGINGVERTEXFORMAT_COMPRESSED:
+			_StagingVertexPrev.Store2(i * _StagingVertexStride, _StagingVertex.Load2(i * _StagingVertexStride)); break;
+		
+		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
+			_StagingVertexPrev.Store3(i * _StagingVertexStride, _StagingVertex.Load3(i * _StagingVertexStride)); break;
 	}
 #endif
 }

@@ -7,10 +7,13 @@ namespace Unity.DemoTeam.Hair
 		[GenerateHLSL]
 		public struct Conf
 		{
-			public const int MAX_BOUNDARIES = 12;
-			// N == max number of boundary shapes
+			public const int MAX_FRUSTUMS = 32;
+			// N == max number of lod cameras
 
-			public const int MAX_WINDS = 8;
+			public const int MAX_BOUNDARIES = 12;
+			// N == max number of solid boundaries
+
+			public const int MAX_EMITTERS = 8;
 			// N == max number of wind emitters
 
 			public const int SECOND_ORDER_UPDATE = 0;
@@ -31,11 +34,6 @@ namespace Unity.DemoTeam.Hair
 			public const int VOLUME_STAGGERED_GRID = 0;
 			// 0 == store everything at cell centers
 			// 1 == store velocity and pressure gradient at cell faces
-
-			public const int DEBUG_STRAND_31_32 = 0;
-			// 0 == off
-			// 1 == on (full strands)
-			// 2 == on (first segments)
 		}
 	}
 }
