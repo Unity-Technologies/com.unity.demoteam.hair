@@ -57,6 +57,11 @@ namespace Unity.DemoTeam.Hair
 				MakeLODFrustums(cameraType, ref lodFrustums);
 			}
 
+			if (lodFrustums.Length > Conf.MAX_FRUSTUMS)
+			{
+				lodFrustums.Resize(Conf.MAX_FRUSTUMS, NativeArrayOptions.UninitializedMemory);
+			}
+
 			return lodFrustums;
 		}
 
