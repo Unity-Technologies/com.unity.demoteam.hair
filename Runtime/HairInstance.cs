@@ -1190,18 +1190,21 @@ namespace Unity.DemoTeam.Hair
 						HairAssetUtility.DeclareParticleStride(groupAsset, out var strandParticleOffset, out var strandParticleStride);
 
 						ref var solverConstants = ref solverData[i].constants;
+						{
+							solverConstants._StrandCount = (uint)groupAsset.strandCount;
+							solverConstants._StrandParticleCount = (uint)groupAsset.strandParticleCount;
+							solverConstants._StrandParticleOffset = (uint)strandParticleOffset;
+							solverConstants._StrandParticleStride = (uint)strandParticleStride;
+							solverConstants._LODCount = (uint)groupAsset.lodCount;
+							//solverConstants._GroupScale
+							//solverConstants._GroupMaxParticleVolume
+							//solverConstants._GroupMaxParticleInterval
+							//solverConstants._GroupMaxParticleDiameter
+							//solverConstants._GroupAvgParticleDiameter
+							solverConstants._GroupBoundsIndex = (uint)i;
 
-						solverConstants._StrandCount = (uint)groupAsset.strandCount;
-						solverConstants._StrandParticleCount = (uint)groupAsset.strandParticleCount;
-						solverConstants._StrandParticleOffset = (uint)strandParticleOffset;
-						solverConstants._StrandParticleStride = (uint)strandParticleStride;
-						solverConstants._LODCount = (uint)groupAsset.lodCount;
-						//solverConstants._GroupScale
-						//solverConstants._GroupMaxParticleVolume
-						//solverConstants._GroupMaxParticleInterval
-						//solverConstants._GroupMaxParticleDiameter
-						//solverConstants._GroupAvgParticleDiameter
-						solverConstants._GroupBoundsIndex = (uint)i;
+							HairSimUtility.PushConstantBufferData(cmd, solverData[i].buffers.SolverCBuffer, solverConstants);
+						}
 
 						solverData[i].memoryLayout = groupAsset.particleMemoryLayout;
 
@@ -1268,7 +1271,6 @@ namespace Unity.DemoTeam.Hair
 
 			// perform initialization
 			{
-				// roots
 				for (int i = 0; i != solverData.Length; i++)
 				{
 					var rootMesh = strandGroupInstances[i].sceneObjects.rootMeshFilter.sharedMesh;
@@ -1282,6 +1284,10 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != solverData.Length; i++)
 				{
 					HairSim.PushSolverGeometry(cmd, ref solverData[i], GetSettingsGeometry(strandGroupInstances[i]), this.transform.localToWorldMatrix);
+				}
+
+				for (int i = 0; i != solverData.Length; i++)
+				{
 					HairSim.InitSolverData(cmd, solverData[i]);
 				}
 
