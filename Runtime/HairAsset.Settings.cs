@@ -1,6 +1,9 @@
 using System;
 using UnityEngine;
 using UnityEngine.Serialization;
+#if UNITY_2021_2_OR_NEWER
+using UnityEngine.Search;
+#endif
 
 #if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
 using UnityEngine.Formats.Alembic.Importer;

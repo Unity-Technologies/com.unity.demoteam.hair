@@ -942,8 +942,8 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					meshRendererHDRP.enabled = true;
-					meshRendererHDRP.rendererGroup = settingsSystem.strandRendererGroup;
-					meshRendererHDRP.enableHighQualityLineRendering = (settingsSystem.strandRenderer == SettingsSystem.StrandRenderer.HDRPHighQualityLines);
+					meshRendererHDRP.rendererGroup = settingsRendering.rendererGroup;
+					meshRendererHDRP.enableHighQualityLineRendering = (settingsRendering.renderer == HairSim.SettingsRendering.Renderer.HDRPHighQualityLines);
 				}
 #endif
 			}
