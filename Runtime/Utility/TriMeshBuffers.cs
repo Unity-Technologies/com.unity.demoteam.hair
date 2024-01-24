@@ -100,6 +100,9 @@ namespace Unity.DemoTeam.Hair
 
 			if (vertexUV0.IsCreated)
 				vertexUV0.Dispose();
+
+			if (triangleVertexIndices.IsCreated)
+				triangleVertexIndices.Dispose();
 		}
 
 		public bool HasAttribute(Attribute attribute)
