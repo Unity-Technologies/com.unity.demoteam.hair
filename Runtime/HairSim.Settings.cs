@@ -209,14 +209,14 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Solver LOD")]
 
 			public SolverLODSelection kLODSelection;
+			[VisibleIf(nameof(kLODSelection), SolverLODSelection.Manual), Range(0.0f, 1.0f)]
+			public float kLODSelectionValue;
 			[Range(0.0f, 1.0f)]
 			public float kLODCeiling;
 			[Range(0.0f, 2.0f)]
 			public float kLODScale;
 			[Range(-1.0f, 1.0f)]
 			public float kLODBias;
-			[VisibleIf(nameof(kLODSelection), SolverLODSelection.Manual), Range(0.0f, 1.0f)]
-			public float kLODValue;
 
 			public static readonly SettingsPhysics defaults = new SettingsPhysics()
 			{
@@ -261,11 +261,11 @@ namespace Unity.DemoTeam.Hair
 				globalFadeOffset = 0.1f,
 				globalFadeExtent = 0.2f,
 
-				kLODSelection = SolverLODSelection.DerivePerGroup,
+				kLODSelection = SolverLODSelection.AutomaticPerGroup,
+				kLODSelectionValue = 1.0f,
 				kLODCeiling = 1.0f,
 				kLODScale = 1.0f,
 				kLODBias = 0.0f,
-				kLODValue = 1.0f,
 			};
 		}
 
@@ -316,14 +316,14 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Renderer LOD")]
 
 			public RenderLODSelection kLODSelection;
+			[VisibleIf(nameof(kLODSelection), (int)RenderLODSelection.Manual), Range(0.0f, 1.0f)]
+			public float kLODSelectionValue;
 			[Range(0.0f, 1.0f)]
 			public float kLODCeiling;
 			[Range(0.0f, 2.0f)]
 			public float kLODScale;
 			[Range(-1.0f, 1.0f)]
 			public float kLODBias;
-			[VisibleIf(nameof(kLODSelection), (int)RenderLODSelection.Manual), Range(0.0f, 1.0f)]
-			public float kLODValue;
 			[Range(0.0f, 1.0f)]
 			public float clipThreshold;
 
@@ -340,11 +340,11 @@ namespace Unity.DemoTeam.Hair
 				rendererLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
 				motionVectors = MotionVectorGenerationMode.Object,
 
-				kLODSelection = RenderLODSelection.DerivePerStrand,
+				kLODSelection = RenderLODSelection.AutomaticPerSegment,
+				kLODSelectionValue = 1.0f,
 				kLODCeiling = 1.0f,
 				kLODScale = 1.0f,
 				kLODBias = 0.0f,
-				kLODValue = 1.0f,
 				clipThreshold = 0.1f,
 			};
 		}
@@ -459,16 +459,13 @@ namespace Unity.DemoTeam.Hair
 				Exact		= 1,
 			}
 
-			[LineHeader("Grid")]
+			[LineHeader("Transfer")]
 
 			public GridPrecision gridPrecision;
 			[Range(8, 160)]
 			public uint gridResolution;
 			[HideInInspector, Tooltip("Increases precision of derivative quantities at the cost of volume splatting performance")]
 			public bool gridStaggered;
-
-			[LineHeader("Transfer")]
-
 			public SplatMethod splatMethod;
 			public bool splatClusters;
 

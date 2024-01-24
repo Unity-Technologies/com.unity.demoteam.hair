@@ -32,6 +32,7 @@ namespace Unity.DemoTeam.Hair
 			public Vector3 center;
 			public Vector3 extent;
 			public float radius;
+			public float reach;
 		}
 
 		[GenerateHLSL(needAccessors = false)]

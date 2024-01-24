@@ -130,23 +130,25 @@ struct HairVertex
 	float3 strandDebugColor;
 };
 
-HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
+HairVertexWS GetHairVertexWS_Live(in float4 packedID)
 {
 	uint decodedStrandIndex;
 	uint decodedVertexIndex;
 	uint decodedVertexFacet;
-	float decodedVertexSign;
 	float2 decodedTubularUV;
 	{
 		uint4 unpack = round(packedID * _DecodeVertexComponentValue);
 
-		decodedStrandIndex = (unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
-								(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
-								(unpack.y >> _DecodeVertexWidth);
+		decodedStrandIndex = (
+			(unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
+			(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
+			(unpack.y >> _DecodeVertexWidth)
+		);
+		
 		decodedVertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
 		decodedVertexIndex = unpack.x;
-		decodedVertexSign = 1.0;
-			
+		
+		//TODO evaluate this in comparison
 		//uint decodedStrandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
 		//uint decodedVertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
 		//uint decodedVertexIndex = packedID.x * _DecodeStrandIndex.w
@@ -178,8 +180,8 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 	float3 curvePositionRWSPrev = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(LoadPositionPrev(i));
 
 	float3 vertexBitangentWS = (r0 + r1);// approx tangent to curve
-	float3 vertexTangentWS = decodedVertexSign * normalize_safe(cross(HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS), vertexBitangentWS));
-	float3 vertexNormalWS = decodedVertexSign * normalize_safe(cross(vertexBitangentWS, vertexTangentWS));
+	float3 vertexTangentWS = normalize_safe(cross(HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS), vertexBitangentWS));
+	float3 vertexNormalWS = normalize_safe(cross(vertexBitangentWS, vertexTangentWS));
 
 	float2 vertexOffset2D = 0;
 	float3 vertexOffsetWS = 0;
@@ -204,7 +206,7 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 				{
 					switch (_RenderLODMethod)
 					{
-						case RENDERLODSELECTION_DERIVE_PER_STRAND:
+						case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
 							lodDesc = ResolveLODIndices(ResolveLODQuantity(curveCoverage, _RenderLODCeiling, _RenderLODScale, _RenderLODBias));
 							break;
 
@@ -232,7 +234,7 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 					{
 #define USE_PASSING_FRACTION 1
 #if USE_PASSING_FRACTION
-						case RENDERLODSELECTION_DERIVE_PER_STRAND:
+						case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
 							//float lodThreshClip = lodClipThreshold;
 							//                    = unitSpanSubpixelDepth / unitSpanClippingDepth;
 							//float lodThreshClipCluster = unitSpanSubpixelDepth / (unitSpanClippingDepth + guideReach * 2);
@@ -320,9 +322,9 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID, in float2 packedUV)
 	return x;
 }
 
-HairVertex GetHairVertex_Live(in float4 packedID, in float2 packedUV)
+HairVertex GetHairVertex_Live(in float4 packedID)
 {
-	HairVertexWS x = GetHairVertexWS_Live(packedID, packedUV);
+	HairVertexWS x = GetHairVertexWS_Live(packedID);
 	HairVertex v;
 	{
 		v.positionOS = mul(UNITY_MATRIX_I_M, float4(x.positionWS, 1.0)).xyz;
@@ -359,20 +361,18 @@ HairVertex GetHairVertex_Static(in float3 positionOS, in float3 normalOS, in flo
 
 HairVertex GetHairVertex(
 	in float4 in_packedID,
-	in float2 in_packedUV,
 	in float3 in_staticPositionOS,
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS)
 {
 	if (_DecodeVertexCount > 0)
-		return GetHairVertex_Live(in_packedID, in_packedUV);
+		return GetHairVertex_Live(in_packedID);
 	else
 		return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 }
 
 void HairVertex_float(
 	in float4 in_packedID,
-	in float2 in_packedUV,
 	in float3 in_staticPositionOS,
 	in float3 in_staticNormalOS,
 	in float3 in_staticTangentOS,
@@ -387,7 +387,7 @@ void HairVertex_float(
 	out float3 out_strandNormalTS,
 	out float3 out_strandDebugColor)
 {
-	HairVertex v = GetHairVertex(in_packedID, in_packedUV, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
+	HairVertex v = GetHairVertex(in_packedID, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
 	{
 		out_positionOS = v.positionOS;
 		out_motionOS = v.positionOS - v.positionOSPrev;

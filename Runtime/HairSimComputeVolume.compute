@@ -182,10 +182,10 @@ float GetParticleLODCarry(uint particleIndex)
 	LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
 
 	//TODO check if it's worth doing this in practice
-	// uint strandIndex = GetParticleStrandIndex(particleIndex);
-	// float strandCarryLo = _LODGuideCarry[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
-	// float strandCarryHi = _LODGuideCarry[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
-	// return lerp(strandCarryLo, strandCarryHi, lodDesc.lodBlendFraction);
+	//uint strandIndex = GetParticleStrandIndex(particleIndex);
+	//float strandCarryLo = _LODGuideCarry[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
+	//float strandCarryHi = _LODGuideCarry[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
+	//return lerp(strandCarryLo, strandCarryHi, lodDesc.lodBlendFrac);
 
 	return _LODGuideCarry[(lodDesc.lodIndexHi * _StrandCount) + GetParticleStrandIndex(particleIndex)];
 #else
@@ -1452,6 +1452,7 @@ void KBoundsResolve(
 		lodBounds.center = 0.5 * (boundsMax + boundsMin);
 		lodBounds.extent = 0.5 * (boundsMax - boundsMin);
 		lodBounds.radius = length(lodBounds.extent);
+		lodBounds.reach = min(lodBounds.extent.x, min(lodBounds.extent.y, lodBounds.extent.z));
 	}
 
 	_Bounds[boundsIndex] = lodBounds;
@@ -1481,11 +1482,13 @@ void KBoundsResolveCombined(
 		lodBounds.center = 0.5 * (combinedBoundsMax + combinedBoundsMin);
 		lodBounds.extent = 0.5 * (combinedBoundsMax - combinedBoundsMin);
 		lodBounds.radius = length(lodBounds.extent);
+		lodBounds.reach = min(lodBounds.extent.x, min(lodBounds.extent.y, lodBounds.extent.z));
 	}
 
 	_Bounds[boundsIndex] = lodBounds;
 }
 
+//TODO use y-dim for frustums..
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void KBoundsCoverage(
 	uint3 groupIdx : SV_GroupID,

@@ -662,11 +662,11 @@ void KLODSelection(
 	{
 		switch (_SolverLODMethod)
 		{
-			case SOLVERLODSELECTION_DERIVE_PER_GROUP:
+			case SOLVERLODSELECTION_AUTOMATIC_PER_GROUP:
 				solverLODQuantity = ResolveLODQuantity(_BoundsCoverage[_GroupBoundsIndex].x, _SolverLODCeiling, _SolverLODScale, _SolverLODBias);
 				break;
 
-			case SOLVERLODSELECTION_DERIVE_PER_VOLUME:
+			case SOLVERLODSELECTION_AUTOMATIC_PER_VOLUME:
 				solverLODQuantity = ResolveLODQuantity(_BoundsCoverage[_CombinedBoundsIndex].x, _SolverLODCeiling, _SolverLODScale, _SolverLODBias);
 				break;
 
@@ -681,12 +681,12 @@ void KLODSelection(
 	{
 		switch (_RenderLODMethod)
 		{
-			case RENDERLODSELECTION_DERIVE_PER_STRAND:
-			case RENDERLODSELECTION_DERIVE_PER_GROUP:
+			case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
+			case RENDERLODSELECTION_AUTOMATIC_PER_GROUP:
 				renderLODQuantity = ResolveLODQuantity(_BoundsCoverage[_GroupBoundsIndex].x, _RenderLODCeiling, _RenderLODScale, _RenderLODBias);
 				break;
 
-			case RENDERLODSELECTION_DERIVE_PER_VOLUME:
+			case RENDERLODSELECTION_AUTOMATIC_PER_VOLUME:
 				renderLODQuantity = ResolveLODQuantity(_BoundsCoverage[_CombinedBoundsIndex].x, _RenderLODCeiling, _RenderLODScale, _RenderLODBias);
 				break;
 

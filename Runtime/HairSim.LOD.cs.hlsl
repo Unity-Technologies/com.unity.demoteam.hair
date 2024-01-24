@@ -27,6 +27,7 @@ struct LODBounds
     float3 center;
     float3 extent;
     float radius;
+    float reach;
 };
 
 // Generated from Unity.DemoTeam.Hair.HairSim+LODGeometry

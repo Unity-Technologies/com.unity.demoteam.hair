@@ -277,8 +277,8 @@ namespace Unity.DemoTeam.Hair
 		[GenerateHLSL]
 		public enum SolverLODSelection
 		{
-			DerivePerGroup		= 0,
-			DerivePerVolume		= 1,
+			AutomaticPerGroup	= 0,
+			AutomaticPerVolume	= 1,
 			Manual				= 2,
 		}
 
@@ -293,9 +293,9 @@ namespace Unity.DemoTeam.Hair
 		[GenerateHLSL]
 		public enum RenderLODSelection
 		{
-			DerivePerStrand		= 0,
-			DerivePerGroup		= 1,
-			DerivePerVolume		= 2,
+			AutomaticPerSegment	= 0,
+			AutomaticPerGroup	= 1,
+			AutomaticPerVolume	= 2,
 			MatchPhysics		= 3,
 			Manual				= 4,
 		}
