@@ -345,7 +345,7 @@ namespace Unity.DemoTeam.Hair
 				kLODCeiling = 1.0f,
 				kLODScale = 1.0f,
 				kLODBias = 0.0f,
-				clipThreshold = 0.1f,
+				clipThreshold = 0.05f,
 			};
 		}
 

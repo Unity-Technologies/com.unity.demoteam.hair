@@ -24,8 +24,8 @@
 #define UNITY_PREV_MATRIX_I_M UNITY_MATRIX_I_M
 #endif
 
-#define STRAND_PARTICLE_COUNT	_StagingStrandVertexCount
 #define STRAND_PARTICLE_OFFSET	_StagingStrandVertexOffset
+#define STRAND_PARTICLE_COUNT	_StagingStrandVertexCount
 
 #define DECLARE_STRAND(x)													\
 	const uint strandIndex = x;												\
@@ -33,31 +33,32 @@
 	const uint strandParticleStride = _StrandParticleStride;				\
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * STRAND_PARTICLE_COUNT;
 
-float3 LoadPosition(uint i)
+//---------
+// utility
+
+float3 LoadPosition(const uint i)
 {
 	return LoadStagingPosition(i);
 }
 
-float3 LoadPositionPrev(uint i)
+float3 LoadPositionPrev(const uint i)
 {
 	return LoadStagingPositionPrev(i);
 }
 
-float GetStrandParticleOffset(in uint strandParticleNumber)
+float GetStrandParticleOffset(const uint strandParticleNumber)
 {
 	return strandParticleNumber / (float)(STRAND_PARTICLE_COUNT - 1);
 }
 
-float GetStrandParticleTaper(in uint strandParticleNumber, in float2 strandTaperParams)
+float GetStrandParticleTaperScale(const uint strandParticleNumber, const float2 strandTaperOffsetScale)
 {
-	// strandTaperParams.x = tip scale offset
-	// strandTaperParams.y = tip scale
 	float strandParticleOffset = GetStrandParticleOffset(strandParticleNumber);
-	float strandParticleTipT = saturate((strandParticleOffset - strandTaperParams.x) / (1.0 - strandTaperParams.x));
-	return lerp(1.0, strandTaperParams.y, strandParticleTipT);
+	float strandParticleTaperT = saturate((strandParticleOffset - strandTaperOffsetScale.x) / (1.0 - strandTaperOffsetScale.x));
+	return lerp(1.0, strandTaperOffsetScale.y, strandParticleTaperT);
 }
 
-float3 GetStrandDebugColor(in uint strandIndex)
+float3 GetStrandDebugColor(const uint strandIndex)
 {
 	LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
 	uint guideIndexLo = _LODGuideIndex[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
@@ -67,22 +68,125 @@ float3 GetStrandDebugColor(in uint strandIndex)
 	return lerp(guideColorLo, guideColorHi, lodDesc.lodBlendFrac);
 }
 
+//-----------
+// accessors
+
 int _DecodeVertexCount;
 int _DecodeVertexWidth;
 int _DecodeVertexComponentValue;
 int _DecodeVertexComponentWidth;
 
-float3 GetSurfaceNormalTS(in float2 tubularUV)
+struct HairVertexID
+{
+	uint strandIndex;
+	uint vertexIndex;
+	uint vertexFacet;
+	float2 tubularUV;
+};
+
+static const HairVertexID defaultHairVertexID =
+{
+	/* uint strandIndex; */ 0,
+	/* uint vertexIndex; */ 0,
+	/* uint vertexFacet; */ 0,
+	/* float2 tubularUV; */ float2(0.5, 0.0),
+};
+
+struct HairVertexModifiers
+{
+	float lodScale;
+	float lodBias;
+	float widthMod;
+	bool widthSet;
+};
+
+static const HairVertexModifiers defaultHairVertexModifiers =
+{
+	/* float lodScale; */ 1.0,
+	/* float lodBias;  */ 0.0,
+	/* float widthMod; */ 1.0,
+	/* bool widthSet;  */ false,
+};
+
+struct HairVertexData
+{
+	float3 surfacePosition;
+	float3 surfaceNormal;
+	float3 surfaceTangent;
+	float3 surfaceVelocity;
+	float3 surfaceNormalTS;
+	float2 surfaceUV;
+	float2 surfaceUVClip;
+	float lodOutputOpacity;
+	float lodOutputWidth;
+	float2 rootUV;
+	float4 rootScale;
+	uint strandIndex;
+	float3 strandIndexColor;
+};
+
+static const HairVertexData defaultHairVertexData =
+{
+	/* float3 surfacePosition;  */ float3(0.0, 0.0, 0.0),
+	/* float3 surfaceNormal;    */ float3(0.0, 0.0, 0.0),
+	/* float3 surfaceTangent;   */ float3(0.0, 0.0, 0.0),
+	/* float3 surfaceVelocity;  */ float3(0.0, 0.0, 0.0),
+	/* float3 surfaceNormalTS;  */ float3(0.0, 0.0, 1.0),
+	/* float2 surfaceUV;        */ float2(0.5, 0.0),
+	/* float2 surfaceUVClip;    */ float2(0.5, 0.0),
+	/* float lodOutputOpacity;  */ 1.0,
+	/* float lodOutputWidth;    */ 1.0 * 0.1,
+	/* float2 rootUV;           */ float2(0.0, 0.0),
+	/* float4 rootScale;        */ float4(1.0, 1.0, 1.0, 1.0),
+	/* uint strandIndex;        */ 0,
+	/* float3 strandIndexColor; */ float3(0.5, 0.5, 0.5),
+};
+
+HairVertexID DecodeHairVertexID(float4 packedID)
+{
+	HairVertexID id;
+	{
+		uint4 unpack = round(packedID * _DecodeVertexComponentValue);
+
+		id.strandIndex = (
+			(unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
+			(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
+			(unpack.y >> _DecodeVertexWidth)
+		);
+		
+		id.vertexIndex = unpack.x;
+		id.vertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
+		
+		//TODO evaluate this in comparison
+		//	id.strandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
+		//	id.vertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
+		//	id.vertexIndex = packedID.x * _DecodeStrandIndex.w
+
+		if (_DecodeVertexCount == 1)
+		{
+			id.tubularUV.x = 0.5;
+			id.tubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float) (STRAND_PARTICLE_COUNT - 1);
+		}
+		else
+		{
+			id.tubularUV.x = frac(packedID.y * (_DecodeVertexComponentValue / (float)(1 << _DecodeVertexWidth))) * ((1 << _DecodeVertexWidth) / (float)_DecodeVertexCount);
+			id.tubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float) (STRAND_PARTICLE_COUNT - 1);
+		}
+	}
+	return id;
+}
+
+float3 GetSurfaceNormalTS(const float2 tubularUV)
 {
 	float3 surfaceNormalTS;
 	{
-		if (_DecodeVertexCount == 2)
+		if (_DecodeVertexCount == 2)// strips
 		{
 			surfaceNormalTS.x = 4.0 * saturate(tubularUV.x) - 1.0;
 			surfaceNormalTS.y = 0.0;
 			surfaceNormalTS.z = sqrt(max(1e-5, 1.0 - surfaceNormalTS.x * surfaceNormalTS.x));
 		}
-		else
+		else// everything else
 		{
 			surfaceNormalTS = float3(0.0, 0.0, 1.0);
 		}
@@ -90,11 +194,11 @@ float3 GetSurfaceNormalTS(in float2 tubularUV)
 	return surfaceNormalTS;
 }
 
-float2 GetSurfaceUV(in float2 tubularUV)
+float2 GetSurfaceUV(const float2 tubularUV)
 {
 	float2 surfaceUV = tubularUV;
 	{
-		if (_DecodeVertexCount >= 2)
+		if (_DecodeVertexCount >= 2)// strips, tubes
 		{
 			surfaceUV.x *= 2.0;
 		}
@@ -102,71 +206,10 @@ float2 GetSurfaceUV(in float2 tubularUV)
 	return surfaceUV;
 }
 
-struct HairVertexWS
+HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers m)
 {
-	float3 positionWS;
-	float3 positionWSPrev;
-	float3 normalWS;
-	float3 tangentWS;
-	float3 bitangentWS;
-	float2 rootUV;
-	float2 strandUV;
-	uint strandIndex;
-	float3 strandNormalTS;
-	float3 strandDebugColor;
-};
-
-struct HairVertex
-{
-	float3 positionOS;
-	float3 positionOSPrev;
-	float3 normalOS;
-	float3 tangentOS;
-	float3 bitangentOS;
-	float2 rootUV;
-	float2 strandUV;
-	uint strandIndex;
-	float3 strandNormalTS;
-	float3 strandDebugColor;
-};
-
-HairVertexWS GetHairVertexWS_Live(in float4 packedID)
-{
-	uint decodedStrandIndex;
-	uint decodedVertexIndex;
-	uint decodedVertexFacet;
-	float2 decodedTubularUV;
-	{
-		uint4 unpack = round(packedID * _DecodeVertexComponentValue);
-
-		decodedStrandIndex = (
-			(unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
-			(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
-			(unpack.y >> _DecodeVertexWidth)
-		);
-		
-		decodedVertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
-		decodedVertexIndex = unpack.x;
-		
-		//TODO evaluate this in comparison
-		//uint decodedStrandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
-		//uint decodedVertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
-		//uint decodedVertexIndex = packedID.x * _DecodeStrandIndex.w
-
-		if (_DecodeVertexCount == 1)
-		{
-			decodedTubularUV.x = 0.5;
-			decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
-		}
-		else
-		{
-			decodedTubularUV.x = frac(packedID.y * (_DecodeVertexComponentValue / (float)(1 << _DecodeVertexWidth))) * ((1 << _DecodeVertexWidth) / (float)_DecodeVertexCount);
-			decodedTubularUV.y = (packedID.x * _DecodeVertexComponentValue) / (float)(STRAND_PARTICLE_COUNT - 1);
-		}
-	}
-
-	DECLARE_STRAND(decodedStrandIndex);
-	const uint i = strandParticleBegin + decodedVertexIndex * strandParticleStride;
+	DECLARE_STRAND(id.strandIndex);
+	const uint i = strandParticleBegin + id.vertexIndex * strandParticleStride;
 	const uint i_next = i + strandParticleStride;
 	const uint i_prev = i - strandParticleStride;
 	const uint i_head = strandParticleBegin;
@@ -178,227 +221,255 @@ HairVertexWS GetHairVertexWS_Live(in float4 packedID)
 
 	float3 curvePositionRWS = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(p);
 	float3 curvePositionRWSPrev = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(LoadPositionPrev(i));
+	float3 curveTangentWS = (r0 + r1); // approx tangent to curve
 
-	float3 vertexBitangentWS = (r0 + r1);// approx tangent to curve
-	float3 vertexTangentWS = normalize_safe(cross(HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS), vertexBitangentWS));
-	float3 vertexNormalWS = normalize_safe(cross(vertexBitangentWS, vertexTangentWS));
-
-	float2 vertexOffset2D = 0;
-	float3 vertexOffsetWS = 0;
+	// calc world radius
+	float radius = (0.5 * _GroupMaxParticleDiameter) * _RootScale[strandIndex].y;
 	{
-		if (_DecodeVertexCount > 1)
+		// apply cluster level of detail
 		{
-			// calc radius in world space
-			float radius = (0.5 * _GroupMaxParticleDiameter) * _RootScale[strandIndex].y;
+			LODFrustum lodFrustum = MakeLODFrustumForCurrentCamera();
 
-			// apply cluster based level of detail
+			float curveSpan = 2.0 * radius;
+			float curveDepth = dot(lodFrustum.cameraForward, curvePositionRWS - lodFrustum.cameraPosition);
+			float curveCoverage = LODFrustumCoverage(lodFrustum, curveDepth, curveSpan);
+
+			// lod selection
+			LODIndices lodDesc;
 			{
-				// get frustum
-				LODFrustum lodFrustum = MakeLODFrustumForCurrentCamera();
-
-				// get coverage
-				float curveSpan = 2.0 * radius;
-				float curveDepth = dot(lodFrustum.cameraForward, curvePositionRWS - lodFrustum.cameraPosition);
-				float curveCoverage = LODFrustumCoverage(lodFrustum, curveDepth, curveSpan);
-
-				// lod selection
-				LODIndices lodDesc;
+				switch (_RenderLODMethod)
 				{
-					switch (_RenderLODMethod)
-					{
-						case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
-							lodDesc = ResolveLODIndices(ResolveLODQuantity(curveCoverage, _RenderLODCeiling, _RenderLODScale, _RenderLODBias));
-							break;
+					case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
+						lodDesc = ResolveLODIndices(ResolveLODQuantity(curveCoverage, _RenderLODCeiling, _RenderLODScale * m.lodScale, _RenderLODBias + m.lodBias));
+						break;
 
-						default:
+					default:
+						if (m.lodScale == 1.0 && m.lodBias == 0.0)
+						{
 							lodDesc = _SolverLODStage[SOLVERLODSTAGE_RENDERING];
-							break;
-					}
+						}
+						else
+						{
+							lodDesc = ResolveLODIndices(ResolveLODQuantity(_SolverLODStage[SOLVERLODSTAGE_RENDERING].lodValue, _RenderLODCeiling, m.lodScale, m.lodBias));
+						}
+						break;
 				}
+			}
 
-				// lod subpixel accumulation -> cluster centroid
+			// lod subpixel accumulation -> cluster centroid
+			{
+				float guideCarryLo = _LODGuideCarry[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
+				float guideCarryHi = _LODGuideCarry[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
+				float guideCarry = lerp(guideCarryLo, guideCarryHi, lodDesc.lodBlendFrac);
+
+				float guideReachLo = _LODGuideReach[(lodDesc.lodIndexLo * _StrandCount) + strandIndex] * _GroupScale;
+				float guideReachHi = _LODGuideReach[(lodDesc.lodIndexHi * _StrandCount) + strandIndex] * _GroupScale;
+				float guideReach = lerp(guideReachLo, guideReachHi, lodDesc.lodBlendFrac);
+
+				float guideProjectedCoverageLo = 1.0 - exp(-radius * guideCarryLo / guideReachLo);
+				float guideProjectedCoverageHi = 1.0 - exp(-radius * guideCarryHi / guideReachHi);
+				float guideProjectedCoverage = 1.0 - exp(-radius * guideCarry / guideReach);
+
+				switch (_RenderLODMethod)
 				{
-					float guideCarryLo = _LODGuideCarry[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
-					float guideCarryHi = _LODGuideCarry[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
-					float guideCarry = lerp(guideCarryLo, guideCarryHi, lodDesc.lodBlendFrac);
-
-					float guideReachLo = _LODGuideReach[(lodDesc.lodIndexLo * _StrandCount) + strandIndex] * _GroupScale;
-					float guideReachHi = _LODGuideReach[(lodDesc.lodIndexHi * _StrandCount) + strandIndex] * _GroupScale;
-					float guideReach = lerp(guideReachLo, guideReachHi, lodDesc.lodBlendFrac);
-
-					float guideProjectedCoverageLo = 1.0 - exp(-radius * guideCarryLo / guideReachLo);
-					float guideProjectedCoverageHi = 1.0 - exp(-radius * guideCarryHi / guideReachHi);
-					float guideProjectedCoverage = 1.0 - exp(-radius * guideCarry / guideReach);
-
-					switch (_RenderLODMethod)
-					{
 #define USE_PASSING_FRACTION 1
 #if USE_PASSING_FRACTION
-						case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
-							//float lodThreshClip = lodClipThreshold;
-							//                    = unitSpanSubpixelDepth / unitSpanClippingDepth;
-							//float lodThreshClipCluster = unitSpanSubpixelDepth / (unitSpanClippingDepth + guideReach * 2);
-							//                           = unitSpanSubpixelDepth / ((unitSpanSubpixelDepth / lodClipThreshold) + guideReach * 2);
-							//                           = (unitSpanSubpixelDepth * lodClipThreshold) / (unitSpanSubpixelDepth + 2 * guideReach * lodClipThreshold);
+					case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
+						//float lodThreshClip = lodClipThreshold;
+						//                    = unitSpanSubpixelDepth / unitSpanClippingDepth;
+						//float lodThreshClipCluster = unitSpanSubpixelDepth / (unitSpanClippingDepth + guideReach * 2);
+						//                           = unitSpanSubpixelDepth / ((unitSpanSubpixelDepth / lodClipThreshold) + guideReach * 2);
+						//                           = (unitSpanSubpixelDepth * lodClipThreshold) / (unitSpanSubpixelDepth + 2 * guideReach * lodClipThreshold);
 
-							float lodThresh = 1.0;
-							float lodThreshClip = max(_RenderLODClipThreshold, 1e-5);
-							float lodThreshClipCluster = (lodFrustum.unitSpanSubpixelDepth * lodThreshClip) / (lodFrustum.unitSpanSubpixelDepth + 2.0 * guideReach * lodThreshClip);
+						float lodThresh = 1.0;
+						float lodThreshClip = max(_RenderLODClipThreshold, 1e-5);
+						float lodThreshClipCluster = (lodFrustum.unitSpanSubpixelDepth * lodThreshClip) / (lodFrustum.unitSpanSubpixelDepth + 2.0 * guideReach * lodThreshClip);
 
-							float farDepth = curveDepth + guideReach;
-							float farLod = saturate(lodDesc.lodValue * (curveDepth / farDepth));
-							float farLodT = saturate((farLod - lodThreshClipCluster) / (lodThresh - lodThreshClipCluster));
+						float farDepth = curveDepth + guideReach;
+						float farLod = saturate(lodDesc.lodValue * (curveDepth / farDepth));
+						float farLodT = saturate((farLod - lodThreshClipCluster) / (lodThresh - lodThreshClipCluster));
 
 #define USE_CIRCULAR_SECTION 1
 #if USE_CIRCULAR_SECTION
-							// replaces t with normalized area of circular section at height 2rt:
-							// A = (acos(1-2*x)-(1-2*x)*2*sqrt(x*(1-x)))/PI
-							farLodT = (acos(1.0 - 2.0 * farLodT) - (1.0 - 2.0 * farLodT) * 2 * sqrt(farLodT * (1.0 - farLodT))) / 3.14159;
+						// replaces t with normalized area of circular section at height 2rt:
+						// A = (acos(1-2*x)-(1-2*x)*2*sqrt(x*(1-x)))/PI
+						farLodT = (acos(1.0 - 2.0 * farLodT) - (1.0 - 2.0 * farLodT) * 2 * sqrt(farLodT * (1.0 - farLodT))) / 3.14159;
 #endif
 
-							radius = lerp((radius + guideReach) * guideProjectedCoverage, radius, farLodT);
-							break;
+						radius = lerp((radius + guideReach) * guideProjectedCoverage, radius, farLodT);
+						break;
 #endif
 
-						default:
-							radius = lerp((radius + guideReachLo) * guideProjectedCoverageLo, (radius + guideReachHi) * guideProjectedCoverageHi, lodDesc.lodBlendFrac);
-							break;
-					}
-
-					curveSpan = 2.0 * radius;
-					curveCoverage = LODFrustumCoverage(lodFrustum, curveDepth, curveSpan);
+					default:
+						radius = lerp((radius + guideReachLo) * guideProjectedCoverageLo, (radius + guideReachHi) * guideProjectedCoverageHi, lodDesc.lodBlendFrac);
+						break;
 				}
 
-				// apply subpixel discard
+				curveSpan = 2.0 * radius;
+				curveCoverage = LODFrustumCoverage(lodFrustum, curveDepth, curveSpan);
+			}
+
+			// lod subpixel discard
+			{
+				if (curveCoverage < _RenderLODClipThreshold)
 				{
-					if (curveCoverage < _RenderLODClipThreshold)
-					{
-						curvePositionRWS = asfloat(0x7FC00000u);// => NaN
-					}
+					curvePositionRWS = asfloat(0x7FC00000u); // => NaN
 				}
 			}
+		}
 
-			// apply tapering
-			radius *= GetStrandParticleTaper(decodedVertexIndex, _RootScale[strandIndex].zw);
-
-			// calc offset in plane
-			sincos((0.5 - decodedTubularUV.x) * 6.2831853, vertexOffset2D.y, vertexOffset2D.x);
-
-			// calc offset in world space
-			if (_DecodeVertexCount == 2)
-			{
-				vertexOffsetWS =
-					(radius * vertexOffset2D.x) * vertexTangentWS +
-					(radius * vertexOffset2D.y) * vertexNormalWS;
-			}
-			else
-			{
-				vertexNormalWS =
-					(vertexOffset2D.x) * vertexTangentWS +
-					(vertexOffset2D.y) * vertexNormalWS;
-				
-				vertexOffsetWS =
-					(radius) * vertexNormalWS;
-			}
+		// apply tapering
+		{
+			radius *= GetStrandParticleTaperScale(id.vertexIndex, _RootScale[strandIndex].zw);
+		}
+		
+		// apply scaling
+		{
+			radius = m.widthMod * (m.widthSet ? 0.5 : radius);
 		}
 	}
 
-	float3 vertexPositionWS = curvePositionRWS + vertexOffsetWS;
-	float3 vertexPositionWSPrev = curvePositionRWSPrev + vertexOffsetWS;
-
-	HairVertexWS x;
+	// calc surface vectors
+	float3 surfaceTangentWS = normalize_safe(cross(HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS), curveTangentWS));
+	float3 surfaceNormalWS = normalize_safe(cross(curveTangentWS, surfaceTangentWS));
+	
+	// calc surface offset
+	float3 surfaceOffsetWS;
 	{
-		x.positionWS = vertexPositionWS;
-		x.positionWSPrev = vertexPositionWSPrev;
-		x.normalWS = vertexNormalWS;
-		x.tangentWS = vertexTangentWS;
-		x.bitangentWS = vertexBitangentWS;
-		x.rootUV = _RootUV[strandIndex];
-		x.strandUV = GetSurfaceUV(decodedTubularUV) * float2(1.0, _RootScale[strandIndex].x);//TODO scroll to handle twist / change in view direction
-		x.strandIndex = strandIndex;
-		x.strandNormalTS = GetSurfaceNormalTS(decodedTubularUV);
-		x.strandDebugColor = GetStrandDebugColor(decodedStrandIndex);
+		// calc offset in plane
+		float2 surfaceOffset2D;
+		{
+			sincos((0.5 - id.tubularUV.x) * 6.2831853, surfaceOffset2D.y, surfaceOffset2D.x);
+		}
+
+		// calc offset in world space
+		if (_DecodeVertexCount == 2)
+		{
+			surfaceOffsetWS =
+				(radius * surfaceOffset2D.x) * surfaceTangentWS +
+				(radius * surfaceOffset2D.y) * surfaceNormalWS;
+		}
+		else
+		{
+			surfaceNormalWS =
+				(surfaceOffset2D.x) * surfaceTangentWS +
+				(surfaceOffset2D.y) * surfaceNormalWS;
+				
+			surfaceOffsetWS =
+				(radius) * surfaceNormalWS;
+		}
 	}
-	return x;
-}
 
-HairVertex GetHairVertex_Live(in float4 packedID)
-{
-	HairVertexWS x = GetHairVertexWS_Live(packedID);
-	HairVertex v;
+	// assemble output
+	HairVertexData v;
 	{
-		v.positionOS = mul(UNITY_MATRIX_I_M, float4(x.positionWS, 1.0)).xyz;
-		v.positionOSPrev = mul(UNITY_PREV_MATRIX_I_M, float4(x.positionWSPrev, 1.0)).xyz;
-		v.normalOS = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(x.normalWS);
-		v.tangentOS = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(x.tangentWS);
-		v.bitangentOS = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(x.bitangentWS);
-		v.rootUV = x.rootUV;
-		v.strandUV = x.strandUV;
-		v.strandIndex = x.strandIndex;
-		v.strandNormalTS = x.strandNormalTS;
-		v.strandDebugColor = x.strandDebugColor;
-	}
-	return v;
-}
-
-HairVertex GetHairVertex_Static(in float3 positionOS, in float3 normalOS, in float3 tangentOS)
-{
-	HairVertex v;
-	{
-		v.positionOS = positionOS;
-		v.positionOSPrev = positionOS;
-		v.normalOS = normalOS;
-		v.tangentOS = tangentOS;
-		v.bitangentOS = normalize(cross(normalOS, tangentOS));
-		v.rootUV = float2(0.0, 0.0);
-		v.strandUV = float2(0.0, 0.0);
-		v.strandIndex = 0;
-		v.strandNormalTS = float3(0.0, 0.0, 1.0);
-		v.strandDebugColor = float3(0.5, 0.5, 0.5);
+		v.surfacePosition = surfaceOffsetWS + curvePositionRWS;
+		v.surfaceNormal = surfaceNormalWS;
+		v.surfaceTangent = surfaceTangentWS;	
+		v.surfaceVelocity = curvePositionRWS - curvePositionRWSPrev;
+		v.surfaceNormalTS = GetSurfaceNormalTS(id.tubularUV);
+		v.surfaceUV = GetSurfaceUV(id.tubularUV);//TODO scroll to handle twist / change in view direction
+		v.surfaceUVClip = GetSurfaceUV(id.tubularUV) * float2(1.0, _RootScale[strandIndex].x);//TODO scroll to handle twist / change in view direction
+		v.lodOutputOpacity = 1.0;//TODO reserved for later use
+		v.lodOutputWidth = (2.0 * radius) * 100.0;// output in cm
+		v.rootUV = _RootUV[strandIndex];
+		v.rootScale = _RootScale[strandIndex];
+		v.strandIndex = strandIndex;
+		v.strandIndexColor = GetStrandDebugColor(strandIndex);
 	}
 	return v;
 }
 
-HairVertex GetHairVertex(
-	in float4 in_packedID,
-	in float3 in_staticPositionOS,
-	in float3 in_staticNormalOS,
-	in float3 in_staticTangentOS)
+HairVertexData GetHairVertexOS(const HairVertexID id, const HairVertexModifiers m)
+{
+	HairVertexData v = GetHairVertexWS(id, m);
+	{
+#define USE_OBJECT_SPACE_DELTA 1
+#if USE_OBJECT_SPACE_DELTA
+		float3 surfacePositionOS = mul(UNITY_MATRIX_I_M, float4(v.surfacePosition, 1.0)).xyz;
+		float3 surfacePositionOSPrev = mul(UNITY_PREV_MATRIX_I_M, float4(v.surfacePosition - v.surfaceVelocity, 1.0)).xyz;
+		
+		v.surfacePosition = surfacePositionOS;
+		v.surfaceNormal = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(v.surfaceNormal);
+		v.surfaceTangent = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(v.surfaceTangent);
+		v.surfaceVelocity = surfacePositionOS - surfacePositionOSPrev;
+#else
+		v.surfacePosition = mul(UNITY_MATRIX_I_M, float4(v.surfacePosition, 1.0)).xyz;
+		v.surfaceNormal = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(v.surfaceNormal);
+		v.surfaceTangent = HAIR_VERTEX_IMPL_WS_VEC_TO_OS(v.surfaceTangent);
+		v.surfaceVelocity = mul(UNITY_PREV_MATRIX_I_M, float4(v.surfaceVelocity, 0.0)).xyz;
+#endif
+	}
+	return v;
+}
+
+HairVertexData GetHairVertex(
+	const float4 packedID,
+	const float3 staticPositionOS,
+	const float3 staticNormalOS,
+	const float3 staticTangentOS,
+	const HairVertexModifiers m = defaultHairVertexModifiers)
 {
 	if (_DecodeVertexCount > 0)
-		return GetHairVertex_Live(in_packedID);
+	{
+		return GetHairVertexOS(DecodeHairVertexID(packedID), m);
+	}
 	else
-		return GetHairVertex_Static(in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
+	{
+		HairVertexData v = defaultHairVertexData;
+		{
+			v.surfacePosition = staticPositionOS;
+			v.surfaceNormal = staticNormalOS;
+			v.surfaceTangent = staticTangentOS;
+		}
+		return v;
+	}
 }
 
+//-------------
+// shadergraph
+
 void HairVertex_float(
-	in float4 in_packedID,
-	in float3 in_staticPositionOS,
-	in float3 in_staticNormalOS,
-	in float3 in_staticTangentOS,
-	out float3 out_positionOS,
-	out float3 out_motionOS,
-	out float3 out_normalOS,
-	out float3 out_tangentOS,
-	out float3 out_bitangentOS,
+	const float4 in_packedID,
+	const float3 in_staticPositionOS,
+	const float3 in_staticNormalOS,
+	const float3 in_staticTangentOS,
+
+	const float in_lodScale,
+	const float in_lodBias,
+	const float in_widthMod,
+	const bool in_widthSet,
+
+	out float3 out_surfacePositionOS,
+	out float3 out_surfaceNormalOS,
+	out float3 out_surfaceTangentOS,
+	out float3 out_surfaceVelocityOS,
+	out float3 out_surfaceNormalTS,
+	out float2 out_surfaceUV,
+	out float2 out_surfaceUVClip,
+	out float out_lodOutputOpacity,
+	out float out_lodOutputWidth,
 	out float2 out_rootUV,
-	out float2 out_strandUV,
+	out float4 out_rootScale,
 	out float out_strandIndex,
-	out float3 out_strandNormalTS,
-	out float3 out_strandDebugColor)
+	out float3 out_strandIndexColor)
 {
-	HairVertex v = GetHairVertex(in_packedID, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS);
+	HairVertexModifiers m = { in_lodScale, in_lodBias, in_widthMod, in_widthSet };
+	HairVertexData v = GetHairVertex(in_packedID, in_staticPositionOS, in_staticNormalOS, in_staticTangentOS, m);
 	{
-		out_positionOS = v.positionOS;
-		out_motionOS = v.positionOS - v.positionOSPrev;
-		out_normalOS = v.normalOS;
-		out_tangentOS = v.tangentOS;
-		out_bitangentOS = v.bitangentOS;
+		out_surfacePositionOS = v.surfacePosition;
+		out_surfaceNormalOS = v.surfaceNormal;
+		out_surfaceTangentOS = v.surfaceTangent;
+		out_surfaceVelocityOS = v.surfaceVelocity;
+		out_surfaceNormalTS = v.surfaceNormalTS;
+		out_surfaceUV = v.surfaceUV;
+		out_surfaceUVClip = v.surfaceUVClip;
+		out_lodOutputOpacity = v.lodOutputOpacity;
+		out_lodOutputWidth = v.lodOutputWidth;
 		out_rootUV = v.rootUV;
-		out_strandUV = v.strandUV;
+		out_rootScale = v.rootScale;
 		out_strandIndex = v.strandIndex;
-		out_strandNormalTS = v.strandNormalTS;
-		out_strandDebugColor = v.strandDebugColor;
+		out_strandIndexColor = v.strandIndexColor;
 	}
 }
 

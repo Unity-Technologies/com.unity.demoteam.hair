@@ -51,12 +51,12 @@ struct UnlitVaryings
 
 UnlitVaryings UnlitVert(UnlitAttribs IN)
 {
-	HairVertex hair = GetHairVertex(IN.packedID, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
+	HairVertexData v = GetHairVertex(IN.packedID, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
 	{
 		UnlitVaryings OUT;
-		OUT.positionCS = TransformObjectToHClip(hair.positionOS);
-		OUT.strandColor = hair.strandDebugColor;
-		OUT.strandUV = hair.strandUV;
+		OUT.positionCS = TransformObjectToHClip(v.surfacePosition);
+		OUT.strandColor = v.strandIndexColor;
+		OUT.strandUV = v.surfaceUV;
 		return OUT;
 	}
 }
