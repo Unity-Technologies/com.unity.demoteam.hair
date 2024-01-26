@@ -462,7 +462,7 @@ namespace Unity.DemoTeam.Hair
 				},
 				baseLODParamsGenerated = new BaseLODParamsGenerated
 				{
-					baseLODClusterQuantity = 0.0f,
+					baseLODClusterQuantity = 0.001f,
 				},
 				baseLODParamsUVMapped = new BaseLODParamsUVMapped
 				{

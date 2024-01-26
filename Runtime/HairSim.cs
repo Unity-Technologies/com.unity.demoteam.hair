@@ -769,12 +769,12 @@ namespace Unity.DemoTeam.Hair
 			solverConstants._SolverLODMethod = (uint)settingsPhysics.kLODSelection;
 			solverConstants._SolverLODCeiling = settingsPhysics.kLODCeiling;
 			solverConstants._SolverLODScale = settingsPhysics.kLODScale;
-			solverConstants._SolverLODBias = (settingsPhysics.kLODSelection == SolverLODSelection.Manual) ? settingsPhysics.kLODValue : settingsPhysics.kLODBias;
+			solverConstants._SolverLODBias = (settingsPhysics.kLODSelection == SolverLODSelection.Manual) ? settingsPhysics.kLODSelectionValue : settingsPhysics.kLODBias;
 
 			solverConstants._RenderLODMethod = (uint)settingsRendering.kLODSelection;
 			solverConstants._RenderLODCeiling = settingsRendering.kLODCeiling;
 			solverConstants._RenderLODScale = settingsRendering.kLODScale;
-			solverConstants._RenderLODBias = (settingsRendering.kLODSelection == RenderLODSelection.Manual) ? settingsRendering.kLODValue : settingsRendering.kLODBias;
+			solverConstants._RenderLODBias = (settingsRendering.kLODSelection == RenderLODSelection.Manual) ? settingsRendering.kLODSelectionValue : settingsRendering.kLODBias;
 			solverConstants._RenderLODClipThreshold = settingsRendering.clipThreshold;
 
 			// update cbuffer

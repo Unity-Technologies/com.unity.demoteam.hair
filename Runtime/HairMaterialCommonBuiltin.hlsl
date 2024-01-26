@@ -51,8 +51,7 @@
 struct appdata_hair
 {
 	float4 packedID : TEXCOORD0;
-	float2 packedUV : TEXCOORD1;
-#if (HAIR_VERTEX_ID_LINES || HAIR_VERTEX_ID_STRIPS || HAIR_VERTEX_ID_TUBES)
+#if HAIR_VERTEX_LIVE//TODO reintroduce similar editor-only variant to suppress editor warnings on some platforms
 	float4 vertex : COLOR;
 #else
 	float4 vertex : POSITION;
@@ -71,24 +70,24 @@ struct Input
 //----------
 // programs
 
-void BuiltinVert(inout appdata_hair v, out Input o)
+void BuiltinVert(inout appdata_hair a, out Input o)
 {
 #if !SHADER_TARGET_SURFACE_ANALYSIS
-	HairVertex hair = GetHairVertex(v.packedID, v.packedUV, v.vertex.xyz, v.normal.xyz, v.tangent.xyz);
+	HairVertexData v = GetHairVertex(a.packedID, a.vertex.xyz, a.normal.xyz, (a.tangent.xyz * a.tangent.w));
 	{
-		v.vertex = float4(hair.positionOS, 1.0);
-		v.normal = float4(hair.normalOS, 1.0);
-		v.tangent = float4(hair.tangentOS, 1.0);
+		a.vertex = float4(v.surfacePosition, 1.0);
+		a.normal = v.surfacePosition;
+		a.tangent = float4(v.surfaceTangent, 1.0);
 
 		UNITY_INITIALIZE_OUTPUT(Input, o);
-		o.strandTangentWS = TransformObjectToWorldNormal(hair.tangentOS);
-		o.strandColor = hair.strandDebugColor;
-		o.strandUV = hair.strandUV;
+		o.strandTangentWS = TransformObjectToWorldNormal(v.surfaceTangent);
+		o.strandColor = v.strandIndexColor;
+		o.strandUV = v.surfaceUV;
 	}
 #else
-	o.strandTangentWS = TransformObjectToWorldNormal(v.tangent.xyz);
-	o.strandColor = float3(1.0, 1.0, 1.0);
-	o.strandUV = float2(0.5, 0.5);
+	o.strandTangentWS = TransformObjectToWorldNormal(a.tangent.xyz);
+	o.strandColor = float3(0.5, 0.5, 0.5);
+	o.strandUV = float2(0.5, 0.0);
 #endif
 }
 
@@ -105,7 +104,8 @@ void BuiltinSurf(Input IN, inout SurfaceOutput o)
 		float3x3(
 			normalize(IN.strandTangentWS),
 			normalize(cross(IN.strandTangentWS, o.Normal)),
-			o.Normal)
+			o.Normal
+		)
 	);
 }
 

@@ -663,10 +663,10 @@
     "m_Type": "UnityEditor.ShaderGraph.Texture3DInputMaterialSlot",
     "m_ObjectId": "bc701a7ba6af4598b012b9c4683c4eb9",
     "m_Id": 9,
-    "m_DisplayName": "volumeScatteringProbe",
+    "m_DisplayName": "volumeScattering",
     "m_SlotType": 0,
     "m_Hidden": false,
-    "m_ShaderOutputName": "volumeScatteringProbe",
+    "m_ShaderOutputName": "volumeScattering",
     "m_StageCapability": 3,
     "m_Texture": {
         "m_SerializedTexture": "{\"texture\":{\"instanceID\":0}}",

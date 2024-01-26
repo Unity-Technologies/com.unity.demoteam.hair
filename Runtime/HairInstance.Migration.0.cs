@@ -123,13 +123,13 @@ namespace Unity.DemoTeam.Hair
 							switch (x)
 							{
 								default:
-								case __0__SettingsSystem.LODSelection.Automatic: return __1__SolverLODSelection.DerivePerGroup;
+								case __0__SettingsSystem.LODSelection.Automatic: return __1__SolverLODSelection.AutomaticPerGroup;
 								case __0__SettingsSystem.LODSelection.Fixed: return __1__SolverLODSelection.Manual;
 							}
 						};
 
 						out_1.kLODSelection = TranslateLODSelection(in_0.kLODSearch);
-						out_1.kLODValue = in_0.kLODSearchValue;
+						out_1.kLODSelectionValue = in_0.kLODSearchValue;
 					}
 
 					TransferSettingsSystem(in_0, ref data_1_strandGroupDefaults.settingsPhysics);
