@@ -226,7 +226,7 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 	// calc world radius
 	float radius = (0.5 * _GroupMaxParticleDiameter) * _RootScale[strandIndex].y;
 	{
-		// apply cluster level of detail
+		// apply clustering lod
 		{
 			LODFrustum lodFrustum = MakeLODFrustumForCurrentCamera();
 
@@ -334,29 +334,32 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 	float3 surfaceNormalWS = normalize_safe(cross(curveTangentWS, surfaceTangentWS));
 	
 	// calc surface offset
-	float3 surfaceOffsetWS;
+	float3 surfaceOffsetWS = 0;
 	{
-		// calc offset in plane
-		float2 surfaceOffset2D;
+		if (_DecodeVertexCount > 1)
 		{
-			sincos((0.5 - id.tubularUV.x) * 6.2831853, surfaceOffset2D.y, surfaceOffset2D.x);
-		}
+			// calc offset in plane
+			float2 surfaceOffset2D;
+			{
+				sincos((0.5 - id.tubularUV.x) * 6.2831853, surfaceOffset2D.y, surfaceOffset2D.x);
+			}
 
-		// calc offset in world space
-		if (_DecodeVertexCount == 2)
-		{
-			surfaceOffsetWS =
-				(radius * surfaceOffset2D.x) * surfaceTangentWS +
-				(radius * surfaceOffset2D.y) * surfaceNormalWS;
-		}
-		else
-		{
-			surfaceNormalWS =
-				(surfaceOffset2D.x) * surfaceTangentWS +
-				(surfaceOffset2D.y) * surfaceNormalWS;
+			// calc offset in world space
+			if (_DecodeVertexCount == 2)
+			{
+				surfaceOffsetWS =
+					(radius * surfaceOffset2D.x) * surfaceTangentWS +
+					(radius * surfaceOffset2D.y) * surfaceNormalWS;
+			}
+			else
+			{
+				surfaceNormalWS =
+					(surfaceOffset2D.x) * surfaceTangentWS +
+					(surfaceOffset2D.y) * surfaceNormalWS;
 				
-			surfaceOffsetWS =
-				(radius) * surfaceNormalWS;
+				surfaceOffsetWS =
+					(radius) * surfaceNormalWS;
+			}
 		}
 	}
 
