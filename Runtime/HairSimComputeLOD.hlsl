@@ -126,32 +126,37 @@ LODIndices ResolveLODIndices(const float lodValue)
 
 	LODIndices lodDesc;
 	{
-		lodDesc.lodIndexLo = _LODCount;
+		lodDesc.lodIndexLo = 0;
+		lodDesc.lodIndexHi = _LODCount - 1;
 		{
-			while (lodDesc.lodIndexLo > 0)
+			while (lodDesc.lodIndexHi > 0)
 			{
-				float lodValueLo = _LODGuideCount[--lodDesc.lodIndexLo] / (float) _StrandCount;
-				if (lodValueLo < lodValue)
+				if (lodValue > _LODGuideCount[lodDesc.lodIndexHi - 1] / (float)_StrandCount)
 				{
 					break;
+				}
+				else
+				{
+					lodDesc.lodIndexHi--;
 				}
 			}
 		}
 		
-		lodDesc.lodIndexHi = min(lodDesc.lodIndexLo + 1, _LODCount - 1);
+		if (lodDesc.lodIndexLo != lodDesc.lodIndexHi)
 		{
-			float lodValueLo = _LODGuideCount[lodDesc.lodIndexLo] / (float) _StrandCount;
-			float lodValueHi = _LODGuideCount[lodDesc.lodIndexHi] / (float) _StrandCount;
-			if (lodValueHi > lodValueLo)
+			lodDesc.lodIndexLo = lodDesc.lodIndexHi - 1;
 			{
+				float lodValueLo = _LODGuideCount[lodDesc.lodIndexLo] / (float)_StrandCount;
+				float lodValueHi = _LODGuideCount[lodDesc.lodIndexHi] / (float)_StrandCount;
+			
 				lodDesc.lodBlendFrac = saturate((lodValue - lodValueLo) / (lodValueHi - lodValueLo));
 			}
-			else
-			{
-				lodDesc.lodBlendFrac = 0.0;
-			}
 		}
-
+		else
+		{
+			lodDesc.lodBlendFrac = 0.0f;
+		}
+		
 		lodDesc.lodValue = lodValue;
 	}
 

@@ -115,6 +115,8 @@ namespace Unity.DemoTeam.Hair
 						//}
 						*/
 
+						//Debug.LogFormat("solverLOD (num {4}): lo {0} hi {1} frac {2} value {3}", solverLODPhysics.lodIndexLo, solverLODPhysics.lodIndexHi, solverLODPhysics.lodBlendFrac, solverLODPhysics.lodValue, strandGroupInstances[i].groupAssetReference.Resolve().lodCount);
+
 						Gizmos.matrix = Matrix4x4.TRS(planarBoundsCenter, cameraRotation, new Vector3(2.0f * planarBoundsExtent, 2.0f * planarBoundsExtent, 0.0f));
 
 						//using (new UnityEditor.Handles.DrawingScope(Gizmos.matrix))
