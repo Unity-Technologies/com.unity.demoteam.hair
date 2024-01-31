@@ -72,6 +72,7 @@ float2 LODFrustumCoverageCeiling(const LODFrustum lodFrustum, const LODBounds lo
 		float3 cameraVector = lodFrustum.cameraPosition - lodBounds.center;
 		float cameraDistance = length(cameraVector);
 
+		//TODO revisit this
 		float3 nearestSamplePosition = lodBounds.center + cameraVector * (min(cameraDistance, lodBounds.radius) / cameraDistance);
 		float2 nearestSampleCoverage = float2(
 			LODFrustumCoverage(lodFrustum, nearestSamplePosition, lodGeometry.maxParticleDiameter),
@@ -101,7 +102,7 @@ float2 LODFrustumCoverageCeilingSequential(const LODBounds lodBounds, const LODG
 
 float ResolveLODQuantity(const float sampleCoverage, const float lodCeiling, const float lodScale, const float lodBias)
 {
-	//TODO: more friendly hybdrid?
+	//TODO: more friendly hybrid?
 	//
 	// if (bias < 0.0)
 	//		scale	= 1 + min(0.0, bias)

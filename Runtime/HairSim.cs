@@ -254,6 +254,8 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._LODGuideCarry, "LODGuideCarry", Mathf.Max(1, lodCount) * strandCount, particleStrideScalar);
 				changed |= CreateBuffer(ref solverBuffers._LODGuideReach, "LODGuideReach", Mathf.Max(1, lodCount) * strandCount, particleStrideScalar);
 
+				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODStage, solverBuffers._SolverLODStage);
+
 				return changed;
 			}
 		}
@@ -332,6 +334,7 @@ namespace Unity.DemoTeam.Hair
 
 				CreateReadbackBuffer(ref volumeData.buffersReadback._Bounds, volumeBuffers._Bounds);
 				CreateReadbackBuffer(ref volumeData.buffersReadback._BoundsCoverage, volumeBuffers._BoundsCoverage);
+				CreateReadbackBuffer(ref volumeData.buffersReadback._VolumeLODStage, volumeBuffers._VolumeLODStage);
 
 				return changed;
 			}
@@ -377,6 +380,8 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref solverBuffers._StagingVertex);
 			ReleaseBuffer(ref solverBuffers._StagingVertexPrev);
+
+			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODStage);
 
 			if (solverData.lodThreshold.IsCreated)
 				solverData.lodThreshold.Dispose();
@@ -437,6 +442,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._Bounds);
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._BoundsCoverage);
+			ReleaseReadbackBuffer(ref volumeData.buffersReadback._VolumeLODStage);
 
 			if (volumeData.boundaryPrevXform.IsCreated)
 				volumeData.boundaryPrevXform.Dispose();
@@ -784,6 +790,9 @@ namespace Unity.DemoTeam.Hair
 			BindVolumeData(cmd, s_solverCS, SolverKernels.KLODSelection, volumeData);
 			BindSolverData(cmd, s_solverCS, SolverKernels.KLODSelection, solverData);
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KLODSelection, 1, 1, 1);
+
+			// schedule readback
+			solverData.buffersReadback._SolverLODStage.ScheduleCopy(cmd, solverData.buffers._SolverLODStage);
 		}
 
 		public static void PushSolverSettings(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, float deltaTime)
@@ -1537,6 +1546,9 @@ namespace Unity.DemoTeam.Hair
 			// lod selection
 			BindVolumeData(cmd, s_volumeCS, VolumeKernels.KLODSelection, volumeData);
 			cmd.DispatchCompute(s_volumeCS, VolumeKernels.KLODSelection, 1, 1, 1);
+
+			// schedule readback
+			volumeData.buffersReadback._VolumeLODStage.ScheduleCopy(cmd, volumeData.buffers._VolumeLODStage);
 		}
 
 		public static void PushVolumeSettings(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume, float deltaTime)
@@ -2022,6 +2034,32 @@ namespace Unity.DemoTeam.Hair
 			else
 			{
 				return new Bounds();
+			}
+		}
+
+		public static LODIndices GetSolverLODSelection(in SolverData solverData, SolverLODStage solverLODStage)
+		{
+			var lodDescBuffer = solverData.buffersReadback._SolverLODStage.GetData<LODIndices>();
+			if (lodDescBuffer.IsCreated)
+			{
+				return lodDescBuffer[(int)solverLODStage];
+			}
+			else
+			{
+				return new LODIndices();
+			}
+		}
+
+		public static VolumeLODGrid GetVolumeLODSelection(in VolumeData volumeData, VolumeLODStage volumeLODStage)
+		{
+			var lodDescBuffer = volumeData.buffersReadback._VolumeLODStage.GetData<VolumeLODGrid>();
+			if (lodDescBuffer.IsCreated)
+			{
+				return lodDescBuffer[(int)volumeLODStage];
+			}
+			else
+			{
+				return new VolumeLODGrid();
 			}
 		}
 	}

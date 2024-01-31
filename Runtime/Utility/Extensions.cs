@@ -2,6 +2,37 @@ using UnityEngine;
 
 namespace Unity.DemoTeam.Hair
 {
+	public static class Vector2Extensions
+	{
+		public static Vector2 Abs(this Vector2 value)
+		{
+			return new Vector2
+			{
+				x = Mathf.Abs(value.x),
+				y = Mathf.Abs(value.y),
+			};
+		}
+
+		public static Vector2 CMul(this Vector2 value, in Vector2 other)
+		{
+			return new Vector2
+			{
+				x = value.x * other.x,
+				y = value.y * other.y,
+			};
+		}
+
+		public static float CMin(this Vector2 value)
+		{
+			return Mathf.Min(value.x, value.y);
+		}
+
+		public static float CMax(this Vector2 value)
+		{
+			return Mathf.Max(value.x, value.y);
+		}
+	}
+
 	public static class Vector3Extensions
 	{
 		public static Vector3 Abs(this Vector3 value)
