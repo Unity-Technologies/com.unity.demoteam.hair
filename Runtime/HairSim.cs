@@ -113,6 +113,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KBoundsGather;
 			public static int KBoundsResolve;
 			public static int KBoundsResolveCombined;
+			public static int KBoundsHistory;
 			public static int KBoundsCoverage;
 			public static int KLODSelection;
 			public static int KVolumeClear;
@@ -254,6 +255,8 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._LODGuideCarry, "LODGuideCarry", Mathf.Max(1, lodCount) * strandCount, particleStrideScalar);
 				changed |= CreateBuffer(ref solverBuffers._LODGuideReach, "LODGuideReach", Mathf.Max(1, lodCount) * strandCount, particleStrideScalar);
 
+				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODStage, solverBuffers._SolverLODStage);
+
 				return changed;
 			}
 		}
@@ -291,6 +294,7 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref volumeBuffers._BoundsMinMaxU, "BoundsMinMaxU", boundsCount * 2, particleStrideVector3);
 				changed |= CreateBuffer(ref volumeBuffers._Bounds, "Bounds", boundsCount, sizeof(LODBounds));
+				changed |= CreateBuffer(ref volumeBuffers._BoundsPrev, "BoundsPrev", boundsCount, sizeof(LODBounds));
 				changed |= CreateBuffer(ref volumeBuffers._BoundsGeometry, "BoundsGeometry", boundsCount, sizeof(LODGeometry));
 				changed |= CreateBuffer(ref volumeBuffers._BoundsCoverage, "BoundsCoverage", boundsCount, particleStrideVector2);
 
@@ -332,6 +336,7 @@ namespace Unity.DemoTeam.Hair
 
 				CreateReadbackBuffer(ref volumeData.buffersReadback._Bounds, volumeBuffers._Bounds);
 				CreateReadbackBuffer(ref volumeData.buffersReadback._BoundsCoverage, volumeBuffers._BoundsCoverage);
+				CreateReadbackBuffer(ref volumeData.buffersReadback._VolumeLODStage, volumeBuffers._VolumeLODStage);
 
 				return changed;
 			}
@@ -378,6 +383,8 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverBuffers._StagingVertex);
 			ReleaseBuffer(ref solverBuffers._StagingVertexPrev);
 
+			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODStage);
+
 			if (solverData.lodThreshold.IsCreated)
 				solverData.lodThreshold.Dispose();
 
@@ -403,6 +410,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref volumeBuffers._BoundsMinMaxU);
 			ReleaseBuffer(ref volumeBuffers._Bounds);
+			ReleaseBuffer(ref volumeBuffers._BoundsPrev);
 			ReleaseBuffer(ref volumeBuffers._BoundsGeometry);
 			ReleaseBuffer(ref volumeBuffers._BoundsCoverage);
 
@@ -437,6 +445,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._Bounds);
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._BoundsCoverage);
+			ReleaseReadbackBuffer(ref volumeData.buffersReadback._VolumeLODStage);
 
 			if (volumeData.boundaryPrevXform.IsCreated)
 				volumeData.boundaryPrevXform.Dispose();
@@ -522,6 +531,7 @@ namespace Unity.DemoTeam.Hair
 
 			target.BindComputeBuffer(volumeBufferIDs._BoundsMinMaxU, volumeBuffers._BoundsMinMaxU);
 			target.BindComputeBuffer(volumeBufferIDs._Bounds, volumeBuffers._Bounds);
+			target.BindComputeBuffer(volumeBufferIDs._BoundsPrev, volumeBuffers._BoundsPrev);
 			target.BindComputeBuffer(volumeBufferIDs._BoundsGeometry, volumeBuffers._BoundsGeometry);
 			target.BindComputeBuffer(volumeBufferIDs._BoundsCoverage, volumeBuffers._BoundsCoverage);
 
@@ -784,6 +794,9 @@ namespace Unity.DemoTeam.Hair
 			BindVolumeData(cmd, s_solverCS, SolverKernels.KLODSelection, volumeData);
 			BindSolverData(cmd, s_solverCS, SolverKernels.KLODSelection, solverData);
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KLODSelection, 1, 1, 1);
+
+			// schedule readback
+			solverData.buffersReadback._SolverLODStage.ScheduleCopy(cmd, solverData.buffers._SolverLODStage);
 		}
 
 		public static void PushSolverSettings(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, float deltaTime)
@@ -1141,6 +1154,8 @@ namespace Unity.DemoTeam.Hair
 
 			// update bounds
 			{
+				CoreUtils.Swap(ref volumeData.buffers._Bounds, ref volumeData.buffers._BoundsPrev);
+
 				// clear
 				using (var minMaxUBuffer = new NativeArray<uint>(6 * boundsCount, Allocator.Temp))
 				{
@@ -1264,6 +1279,17 @@ namespace Unity.DemoTeam.Hair
 				volumeData.buffersReadback._Bounds.ScheduleCopy(cmd, volumeData.buffers._Bounds);
 				volumeData.buffersReadback._BoundsCoverage.ScheduleCopy(cmd, volumeData.buffers._BoundsCoverage);
 			}
+		}
+
+		public static void PushVolumeBoundsHistory(CommandBuffer cmd, in VolumeData volumeData)
+		{
+			var boundsCount = volumeData.constants._CombinedBoundsIndex + 1;
+			int boundsNumX = ((int)boundsCount + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
+			int boundsNumY = 1;
+			int boundsNumZ = 1;
+
+			BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundsHistory, volumeData);
+			cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundsHistory, boundsNumX, boundsNumY, boundsNumZ);
 		}
 
 		public static void PushVolumeObservers(CommandBuffer cmd, ref VolumeData volumeData, CameraType cameraType)
@@ -1537,6 +1563,9 @@ namespace Unity.DemoTeam.Hair
 			// lod selection
 			BindVolumeData(cmd, s_volumeCS, VolumeKernels.KLODSelection, volumeData);
 			cmd.DispatchCompute(s_volumeCS, VolumeKernels.KLODSelection, 1, 1, 1);
+
+			// schedule readback
+			volumeData.buffersReadback._VolumeLODStage.ScheduleCopy(cmd, volumeData.buffers._VolumeLODStage);
 		}
 
 		public static void PushVolumeSettings(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume, float deltaTime)
@@ -2022,6 +2051,32 @@ namespace Unity.DemoTeam.Hair
 			else
 			{
 				return new Bounds();
+			}
+		}
+
+		public static LODIndices GetSolverLODSelection(in SolverData solverData, SolverLODStage solverLODStage)
+		{
+			var lodDescBuffer = solverData.buffersReadback._SolverLODStage.GetData<LODIndices>();
+			if (lodDescBuffer.IsCreated)
+			{
+				return lodDescBuffer[(int)solverLODStage];
+			}
+			else
+			{
+				return new LODIndices();
+			}
+		}
+
+		public static VolumeLODGrid GetVolumeLODSelection(in VolumeData volumeData, VolumeLODStage volumeLODStage)
+		{
+			var lodDescBuffer = volumeData.buffersReadback._VolumeLODStage.GetData<VolumeLODGrid>();
+			if (lodDescBuffer.IsCreated)
+			{
+				return lodDescBuffer[(int)volumeLODStage];
+			}
+			else
+			{
+				return new VolumeLODGrid();
 			}
 		}
 	}

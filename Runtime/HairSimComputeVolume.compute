@@ -2,6 +2,7 @@
 #pragma kernel KBoundsGather					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsResolve					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsResolveCombined			THREAD_GROUP_SIZE=1		F_BOUNDS
+#pragma kernel KBoundsHistory					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsCoverage					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KLODSelection					THREAD_GROUP_SIZE=1		F_LOD
 #pragma kernel KVolumeClear						F_CLEAR
@@ -1486,6 +1487,22 @@ void KBoundsResolveCombined(
 	}
 
 	_Bounds[boundsIndex] = lodBounds;
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KBoundsHistory(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	DECLARE_BOUNDS(worldIdx.x);
+
+	_BoundsPrev[boundsIndex] = _Bounds[boundsIndex];
 }
 
 //TODO use y-dim for frustums..

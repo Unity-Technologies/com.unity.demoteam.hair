@@ -1117,7 +1117,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				if (lodChain.lodCount == 0)
+				if (lodChain.lodCount == 0 || lodChain.lodGuideCount[lodChain.lodCount - 1] < strandCount)
 				{
 					BuildHighLODAllStrands(ref lodChain, strandGroup, hairAsset);
 				}
@@ -1476,10 +1476,18 @@ namespace Unity.DemoTeam.Hair
 				if (clusterCount < 1)
 					clusterCount = 1;
 
-				if (lodChain.clusterSet.ExpandProcedural(clusterCount, settingsClusters.clusterAllocation, settingsClusters.clusterAllocationOrder, settingsClusters.clusterRefinement ? settingsClusters.clusterRefinementIterations : 0))
+				if (clusterCount < lodChain.strandCount)
 				{
-					lodChain.clusterSet.Commit();
-					lodChain.Increment();
+					if (lodChain.clusterSet.ExpandProcedural(clusterCount, settingsClusters.clusterAllocation, settingsClusters.clusterAllocationOrder, settingsClusters.clusterRefinement ? settingsClusters.clusterRefinementIterations : 0))
+					{
+						lodChain.clusterSet.Commit();
+						lodChain.Increment();
+					}
+				}
+				else
+				{
+					BuildHighLODAllStrands(ref lodChain, strandGroup, hairAsset);
+					break;
 				}
 			}
 		}

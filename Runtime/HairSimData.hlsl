@@ -104,6 +104,7 @@ StructuredBuffer<LODFrustum> _LODFrustum;
 
 HAIRSIM_VOLUMEBOUNDS<uint3> _BoundsMinMaxU;			// xyz: bounds min/max (unsigned sortable)
 HAIRSIM_VOLUMEBOUNDS<LODBounds> _Bounds;			// array(LODBounds): bounds (center, extent, radius)
+HAIRSIM_VOLUMEBOUNDS<LODBounds> _BoundsPrev;		// array(LODBounds): bounds (center, extent, radius)
 HAIRSIM_VOLUMEBOUNDS<LODGeometry> _BoundsGeometry;	// array(LODGeometry): bounds geometry description (dimensions for coverage)
 HAIRSIM_VOLUMEBOUNDS<float2> _BoundsCoverage;		// xy: bounds coverage (unbiased ceiling)
 
@@ -179,9 +180,9 @@ StructuredBuffer<WindEmitter> _WindEmitter;
 //---------
 // utility
 
-uint2 EncodePosition(float3 p, float4 bounds)
+uint2 EncodePosition(float3 p, float4 pivot)
 {
-	uint3 p_f16 = f32tof16((p - bounds.xyz) / bounds.w);
+	uint3 p_f16 = f32tof16((p - pivot.xyz) / pivot.w);
 	uint2 p_enc;
 	{
 		p_enc.x = p_f16.x << 16 | p_f16.y;
@@ -190,82 +191,83 @@ uint2 EncodePosition(float3 p, float4 bounds)
 	return p_enc;
 }
 
-float3 DecodePosition(uint2 p_enc, float4 bounds)
+float3 DecodePosition(uint2 p_enc, float4 pivot)
 {
 	uint3 p_f16 = uint3(p_enc.x >> 16, p_enc.x & 0xffff, p_enc.y);
-	float3 p = f16tof32(p_f16) * bounds.w + bounds.xyz;
+	float3 p = f16tof32(p_f16) * pivot.w + pivot.xyz;
 	return p;
 }
 
-float3 LoadStagingPosition(const uint i)
+float3 LoadStagingPosition(const uint i, const LODBounds lodBounds)
 {
-	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
-	const float4 bounds = float4(lodBounds.center, max(lodBounds.extent.x, max(lodBounds.extent.y, lodBounds.extent.z)));
+	const float4 stagingPivot = float4(lodBounds.center, lodBounds.reach);
 
 	switch (_StagingVertexFormat)
 	{
 		case STAGINGVERTEXFORMAT_COMPRESSED:
-			return DecodePosition(asuint(_StagingVertex.Load2(i * _StagingVertexStride)), bounds);
-		
+			return DecodePosition(asuint(_StagingVertex.Load2(i * _StagingVertexStride)), stagingPivot);
+
 		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
 			return asfloat(_StagingVertex.Load3(i * _StagingVertexStride));
 
 		case STAGINGVERTEXFORMAT_UNCOMPRESSED_PT:
 			return _ParticlePosition[i].xyz;
-		
+
 		default:
 			return 0;
 	}
 }
 
-float3 LoadStagingPositionPrev(const uint i)
+float3 LoadStagingPositionPrev(const uint i, const LODBounds lodBoundsPrev)
 {
-	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
-	const float4 bounds = float4(lodBounds.center, max(lodBounds.extent.x, max(lodBounds.extent.y, lodBounds.extent.z)));
+	const float4 stagingPivotPrev = float4(lodBoundsPrev.center, lodBoundsPrev.reach);
 
 	switch (_StagingVertexFormat)
 	{
 		case STAGINGVERTEXFORMAT_COMPRESSED:
-			return DecodePosition(asuint(_StagingVertexPrev.Load2(i * _StagingVertexStride)), bounds);
+			return DecodePosition(asuint(_StagingVertexPrev.Load2(i * _StagingVertexStride)), stagingPivotPrev);
 
 		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
 			return asfloat(_StagingVertexPrev.Load3(i * _StagingVertexStride));
-		
+
 		case STAGINGVERTEXFORMAT_UNCOMPRESSED_PT:
 			return _ParticlePositionPrev[i].xyz;
-		
+
 		default:
 			return 0;
 	}
 }
 
-void StoreStagingPosition(uint i, float3 p)
+void StoreStagingPosition(const uint i, float3 p, const LODBounds lodBounds)
 {
 #if HAIRSIM_WRITEABLE_SOLVERDATA
-	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
-	const float4 bounds = float4(lodBounds.center, max(lodBounds.extent.x, max(lodBounds.extent.y, lodBounds.extent.z)));
+	const float4 stagingPivot = float4(lodBounds.center, lodBounds.reach);
 
 	switch (_StagingVertexFormat)
 	{
 		case STAGINGVERTEXFORMAT_COMPRESSED:
-			_StagingVertex.Store2(i * _StagingVertexStride, EncodePosition(p, bounds)); break;
-		
+			_StagingVertex.Store2(i * _StagingVertexStride, EncodePosition(p, stagingPivot));
+			break;
+
 		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
-			_StagingVertex.Store3(i * _StagingVertexStride, asuint(p)); break;
+			_StagingVertex.Store3(i * _StagingVertexStride, asuint(p));
+			break;
 	}
 #endif
 }
 
-void ResetStagingPositionPrev(uint i)
+void ResetStagingPositionPrev(const uint i)
 {
 #if HAIRSIM_WRITEABLE_SOLVERDATA
 	switch (_StagingVertexFormat)
 	{
 		case STAGINGVERTEXFORMAT_COMPRESSED:
-			_StagingVertexPrev.Store2(i * _StagingVertexStride, _StagingVertex.Load2(i * _StagingVertexStride)); break;
-		
+			_StagingVertexPrev.Store2(i * _StagingVertexStride, _StagingVertex.Load2(i * _StagingVertexStride));
+			break;
+
 		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
-			_StagingVertexPrev.Store3(i * _StagingVertexStride, _StagingVertex.Load3(i * _StagingVertexStride)); break;
+			_StagingVertexPrev.Store3(i * _StagingVertexStride, _StagingVertex.Load3(i * _StagingVertexStride));
+			break;
 	}
 #endif
 }

@@ -36,14 +36,14 @@
 //---------
 // utility
 
-float3 LoadPosition(const uint i)
+float3 LoadPosition(const uint i, const LODBounds lodBounds)
 {
-	return LoadStagingPosition(i);
+	return LoadStagingPosition(i, lodBounds);
 }
 
-float3 LoadPositionPrev(const uint i)
+float3 LoadPositionPrev(const uint i, const LODBounds lodBoundsPrev)
 {
-	return LoadStagingPositionPrev(i);
+	return LoadStagingPositionPrev(i, lodBoundsPrev);
 }
 
 float GetStrandParticleOffset(const uint strandParticleNumber)
@@ -215,12 +215,15 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 	const uint i_head = strandParticleBegin;
 	const uint i_tail = strandParticleEnd - strandParticleStride;
 
-	float3 p = LoadPosition(i);
-	float3 r0 = (i == i_head) ? LoadPosition(i_next) - p : p - LoadPosition(i_prev);
-	float3 r1 = (i == i_tail) ? r0 /* ............... */ : LoadPosition(i_next) - p;
+	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
+	const LODBounds lodBoundsPrev = _BoundsPrev[_GroupBoundsIndex];
+
+	float3 p = LoadPosition(i, lodBounds);
+	float3 r0 = (i == i_head) ? LoadPosition(i_next, lodBounds) - p : p - LoadPosition(i_prev, lodBounds);
+	float3 r1 = (i == i_tail) ? r0 /* .......................... */ : LoadPosition(i_next, lodBounds) - p;
 
 	float3 curvePositionRWS = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(p);
-	float3 curvePositionRWSPrev = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(LoadPositionPrev(i));
+	float3 curvePositionRWSPrev = HAIR_VERTEX_IMPL_WS_POS_TO_RWS(LoadPositionPrev(i, lodBoundsPrev));
 	float3 curveTangentWS = (r0 + r1); // approx tangent to curve
 
 	// calc world radius

@@ -1496,6 +1496,7 @@ namespace Unity.DemoTeam.Hair
 				HairSim.PushVolumeObservers(cmd, ref volumeData, CameraType.Game | CameraType.SceneView);
 				HairSim.PushVolumeGeometry(cmd, ref volumeData, solverData);
 				HairSim.PushVolumeBounds(cmd, ref volumeData, solverData);
+				HairSim.PushVolumeBoundsHistory(cmd, volumeData);
 
 				for (int i = 0; i != solverData.Length; i++)
 				{

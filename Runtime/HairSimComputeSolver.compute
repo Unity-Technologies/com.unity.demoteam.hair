@@ -1790,6 +1790,8 @@ void KStaging(
 {
 	DECLARE_STRAND(worldIdx.x);
 
+	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
+
 	float4 rootFrame = _RootFrame[strandIndex];
 	float3 rootDir = QMul(rootFrame, float3(0, 1, 0));
 
@@ -1801,13 +1803,13 @@ void KStaging(
 		float3 p1 = _ParticlePosition[i + strandParticleStride].xyz;
 		float3 r1 = normalize(p1 - p0);
 
-		StoreStagingPosition(i, p0);
+		StoreStagingPosition(i, p0, lodBounds);
 
 		p0 = p1;
 		r0 = r1;
 	}
 
-	StoreStagingPosition(strandParticleEnd - strandParticleStride, p0);
+	StoreStagingPosition(strandParticleEnd - strandParticleStride, p0, lodBounds);
 }
 
 struct CatmullRomParticle
@@ -1851,6 +1853,8 @@ void KStagingSubdivision(
 {
 	DECLARE_STRAND(worldIdx.x);
 
+	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
+
 	float4 rootFrame = _RootFrame[strandIndex];
 	float3 rootVec = GetParticleInterval(strandIndex) * QMul(rootFrame, float3(0, 1, 0));
 
@@ -1872,7 +1876,7 @@ void KStagingSubdivision(
 
 		for (uint k = 0; k != segmentStepCount; k++, writeIndex += writeStride)
 		{
-			StoreStagingPosition(writeIndex, CatmullRom(p0, m0, p1, m1, segmentStep * k).xt);
+			StoreStagingPosition(writeIndex, CatmullRom(p0, m0, p1, m1, segmentStep * k).xt, lodBounds);
 		}
 
 		p0 = p1;
@@ -1886,7 +1890,7 @@ void KStagingSubdivision(
 
 		for (uint k = 0; k != segmentStepCount; k++, writeIndex += writeStride)
 		{
-			StoreStagingPosition(writeIndex, CatmullRom(p0, m0, p1, m1, segmentStep * k).xt);
+			StoreStagingPosition(writeIndex, CatmullRom(p0, m0, p1, m1, segmentStep * k).xt, lodBounds);
 		}
 
 		p0 = p1;
@@ -1894,7 +1898,7 @@ void KStagingSubdivision(
 	}
 
 	// cap
-	StoreStagingPosition(writeIndex, p0);
+	StoreStagingPosition(writeIndex, p0, lodBounds);
 }
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]

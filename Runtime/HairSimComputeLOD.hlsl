@@ -72,6 +72,7 @@ float2 LODFrustumCoverageCeiling(const LODFrustum lodFrustum, const LODBounds lo
 		float3 cameraVector = lodFrustum.cameraPosition - lodBounds.center;
 		float cameraDistance = length(cameraVector);
 
+		//TODO revisit this
 		float3 nearestSamplePosition = lodBounds.center + cameraVector * (min(cameraDistance, lodBounds.radius) / cameraDistance);
 		float2 nearestSampleCoverage = float2(
 			LODFrustumCoverage(lodFrustum, nearestSamplePosition, lodGeometry.maxParticleDiameter),
@@ -101,7 +102,7 @@ float2 LODFrustumCoverageCeilingSequential(const LODBounds lodBounds, const LODG
 
 float ResolveLODQuantity(const float sampleCoverage, const float lodCeiling, const float lodScale, const float lodBias)
 {
-	//TODO: more friendly hybdrid?
+	//TODO: more friendly hybrid?
 	//
 	// if (bias < 0.0)
 	//		scale	= 1 + min(0.0, bias)
@@ -125,32 +126,37 @@ LODIndices ResolveLODIndices(const float lodValue)
 
 	LODIndices lodDesc;
 	{
-		lodDesc.lodIndexLo = _LODCount;
+		lodDesc.lodIndexLo = 0;
+		lodDesc.lodIndexHi = _LODCount - 1;
 		{
-			while (lodDesc.lodIndexLo > 0)
+			while (lodDesc.lodIndexHi > 0)
 			{
-				float lodValueLo = _LODGuideCount[--lodDesc.lodIndexLo] / (float) _StrandCount;
-				if (lodValueLo < lodValue)
+				if (lodValue > _LODGuideCount[lodDesc.lodIndexHi - 1] / (float)_StrandCount)
 				{
 					break;
+				}
+				else
+				{
+					lodDesc.lodIndexHi--;
 				}
 			}
 		}
 		
-		lodDesc.lodIndexHi = min(lodDesc.lodIndexLo + 1, _LODCount - 1);
+		if (lodDesc.lodIndexLo != lodDesc.lodIndexHi)
 		{
-			float lodValueLo = _LODGuideCount[lodDesc.lodIndexLo] / (float) _StrandCount;
-			float lodValueHi = _LODGuideCount[lodDesc.lodIndexHi] / (float) _StrandCount;
-			if (lodValueHi > lodValueLo)
+			lodDesc.lodIndexLo = lodDesc.lodIndexHi - 1;
 			{
+				float lodValueLo = _LODGuideCount[lodDesc.lodIndexLo] / (float)_StrandCount;
+				float lodValueHi = _LODGuideCount[lodDesc.lodIndexHi] / (float)_StrandCount;
+			
 				lodDesc.lodBlendFrac = saturate((lodValue - lodValueLo) / (lodValueHi - lodValueLo));
 			}
-			else
-			{
-				lodDesc.lodBlendFrac = 0.0;
-			}
 		}
-
+		else
+		{
+			lodDesc.lodBlendFrac = 0.0f;
+		}
+		
 		lodDesc.lodValue = lodValue;
 	}
 
