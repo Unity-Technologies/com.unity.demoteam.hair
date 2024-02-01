@@ -113,6 +113,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KBoundsGather;
 			public static int KBoundsResolve;
 			public static int KBoundsResolveCombined;
+			public static int KBoundsHistory;
 			public static int KBoundsCoverage;
 			public static int KLODSelection;
 			public static int KVolumeClear;
@@ -293,6 +294,7 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref volumeBuffers._BoundsMinMaxU, "BoundsMinMaxU", boundsCount * 2, particleStrideVector3);
 				changed |= CreateBuffer(ref volumeBuffers._Bounds, "Bounds", boundsCount, sizeof(LODBounds));
+				changed |= CreateBuffer(ref volumeBuffers._BoundsPrev, "BoundsPrev", boundsCount, sizeof(LODBounds));
 				changed |= CreateBuffer(ref volumeBuffers._BoundsGeometry, "BoundsGeometry", boundsCount, sizeof(LODGeometry));
 				changed |= CreateBuffer(ref volumeBuffers._BoundsCoverage, "BoundsCoverage", boundsCount, particleStrideVector2);
 
@@ -408,6 +410,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref volumeBuffers._BoundsMinMaxU);
 			ReleaseBuffer(ref volumeBuffers._Bounds);
+			ReleaseBuffer(ref volumeBuffers._BoundsPrev);
 			ReleaseBuffer(ref volumeBuffers._BoundsGeometry);
 			ReleaseBuffer(ref volumeBuffers._BoundsCoverage);
 
@@ -528,6 +531,7 @@ namespace Unity.DemoTeam.Hair
 
 			target.BindComputeBuffer(volumeBufferIDs._BoundsMinMaxU, volumeBuffers._BoundsMinMaxU);
 			target.BindComputeBuffer(volumeBufferIDs._Bounds, volumeBuffers._Bounds);
+			target.BindComputeBuffer(volumeBufferIDs._BoundsPrev, volumeBuffers._BoundsPrev);
 			target.BindComputeBuffer(volumeBufferIDs._BoundsGeometry, volumeBuffers._BoundsGeometry);
 			target.BindComputeBuffer(volumeBufferIDs._BoundsCoverage, volumeBuffers._BoundsCoverage);
 
@@ -1150,6 +1154,8 @@ namespace Unity.DemoTeam.Hair
 
 			// update bounds
 			{
+				CoreUtils.Swap(ref volumeData.buffers._Bounds, ref volumeData.buffers._BoundsPrev);
+
 				// clear
 				using (var minMaxUBuffer = new NativeArray<uint>(6 * boundsCount, Allocator.Temp))
 				{
@@ -1273,6 +1279,17 @@ namespace Unity.DemoTeam.Hair
 				volumeData.buffersReadback._Bounds.ScheduleCopy(cmd, volumeData.buffers._Bounds);
 				volumeData.buffersReadback._BoundsCoverage.ScheduleCopy(cmd, volumeData.buffers._BoundsCoverage);
 			}
+		}
+
+		public static void PushVolumeBoundsHistory(CommandBuffer cmd, in VolumeData volumeData)
+		{
+			var boundsCount = volumeData.constants._CombinedBoundsIndex + 1;
+			int boundsNumX = ((int)boundsCount + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
+			int boundsNumY = 1;
+			int boundsNumZ = 1;
+
+			BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundsHistory, volumeData);
+			cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundsHistory, boundsNumX, boundsNumY, boundsNumZ);
 		}
 
 		public static void PushVolumeObservers(CommandBuffer cmd, ref VolumeData volumeData, CameraType cameraType)

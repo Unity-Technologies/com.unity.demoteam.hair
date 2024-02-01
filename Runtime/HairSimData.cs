@@ -328,6 +328,7 @@ namespace Unity.DemoTeam.Hair
 
 				public T _BoundsMinMaxU;			// xyz: bounds min/max (unsigned sortable)
 				public T _Bounds;					// array(LODBounds): bounds (center, extent, radius)
+				public T _BoundsPrev;				// array(LODBounds): bounds (center, extent, radius)
 				public T _BoundsGeometry;			// array(LODGeometry): bounds geometry description (dimensions for coverage)
 				public T _BoundsCoverage;			// xy: bounds coverage (unbiased ceiling)
 

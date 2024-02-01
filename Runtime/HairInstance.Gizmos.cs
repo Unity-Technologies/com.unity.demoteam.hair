@@ -88,6 +88,7 @@ namespace Unity.DemoTeam.Hair
 				var cameraPosition = camera.transform.position;
 				var cameraRotation = camera.transform.rotation;
 				var cameraForward = cameraRotation * Vector3.forward;
+				var cameraOrtho = camera.orthographic;
 
 				for (int i = 0; i != solverData.Length; i++)
 				{
@@ -95,8 +96,13 @@ namespace Unity.DemoTeam.Hair
 					var solverLODPhysics = HairSim.GetSolverLODSelection(solverData[i], HairSim.SolverLODStage.Physics);
 					var solverLODRendering = HairSim.GetSolverLODSelection(solverData[i], HairSim.SolverLODStage.Rendering);
 					{
-						var planarBoundsExtent = solverBounds.extents.CMax();
 						var planarBoundsCenter = solverBounds.center;
+						var planarBoundsExtent = solverBounds.extents.CMax();
+						var planarBoundsDepth = cameraOrtho ? 1.0f : Mathf.Max(Vector3.Dot(cameraForward, planarBoundsCenter - cameraPosition), camera.nearClipPlane);
+
+						var viewportExtentUnitDepth = cameraOrtho ? camera.orthographicSize : Mathf.Tan(0.5f * Mathf.Deg2Rad * camera.GetGateFittedFieldOfView());
+						var viewportExtent = planarBoundsDepth * viewportExtentUnitDepth;
+						var viewportScale = viewportExtent / planarBoundsExtent;
 
 						/* TODO minify indicator up close?
 						//var planarBoundsP00 = planarBoundsCenter - cameraRotation * (new Vector3(-planarBoundsExtent, -planarBoundsExtent, 0.0f));
@@ -114,8 +120,6 @@ namespace Unity.DemoTeam.Hair
 						//{
 						//}
 						*/
-
-						//Debug.LogFormat("solverLOD (num {4}): lo {0} hi {1} frac {2} value {3}", solverLODPhysics.lodIndexLo, solverLODPhysics.lodIndexHi, solverLODPhysics.lodBlendFrac, solverLODPhysics.lodValue, strandGroupInstances[i].groupAssetReference.Resolve().lodCount);
 
 						Gizmos.matrix = Matrix4x4.TRS(planarBoundsCenter, cameraRotation, new Vector3(2.0f * planarBoundsExtent, 2.0f * planarBoundsExtent, 0.0f));
 
@@ -151,7 +155,7 @@ namespace Unity.DemoTeam.Hair
 							//Gizmos.DrawWireCube(p0 + (rx + ry) * 0.5f, rx + ry);
 						}
 
-						float indicatorHeight = 0.0025f * Mathf.Tan(0.5f * camera.GetGateFittedFieldOfView()) * (Vector3.Dot(cameraForward, planarBoundsCenter - cameraPosition) / planarBoundsExtent);
+						float indicatorHeight = 0.005f * viewportScale;
 						float indicatorOffset = 0.5f + indicatorHeight;
 
 						GizmosDrawLODIndicator(solverLODRendering, solverData[i].lodThreshold, Vector2.down * 0.5f + Vector2.right * indicatorOffset, Vector2.up, Vector2.left * indicatorHeight, Color.green);
