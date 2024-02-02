@@ -266,7 +266,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
-		public struct SettingsResolve
+		public partial struct SettingsResolve
 		{
 			public const int MIN_RESAMPLE_RESOLUTION = HairSim.MIN_STRAND_PARTICLE_COUNT;
 			public const int MAX_RESAMPLE_RESOLUTION = HairSim.MAX_STRAND_PARTICLE_COUNT;
