@@ -569,8 +569,9 @@ namespace Unity.DemoTeam.Hair
 							bool dataStorageNeedsRefresh = attachment.common.HasDataStorageChanged() ||
 							                               attachment.DataStorage == null ||
 							                               !attachment.ValidateBakedData();
-
-							if (dataStorageNeedsRefresh || buildTargetChanged)
+							bool attachmentStateChanged = attachment.IsAttached != settingsSkinning.rootsAttach;
+							
+							if (dataStorageNeedsRefresh || buildTargetChanged || attachmentStateChanged)
 							{
 								attachment.Target = settingsSkinning.rootsAttachTarget;
 
