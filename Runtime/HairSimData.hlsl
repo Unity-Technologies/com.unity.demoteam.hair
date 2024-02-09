@@ -144,7 +144,7 @@ struct BoundaryShape
 	//  capsule |  centerA    radius     centerB    __pad
 	//  sphere  |  center     radius     __pad      __pad
 	//  torus   |  center     radiusA    axis       radiusB
-	//  cube    |  extent     __pad      __pad      __pad
+	//  cube    |  center     rotf16x    extent     rotf16y
 
 	float3 pA; float tA;
 	float3 pB; float tB;
@@ -183,17 +183,13 @@ StructuredBuffer<WindEmitter> _WindEmitter;
 uint2 EncodePosition(float3 p, float4 pivot)
 {
 	uint3 p_f16 = f32tof16((p - pivot.xyz) / pivot.w);
-	uint2 p_enc;
-	{
-		p_enc.x = p_f16.x << 16 | p_f16.y;
-		p_enc.y = p_f16.z;
-	}
+	uint2 p_enc = p_f16.xy | (p_f16.z << 16);
 	return p_enc;
 }
 
 float3 DecodePosition(uint2 p_enc, float4 pivot)
 {
-	uint3 p_f16 = uint3(p_enc.x >> 16, p_enc.x & 0xffff, p_enc.y);
+	uint3 p_f16 = uint3(p_enc, p_enc.x >> 16);
 	float3 p = f16tof32(p_f16) * pivot.w + pivot.xyz;
 	return p;
 }

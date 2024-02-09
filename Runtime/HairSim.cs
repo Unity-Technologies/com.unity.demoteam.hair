@@ -1503,6 +1503,29 @@ namespace Unity.DemoTeam.Hair
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrix, bufMatrix);
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixInv, bufMatrixInv);
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixW2PrevW, bufMatrixW2PrevW);
+
+					fixed (void* outShape = volumeConstantsScene._CB_BoundaryShape)
+					fixed (void* outMatrix = volumeConstantsScene._CB_BoundaryMatrix)
+					fixed (void* outMatrixInv = volumeConstantsScene._CB_BoundaryMatrixInv)
+					fixed (void* outMatrixW2PrevW = volumeConstantsScene._CB_BoundaryMatrixW2PrevW)
+					{
+						UnsafeUtility.MemCpy(outShape, ptrShape, boundaryCount * sizeof(HairBoundary.RuntimeShape.Data));
+
+						static void CopyTransformRows3x4(Vector4* dst, Matrix4x4* src, int count)
+						{
+							for (int i = 0; i != count; i++)
+							{
+								ref readonly var A = ref src[i];
+								dst[i * 3 + 0] = new Vector4(A.m00, A.m01, A.m02, A.m03);
+								dst[i * 3 + 1] = new Vector4(A.m10, A.m11, A.m12, A.m13);
+								dst[i * 3 + 2] = new Vector4(A.m20, A.m21, A.m22, A.m23);
+							}
+						}
+
+						CopyTransformRows3x4((Vector4*)outMatrix, ptrMatrix, boundaryCount);
+						CopyTransformRows3x4((Vector4*)outMatrixInv, ptrMatrixInv, boundaryCount);
+						CopyTransformRows3x4((Vector4*)outMatrixW2PrevW, ptrMatrixW2PrevW, boundaryCount);
+					}
 				}
 			}
 

@@ -219,7 +219,7 @@ namespace Unity.DemoTeam.Hair
 			return length(q) - t.y;
 		}
 
-		public static float SdCube(in float3 p, in HairBoundary.RuntimeShape.Data cube, in float4x4 invM) => SdCube(p, cube.pA, invM);
+		public static float SdCube(in float3 p, in HairBoundary.RuntimeShape.Data cube, in float4x4 invM) => SdCube(p, cube.pB, invM);
 		public static float SdCube(float3 p, in float3 extent, in float4x4 invM)
 		{
 			p = mul(invM, float4(p, 1.0f)).xyz;

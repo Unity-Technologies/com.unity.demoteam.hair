@@ -2,13 +2,18 @@
 #define __HAIRSIMCOMPUTEBOUNDARIES_HLSL__
 
 #include "HairSimData.hlsl"
+#include "HairSimComputeSolverQuaternion.hlsl"
+
+#define BOUNDARIES_OPT_HINT_LOOP 1
+#define BOUNDARIES_OPT_PACK_CUBE 1
+#define BOUNDARIES_OPT_CBUF_DATA 1
 
 //-----------------
 // boundary shapes
 
-float SdDiscrete(const float3 p, const float4x4 invM, Texture3D<float> sdf)
+float SdDiscrete(const float3 p, const float3x4 invM, Texture3D<float> sdf)
 {
-	float3 uvw = mul(invM, float4(p, 1.0)).xyz;
+	float3 uvw = mul(invM, float4(p, 1.0));
 	return sdf.SampleLevel(_Volume_trilinear_clamp, uvw, 0);
 }
 
@@ -52,9 +57,18 @@ float SdTorus(float3 p, const float3 center, const float3 axis, const float radi
 	return length(q) - t.y;
 }
 
-float SdCube(float3 p, const float3 extent, const float4x4 invM)
+#if BOUNDARIES_OPT_PACK_CUBE
+float SdCube(float3 p, const float3 center, const float3 extent, const uint2 rotf16)
+#else
+float SdCube(float3 p, const float3 extent, const float3x4 invM)
+#endif
 {
-	p = mul(invM, float4(p, 1.0)).xyz;
+#if BOUNDARIES_OPT_PACK_CUBE
+	
+	p = QMul(f16tof32(uint4(rotf16, rotf16 >> 16)), p - center);
+#else
+	p = mul(invM, float4(p, 1.0));
+#endif
 
 	// see: "distance functions" by Inigo Quilez
 	// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
@@ -80,13 +94,73 @@ float SdTorus(const float3 p, const BoundaryShape torus)
 	return SdTorus(p, torus.pA, torus.pB, torus.tA, torus.tB);
 }
 
-float SdCube(const float3 p, const BoundaryShape cube, const float4x4 invM)
+#if BOUNDARIES_OPT_PACK_CUBE
+float SdCube(const float3 p, const BoundaryShape cube)
 {
-	return SdCube(p, cube.pA, invM);
+	return SdCube(p, cube.pA, cube.pB, asuint(float2(cube.tA, cube.tB)));
 }
+#else
+float SdCube(const float3 p, const BoundaryShape cube, const float3x4 invM)
+{
+	return SdCube(p, cube.pB, invM);
+}
+#endif
+
+//--------------------
+// boundary accessors
+
+#if BOUNDARIES_OPT_CBUF_DATA
+
+BoundaryShape GetBoundaryShape(const uint i)
+{
+	BoundaryShape shape = {
+		_CB_BoundaryShape[i * 2 + 0],
+		_CB_BoundaryShape[i * 2 + 1]
+	};
+	return shape;
+}
+
+float3x4 GetBoundaryMatrix(const uint i)
+{
+	return float3x4(
+		_CB_BoundaryMatrix[i * 3 + 0],
+		_CB_BoundaryMatrix[i * 3 + 1],
+		_CB_BoundaryMatrix[i * 3 + 2]);
+}
+
+float3x4 GetBoundaryMatrixInv(const uint i)
+{
+	return float3x4(
+		_CB_BoundaryMatrixInv[i * 3 + 0],
+		_CB_BoundaryMatrixInv[i * 3 + 1],
+		_CB_BoundaryMatrixInv[i * 3 + 2]);
+}
+
+float3x4 GetBoundaryMatrixW2PrevW(const uint i)
+{
+	return float3x4(
+		_CB_BoundaryMatrixW2PrevW[i * 3 + 0],
+		_CB_BoundaryMatrixW2PrevW[i * 3 + 1],
+		_CB_BoundaryMatrixW2PrevW[i * 3 + 2]);
+}
+
+#else
+
+#define GetBoundaryShape(i) _BoundaryShape[i]
+#define GetBoundaryMatrix(i) (float3x4)_BoundaryMatrix[i]
+#define GetBoundaryMatrixInv(i) (float3x4)_BoundaryMatrixInv[i]
+#define GetBoundaryMatrixW2PrevW(i) (float3x4)_BoundaryMatrixW2PrevW[i]
+
+#endif
 
 //------------------
 // boundary queries
+
+#if BOUNDARIES_OPT_HINT_LOOP
+#define BOUNDARIES_LOOP [loop]
+#else
+#define BOUNDARIES_LOOP
+#endif
 
 float BoundaryDistance(const float3 p)
 {
@@ -95,29 +169,38 @@ float BoundaryDistance(const float3 p)
 	uint i = 0;
 	uint j = 0;
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountDiscrete; i != j; i++)
 	{
-		d = min(d, SdDiscrete(p, _BoundaryMatrixInv[i], _BoundarySDF));
+		d = min(d, SdDiscrete(p, GetBoundaryMatrixInv(i), _BoundarySDF));
 	}
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountCapsule; i != j; i++)
 	{
-		d = min(d, SdCapsule(p, _BoundaryShape[i]));
+		d = min(d, SdCapsule(p, GetBoundaryShape(i)));
 	}
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountSphere; i != j; i++)
 	{
-		d = min(d, SdSphere(p, _BoundaryShape[i]));
+		d = min(d, SdSphere(p, GetBoundaryShape(i)));
 	}
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountTorus; i != j; i++)
 	{
-		d = min(d, SdTorus(p, _BoundaryShape[i]));
+		d = min(d, SdTorus(p, GetBoundaryShape(i)));
 	}
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountCube; i != j; i++)
 	{
-		d = min(d, SdCube(p, _BoundaryShape[i], _BoundaryMatrixInv[i]));
+#if BOUNDARIES_OPT_PACK_CUBE
+		d = min(d, SdCube(p, GetBoundaryShape(i)));
+#else
+		d = min(d, SdCube(p, GetBoundaryShape(i), GetBoundaryMatrixInv(i)));
+#endif
 	}
 
 	return d;
@@ -130,34 +213,44 @@ uint BoundarySelect(const float3 p, const float d)
 	uint i = 0;
 	uint j = 0;
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountDiscrete; i != j; i++)
 	{
-		if (d == SdDiscrete(p, _BoundaryMatrixInv[i], _BoundarySDF))
+		if (d == SdDiscrete(p, GetBoundaryMatrixInv(i), _BoundarySDF))
 			index = i;
 	}
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountCapsule; i != j; i++)
 	{
-		if (d == SdCapsule(p, _BoundaryShape[i]))
+		if (d == SdCapsule(p, GetBoundaryShape(i)))
 			index = i;
 	}
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountSphere; i != j; i++)
 	{
-		if (d == SdSphere(p, _BoundaryShape[i]))
+		if (d == SdSphere(p, GetBoundaryShape(i)))
 			index = i;
 	}
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountTorus; i != j; i++)
 	{
-		if (d == SdTorus(p, _BoundaryShape[i]))
+		if (d == SdTorus(p, GetBoundaryShape(i)))
 			index = i;
 	}
 
+	BOUNDARIES_LOOP
 	for (j += _BoundaryCountCube; i != j; i++)
 	{
-		if (d == SdCube(p, _BoundaryShape[i], _BoundaryMatrixInv[i]))
+#if BOUNDARIES_OPT_PACK_CUBE
+		if (d == SdCube(p, GetBoundaryShape(i)))
 			index = i;
+#else
+		if (d == SdCube(p, GetBoundaryShape(i), GetBoundaryMatrixInv(i)))
+			index = i;
+#endif
 	}
 
 	return index;

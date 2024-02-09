@@ -397,7 +397,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
-		public struct VolumeCBufferEnvironment
+		public unsafe struct VolumeCBufferEnvironment
 		{
 			// NOTE: explicit end padding to 16 byte boundary required on some platforms, please update counts if modifying
 
@@ -428,6 +428,15 @@ namespace Unity.DemoTeam.Hair
 			public float __ecbpad1;
 			public float __ecbpad2;
 			//public float __ecbpad3;
+
+			[HLSLArray(2 * Conf.MAX_BOUNDARIES, typeof(Vector4))]
+			public fixed float _CB_BoundaryShape[8 * Conf.MAX_BOUNDARIES];
+			[HLSLArray(3 * Conf.MAX_BOUNDARIES, typeof(Vector4))]
+			public fixed float _CB_BoundaryMatrix[12 * Conf.MAX_BOUNDARIES];
+			[HLSLArray(3 * Conf.MAX_BOUNDARIES, typeof(Vector4))]
+			public fixed float _CB_BoundaryMatrixInv[12 * Conf.MAX_BOUNDARIES];
+			[HLSLArray(3 * Conf.MAX_BOUNDARIES, typeof(Vector4))]
+			public fixed float _CB_BoundaryMatrixW2PrevW[12 * Conf.MAX_BOUNDARIES];
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
