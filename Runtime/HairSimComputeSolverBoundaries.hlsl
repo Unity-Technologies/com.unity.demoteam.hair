@@ -8,7 +8,7 @@
 #define BOUNDARIES_OPT_PACK_CUBE 0
 #define BOUNDARIES_OPT_CBUF_DATA 1
 #if BOUNDARIES_GROUPSHARED
-#define BOUNDARIES_OPT_GROUP_MEM 1// requires call to InitGroupBoundaries(threadIndex, threadCount)
+#define BOUNDARIES_OPT_GROUP_MEM 0// requires call to InitGroupBoundaries(threadIndex, threadCount)
 #endif
 
 //-----------------
