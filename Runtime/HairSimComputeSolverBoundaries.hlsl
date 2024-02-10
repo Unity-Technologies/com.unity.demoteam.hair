@@ -5,8 +5,11 @@
 #include "HairSimComputeSolverQuaternion.hlsl"
 
 #define BOUNDARIES_OPT_HINT_LOOP 1
-#define BOUNDARIES_OPT_PACK_CUBE 1
+#define BOUNDARIES_OPT_PACK_CUBE 0
 #define BOUNDARIES_OPT_CBUF_DATA 1
+#if BOUNDARIES_GROUPSHARED
+#define BOUNDARIES_OPT_GROUP_MEM 1// requires call to InitGroupBoundaries(threadIndex, threadCount)
+#endif
 
 //-----------------
 // boundary shapes
@@ -111,7 +114,7 @@ float SdCube(const float3 p, const BoundaryShape cube, const float3x4 invM)
 
 #if BOUNDARIES_OPT_CBUF_DATA
 
-BoundaryShape GetBoundaryShape(const uint i)
+BoundaryShape __GetBoundaryShape(const uint i)
 {
 	BoundaryShape shape = {
 		_CB_BoundaryShape[i * 2 + 0],
@@ -119,24 +122,21 @@ BoundaryShape GetBoundaryShape(const uint i)
 	};
 	return shape;
 }
-
-float3x4 GetBoundaryMatrix(const uint i)
+float3x4 __GetBoundaryMatrix(const uint i)
 {
 	return float3x4(
 		_CB_BoundaryMatrix[i * 3 + 0],
 		_CB_BoundaryMatrix[i * 3 + 1],
 		_CB_BoundaryMatrix[i * 3 + 2]);
 }
-
-float3x4 GetBoundaryMatrixInv(const uint i)
+float3x4 __GetBoundaryMatrixInv(const uint i)
 {
 	return float3x4(
 		_CB_BoundaryMatrixInv[i * 3 + 0],
 		_CB_BoundaryMatrixInv[i * 3 + 1],
 		_CB_BoundaryMatrixInv[i * 3 + 2]);
 }
-
-float3x4 GetBoundaryMatrixW2PrevW(const uint i)
+float3x4 __GetBoundaryMatrixW2PrevW(const uint i)
 {
 	return float3x4(
 		_CB_BoundaryMatrixW2PrevW[i * 3 + 0],
@@ -146,10 +146,49 @@ float3x4 GetBoundaryMatrixW2PrevW(const uint i)
 
 #else
 
-#define GetBoundaryShape(i) _BoundaryShape[i]
-#define GetBoundaryMatrix(i) (float3x4)_BoundaryMatrix[i]
-#define GetBoundaryMatrixInv(i) (float3x4)_BoundaryMatrixInv[i]
-#define GetBoundaryMatrixW2PrevW(i) (float3x4)_BoundaryMatrixW2PrevW[i]
+#define __GetBoundaryShape(i) _BoundaryShape[i]
+#define __GetBoundaryMatrix(i) (float3x4)_BoundaryMatrix[i]
+#define __GetBoundaryMatrixInv(i) (float3x4)_BoundaryMatrixInv[i]
+#define __GetBoundaryMatrixW2PrevW(i) (float3x4)_BoundaryMatrixW2PrevW[i]
+
+#endif
+
+#if BOUNDARIES_OPT_GROUP_MEM
+
+groupshared BoundaryShape gs_boundaryShape[MAX_BOUNDARIES];
+groupshared float3x4 gs_boundaryMatrix[MAX_BOUNDARIES];
+groupshared float3x4 gs_boundaryMatrixInv[MAX_BOUNDARIES];
+groupshared float3x4 gs_boundaryMatrixW2PrevW[MAX_BOUNDARIES];
+
+#define GetBoundaryShape(i) gs_boundaryShape[i]
+#define GetBoundaryMatrix(i) gs_boundaryMatrix[i]
+#define GetBoundaryMatrixInv(i) gs_boundaryMatrixInv[i]
+#define GetBoundaryMatrixW2PrevW(i) gs_boundaryMatrixW2PrevW[i]
+
+void InitGroupBoundaries(const uint threadIndex, const uint threadCount)
+{
+	if (threadIndex == 0)
+	{
+		for (int i = 0; i != MAX_BOUNDARIES; i++)
+		{
+			gs_boundaryShape[i] = __GetBoundaryShape(i);
+			gs_boundaryMatrix[i] = __GetBoundaryMatrix(i);
+			gs_boundaryMatrixInv[i] = __GetBoundaryMatrixInv(i);
+			gs_boundaryMatrixW2PrevW[i] = __GetBoundaryMatrixW2PrevW(i);
+		}
+	}
+
+	GroupMemoryBarrierWithGroupSync();
+}
+
+#else
+
+#define GetBoundaryShape(i) __GetBoundaryShape(i)
+#define GetBoundaryMatrix(i) __GetBoundaryMatrix(i)
+#define GetBoundaryMatrixInv(i) __GetBoundaryMatrixInv(i)
+#define GetBoundaryMatrixW2PrevW(i) __GetBoundaryMatrixW2PrevW(i)
+
+void InitGroupBoundaries(const uint threadIndex, const uint threadCount) { }
 
 #endif
 
