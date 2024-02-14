@@ -1,3 +1,6 @@
+#pragma use_dxc
+#pragma enable_d3d11_debug_symbols
+
 #ifndef __HAIRVERTEX_HLSL__
 #define __HAIRVERTEX_HLSL__
 
@@ -273,39 +276,37 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 				float guideProjectedCoverageHi = 1.0 - exp(-radius * guideCarryHi / guideReachHi);
 				float guideProjectedCoverage = 1.0 - exp(-radius * guideCarry / guideReach);
 
-				switch (_RenderLODMethod)
-				{
 #define USE_PASSING_FRACTION 1
 #if USE_PASSING_FRACTION
-					case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
-						//float lodThreshClip = lodClipThreshold;
-						//                    = unitSpanSubpixelDepth / unitSpanClippingDepth;
-						//float lodThreshClipCluster = unitSpanSubpixelDepth / (unitSpanClippingDepth + guideReach * 2);
-						//                           = unitSpanSubpixelDepth / ((unitSpanSubpixelDepth / lodClipThreshold) + guideReach * 2);
-						//                           = (unitSpanSubpixelDepth * lodClipThreshold) / (unitSpanSubpixelDepth + 2 * guideReach * lodClipThreshold);
+				if (_RenderLODMethod == RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT)
+				{
+					//float lodThreshClip = lodClipThreshold;
+					//                    = unitSpanSubpixelDepth / unitSpanClippingDepth;
+					//float lodThreshClipCluster = unitSpanSubpixelDepth / (unitSpanClippingDepth + guideReach * 2);
+					//                           = unitSpanSubpixelDepth / ((unitSpanSubpixelDepth / lodClipThreshold) + guideReach * 2);
+					//                           = (unitSpanSubpixelDepth * lodClipThreshold) / (unitSpanSubpixelDepth + 2 * guideReach * lodClipThreshold);
 
-						float lodThresh = 1.0;
-						float lodThreshClip = max(_RenderLODClipThreshold, 1e-5);
-						float lodThreshClipCluster = (lodFrustum.unitSpanSubpixelDepth * lodThreshClip) / (lodFrustum.unitSpanSubpixelDepth + 2.0 * guideReach * lodThreshClip);
+					float lodThresh = 1.0;
+					float lodThreshClip = max(_RenderLODClipThreshold, 1e-5);
+					float lodThreshClipCluster = (lodFrustum.unitSpanSubpixelDepth * lodThreshClip) / (lodFrustum.unitSpanSubpixelDepth + 2.0 * guideReach * lodThreshClip);
 
-						float farDepth = curveDepth + guideReach;
-						float farLod = saturate(lodDesc.lodValue * (curveDepth / farDepth));
-						float farLodT = saturate((farLod - lodThreshClipCluster) / (lodThresh - lodThreshClipCluster));
+					float farDepth = curveDepth + guideReach;
+					float farLod = saturate(lodDesc.lodValue * (curveDepth / farDepth));
+					float farLodT = saturate((farLod - lodThreshClipCluster) / (lodThresh - lodThreshClipCluster));
 
 #define USE_CIRCULAR_SECTION 1
 #if USE_CIRCULAR_SECTION
-						// replaces t with normalized area of circular section at height 2rt:
-						// A = (acos(1-2*x)-(1-2*x)*2*sqrt(x*(1-x)))/PI
-						farLodT = (acos(1.0 - 2.0 * farLodT) - (1.0 - 2.0 * farLodT) * 2 * sqrt(farLodT * (1.0 - farLodT))) / 3.14159;
+					// replaces t with normalized area of circular section at height 2rt:
+					// A = (acos(1-2*x)-(1-2*x)*2*sqrt(x*(1-x)))/PI
+					farLodT = (acos(1.0 - 2.0 * farLodT) - (1.0 - 2.0 * farLodT) * 2 * sqrt(farLodT * (1.0 - farLodT))) / 3.14159;
 #endif
 
-						radius = lerp((radius + guideReach) * guideProjectedCoverage, radius, farLodT);
-						break;
+					radius = lerp((radius + guideReach) * guideProjectedCoverage, radius, farLodT);
+				}
+				else
+				{
 #endif
-
-					default:
-						radius = lerp((radius + guideReachLo) * guideProjectedCoverageLo, (radius + guideReachHi) * guideProjectedCoverageHi, lodDesc.lodBlendFrac);
-						break;
+					radius = lerp((radius + guideReachLo) * guideProjectedCoverageLo, (radius + guideReachHi) * guideProjectedCoverageHi, lodDesc.lodBlendFrac);
 				}
 
 				curveSpan = 2.0 * radius;

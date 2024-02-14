@@ -331,9 +331,15 @@ void SolveMaterialFrameBendTwistConstraint(
 	float4 darboux = QMul(QInverse(q0), q1);
 
 	// apply eq. 32 + 33 to pick closest delta
+#if 1
+	float sqnorm_add = dot(darboux + darboux0, darboux + darboux0);
+	float sqnorm_sub = dot(darboux - darboux0, darboux - darboux0);
+	float4 delta = darboux + (sqnorm_add < sqnorm_sub ? 1.0 : -1.0) * darboux0;
+#else
 	float4 delta_add = (darboux + darboux0);
 	float4 delta_sub = (darboux - darboux0);
 	float4 delta = (dot(delta_add, delta_add) < dot(delta_sub, delta_sub)) ? delta_add : delta_sub;
+#endif
 
 	//TODO consider this?
 	//if (dot(delta.xyz, delta.xyz) < 1e-7)

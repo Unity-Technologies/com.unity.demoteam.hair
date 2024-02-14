@@ -160,11 +160,11 @@ CBUFFER_END
 CBUFFER_START(VolumeCBufferEnvironment)
     float4 _WorldGravity;
     uint _LODFrustumCount;
-    uint _BoundaryCountDiscrete;
-    uint _BoundaryCountCapsule;
-    uint _BoundaryCountSphere;
-    uint _BoundaryCountTorus;
-    uint _BoundaryCountCube;
+    uint _BoundaryDelimDiscrete;
+    uint _BoundaryDelimCapsule;
+    uint _BoundaryDelimSphere;
+    uint _BoundaryDelimTorus;
+    uint _BoundaryDelimCube;
     float _BoundaryWorldEpsilon;
     float _BoundaryWorldMargin;
     float _WindEmitterClock;

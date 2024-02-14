@@ -409,11 +409,11 @@ namespace Unity.DemoTeam.Hair
 			public uint _LODFrustumCount;
 
 			// +5
-			public uint _BoundaryCountDiscrete;
-			public uint _BoundaryCountCapsule;
-			public uint _BoundaryCountSphere;
-			public uint _BoundaryCountTorus;
-			public uint _BoundaryCountCube;
+			public uint _BoundaryDelimDiscrete;
+			public uint _BoundaryDelimCapsule;
+			public uint _BoundaryDelimSphere;
+			public uint _BoundaryDelimTorus;
+			public uint _BoundaryDelimCube;
 			public float _BoundaryWorldEpsilon;
 			public float _BoundaryWorldMargin;
 

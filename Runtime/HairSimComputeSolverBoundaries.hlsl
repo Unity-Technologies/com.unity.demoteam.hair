@@ -7,8 +7,8 @@
 #define BOUNDARIES_OPT_HINT_LOOP 1
 #define BOUNDARIES_OPT_PACK_CUBE 0
 #define BOUNDARIES_OPT_CBUF_DATA 1
-#if BOUNDARIES_GROUPSHARED
-#define BOUNDARIES_OPT_GROUP_MEM 0// requires call to InitGroupBoundaries(threadIndex, threadCount)
+#if GROUPSHARED_BOUNDARY_DATA
+#define BOUNDARIES_OPT_GROUP_MEM 0// requires call to PrepareBoundaryData(threadIndex, threadCount)
 #endif
 
 //-----------------
@@ -165,7 +165,7 @@ groupshared float3x4 gs_boundaryMatrixW2PrevW[MAX_BOUNDARIES];
 #define GetBoundaryMatrixInv(i) gs_boundaryMatrixInv[i]
 #define GetBoundaryMatrixW2PrevW(i) gs_boundaryMatrixW2PrevW[i]
 
-void InitGroupBoundaries(const uint threadIndex, const uint threadCount)
+void PrepareBoundaryData(const uint threadIndex, const uint threadCount)
 {
 	if (threadIndex == 0)
 	{
@@ -188,7 +188,7 @@ void InitGroupBoundaries(const uint threadIndex, const uint threadCount)
 #define GetBoundaryMatrixInv(i) __GetBoundaryMatrixInv(i)
 #define GetBoundaryMatrixW2PrevW(i) __GetBoundaryMatrixW2PrevW(i)
 
-void InitGroupBoundaries(const uint threadIndex, const uint threadCount) { }
+void PrepareBoundaryData(const uint threadIndex, const uint threadCount) { }
 
 #endif
 
@@ -201,39 +201,36 @@ void InitGroupBoundaries(const uint threadIndex, const uint threadCount) { }
 #define BOUNDARIES_LOOP
 #endif
 
+#if 1
+#define BOUNDARIES_FOR_VARS(i, val) uint i = val;
+#define BOUNDARIES_FOR(i, n) BOUNDARIES_LOOP for (; i != n; i++)
+#else
+#define BOUNDARIES_FOR_VARS(i, val) uint i = val; uint j = val;
+#define BOUNDARIES_FOR(i, n) BOUNDARIES_LOOP for (j += n; i != j; i++)
+#endif
+
 float BoundaryDistance(const float3 p)
 {
 	float d = 1e+7;
 
-	uint i = 0;
-	uint j = 0;
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountDiscrete; i != j; i++)
+	BOUNDARIES_FOR_VARS(i, 0)
+	BOUNDARIES_FOR(i, _BoundaryDelimDiscrete)
 	{
 		d = min(d, SdDiscrete(p, GetBoundaryMatrixInv(i), _BoundarySDF));
 	}
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountCapsule; i != j; i++)
+	BOUNDARIES_FOR(i, _BoundaryDelimCapsule)
 	{
 		d = min(d, SdCapsule(p, GetBoundaryShape(i)));
 	}
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountSphere; i != j; i++)
+	BOUNDARIES_FOR(i, _BoundaryDelimSphere)
 	{
 		d = min(d, SdSphere(p, GetBoundaryShape(i)));
 	}
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountTorus; i != j; i++)
+	BOUNDARIES_FOR(i, _BoundaryDelimTorus)
 	{
 		d = min(d, SdTorus(p, GetBoundaryShape(i)));
 	}
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountCube; i != j; i++)
+	BOUNDARIES_FOR(i, _BoundaryDelimCube)
 	{
 #if BOUNDARIES_OPT_PACK_CUBE
 		d = min(d, SdCube(p, GetBoundaryShape(i)));
@@ -247,52 +244,41 @@ float BoundaryDistance(const float3 p)
 
 uint BoundarySelect(const float3 p, const float d)
 {
-	uint index = 0;
+	uint k = 0;
 
-	uint i = 0;
-	uint j = 0;
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountDiscrete; i != j; i++)
+	BOUNDARIES_FOR_VARS(i, 0)
+	BOUNDARIES_FOR(i, _BoundaryDelimDiscrete)
 	{
 		if (d == SdDiscrete(p, GetBoundaryMatrixInv(i), _BoundarySDF))
-			index = i;
+			k = i;
 	}
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountCapsule; i != j; i++)
+	BOUNDARIES_FOR(i, _BoundaryDelimCapsule)
 	{
 		if (d == SdCapsule(p, GetBoundaryShape(i)))
-			index = i;
+			k = i;
 	}
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountSphere; i != j; i++)
+	BOUNDARIES_FOR(i, _BoundaryDelimSphere)
 	{
 		if (d == SdSphere(p, GetBoundaryShape(i)))
-			index = i;
+			k = i;
 	}
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountTorus; i != j; i++)
+	BOUNDARIES_FOR(i, _BoundaryDelimTorus)
 	{
 		if (d == SdTorus(p, GetBoundaryShape(i)))
-			index = i;
+			k = i;
 	}
-
-	BOUNDARIES_LOOP
-	for (j += _BoundaryCountCube; i != j; i++)
+	BOUNDARIES_FOR(i, _BoundaryDelimCube)
 	{
 #if BOUNDARIES_OPT_PACK_CUBE
 		if (d == SdCube(p, GetBoundaryShape(i)))
-			index = i;
+			k = i;
 #else
 		if (d == SdCube(p, GetBoundaryShape(i), GetBoundaryMatrixInv(i)))
-			index = i;
+			k = i;
 #endif
 	}
 
-	return index;
+	return k;
 }
 
 float3 BoundaryNormal(const float3 p, const float d)
