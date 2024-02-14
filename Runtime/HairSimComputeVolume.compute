@@ -1,4 +1,7 @@
-﻿#pragma kernel KBoundsClear						THREAD_GROUP_SIZE=64	F_BOUNDS
+﻿#pragma use_dxc
+#pragma enable_d3d11_debug_symbols
+
+#pragma kernel KBoundsClear						THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsGather					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsResolve					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsResolveCombined			THREAD_GROUP_SIZE=1		F_BOUNDS

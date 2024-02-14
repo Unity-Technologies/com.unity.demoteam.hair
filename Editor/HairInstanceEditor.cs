@@ -567,11 +567,17 @@ namespace Unity.DemoTeam.Hair
 				{
 					using (new EditorGUI.IndentLevelScope())
 					{
-						var countDiscrete = hairInstance.volumeData.constantsEnvironment._BoundaryCountDiscrete;
-						var countCapsule = hairInstance.volumeData.constantsEnvironment._BoundaryCountCapsule;
-						var countSphere = hairInstance.volumeData.constantsEnvironment._BoundaryCountSphere;
-						var countTorus = hairInstance.volumeData.constantsEnvironment._BoundaryCountTorus;
-						var countCube = hairInstance.volumeData.constantsEnvironment._BoundaryCountCube;
+						ref readonly var delimDiscrete = ref hairInstance.volumeData.constantsEnvironment._BoundaryDelimDiscrete;
+						ref readonly var delimCapsule = ref hairInstance.volumeData.constantsEnvironment._BoundaryDelimCapsule;
+						ref readonly var delimSphere = ref hairInstance.volumeData.constantsEnvironment._BoundaryDelimSphere;
+						ref readonly var delimTorus = ref hairInstance.volumeData.constantsEnvironment._BoundaryDelimTorus;
+						ref readonly var delimCube = ref hairInstance.volumeData.constantsEnvironment._BoundaryDelimCube;
+
+						var countDiscrete = delimDiscrete;
+						var countCapsule = delimCapsule - delimDiscrete;
+						var countSphere = delimSphere - delimCapsule;
+						var countTorus = delimTorus - delimSphere;
+						var countCube = delimCube - delimTorus;
 
 						var countAll = countDiscrete + countCapsule + countSphere + countTorus + countCube;
 						var countTxt = string.Format("{0} boundaries ({1} discrete, {2} capsule, {3} sphere, {4} torus, {5} cube)", countAll, countDiscrete, countCapsule, countSphere, countTorus, countCube);

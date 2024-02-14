@@ -1364,18 +1364,18 @@ namespace Unity.DemoTeam.Hair
 					var boundarySDFCellSize = 0.0f;
 
 					// count boundaries
-					volumeConstantsScene._BoundaryCountDiscrete = 0;
-					volumeConstantsScene._BoundaryCountCapsule = 0;
-					volumeConstantsScene._BoundaryCountSphere = 0;
-					volumeConstantsScene._BoundaryCountTorus = 0;
-					volumeConstantsScene._BoundaryCountCube = 0;
+					var boundaryCountDiscrete = 0u;
+					var boundaryCountCapsule = 0u;
+					var boundaryCountSphere = 0u;
+					var boundaryCountTorus = 0u;
+					var boundaryCountCube = 0u;
 
 					for (int i = 0; i != boundaryList.Count; i++)
 					{
 						var data = boundaryList[i];
 						if (data.type == HairBoundary.RuntimeData.Type.SDF)
 						{
-							volumeConstantsScene._BoundaryCountDiscrete++;
+							boundaryCountDiscrete++;
 							boundaryCount++;
 							boundarySDFIndex = i;
 							boundarySDFCellSize = Mathf.Max(boundarySDFCellSize, data.sdf.worldCellSize);
@@ -1389,10 +1389,10 @@ namespace Unity.DemoTeam.Hair
 						{
 							switch (data.shape.type)
 							{
-								case HairBoundary.RuntimeShape.Type.Capsule: volumeConstantsScene._BoundaryCountCapsule++; break;
-								case HairBoundary.RuntimeShape.Type.Sphere: volumeConstantsScene._BoundaryCountSphere++; break;
-								case HairBoundary.RuntimeShape.Type.Torus: volumeConstantsScene._BoundaryCountTorus++; break;
-								case HairBoundary.RuntimeShape.Type.Cube: volumeConstantsScene._BoundaryCountCube++; break;
+								case HairBoundary.RuntimeShape.Type.Capsule: boundaryCountCapsule++; break;
+								case HairBoundary.RuntimeShape.Type.Sphere: boundaryCountSphere++; break;
+								case HairBoundary.RuntimeShape.Type.Torus: boundaryCountTorus++; break;
+								case HairBoundary.RuntimeShape.Type.Cube: boundaryCountCube++; break;
 							}
 
 							boundaryCount++;
@@ -1402,15 +1402,21 @@ namespace Unity.DemoTeam.Hair
 							break;
 					}
 
+					volumeConstantsScene._BoundaryDelimDiscrete = boundaryCountDiscrete;
+					volumeConstantsScene._BoundaryDelimCapsule = boundaryCountCapsule + volumeConstantsScene._BoundaryDelimDiscrete;
+					volumeConstantsScene._BoundaryDelimSphere = boundaryCountSphere + volumeConstantsScene._BoundaryDelimCapsule;
+					volumeConstantsScene._BoundaryDelimTorus = boundaryCountTorus + volumeConstantsScene._BoundaryDelimSphere;
+					volumeConstantsScene._BoundaryDelimCube = boundaryCountCube + volumeConstantsScene._BoundaryDelimTorus;
+
 					volumeConstantsScene._BoundaryWorldEpsilon = (boundarySDFIndex != -1) ? boundarySDFCellSize * 0.2f : 1e-4f;
 					volumeConstantsScene._BoundaryWorldMargin = settingsEnvironment.defaultSolidMargin * 0.01f;
 
 					// pack boundaries
 					int firstIndexDiscrete = 0;
-					int firstIndexCapsule = firstIndexDiscrete + (int)volumeConstantsScene._BoundaryCountDiscrete;
-					int firstIndexSphere = firstIndexCapsule + (int)volumeConstantsScene._BoundaryCountCapsule;
-					int firstIndexTorus = firstIndexSphere + (int)volumeConstantsScene._BoundaryCountSphere;
-					int firstIndexCube = firstIndexTorus + (int)volumeConstantsScene._BoundaryCountTorus;
+					int firstIndexCapsule = (int)volumeConstantsScene._BoundaryDelimDiscrete;
+					int firstIndexSphere = (int)volumeConstantsScene._BoundaryDelimCapsule;
+					int firstIndexTorus = (int)volumeConstantsScene._BoundaryDelimSphere;
+					int firstIndexCube = (int)volumeConstantsScene._BoundaryDelimTorus;
 
 					int writeIndexDiscrete = firstIndexDiscrete;
 					int writeIndexCapsule = firstIndexCapsule;
@@ -1482,12 +1488,12 @@ namespace Unity.DemoTeam.Hair
 							ptrMatrixW2PrevW[i] = Matrix4x4.identity;
 
 						// world to UVW for discrete
-						if (i < volumeConstantsScene._BoundaryCountDiscrete && boundarySDFIndex != -1)
+						if (i < volumeConstantsScene._BoundaryDelimDiscrete && boundarySDFIndex != -1)
 						{
 							ptrMatrixInv[i] = boundaryList[boundarySDFIndex].sdf.worldToUVW;
 						}
 						// world to prim for cube
-						else if (i < volumeConstantsScene._BoundaryCountCube + firstIndexCube && i >= firstIndexCube)
+						else if (i < volumeConstantsScene._BoundaryDelimCube && i >= firstIndexCube)
 						{
 							ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i].WithoutScale());
 						}
@@ -1503,6 +1509,29 @@ namespace Unity.DemoTeam.Hair
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrix, bufMatrix);
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixInv, bufMatrixInv);
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixW2PrevW, bufMatrixW2PrevW);
+
+					fixed (void* outShape = volumeConstantsScene._CB_BoundaryShape)
+					fixed (void* outMatrix = volumeConstantsScene._CB_BoundaryMatrix)
+					fixed (void* outMatrixInv = volumeConstantsScene._CB_BoundaryMatrixInv)
+					fixed (void* outMatrixW2PrevW = volumeConstantsScene._CB_BoundaryMatrixW2PrevW)
+					{
+						UnsafeUtility.MemCpy(outShape, ptrShape, boundaryCount * sizeof(HairBoundary.RuntimeShape.Data));
+
+						static void CopyTransformRows3x4(Vector4* dst, Matrix4x4* src, int count)
+						{
+							for (int i = 0; i != count; i++)
+							{
+								ref readonly var A = ref src[i];
+								dst[i * 3 + 0] = new Vector4(A.m00, A.m01, A.m02, A.m03);
+								dst[i * 3 + 1] = new Vector4(A.m10, A.m11, A.m12, A.m13);
+								dst[i * 3 + 2] = new Vector4(A.m20, A.m21, A.m22, A.m23);
+							}
+						}
+
+						CopyTransformRows3x4((Vector4*)outMatrix, ptrMatrix, boundaryCount);
+						CopyTransformRows3x4((Vector4*)outMatrixInv, ptrMatrixInv, boundaryCount);
+						CopyTransformRows3x4((Vector4*)outMatrixW2PrevW, ptrMatrixW2PrevW, boundaryCount);
+					}
 				}
 			}
 

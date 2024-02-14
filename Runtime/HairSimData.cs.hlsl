@@ -1,5 +1,5 @@
 //
-// This file was automatically generated. Please don't edit by hand.
+// This file was automatically generated. Please don't edit by hand. Execute Editor command [ Edit > Rendering > Generate Shader Includes ] instead
 //
 
 #ifndef HAIRSIMDATA_CS_HLSL
@@ -21,11 +21,48 @@
 #define SOLVERFEATURES_POSE_GLOBAL_ROTATION (2048)
 
 //
-// Unity.DemoTeam.Hair.HairSim+SolverLODStage:  static fields
+// Unity.DemoTeam.Hair.HairSim+VolumeFeatures:  static fields
 //
-#define SOLVERLODSTAGE_PHYSICS (0)
-#define SOLVERLODSTAGE_RENDERING (1)
-#define SOLVERLODSTAGE___COUNT (2)
+#define VOLUMEFEATURES_SCATTERING (1)
+#define VOLUMEFEATURES_SCATTERING_FASTPATH (2)
+#define VOLUMEFEATURES_WIND (4)
+#define VOLUMEFEATURES_WIND_FASTPATH (8)
+
+//
+// Unity.DemoTeam.Hair.HairSim+RenderFeatures:  static fields
+//
+#define RENDERFEATURES_TAPERING (1)
+#define RENDERFEATURES_PER_VERTEX_TEX_COORD (2)
+#define RENDERFEATURES_PER_VERTEX_DIAMETER (4)
+
+//
+// Unity.DemoTeam.Hair.HairSim+VolumeLODDispatch:  static fields
+//
+#define VOLUMELODDISPATCH_RESOLVE (0)
+#define VOLUMELODDISPATCH_RASTER_POINTS (1)
+#define VOLUMELODDISPATCH_RASTER_VECTORS (2)
+#define VOLUMELODDISPATCH___COUNT__ (3)
+
+//
+// Unity.DemoTeam.Hair.HairSim+SolverLODSelection:  static fields
+//
+#define SOLVERLODSELECTION_AUTOMATIC_PER_GROUP (0)
+#define SOLVERLODSELECTION_AUTOMATIC_PER_VOLUME (1)
+#define SOLVERLODSELECTION_MANUAL (2)
+
+//
+// Unity.DemoTeam.Hair.HairSim+VolumeLODStage:  static fields
+//
+#define VOLUMELODSTAGE_RESOLVE (0)
+#define VOLUMELODSTAGE___COUNT__ (1)
+
+//
+// Unity.DemoTeam.Hair.HairSim+StagingVertexFormat:  static fields
+//
+#define STAGINGVERTEXFORMAT_UNDEFINED (0)
+#define STAGINGVERTEXFORMAT_COMPRESSED (1)
+#define STAGINGVERTEXFORMAT_UNCOMPRESSED (2)
+#define STAGINGVERTEXFORMAT_UNCOMPRESSED_PT (3)
 
 //
 // Unity.DemoTeam.Hair.HairSim+SolverLODDispatch:  static fields
@@ -45,18 +82,11 @@
 #define SOLVERLODDISPATCH___COUNT (12)
 
 //
-// Unity.DemoTeam.Hair.HairSim+SolverLODSelection:  static fields
+// Unity.DemoTeam.Hair.HairSim+SolverLODStage:  static fields
 //
-#define SOLVERLODSELECTION_AUTOMATIC_PER_GROUP (0)
-#define SOLVERLODSELECTION_AUTOMATIC_PER_VOLUME (1)
-#define SOLVERLODSELECTION_MANUAL (2)
-
-//
-// Unity.DemoTeam.Hair.HairSim+RenderFeatures:  static fields
-//
-#define RENDERFEATURES_TAPERING (1)
-#define RENDERFEATURES_PER_VERTEX_TEX_COORD (2)
-#define RENDERFEATURES_PER_VERTEX_DIAMETER (4)
+#define SOLVERLODSTAGE_PHYSICS (0)
+#define SOLVERLODSTAGE_RENDERING (1)
+#define SOLVERLODSTAGE___COUNT (2)
 
 //
 // Unity.DemoTeam.Hair.HairSim+RenderLODSelection:  static fields
@@ -66,53 +96,6 @@
 #define RENDERLODSELECTION_AUTOMATIC_PER_VOLUME (2)
 #define RENDERLODSELECTION_MATCH_PHYSICS (3)
 #define RENDERLODSELECTION_MANUAL (4)
-
-//
-// Unity.DemoTeam.Hair.HairSim+StagingVertexFormat:  static fields
-//
-#define STAGINGVERTEXFORMAT_UNDEFINED (0)
-#define STAGINGVERTEXFORMAT_COMPRESSED (1)
-#define STAGINGVERTEXFORMAT_UNCOMPRESSED (2)
-#define STAGINGVERTEXFORMAT_UNCOMPRESSED_PT (3)
-
-//
-// Unity.DemoTeam.Hair.HairSim+VolumeFeatures:  static fields
-//
-#define VOLUMEFEATURES_SCATTERING (1)
-#define VOLUMEFEATURES_SCATTERING_FASTPATH (2)
-#define VOLUMEFEATURES_WIND (4)
-#define VOLUMEFEATURES_WIND_FASTPATH (8)
-
-//
-// Unity.DemoTeam.Hair.HairSim+VolumeLODStage:  static fields
-//
-#define VOLUMELODSTAGE_RESOLVE (0)
-#define VOLUMELODSTAGE___COUNT__ (1)
-
-//
-// Unity.DemoTeam.Hair.HairSim+VolumeLODDispatch:  static fields
-//
-#define VOLUMELODDISPATCH_RESOLVE (0)
-#define VOLUMELODDISPATCH_RASTER_POINTS (1)
-#define VOLUMELODDISPATCH_RASTER_VECTORS (2)
-#define VOLUMELODDISPATCH___COUNT__ (3)
-
-// Generated from Unity.DemoTeam.Hair.HairSim+SolverCBufferRoots
-// PackingRules = Exact
-CBUFFER_START(SolverCBufferRoots)
-    float4x4 _RootMeshMatrix;
-    float4 _RootMeshRotation;
-    float4 _RootMeshRotationInv;
-    float4 _RootMeshSkinningRotation;
-    uint _RootMeshPositionOffset;
-    uint _RootMeshPositionStride;
-    uint _RootMeshTangentOffset;
-    uint _RootMeshTangentStride;
-    uint _RootMeshNormalOffset;
-    uint _RootMeshNormalStride;
-    float __rcbpad1;
-    float __rcbpad2;
-CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer
 // PackingRules = Exact
@@ -177,17 +160,38 @@ CBUFFER_END
 CBUFFER_START(VolumeCBufferEnvironment)
     float4 _WorldGravity;
     uint _LODFrustumCount;
-    uint _BoundaryCountDiscrete;
-    uint _BoundaryCountCapsule;
-    uint _BoundaryCountSphere;
-    uint _BoundaryCountTorus;
-    uint _BoundaryCountCube;
+    uint _BoundaryDelimDiscrete;
+    uint _BoundaryDelimCapsule;
+    uint _BoundaryDelimSphere;
+    uint _BoundaryDelimTorus;
+    uint _BoundaryDelimCube;
     float _BoundaryWorldEpsilon;
     float _BoundaryWorldMargin;
     float _WindEmitterClock;
     uint _WindEmitterCount;
     float __ecbpad1;
     float __ecbpad2;
+    float4 _CB_BoundaryShape[16];
+    float4 _CB_BoundaryMatrix[24];
+    float4 _CB_BoundaryMatrixInv[24];
+    float4 _CB_BoundaryMatrixW2PrevW[24];
+CBUFFER_END
+
+// Generated from Unity.DemoTeam.Hair.HairSim+SolverCBufferRoots
+// PackingRules = Exact
+CBUFFER_START(SolverCBufferRoots)
+    float4x4 _RootMeshMatrix;
+    float4 _RootMeshRotation;
+    float4 _RootMeshRotationInv;
+    float4 _RootMeshSkinningRotation;
+    uint _RootMeshPositionOffset;
+    uint _RootMeshPositionStride;
+    uint _RootMeshTangentOffset;
+    uint _RootMeshTangentStride;
+    uint _RootMeshNormalOffset;
+    uint _RootMeshNormalStride;
+    float __rcbpad1;
+    float __rcbpad2;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer

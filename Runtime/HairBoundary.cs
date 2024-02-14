@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Unity.Mathematics;
 
 namespace Unity.DemoTeam.Hair
 {
@@ -56,7 +57,7 @@ namespace Unity.DemoTeam.Hair
 				//  capsule |  centerA    radius     centerB    __pad
 				//  sphere  |  center     radius     __pad      __pad
 				//  torus   |  center     radiusA    axis       radiusB
-				//  cube    |  extent     __pad      __pad      __pad
+				//  cube    |  center     rotf16x    extent     rotf16y
 
 				public Vector3 pA; public float tA;
 				public Vector3 pB; public float tB;
@@ -170,6 +171,11 @@ namespace Unity.DemoTeam.Hair
 
 			var worldCenter = transform.TransformPoint(center);
 			var worldSize = Vector3.Scale(size, lossyScaleAbs);
+			var worldRot = transform.rotation;
+
+			var rotf16 = math.f32tof16(Quaternion.Inverse(worldRot).ToVector4());
+			var rotf16x = rotf16.x | (rotf16.z << 16);
+			var rotf16y = rotf16.y | (rotf16.w << 16);
 
 			return new RuntimeData
 			{
@@ -184,7 +190,10 @@ namespace Unity.DemoTeam.Hair
 					type = RuntimeShape.Type.Cube,
 					data = new RuntimeShape.Data
 					{
-						pA = worldSize * 0.5f,
+						pA = worldCenter,
+						pB = worldSize * 0.5f,
+						tA = Unity.Mathematics.math.asfloat(rotf16x),
+						tB = Unity.Mathematics.math.asfloat(rotf16y),
 					},
 				},
 			};
