@@ -1,5 +1,5 @@
-﻿#pragma use_dxc
-#pragma enable_d3d11_debug_symbols
+﻿//#pragma use_dxc
+//#pragma enable_d3d11_debug_symbols
 
 #pragma kernel KRoots									THREAD_GROUP_SIZE=64	F_INPUT
 #pragma kernel KRootsHistory							THREAD_GROUP_SIZE=64	F_INPUT
@@ -485,9 +485,9 @@ void KInitialize(
 			_ParticlePositionPrevPrev[i].xyz = (worldRootPos + worldParticleOffset);
 #endif
 
-			_ParticleVelocity[i] = float4(0.0, 0.0, 0.0, GetParticleInterval(strandIndex));
+			_ParticleVelocity[i] = float3(0.0, 0.0, 0.0);//, GetParticleInterval(strandIndex));
 #if SECOND_ORDER_UPDATE
-			_ParticleVelocityPrev[i] = float4(0.0, 0.0, 0.0, GetParticleInterval(strandIndex));
+			_ParticleVelocityPrev[i] = float3(0.0, 0.0, 0.0);//, GetParticleInterval(strandIndex));
 #endif
 		}
 	}
@@ -1393,14 +1393,14 @@ void KSolveConstraints_GaussSeidel(
 	// solve constraints by Gauss-Seidel iteration
 	{
 #if SOLVER_INLINE_PREDICTION
-		for (uint __iteration = 0; __iteration != min(1, _Iterations); __iteration++)
+		for (uint __iteration0 = 0; __iteration0 != min(1, _Iterations); __iteration0++)
 		{
-			PartialStrand_SolveStrand(strandIndex, __iteration, true);
+			PartialStrand_SolveStrand(strandIndex, __iteration0, true);
 		}
 
-		for (uint __iteration = 1; __iteration != _Iterations; __iteration++)
+		for (uint __iterationX = 1; __iterationX != _Iterations; __iterationX++)
 		{
-			PartialStrand_SolveStrand(strandIndex, __iteration, false);
+			PartialStrand_SolveStrand(strandIndex, __iterationX, false);
 		}
 #else
 		for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
