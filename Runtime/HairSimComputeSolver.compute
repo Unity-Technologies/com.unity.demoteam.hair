@@ -8,7 +8,7 @@
 #pragma kernel KInitializePostVolume					THREAD_GROUP_SIZE=64	F_INIT
 #pragma kernel KLODSelection							THREAD_GROUP_SIZE=1		F_LOD
 #pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64	F_SOLVE
-#pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64	F_SOLVE		GROUPSHARED_STRAND_PROPERTIES=1 GROUPSHARED_BOUNDARY_DATA=0
+#pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64	F_SOLVE		GROUPSHARED_STRAND_PROPERTIES=0 GROUPSHARED_BOUNDARY_DATA=1
 #pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
 #pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
@@ -24,6 +24,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 #define HAIRSIM_WRITEABLE_SOLVERINPUT (F_INPUT)
+#define HAIRSIM_WRITEABLE_SOLVERINIT (F_INIT)
 #define HAIRSIM_WRITEABLE_SOLVERDATA (F_INIT || F_LOD || F_SOLVE || F_INTERPOLATE || F_STAGING)
 
 #include "HairSimData.hlsl"
@@ -520,8 +521,10 @@ void KInitialize(
 			{
 				float4 q0 = _InitialParticleFrameDelta[i - strandParticleStride];
 				float4 q1 = _InitialParticleFrameDelta[i];
+				float4 q = QMul(QInverse(q0), q1);
 
-				_InitialParticleFrameDelta[i] = QMul(QInverse(q0), q1);
+				_InitialParticleFrameDelta[i] = q;
+				_InitialParticleFrameDelta16[i] = QEncode16(q);
 			}
 		}
 	}
@@ -552,11 +555,11 @@ void KInitializePostVolume(
 			accu_w *= VolumeWorldToCellTrilinearInverseMultiplier(gridDesc, _ParticlePosition[i].xyz);
 		}
 
-		_ParticlePosition[i].w = accu_w;//TODO pack elsewhere?
-		_ParticlePositionPrev[i].w = accu_w;
-#if SECOND_ORDER_UPDATE
-		_ParticlePositionPrevPrev[i].w = accu_w;
-#endif
+// 		_ParticlePosition[i].w = accu_w;//TODO pack elsewhere?
+// 		_ParticlePositionPrev[i].w = accu_w;
+// #if SECOND_ORDER_UPDATE
+// 		_ParticlePositionPrevPrev[i].w = accu_w;
+// #endif
 	}
 }
 
@@ -1153,27 +1156,9 @@ float3 PredictParticlePosition(const uint strandIndex, const uint k)
 	return x1_pre;
 }
 
-#define SOLVER_EXPLICIT_PREFETCH 1
-#define SOLVER_INLINE_PREDICTION 1
-
 struct PartialStrandPos
 {
 	float3 minus[4];// ..
-
-	// reg 47
-
-#if SOLVER_EXPLICIT_PREFETCH
-	float3 prefetch_particlePosition;
-	float3 prefetch_particlePositionPrev;
-	float4 prefetch_particleFrameDelta;
-#endif
-
-	// reg 57
-
-	float3 current_particlePositionPrev;
-	float4 current_particleFrameDelta;
-
-	// reg 64
 };
 
 struct PartialStrandRot
@@ -1207,30 +1192,28 @@ void PartialStrand_SolveNext(
 	// - --- p3 ---------- p2 ---------- p1 ---------- p0
 	//                                                   `-- solve
 
-#if SOLVER_EXPLICIT_PREFETCH
+	uint2 prefetch_particleFrameDelta16 = _InitialParticleFrameDelta16[GetParticleIndex(strandIndex, k)];
+
 	p.minus[3] = p.minus[2];
 	p.minus[2] = p.minus[1];
 	p.minus[1] = p.minus[0];
-	p.minus[0] = p.prefetch_particlePosition;
+	
+#define SOLVER_INLINE_PREDICTION 1
 
-	p.current_particlePositionPrev = p.prefetch_particlePositionPrev;
-
-	if (enablePrefetch)
-	{
-		p.prefetch_particlePosition = enablePrediction ? PredictParticlePosition(strandIndex, k + 1) : _ParticlePosition[GetParticleIndex(strandIndex, k + 1)].xyz;
-		p.prefetch_particlePositionPrev = _ParticlePositionPrev[GetParticleIndex(strandIndex, k + 1)].xyz;
-	}
+#if SOLVER_INLINE_PREDICTION
+	if (enablePrediction)
+		p.minus[0] = PredictParticlePosition(strandIndex, k);
+	else
+		p.minus[0] = _ParticlePosition[GetParticleIndex(strandIndex, k)].xyz;
 #else
-	p.minus[3] = p.minus[2];
-	p.minus[2] = p.minus[1];
-	p.minus[1] = p.minus[0];
-	p.minus[0] = enablePrediction ? PredictParticlePosition(strandIndex, k) : _ParticlePosition[GetParticleIndex(strandIndex, k)].xyz;
-
-	p.current_particlePositionPrev = _ParticlePositionPrev[GetParticleIndex(strandIndex, k)].xyz;
+	p.minus[0] = _ParticlePosition[GetParticleIndex(strandIndex, k)].xyz;
 #endif
 
+#define MACRO_particlePositionPrev _ParticlePositionPrev[GetParticleIndex(strandIndex, k)].xyz
+#define MACRO_particleFrameDelta QDecode16(prefetch_particleFrameDelta16)
+
 	if (ENABLE_BOUNDARY)			ApplyCollisionConstraint(0.5 * GetParticleDiameter(strandIndex), p.minus[0]);
-	if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(0.5 * GetParticleDiameter(strandIndex), _BoundaryFriction, p.current_particlePositionPrev, p.minus[0]);
+	if (ENABLE_BOUNDARY_FRICTION)	ApplyCollisionFrictionConstraint(0.5 * GetParticleDiameter(strandIndex), _BoundaryFriction, MACRO_particlePositionPrev, p.minus[0]);
 	if (ENABLE_DISTANCE_LRA)		ApplyDistanceLRAConstraint(GetParticleInterval(strandIndex) * k, GetRootPosition(strandIndex), p.minus[0]);
 	if (ENABLE_DISTANCE)			ApplyDistanceConstraint(GetParticleInterval(strandIndex), 1.0, w_minus[1], w_minus[0], p.minus[1], p.minus[0]);
 	if (ENABLE_CURVATURE_EQ)		ApplyTriangleBendingConstraint(GetBendingRadius(strandIndex), stiffness, w_minus[2], w_minus[1], w_minus[0], p.minus[2], p.minus[1], p.minus[0]);
@@ -1240,23 +1223,12 @@ void PartialStrand_SolveNext(
 	q.minus[1] = q.minus[0];
 	q.minus[0] = NextQuaternionFromBend(p.minus[2], p.minus[1], p.minus[0], q.minus[1]);
 
-#if SOLVER_EXPLICIT_PREFETCH
-	p.current_particleFrameDelta = p.prefetch_particleFrameDelta;
-
-	if (enablePrefetch)
-	{
-		p.prefetch_particleFrameDelta = _InitialParticleFrameDelta[GetParticleIndex(strandIndex, k + 1)];
-	}
-#else
-	p.current_particleFrameDelta = _InitialParticleFrameDelta[GetParticleIndex(strandIndex, k)];
-#endif
-
 	if (ENABLE_POSE_GLOBAL_ROTATION)
 	{
 		const float wq_minus1 = 0.0;
 		const float wq_minus0 = lerp(w_minus[1], w_minus[0], 1e-6);// 0.5);
 
-		ApplyMaterialFrameBendTwistConstraint(p.current_particleFrameDelta, 1.0, wq_minus1, wq_minus0, q.minus[1], q.minus[0]);
+		ApplyMaterialFrameBendTwistConstraint(MACRO_particleFrameDelta, 1.0, wq_minus1, wq_minus0, q.minus[1], q.minus[0]);
 		ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * GetGlobalRotationInfluence(strandIndex, k), w_minus[1], w_minus[0], wq_minus0, p.minus[1], p.minus[0], q.minus[0]);
 	}
 
@@ -1269,11 +1241,11 @@ void PartialStrand_SolveNext(
 		{
 			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus[1], w_minus[0], wq_minus0, p.minus[1], p.minus[0], q.minus[0]);
 			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus[2], w_minus[1], wq_minus1, p.minus[2], p.minus[1], q.minus[1]);
-			ApplyMaterialFrameBendTwistConstraint(p.current_particleFrameDelta, _LocalShape, (1.0 - _LocalShapeBias) * wq_minus1, wq_minus0, q.minus[1], q.minus[0]);
+			ApplyMaterialFrameBendTwistConstraint(MACRO_particleFrameDelta, _LocalShape, (1.0 - _LocalShapeBias) * wq_minus1, wq_minus0, q.minus[1], q.minus[0]);
 		}
 		else
 		{
-			ApplyMaterialFrameBendTwistConstraint(p.current_particleFrameDelta, _LocalShape, (1.0 - _LocalShapeBias) * wq_minus1, wq_minus0, q.minus[1], q.minus[0]);
+			ApplyMaterialFrameBendTwistConstraint(MACRO_particleFrameDelta, _LocalShape, (1.0 - _LocalShapeBias) * wq_minus1, wq_minus0, q.minus[1], q.minus[0]);
 			ApplyMaterialFrameStretchShearConstraint(GetParticleInterval(strandIndex), stiffness * _LocalShape, w_minus[1], w_minus[0], wq_minus0, p.minus[1], p.minus[0], q.minus[0]);
 		}
 	}
@@ -1301,6 +1273,8 @@ void PartialStrand_SolveNext(
 	//                                (anchor)          |`-- done
 	//                                                  |
 	//                                                 write
+
+	GroupMemoryBarrierWithGroupSync();
 
 	if (ENABLE_DISTANCE_FTL)
 	{
@@ -1351,12 +1325,6 @@ void PartialStrand_SolveStrand(const uint strandIndex, const uint iteration, con
 	p.minus[1] = rootPosition - rootVec * 1.0;
 	p.minus[0] = rootPosition;
 
-#if SOLVER_EXPLICIT_PREFETCH
-	p.prefetch_particlePosition = enablePrediction ? PredictParticlePosition(strandIndex, 1) : _ParticlePosition[GetParticleIndex(strandIndex, 1)].xyz;
-	p.prefetch_particlePositionPrev = _ParticlePositionPrev[GetParticleIndex(strandIndex, 1)].xyz;
-	p.prefetch_particleFrameDelta = _InitialParticleFrameDelta[GetParticleIndex(strandIndex, 1)];
-#endif
-
 	PartialStrandRot q;
 	q.minus[1] = QMul(rootFrame, MakeQuaternionTwistIdentity());
 	q.minus[0] = rootFrame;
@@ -1396,7 +1364,6 @@ void KSolveConstraints_GaussSeidel(
 	// SV_GroupIndex        thread offset within execution group
 {
 	DECLARE_STRAND_SOLVER(worldIdx.x);
-	// const uint strandIndex = worldIdx.x;
 
 	PrepareStrandProperties(strandIndex);
 
@@ -1426,17 +1393,17 @@ void KSolveConstraints_GaussSeidel(
 	// solve constraints by Gauss-Seidel iteration
 	{
 #if SOLVER_INLINE_PREDICTION
-		[loop] for (uint __iteration = 0; __iteration != min(1, _Iterations); __iteration++)
+		for (uint __iteration = 0; __iteration != min(1, _Iterations); __iteration++)
 		{
 			PartialStrand_SolveStrand(strandIndex, __iteration, true);
 		}
 
-		[loop] for (uint __iteration = 1; __iteration != _Iterations; __iteration++)
+		for (uint __iteration = 1; __iteration != _Iterations; __iteration++)
 		{
 			PartialStrand_SolveStrand(strandIndex, __iteration, false);
 		}
 #else
-		[loop] for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
+		for (uint __iteration = 0; __iteration != _Iterations; __iteration++)
 		{
 			PartialStrand_SolveStrand(strandIndex, __iteration, false);
 		}
@@ -1445,6 +1412,8 @@ void KSolveConstraints_GaussSeidel(
 
 	// update velocities
 	{
+		GroupMemoryBarrierWithGroupSync();
+
 		// root
 		float3 p0;
 		float3 v0;

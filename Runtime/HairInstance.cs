@@ -1425,9 +1425,11 @@ namespace Unity.DemoTeam.Hair
 
 						uploadCtx.SetData(solverBuffers._RootUV, groupAsset.rootUV);
 						uploadCtx.SetData(solverBuffers._RootScale, groupAsset.rootScale);
+						uploadCtx.SetData(solverBuffers._ParticlePosition, groupAsset.particlePosition);
 
 						unsafe
 						{
+							/*
 							using (var particlePositionAligned = new NativeArray<Vector4>(groupAsset.strandCount * groupAsset.strandParticleCount, Allocator.Persistent, NativeArrayOptions.ClearMemory))
 							{
 								fixed (void* groupAssetParticlePositionPtr = groupAsset.particlePosition)
@@ -1437,6 +1439,7 @@ namespace Unity.DemoTeam.Hair
 
 								uploadCtx.SetData(solverBuffers._ParticlePosition, particlePositionAligned);
 							}
+							*/
 
 							// optional particle features
 							//TODO defer allocation and upload to staging (let render settings decide if material should be able to access)

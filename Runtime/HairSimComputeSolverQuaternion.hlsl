@@ -199,4 +199,17 @@ float4 QDecomposeTwist(float4 q, float3 axis)
 		return normalize(r);
 }
 
+//-------------
+// compression
+
+float4 QDecode16(uint2 q16)
+{
+	return float4(f16tof32(q16), f16tof32(q16 >> 16));
+}
+
+uint2 QEncode16(float4 q)
+{
+	return f32tof16(q.xy) | (f32tof16(q.zw) << 16);
+}
+
 #endif//__HAIRSIMCOMPUTEQUATERNION_HLSL__
