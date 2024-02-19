@@ -41,6 +41,7 @@ namespace Unity.DemoTeam.Hair
 
 				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
 				public T _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
+				public T _InitialParticleFrameDelta16;	// xy: compressed initial particle material frame delta
 
 				public T _ParticlePosition;				// xyz: position, w: initial local accumulated weight (gather)
 				public T _ParticlePositionPrev;			// xyz: ...

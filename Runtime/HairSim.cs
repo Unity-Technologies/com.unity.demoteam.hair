@@ -243,12 +243,13 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta16, "InitialParticleFrameDelta16", particleCount, particleStrideVector2);
 
-				changed |= CreateBuffer(ref solverBuffers._ParticlePosition, "ParticlePosition_0", particleCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverBuffers._ParticlePositionPrev, "ParticlePosition_1", particleCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverBuffers._ParticlePositionPrevPrev, "ParticlePosition_2", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector4);
-				changed |= CreateBuffer(ref solverBuffers._ParticleVelocity, "ParticleVelocity_0", particleCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverBuffers._ParticleVelocityPrev, "ParticleVelocity_1", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector4);
+				changed |= CreateBuffer(ref solverBuffers._ParticlePosition, "ParticlePosition_0", particleCount, particleStrideVector3);
+				changed |= CreateBuffer(ref solverBuffers._ParticlePositionPrev, "ParticlePosition_1", particleCount, particleStrideVector3);
+				changed |= CreateBuffer(ref solverBuffers._ParticlePositionPrevPrev, "ParticlePosition_2", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector3);
+				changed |= CreateBuffer(ref solverBuffers._ParticleVelocity, "ParticleVelocity_0", particleCount, particleStrideVector3);
+				changed |= CreateBuffer(ref solverBuffers._ParticleVelocityPrev, "ParticleVelocity_1", (Conf.SECOND_ORDER_UPDATE != 0) ? particleCount : 1, particleStrideVector3);
 
 				changed |= CreateBuffer(ref solverBuffers._LODGuideCount, "LODGuideCount", Mathf.Max(1, lodCount), particleStrideIndex);
 				changed |= CreateBuffer(ref solverBuffers._LODGuideIndex, "LODGuideIndex", Mathf.Max(1, lodCount) * strandCount, particleStrideIndex);
@@ -364,6 +365,7 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref solverBuffers._InitialParticleOffset);
 			ReleaseBuffer(ref solverBuffers._InitialParticleFrameDelta);
+			ReleaseBuffer(ref solverBuffers._InitialParticleFrameDelta16);
 
 			ReleaseBuffer(ref solverBuffers._ParticlePosition);
 			ReleaseBuffer(ref solverBuffers._ParticlePositionPrev);
@@ -476,6 +478,7 @@ namespace Unity.DemoTeam.Hair
 
 			target.BindComputeBuffer(SolverData.s_bufferIDs._InitialParticleOffset, solverBuffers._InitialParticleOffset);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._InitialParticleFrameDelta, solverBuffers._InitialParticleFrameDelta);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._InitialParticleFrameDelta16, solverBuffers._InitialParticleFrameDelta16);
 
 			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODStage, solverBuffers._SolverLODStage);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODDispatch, solverBuffers._SolverLODDispatch);
@@ -878,9 +881,9 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				var particleCount = (int)solverData.constants._StrandCount * (int)solverData.constants._StrandParticleCount;
-				var particleStrideVector4 = sizeof(Vector4);
+				var particleStrideVector3 = sizeof(Vector3);
 
-				CreateBuffer(ref solverData.buffers._ParticleCorrection, "ParticleCorrection", enableParticlePositionCorr ? particleCount : 1, particleStrideVector4);
+				CreateBuffer(ref solverData.buffers._ParticleCorrection, "ParticleCorrection", enableParticlePositionCorr ? particleCount : 1, particleStrideVector3);
 			}
 
 			// derive keywords

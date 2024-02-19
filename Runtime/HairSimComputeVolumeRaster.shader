@@ -75,7 +75,8 @@
 		const float w1 = localPos.z - localPosFloor.z;
 		const float w0 = 1.0 - w1;
 
-		const float4 v = _ParticleVelocity[vertexID[0]];
+		//TODO update this, should fetch .w from per-strand buffer
+		const float4 v = float4(_ParticleVelocity[vertexID[0]], 1.0);
 		const float4 value = float4((v.xyz * v.w), v.w);
 
 		outStream.Append(MakeVertex(ndc0 + ndcH.zz, value * w0, localPos.xy, slice0));
@@ -123,7 +124,8 @@
 		const float w1 = localPos.z - localPosFloor.z;
 		const float w0 = 1.0 - w1;
 
-		const float4 v = _ParticleVelocity[i];
+		//TODO update this, should fetch .w from per-strand buffer
+		const float4 v = float4(_ParticleVelocity[i], 1.0);
 
 		SliceVaryings output;
 		output.volumePos = float4(ndc0 + ndcH * uv, 0.0, 1.0);

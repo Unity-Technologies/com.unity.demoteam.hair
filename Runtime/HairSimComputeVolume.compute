@@ -350,7 +350,7 @@ void KVolumeSplat(
 		const float3 r0 = QMul(_RootFrame[strandIndex], _InitialParticleOffset[particleIndex].xyz * _GroupScale);
 		InterlockedAddParticleContribution(lodDesc, p0 + r0, (w), _AccuWeight0);
 #elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
-		InterlockedMaxParticleContribution(lodDesc, p, (w * _ParticlePosition[particleIndex].w), _AccuWeight0);
+		//InterlockedMaxParticleContribution(lodDesc, p, (w * _ParticlePosition[particleIndex].w), _AccuWeight0);
 #endif
 	}
 
@@ -397,7 +397,7 @@ void KVolumeSplatDensity(
 		const float3 r0 = QMul(_RootFrame[strandIndex], _InitialParticleOffset[particleIndex].xyz * _GroupScale);
 		InterlockedAddParticleContribution(lodDesc, p0 + r0, (w), _AccuWeight0);
 #elif VOLUME_TARGET_INITIAL_POSE_IN_PARTICLES
-		InterlockedMaxParticleContribution(lodDesc, p, (w * _ParticlePosition[particleIndex].w), _AccuWeight0);
+		//InterlockedMaxParticleContribution(lodDesc, p, (w * _ParticlePosition[particleIndex].w), _AccuWeight0);
 #endif
 	}
 }

@@ -13,6 +13,12 @@
 #define HAIRSIM_SOLVERINPUT StructuredBuffer
 #endif
 
+#if HAIRSIM_WRITEABLE_SOLVERINIT
+#define HAIRSIM_SOLVERINIT RWStructuredBuffer
+#else
+#define HAIRSIM_SOLVERINIT StructuredBuffer
+#endif
+
 #if HAIRSIM_WRITEABLE_SOLVERDATA
 #define HAIRSIM_SOLVERDATA RWStructuredBuffer
 #else
@@ -38,15 +44,16 @@ HAIRSIM_SOLVERINPUT<float4> _RootFrameSubstep;			// quat(xyz,w): ...
 HAIRSIM_SOLVERDATA<LODIndices> _SolverLODStage;			// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
 HAIRSIM_SOLVERDATA<uint4> _SolverLODDispatch;			// xyz: num groups, w: num strands
 
-HAIRSIM_SOLVERDATA<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
-HAIRSIM_SOLVERDATA<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
+HAIRSIM_SOLVERINIT<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
+HAIRSIM_SOLVERINIT<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
+HAIRSIM_SOLVERINIT<uint2> _InitialParticleFrameDelta16;	// xy: compressed initial particle material frame delta
 
-HAIRSIM_SOLVERDATA<float4> _ParticlePosition;			// xyz: position, w: initial local accumulated weight (gather)
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrev;		// xyz: ...
-HAIRSIM_SOLVERDATA<float4> _ParticlePositionPrevPrev;	// xyz: ...
-HAIRSIM_SOLVERDATA<float4> _ParticleVelocity;			// xyz: velocity, w: splatting weight
-HAIRSIM_SOLVERDATA<float4> _ParticleVelocityPrev;		// xyz: ...
-HAIRSIM_SOLVERDATA<float4> _ParticleCorrection;			// xyz: ftl distance correction, w: -
+HAIRSIM_SOLVERDATA<float3> _ParticlePosition;			// xyz: position, w: initial local accumulated weight (gather)
+HAIRSIM_SOLVERINIT<float3> _ParticlePositionPrev;		// xyz: ...
+HAIRSIM_SOLVERINIT<float3> _ParticlePositionPrevPrev;	// xyz: ...
+HAIRSIM_SOLVERDATA<float3> _ParticleVelocity;			// xyz: velocity, w: splatting weight
+HAIRSIM_SOLVERINIT<float3> _ParticleVelocityPrev;		// xyz: ...
+HAIRSIM_SOLVERDATA<float3> _ParticleCorrection;			// xyz: ftl distance correction, w: -
 
 StructuredBuffer<float2> _ParticleExtTexCoord;			// xy: optional uv
 StructuredBuffer<float> _ParticleExtDiameter;			// x: optional diameter
