@@ -1,5 +1,5 @@
-﻿#pragma use_dxc
-#pragma enable_d3d11_debug_symbols
+﻿//#pragma use_dxc
+//#pragma enable_d3d11_debug_symbols
 
 #pragma kernel KBoundsClear						THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsGather					THREAD_GROUP_SIZE=64	F_BOUNDS

@@ -1,5 +1,5 @@
-#pragma use_dxc
-#pragma enable_d3d11_debug_symbols
+//#pragma use_dxc
+//#pragma enable_d3d11_debug_symbols
 
 #ifndef __HAIRVERTEX_HLSL__
 #define __HAIRVERTEX_HLSL__
@@ -304,8 +304,8 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 					radius = lerp((radius + guideReach) * guideProjectedCoverage, radius, farLodT);
 				}
 				else
-				{
 #endif
+				{
 					radius = lerp((radius + guideReachLo) * guideProjectedCoverageLo, (radius + guideReachHi) * guideProjectedCoverageHi, lodDesc.lodBlendFrac);
 				}
 

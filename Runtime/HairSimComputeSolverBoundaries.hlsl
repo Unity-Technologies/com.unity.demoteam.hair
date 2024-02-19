@@ -180,7 +180,7 @@ float SdSphere(const float3 p, const BoundaryShape sphere)
 	return SdSphere(p, sphere.pA, sphere.tA);
 }
 
-float SdgSphere(const float3 p, const BoundaryShape sphere)
+float4 SdgSphere(const float3 p, const BoundaryShape sphere)
 {
 	return SdgSphere(p, sphere.pA, sphere.tA);
 }
@@ -190,7 +190,7 @@ float SdTorus(const float3 p, const BoundaryShape torus)
 	return SdTorus(p, torus.pA, torus.pB, torus.tA, torus.tB);
 }
 
-float SdgTorus(const float3 p, const BoundaryShape torus)
+float4 SdgTorus(const float3 p, const BoundaryShape torus)
 {
 	return SdgTorus(p, torus.pA, torus.pB, torus.tA, torus.tB);
 }
@@ -208,12 +208,12 @@ float SdCube(const float3 p, const BoundaryShape cube, const float3x4 invM)
 #endif
 
 #if BOUNDARIES_OPT_PACK_CUBE
-float SdgCube(const float3 p, const BoundaryShape cube)
+float4 SdgCube(const float3 p, const BoundaryShape cube)
 {
 	return SdgCube(p, cube.pA, cube.pB, asuint(float2(cube.tA, cube.tB)));
 }
 #else
-float SdgCube(const float3 p, const BoundaryShape cube, const float3x4 invM)
+float4 SdgCube(const float3 p, const BoundaryShape cube, const float3x4 invM)
 {
 	return SdgCube(p, cube.pB, invM);
 }
