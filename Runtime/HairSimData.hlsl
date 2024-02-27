@@ -42,21 +42,22 @@ HAIRSIM_SOLVERINPUT<float4> _RootFramePrev;				// quat(xyz,w): ...
 HAIRSIM_SOLVERINPUT<float4> _RootFrameSubstep;			// quat(xyz,w): ...
 
 HAIRSIM_SOLVERDATA<LODIndices> _SolverLODStage;			// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
-HAIRSIM_SOLVERDATA<uint4> _SolverLODDispatch;			// xyz: num groups, w: num strands
+HAIRSIM_SOLVERDATA<uint2> _SolverLODRange;				// xy: dispatch strand range [begin, end)
+HAIRSIM_SOLVERDATA<uint4> _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
 
-HAIRSIM_SOLVERINIT<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
+HAIRSIM_SOLVERINIT<float3> _InitialParticleOffset;		// xyz: initial particle offset from strand root
 HAIRSIM_SOLVERINIT<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 HAIRSIM_SOLVERINIT<uint2> _InitialParticleFrameDelta16;	// xy: compressed initial particle material frame delta
 
-HAIRSIM_SOLVERDATA<float3> _ParticlePosition;			// xyz: position, w: initial local accumulated weight (gather)
+HAIRSIM_SOLVERDATA<float3> _ParticlePosition;			// xyz: position//, w: initial local accumulated weight (gather)
 HAIRSIM_SOLVERINIT<float3> _ParticlePositionPrev;		// xyz: ...
 HAIRSIM_SOLVERINIT<float3> _ParticlePositionPrevPrev;	// xyz: ...
-HAIRSIM_SOLVERDATA<float3> _ParticleVelocity;			// xyz: velocity, w: splatting weight
+HAIRSIM_SOLVERDATA<float3> _ParticleVelocity;			// xyz: velocity
 HAIRSIM_SOLVERINIT<float3> _ParticleVelocityPrev;		// xyz: ...
-HAIRSIM_SOLVERDATA<float3> _ParticleCorrection;			// xyz: ftl distance correction, w: -
+HAIRSIM_SOLVERDATA<float3> _ParticleCorrection;			// xyz: ftl distance correction
 
-StructuredBuffer<float2> _ParticleExtTexCoord;			// xy: optional uv
-StructuredBuffer<float> _ParticleExtDiameter;			// x: optional diameter
+StructuredBuffer<float2> _ParticleExtTexCoord;			// xy: optional particle uv
+StructuredBuffer<float> _ParticleExtDiameter;			// x: optional particle diameter
 
 StructuredBuffer<uint> _LODGuideCount;					// x: lod index -> num. guides
 StructuredBuffer<uint> _LODGuideIndex;					// x: lod index * strand count + strand index -> guide index

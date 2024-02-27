@@ -1300,7 +1300,7 @@ void KVolumeWind(
 	// apply weighted average
 	if (Lsum.w > 0.0)
 	{	
-		_VolumeImpulse[worldIdx].xyz += (Lsum.xyz / Lsum.w) * (_DT * _Substeps);
+		_VolumeImpulse[worldIdx].xyz += (Lsum.xyz / Lsum.w) * (_DT * _Substeps);//TODO this does not look correct
 	}
 }
 

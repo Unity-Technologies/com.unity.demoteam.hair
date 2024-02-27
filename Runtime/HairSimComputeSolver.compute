@@ -1,11 +1,12 @@
-﻿//#pragma use_dxc
-//#pragma enable_d3d11_debug_symbols
+﻿#pragma use_dxc
+#pragma enable_d3d11_debug_symbols
 
 #pragma kernel KRoots									THREAD_GROUP_SIZE=64	F_INPUT
 #pragma kernel KRootsHistory							THREAD_GROUP_SIZE=64	F_INPUT
 #pragma kernel KRootsSubstep							THREAD_GROUP_SIZE=64	F_INPUT
 #pragma kernel KInitialize								THREAD_GROUP_SIZE=64	F_INIT
 #pragma kernel KInitializePostVolume					THREAD_GROUP_SIZE=64	F_INIT
+#pragma kernel KLODSelectionInit						THREAD_GROUP_SIZE=1		F_LOD
 #pragma kernel KLODSelection							THREAD_GROUP_SIZE=1		F_LOD
 #pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64	F_SOLVE
 #pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64	F_SOLVE		GROUPSHARED_STRAND_PROPERTIES=0 GROUPSHARED_BOUNDARY_DATA=1
@@ -14,6 +15,8 @@
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
 #pragma kernel KSolveConstraints_Jacobi_128				THREAD_GROUP_SIZE=128	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_128
 #pragma kernel KInterpolate								THREAD_GROUP_SIZE=64	F_INTERPOLATE
+#pragma kernel KInterpolateAdd							THREAD_GROUP_SIZE=64	F_INTERPOLATE
+#pragma kernel KInterpolatePromote						THREAD_GROUP_SIZE=64	F_INTERPOLATE
 #pragma kernel KStaging									THREAD_GROUP_SIZE=64	F_STAGING
 #pragma kernel KStagingSubdivision						THREAD_GROUP_SIZE=64	F_STAGING
 #pragma kernel KStagingHistory							THREAD_GROUP_SIZE=64	F_STAGING
@@ -88,9 +91,9 @@
 //---------------
 // strand macros
 
-#define CHECK_POW_2(n)			((n & (n - 1)) == 0)
-#define CHECK_STRAND(x)			(x < _StrandCount)
-#define CHECK_STRAND_SOLVER(x)	(x < _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE].w)
+#define CHECK_POW_2(n)					((n & (n - 1)) == 0)
+#define CHECK_STRAND(x)					(x < _StrandCount)
+#define CHECK_STRAND_WITHIN(i, range)	(i + range.x < range.y)
 
 #define DECLARE_STRAND_UNCHECKED(x)											\
 	const uint strandIndex = x;												\
@@ -98,13 +101,13 @@
 	const uint strandParticleStride = _StrandParticleStride;				\
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * _StrandParticleCount;
 
-#define DECLARE_STRAND(x)					\
-	if (!CHECK_STRAND(x)) return;			\
+#define DECLARE_STRAND(x)						\
+	if (!CHECK_STRAND(x)) return;				\
 	DECLARE_STRAND_UNCHECKED(x);
 
-#define DECLARE_STRAND_SOLVER(x)			\
-	if (!CHECK_STRAND_SOLVER(x)) return;	\
-	DECLARE_STRAND_UNCHECKED(x);
+#define DECLARE_STRAND_WITHIN(i, range)			\
+	if (!CHECK_STRAND_WITHIN(i, range)) return;	\
+	DECLARE_STRAND_UNCHECKED(i + range.x);
 
 //-------------------
 // strand properties
@@ -709,6 +712,44 @@ uint4 ResolveDrawParallelParticles(uint strandCount, uint particleVertexCount)
 	return uint4((strandCount * _StrandParticleCount) * particleVertexCount, 1, 0, 0);
 }
 
+uint2 ResolveRange(uint i, uint j)
+{
+	if (i <= j)
+		return uint2(i, j);
+	else
+		return uint2(j, j);
+}
+
+uint ResolveCount(uint2 range)
+{
+	if (range.x < range.y)
+		return (range.y - range.x);
+	else
+		return 0;
+}
+
+[numthreads(1, 1, 1)]
+void KLODSelectionInit(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	uint2 rangeSolve		= ResolveRange(0, _StrandCount);
+	uint2 rangeInterpolate	= ResolveRange(_StrandCount, _StrandCount);
+	uint2 rangeRender		= ResolveRange(0, _StrandCount);
+
+	_SolverLODRange[SOLVERLODRANGE_SOLVE]				= rangeSolve;
+	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE]			= rangeInterpolate;
+	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE_ADD]		= rangeInterpolate;
+	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE_PROMOTE]	= rangeInterpolate;
+	_SolverLODRange[SOLVERLODRANGE_RENDER]				= rangeRender;
+}
+
 [numthreads(1, 1, 1)]
 void KLODSelection(
 	uint3 groupIdx : SV_GroupID,
@@ -720,10 +761,10 @@ void KLODSelection(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	// update solver lod selection
+	// select solver lod
 	float solverLODQuantity = 1.0;
 	{
-		switch (_SolverLODMethod)
+		switch (_SolverLODMethod & 0xffff)
 		{
 			case SOLVERLODSELECTION_AUTOMATIC_PER_GROUP:
 				solverLODQuantity = ResolveLODQuantity(_BoundsCoverage[_GroupBoundsIndex].x, _SolverLODCeiling, _SolverLODScale, _SolverLODBias);
@@ -739,7 +780,12 @@ void KLODSelection(
 		}
 	}
 
-	// update render lod selection (may depend on solver lod)
+	LODIndices solverLODDesc = ResolveLODIndices(solverLODQuantity);
+	{
+		_SolverLODStage[SOLVERLODSTAGE_PHYSICS] = solverLODDesc;
+	}
+
+	// select render lod (may depend on solver lod)
 	float renderLODQuantity = 1.0;
 	{
 		switch (_RenderLODMethod)
@@ -763,28 +809,85 @@ void KLODSelection(
 		}
 	}
 
-	LODIndices solverLODDesc = ResolveLODIndices(solverLODQuantity);
 	LODIndices renderLODDesc = ResolveLODIndices(renderLODQuantity);
-
-	_SolverLODStage[SOLVERLODSTAGE_PHYSICS]		= solverLODDesc;
-	_SolverLODStage[SOLVERLODSTAGE_RENDERING]	= renderLODDesc;
-
-	// update lod dispatch
+	{
+		_SolverLODStage[SOLVERLODSTAGE_RENDERING] = renderLODDesc;
+	}
+	
+	// update delimiters / ranges
 	uint solverStrandCount = _LODGuideCount[solverLODDesc.lodIndexHi];
-	uint renderStrandCount = _LODGuideCount[renderLODDesc.lodIndexHi];
+	uint renderStrandCount = _StrandCount;//_LODGuideCount[renderLODDesc.lodIndexHi];//TODO apply rendering upper bound
 
-	_SolverLODDispatch[SOLVERLODDISPATCH_SOLVE]						= ResolveDispatchParallelStrands(solverStrandCount);
-	_SolverLODDispatch[SOLVERLODDISPATCH_SOLVE_PARALLEL_PARTICLES]	= ResolveDispatchParallelParticlesEachStrand(solverStrandCount);
-	_SolverLODDispatch[SOLVERLODDISPATCH_INTERPOLATE]				= ResolveDispatchParallelStrands(_StrandCount - solverStrandCount);
-	_SolverLODDispatch[SOLVERLODDISPATCH_INTERPOLATE_REENTRANT]		= ResolveDispatchParallelStrands(0);//TODO
-	_SolverLODDispatch[SOLVERLODDISPATCH_STAGING]					= ResolveDispatchParallelStrands(_StrandCount);
-	_SolverLODDispatch[SOLVERLODDISPATCH_STAGING_REENTRANT]			= ResolveDispatchParallelStrands(0);//TODO
-	_SolverLODDispatch[SOLVERLODDISPATCH_TRANSFER]					= ResolveDispatchParallelParticles(solverStrandCount);
-	_SolverLODDispatch[SOLVERLODDISPATCH_TRANSFER_ALL]				= ResolveDispatchParallelParticles(_StrandCount);
-	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_POINTS]				= ResolveDrawParallelParticles(solverStrandCount, 1);
-	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_POINTS_ALL]			= ResolveDrawParallelParticles(_StrandCount, 1);
-	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_QUADS]				= ResolveDrawParallelParticles(solverStrandCount, 8);
-	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_QUADS_ALL]			= ResolveDrawParallelParticles(_StrandCount, 8);
+	uint i0 = _SolverLODRange[SOLVERLODRANGE_SOLVE].y;
+	uint j0 = _SolverLODRange[SOLVERLODRANGE_INTERPOLATE].y;
+	uint i1;
+	uint j1;
+	{
+		/* delimiters
+
+		|------sim------|------pos------|-------------off---------|
+		                i0              j0
+
+		                |------pos---------------|
+		                                :        j1
+		                                `--------´
+		                                  append
+
+
+		|------sim------|------pos------:--------|----off---------|
+		                i0             (j0)      j1 
+
+		|------sim--------------------------|
+		                :                   i1
+		                `-------------------´
+		                       promote
+
+		*/
+
+		if (_SolverLODMethod & 0x10000)
+		{
+			i1 = solverStrandCount;				// promote	[i0, i1]	(pos -> sim)
+			j1 = renderStrandCount;				// append	[j0, j1]	(off -> pos)
+		}
+		else
+		{
+			i1 = i0;							// promote	deferred
+			j1 = max(j0, renderStrandCount);	// append	[j0, j1]	(off -> pos)
+		}
+	}
+
+	uint2 rangeSolve				= ResolveRange(0, i1);
+	uint2 rangeInterpolate			= ResolveRange(i1, j1);
+	uint2 rangeInterpolateAdd		= ResolveRange(j0, j1);
+	uint2 rangeInterpolatePromote	= ResolveRange(i0, i1);
+	uint2 rangeRender				= ResolveRange(0, renderStrandCount);
+
+	_SolverLODRange[SOLVERLODRANGE_SOLVE]				= rangeSolve;
+	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE]			= rangeInterpolate;
+	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE_ADD]		= rangeInterpolateAdd;
+	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE_PROMOTE]	= rangeInterpolatePromote;
+	_SolverLODRange[SOLVERLODRANGE_RENDER]				= rangeRender;
+
+	// update dispatch
+	uint countSolve					= ResolveCount(rangeSolve);
+	uint countInterpolate			= ResolveCount(rangeInterpolate);
+	uint countInterpolateAdd		= ResolveCount(rangeInterpolateAdd);
+	uint countInterpolatePromote	= ResolveCount(rangeInterpolatePromote);
+	uint countRender				= ResolveCount(rangeRender);
+
+	_SolverLODDispatch[SOLVERLODDISPATCH_SOLVE]					= ResolveDispatchParallelStrands(countSolve);
+	_SolverLODDispatch[SOLVERLODDISPATCH_SOLVE_GROUP_PARTICLES]	= ResolveDispatchParallelParticlesEachStrand(countSolve);
+	_SolverLODDispatch[SOLVERLODDISPATCH_INTERPOLATE]			= ResolveDispatchParallelStrands(countInterpolate);
+	_SolverLODDispatch[SOLVERLODDISPATCH_INTERPOLATE_ADD]		= ResolveDispatchParallelStrands(countInterpolateAdd);
+	_SolverLODDispatch[SOLVERLODDISPATCH_INTERPOLATE_PROMOTE]	= ResolveDispatchParallelStrands(countInterpolatePromote);
+	_SolverLODDispatch[SOLVERLODDISPATCH_STAGING]				= ResolveDispatchParallelStrands(countRender);
+	_SolverLODDispatch[SOLVERLODDISPATCH_STAGING_REENTRANT]		= ResolveDispatchParallelStrands(0);//TODO
+	_SolverLODDispatch[SOLVERLODDISPATCH_TRANSFER]				= ResolveDispatchParallelParticles(countSolve);	
+	_SolverLODDispatch[SOLVERLODDISPATCH_TRANSFER_ALL]			= ResolveDispatchParallelParticles(countRender);
+	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_POINTS]			= ResolveDrawParallelParticles(countSolve, 1);
+	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_POINTS_ALL]		= ResolveDrawParallelParticles(countRender, 1);
+	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_QUADS]			= ResolveDrawParallelParticles(countSolve, 8);
+	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_QUADS_ALL]		= ResolveDrawParallelParticles(countRender, 8);
 }
 
 #endif//F_LOD
@@ -805,7 +908,7 @@ void KSolveConstraints_GaussSeidelReference(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND_SOLVER(worldIdx.x);
+	DECLARE_STRAND_WITHIN(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_SOLVE]);
 
 	// clear corrections
 	if (ENABLE_DISTANCE_FTL)
@@ -1363,7 +1466,7 @@ void KSolveConstraints_GaussSeidel(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND_SOLVER(worldIdx.x);
+	DECLARE_STRAND_WITHIN(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_SOLVE]);
 
 	PrepareStrandProperties(strandIndex);
 
@@ -1410,7 +1513,7 @@ void KSolveConstraints_GaussSeidel(
 #endif
 	}
 
-	// update velocities
+	// derive velocities
 	{
 		GroupMemoryBarrierWithGroupSync();
 
@@ -1465,7 +1568,7 @@ void KSolveConstraints_Jacobi(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	//DECLARE_STRAND_SOLVER(groupIdx.x);
+	//DECLARE_STRAND_WITHIN(groupIdx.x, _SolverLODRange[SOLVERLODRANGE_SOLVE]);
 	DECLARE_STRAND(groupIdx.x);//TODO
 
 	const uint i = strandParticleBegin + strandParticleStride * threadIdx;
@@ -1769,52 +1872,23 @@ void KSolveConstraints_Jacobi(
 
 void StoreInterpolatedPosition(int particleIndex, float3 position)
 {
-	float3 positionPrev;
-	{
-#if SECOND_ORDER_UPDATE
-		// locate previous interpolated position (A), taking into account buffer rotations from substeps
-		// (s=1) A B C --> C *A* B
-		// (s=2) A B C --> C A B --> B C *A*
-		// (s=3) A B C --> C A B --> B C A --> *A* B C
-		switch (_Substeps % 3)
-		{
-		case 0: positionPrev = _ParticlePosition[particleIndex].xyz; break;
-		case 1: positionPrev = _ParticlePositionPrev[particleIndex].xyz; break;
-		case 2: positionPrev = _ParticlePositionPrevPrev[particleIndex].xyz; break;
-		}
-#else
-		// locate previous interpolated position (A), taking into account buffer rotations from substeps
-		// (s=1) A B --> B *A*
-		// (s=2) A B --> B A --> *A* B
-		switch (_Substeps % 2)
-		{
-		case 0: positionPrev = _ParticlePosition[particleIndex].xyz; break;
-		case 1: positionPrev = _ParticlePositionPrev[particleIndex].xyz; break;
-		}
-#endif
-	}
-
-	_ParticleVelocity[particleIndex].xyz = (position - positionPrev) / (_DT * _Substeps);
 	_ParticlePosition[particleIndex].xyz = position;
-
 #if SECOND_ORDER_UPDATE
-	_ParticleVelocityPrev[particleIndex].xyz = 0;
 	_ParticlePositionPrev[particleIndex].xyz = position;
 #endif
 }
 
-[numthreads(THREAD_GROUP_SIZE, 1, 1)]
-void KInterpolate(
-	uint3 groupIdx : SV_GroupID,
-	uint3 localIdx : SV_GroupThreadID,
-	uint3 worldIdx : SV_DispatchThreadID,
-	uint threadIdx : SV_GroupIndex)
-	// SV_GroupID           execution group coords
-	// SV_GroupThreadID     thread coords within execution group
-	// SV_DispatchThreadID  thread coords (global)
-	// SV_GroupIndex        thread offset within execution group
+void StoreInterpolatedVelocity(int particleIndex, float3 velocity)
 {
-	DECLARE_STRAND(worldIdx.x + _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE].w);
+	_ParticleVelocity[particleIndex] = velocity;
+#if SECOND_ORDER_UPDATE
+	_ParticleVelocityPrev[particleIndex] = 0;
+#endif
+}
+
+void InterpolateStrandPositions(const uint index, const uint2 range)
+{
+	DECLARE_STRAND_WITHIN(index, range);
 
 	const LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
 
@@ -1855,6 +1929,37 @@ void KInterpolate(
 	}
 	else
 	{
+#if 0// experiment
+		float4 frame = rootFrame;
+		float4 frameLo = rootFrameLo;
+		float4 frameHi = rootFrameHi;
+
+		float3 initialPosition = rootPosition;
+		float3 initialPositionLo = rootPositionLo;
+		float3 initialPositionHi = rootPositionHi;
+
+		float step = GetParticleInterval(strandIndex);
+		float stepLo = GetParticleInterval(strandIndexLo);
+		float stepHi = GetParticleInterval(strandIndexHi);
+
+		for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride, iHi = strandParticleBeginHi + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
+		{
+			frame = QMul(frame, QDecode16(_InitialParticleFrameDelta16[i]));
+			frameLo = QMul(frameLo, QDecode16(_InitialParticleFrameDelta16[iLo]));
+			frameHi = QMul(frameHi, QDecode16(_InitialParticleFrameDelta16[iHi]));
+
+			initialPosition += QMul(frame, float3(0.0, 1.0, 0.0)) * step;
+			initialPositionLo += QMul(frameLo, float3(0.0, 1.0, 0.0)) * stepLo;
+			initialPositionHi += QMul(frameHi, float3(0.0, 1.0, 0.0)) * stepHi;
+
+			float3 positionDeltaLo = strandContribLo * (_ParticlePosition[iLo].xyz - initialPositionLo);
+			float3 positionDeltaHi = strandContribHi * (_ParticlePosition[iHi].xyz - initialPositionHi);
+			float3 position = initialPosition + lerp(positionDeltaLo, positionDeltaHi, lodDesc.lodBlendFrac);
+
+			//TODO transition strand to interpolated to avoid pops
+			StoreInterpolatedPosition(i, position);
+		}
+#else
 		for (uint i = strandParticleBegin + strandParticleStride, iLo = strandParticleBeginLo + strandParticleStride, iHi = strandParticleBeginHi + strandParticleStride; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
 		{
 			float3 initialOffset = QMul(rootFrame, _InitialParticleOffset[i].xyz) * _GroupScale;
@@ -1871,7 +1976,88 @@ void KInterpolate(
 			//TODO transition strand to interpolated to avoid pops
 			StoreInterpolatedPosition(i, position);
 		}
+#endif
 	}
+}
+
+void InterpolateStrandVelocities(const uint index, const uint2 range)
+{
+	DECLARE_STRAND_WITHIN(index, range);
+
+	const LODIndices lodDesc = _SolverLODStage[SOLVERLODSTAGE_PHYSICS];
+
+	const uint strandIndexLo = _LODGuideIndex[(lodDesc.lodIndexLo * _StrandCount) + strandIndex];
+	const uint strandIndexHi = _LODGuideIndex[(lodDesc.lodIndexHi * _StrandCount) + strandIndex];
+
+	const uint strandParticleBeginLo = strandIndexLo * _StrandParticleOffset;
+	const uint strandParticleBeginHi = strandIndexHi * _StrandParticleOffset;
+
+	float strandContribLo = _RootScale[strandIndex].x / _RootScale[strandIndexLo].x;
+	float strandContribHi = _RootScale[strandIndex].x / _RootScale[strandIndexHi].x;
+
+	if (lodDesc.lodBlendFrac == 0.0)
+	{
+		for (uint i = strandParticleBegin, iLo = strandParticleBeginLo; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride)
+		{
+			float3 velocityLo = strandContribLo * _ParticleVelocity[iLo];
+			float3 velocity = velocityLo;
+
+			StoreInterpolatedVelocity(i, velocity);
+		}
+	}
+	else
+	{
+		for (uint i = strandParticleBegin, iLo = strandParticleBeginLo, iHi = strandParticleBeginHi; i != strandParticleEnd; i += strandParticleStride, iLo += strandParticleStride, iHi += strandParticleStride)
+		{
+			float3 velocityLo = strandContribLo * _ParticleVelocity[iLo];
+			float3 velocityHi = strandContribHi * _ParticleVelocity[iHi];
+			float3 velocity = lerp(velocityLo, velocityHi, lodDesc.lodBlendFrac);
+
+			StoreInterpolatedVelocity(i, velocity);
+		}
+	}
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KInterpolate(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	InterpolateStrandPositions(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_INTERPOLATE]);
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KInterpolateAdd(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	InterpolateStrandPositions(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_INTERPOLATE_ADD]);
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KInterpolatePromote(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	InterpolateStrandVelocities(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_INTERPOLATE_PROMOTE]);
 }
 
 #endif//F_INTERPOLATE
