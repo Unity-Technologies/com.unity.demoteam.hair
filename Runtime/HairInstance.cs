@@ -741,7 +741,7 @@ namespace Unity.DemoTeam.Hair
 
 			HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
 			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, (float)execState.accumulatedTimeSession);
-			HairSim.PushVolumeStepFrame(cmd, ref volumeData, settingsVolumetrics, stepDesc.dt);
+			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics, stepDesc.dt);
 
 			if (stepDesc.count == 0 || HairSim.PrepareVolumeData(ref volumeData, settingsVolumetrics, solverData.Length + 1))
 			{
@@ -752,7 +752,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				for (int i = 0; i != solverData.Length; i++)
 				{
-					HairSim.PushSolverStepFrame(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), stepDesc.dt);
+					HairSim.PushSolverStepBegin(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), stepDesc.dt);
 				}
 
 				for (int k = 0; k != stepDesc.count; k++)
@@ -772,7 +772,14 @@ namespace Unity.DemoTeam.Hair
 					if (onSimulationStateChanged != null)
 						onSimulationStateChanged(cmd);
 				}
+
+				for (int i = 0; i != solverData.Length; i++)
+				{
+					HairSim.PushSolverStepEnd(cmd, solverData[i], volumeData);
+				}
 			}
+
+			HairSim.PushVolumeStepEnd(cmd, volumeData);
 
 			for (int i = 0; i != solverData.Length; i++)
 			{
@@ -1306,8 +1313,9 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
-				HairSim.PushVolumeStepFrame(cmd, ref volumeData, settingsVolumetrics, 1.0f);
+				HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics, 1.0f);
 				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, 1.0f);
+				HairSim.PushVolumeStepEnd(cmd, volumeData);
 
 				for (int i = 0; i != solverData.Length; i++)
 				{

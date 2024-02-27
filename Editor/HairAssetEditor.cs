@@ -654,7 +654,7 @@ namespace Unity.DemoTeam.Hair
 				{
 					for (int i = 0; i != previewData.Length; i++)
 					{
-						HairSim.PushSolverStepFrame(cmd, ref previewData[i], HairSim.SettingsPhysics.defaults, 1.0f);
+						HairSim.PushSolverStepBegin(cmd, ref previewData[i], HairSim.SettingsPhysics.defaults, 1.0f);
 					}
 
 					Graphics.ExecuteCommandBuffer(cmd);

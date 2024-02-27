@@ -839,7 +839,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolateAdd, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.InterpolateAdd);
 		}
 
-		public static void PushSolverStepFrame(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, float deltaTime)
+		public static void PushSolverStepBegin(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, float deltaTime)
 		{
 			ref var solverConstants = ref solverData.constants;
 			ref var solverKeywords = ref solverData.keywords;
@@ -996,20 +996,21 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != substepCount; i++)
 				{
-					var substepStepFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
-					if (substepStepFraction < (1.0f - float.Epsilon))
+					var substepRootsFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
+					if (substepRootsFraction < (1.0f - float.Epsilon))
 					{
-						var rootsNumX = ((int)solverData.constants._StrandCount + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
-						var rootsNumY = 1;
-						var rootsNumZ = 1;
-
 						using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepRoots))
 						{
+							var substepRootsInterpolated = (i == substepCount - 1);
+							var substepRootsDispatch = (volumeData.keywords.VOLUME_SPLAT_CLUSTERS == false) && substepRootsInterpolated ?
+								SolverLODDispatch.Staging :
+								SolverLODDispatch.Solve;
+
 							//TODO move into cbuffer?
-							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepStepFraction);
+							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepRootsFraction);
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KRootsSubstep, solverData);
-							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, rootsNumX, rootsNumY, rootsNumZ);
+							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)substepRootsDispatch);
 						}
 					}
 
@@ -1029,7 +1030,7 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						BindVolumeData(cmd, s_solverCS, solveKernel, volumeData);
-						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepStepFraction < (1.0f - float.Epsilon)));
+						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepRootsFraction < (1.0f - float.Epsilon)));
 						cmd.DispatchCompute(s_solverCS, solveKernel, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)solveDispatch);
 					}
 
@@ -1048,10 +1049,25 @@ namespace Unity.DemoTeam.Hair
 					solverData.constants = substepConstantsBackup;
 					PushConstantBufferData(cmd, solverData.buffers.SolverCBuffer, solverData.constants);
 				}
+			}
 
+			if (volumeData.keywords.VOLUME_SPLAT_CLUSTERS == false)
+			{
 				using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
 				{
 					BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolate, WithSubstepData(solverData, stepFracHi < (1.0f - float.Epsilon)));
+					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.Interpolate);
+				}
+			}
+		}
+
+		public static void PushSolverStepEnd(CommandBuffer cmd, in SolverData solverData, in VolumeData volumeData)
+		{
+			if (volumeData.keywords.VOLUME_SPLAT_CLUSTERS)
+			{
+				using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
+				{
+					BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolate, solverData);
 					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.Interpolate);
 				}
 			}
@@ -1619,7 +1635,7 @@ namespace Unity.DemoTeam.Hair
 			volumeData.buffersReadback._VolumeLODStage.ScheduleCopy(cmd, volumeData.buffers._VolumeLODStage);
 		}
 
-		public static void PushVolumeStepFrame(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume, float deltaTime)
+		public static void PushVolumeStepBegin(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume, float deltaTime)
 		{
 			ref var volumeConstants = ref volumeData.constants;
 			ref var volumeKeywords = ref volumeData.keywords;
@@ -1680,6 +1696,11 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public static void PushVolumeStepEnd(CommandBuffer cmd, in VolumeData volumeData)
+		{
+			// defined for completeness
+		}
+
 		static void PushVolumeClear(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
@@ -1691,13 +1712,6 @@ namespace Unity.DemoTeam.Hair
 
 		static void PushVolumeTransfer(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in SettingsVolume settingsVolume, in SolverData solverData)
 		{
-			//var splatStrandCount = volumeData.keywords.VOLUME_SPLAT_CLUSTERS ? solverData.constants._SolverStrandCount : solverData.constants._StrandCount;
-			//var splatParticleCount = splatStrandCount * solverData.constants._StrandParticleCount;
-
-			//int numX = ((int)splatParticleCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
-			//int numY = 1;
-			//int numZ = 1;
-
 			var transferDispatch = volumeData.keywords.VOLUME_SPLAT_CLUSTERS ?
 				SolverLODDispatch.Transfer :
 				SolverLODDispatch.TransferAll;
@@ -1759,7 +1773,6 @@ namespace Unity.DemoTeam.Hair
 									BindVolumeData(cmd, volumeData);
 									BindSolverData(cmd, solverData);
 									cmd.DrawProceduralIndirect(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, solverData.buffers._SolverLODDispatch, (int)solverData.buffers._SolverLODDispatch.stride * (int)rasterDispatchPoints);
-									//cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, (int)splatParticleCount, 1);
 								}
 							}
 							else
@@ -1788,7 +1801,6 @@ namespace Unity.DemoTeam.Hair
 									BindVolumeData(cmd, volumeData);
 									BindSolverData(cmd, solverData);
 									cmd.DrawProceduralIndirect(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, solverData.buffers._SolverLODDispatch, (int)solverData.buffers._SolverLODDispatch.stride * (int)rasterDispatchQuads);
-									//cmd.DrawProcedural(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, (int)splatParticleCount * 8, 1);
 								}
 							}
 						}
