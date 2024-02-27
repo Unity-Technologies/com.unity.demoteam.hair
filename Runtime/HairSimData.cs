@@ -37,18 +37,19 @@ namespace Unity.DemoTeam.Hair
 				public T _RootFrameSubstep;				// quat(xyz,w): ...
 
 				public T _SolverLODStage;				// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
-				public T _SolverLODDispatch;			// xyz: num groups, w: num strands
+				public T _SolverLODRange;				// xy: dispatch strand range [begin, end)
+				public T _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
 
-				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: -
+				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root
 				public T _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 				public T _InitialParticleFrameDelta16;	// xy: compressed initial particle material frame delta
 
-				public T _ParticlePosition;				// xyz: position, w: initial local accumulated weight (gather)
+				public T _ParticlePosition;				// xyz: position//, w: initial local accumulated weight (gather)
 				public T _ParticlePositionPrev;			// xyz: ...
 				public T _ParticlePositionPrevPrev;		// xyz: ...
-				public T _ParticleVelocity;				// xyz: velocity, w: splatting weight
+				public T _ParticleVelocity;				// xyz: velocity
 				public T _ParticleVelocityPrev;			// xyz: ...
-				public T _ParticleCorrection;			// xyz: ftl distance correction, w: -
+				public T _ParticleCorrection;			// xyz: ftl distance correction
 
 				public T _ParticleExtTexCoord;			// xy: optional particle uv
 				public T _ParticleExtDiameter;			// x: optional particle diameter
@@ -258,20 +259,32 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[GenerateHLSL]
+		public enum SolverLODDispatchRange
+		{
+			Solve					= 0,
+			Interpolate				= 1,
+			InterpolateAdd			= 2,
+			InterpolatePromote		= 3,
+			Render					= 4,
+			__COUNT
+		}
+
+		[GenerateHLSL]
 		public enum SolverLODDispatch
 		{
 			Solve					= 0,	// thread group is 64 strands
-			SolveParallelParticles	= 1,	// thread group is 16|32|64|128 particles (one group = one strand)
+			SolveGroupParticles		= 1,	// thread group is 16|32|64|128 particles (one group = one strand)
 			Interpolate				= 2,	// thread group is 64 strands
-			InterpolateReentrant	= 3,	// thread group is 64 strands
-			Staging					= 4,	// thread group is 64 strands
-			StagingReentrant		= 5,	// thread group is 64 strands
-			Transfer				= 6,	// thread group is 64 particles
-			TransferAll				= 7,	// thread group is 64 particles
-			RasterPoints			= 8,	// -
-			RasterPointsAll			= 9,	// -
-			RasterQuads				= 10,	// -
-			RasterQuadsAll			= 11,	// -
+			InterpolateAdd			= 3,	// thread group is 64 strands
+			InterpolatePromote		= 4,	// thread group is 64 strands
+			Staging					= 5,	// thread group is 64 strands
+			StagingReentrant		= 6,	// thread group is 64 strands
+			Transfer				= 7,	// thread group is 64 particles
+			TransferAll				= 8,	// thread group is 64 particles
+			RasterPoints			= 9,	// -
+			RasterPointsAll			= 10,	// -
+			RasterQuads				= 11,	// -
+			RasterQuadsAll			= 12,	// -
 			__COUNT
 		}
 

@@ -94,6 +94,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KRootsSubstep;
 			public static int KInitialize;
 			public static int KInitializePostVolume;
+			public static int KLODSelectionInit;
 			public static int KLODSelection;
 			public static int KSolveConstraints_GaussSeidelReference;
 			public static int KSolveConstraints_GaussSeidel;
@@ -102,6 +103,8 @@ namespace Unity.DemoTeam.Hair
 			public static int KSolveConstraints_Jacobi_64;
 			public static int KSolveConstraints_Jacobi_128;
 			public static int KInterpolate;
+			public static int KInterpolateAdd;
+			public static int KInterpolatePromote;
 			public static int KStaging;
 			public static int KStagingSubdivision;
 			public static int KStagingHistory;
@@ -239,9 +242,10 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._RootFrameSubstep, "RootFrame_t", strandCount, particleStrideVector4);
 
 				changed |= CreateBuffer(ref solverBuffers._SolverLODStage, "SolverLODStage", (int)SolverLODStage.__COUNT, sizeof(LODIndices));
-				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT, sizeof(uint) * 4, ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
+				changed |= CreateBuffer(ref solverBuffers._SolverLODRange, "SolverLODRange", (int)SolverLODDispatchRange.__COUNT, particleStrideVector2);
+				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT, particleStrideVector4, ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
 
-				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector3);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta16, "InitialParticleFrameDelta16", particleCount, particleStrideVector2);
 
@@ -361,6 +365,7 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverBuffers._RootFrameSubstep);
 
 			ReleaseBuffer(ref solverBuffers._SolverLODStage);
+			ReleaseBuffer(ref solverBuffers._SolverLODRange);
 			ReleaseBuffer(ref solverBuffers._SolverLODDispatch);
 
 			ReleaseBuffer(ref solverBuffers._InitialParticleOffset);
@@ -481,6 +486,7 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(SolverData.s_bufferIDs._InitialParticleFrameDelta16, solverBuffers._InitialParticleFrameDelta16);
 
 			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODStage, solverBuffers._SolverLODStage);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODRange, solverBuffers._SolverLODRange);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODDispatch, solverBuffers._SolverLODDispatch);
 
 			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticlePosition, solverBuffers._ParticlePosition);
@@ -774,12 +780,18 @@ namespace Unity.DemoTeam.Hair
 			solverData.manualBoundsMax = settingsGeometry.boundsCenter + settingsGeometry.boundsExtent;
 		}
 
-		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, in SettingsRendering settingsRendering, in VolumeData volumeData)
+		public static void PushSolverLODInit(CommandBuffer cmd, in SolverData solverData)
+		{
+			BindSolverData(cmd, s_solverCS, SolverKernels.KLODSelectionInit, solverData);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KLODSelectionInit, 1, 1, 1);
+		}
+
+		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, in SettingsRendering settingsRendering, in VolumeData volumeData, float deltaTime)
 		{
 			ref var solverConstants = ref solverData.constants;
 
 			// derive constants
-			solverConstants._SolverLODMethod = (uint)settingsPhysics.kLODSelection;
+			solverConstants._SolverLODMethod = ((uint)settingsPhysics.kLODSelection & 0xffffu) | (deltaTime > 0.0f ? 0x10000u : 0x00000u);
 			solverConstants._SolverLODCeiling = settingsPhysics.kLODCeiling;
 			solverConstants._SolverLODScale = settingsPhysics.kLODScale;
 			solverConstants._SolverLODBias = (settingsPhysics.kLODSelection == SolverLODSelection.Manual) ? settingsPhysics.kLODSelectionValue : settingsPhysics.kLODBias;
@@ -800,10 +812,39 @@ namespace Unity.DemoTeam.Hair
 
 			// schedule readback
 			solverData.buffersReadback._SolverLODStage.ScheduleCopy(cmd, solverData.buffers._SolverLODStage);
+			/*
+			solverData.buffersReadback._SolverLODRange.ScheduleCopy(cmd, solverData.buffers._SolverLODRange);
+			{
+				var data = solverData.buffersReadback._SolverLODRange.GetData<uint2>(true);
+				
+				var rangeAdd = data[(int)HairSim.SolverLODRange.InterpolateAdd];
+				var rangePromote = data[(int)HairSim.SolverLODRange.InterpolatePromote];
+
+				var countAdd = rangeAdd.y - rangeAdd.x;
+				var countPromote = rangePromote.y - rangePromote.x;
+
+				if (countAdd > 0 || countPromote > 0)
+				{
+					Debug.Log("---- ADD OR PROMOTE -----");
+					for (int i = 0; i != (int)HairSim.SolverLODRange.__COUNT; i++)
+					{
+						Debug.LogFormat("range {0} = {1}", (HairSim.SolverLODRange)i, data[i]);
+					}
+				}
+			}
+			*/
+
+			// add reentrant -> interpolated
+			BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolateAdd, solverData);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolateAdd, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.InterpolateAdd);
 		}
 
-		public static void PushSolverSettings(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, float deltaTime)
+		public static void PushSolverStepFrame(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, float deltaTime)
 		{
+			ref var solverConstants = ref solverData.constants;
+			ref var solverKeywords = ref solverData.keywords;
+
+			// derive constants
 			static float IntervalToSeconds(SettingsPhysics.TimeInterval interval)
 			{
 				switch (interval)
@@ -816,10 +857,6 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			ref var solverConstants = ref solverData.constants;
-			ref var solverKeywords = ref solverData.keywords;
-
-			// derive constants
 			solverConstants._DT = deltaTime / Mathf.Max(1, settingsPhysics.solverSubsteps);
 			solverConstants._Substeps = (uint)Mathf.Max(1, settingsPhysics.solverSubsteps);
 			solverConstants._Iterations = (uint)settingsPhysics.constraintIterations;
@@ -895,6 +932,10 @@ namespace Unity.DemoTeam.Hair
 
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.buffers.SolverCBuffer, solverConstants);
+
+			// promote interpolated -> simulated
+			BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolatePromote, solverData);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolatePromote, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.InterpolatePromote);
 		}
 
 		public static void PushSolverStep(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, in VolumeData volumeData, float stepFracLo, float stepFracHi)
@@ -933,7 +974,7 @@ namespace Unity.DemoTeam.Hair
 							solveKernel = SolverKernels.KSolveConstraints_Jacobi_128;
 							break;
 					}
-					solveDispatch = SolverLODDispatch.SolveParallelParticles;
+					solveDispatch = SolverLODDispatch.SolveGroupParticles;
 					break;
 			}
 
@@ -955,8 +996,8 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != substepCount; i++)
 				{
-					var substepFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
-					if (substepFraction < (1.0f - float.Epsilon))
+					var substepStepFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
+					if (substepStepFraction < (1.0f - float.Epsilon))
 					{
 						var rootsNumX = ((int)solverData.constants._StrandCount + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
 						var rootsNumY = 1;
@@ -965,7 +1006,7 @@ namespace Unity.DemoTeam.Hair
 						using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepRoots))
 						{
 							//TODO move into cbuffer?
-							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepFraction);
+							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepStepFraction);
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KRootsSubstep, solverData);
 							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, rootsNumX, rootsNumY, rootsNumZ);
@@ -988,31 +1029,9 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						BindVolumeData(cmd, s_solverCS, solveKernel, volumeData);
-						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepFraction < (1.0f - float.Epsilon)));
+						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepStepFraction < (1.0f - float.Epsilon)));
 						cmd.DispatchCompute(s_solverCS, solveKernel, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)solveDispatch);
 					}
-
-					/* TODO remove
-					// interpolate follow-strands
-					//TODO move this out of the substep loop (bit finicky due to the buffer shuffling per substep)
-					var interpolateStrandCount = solverData.cbuffer._StrandCount - solverData.cbuffer._SolverStrandCount;
-					if (interpolateStrandCount > 0)
-					{
-						int kernelInterpolate = (solverData.cbuffer._LODIndexLo != solverData.cbuffer._LODIndexHi)
-							? SolverKernels.KInterpolate
-							: SolverKernels.KInterpolateNearest;
-
-						var interpolateNumX = ((int)interpolateStrandCount + PARTICLE_GROUP_SIZE - 1) / PARTICLE_GROUP_SIZE;
-						var interpolateNumY = 1;
-						var interpolateNumZ = 1;
-
-						using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
-						{
-							BindSolverData(cmd, s_solverCS, kernelInterpolate, WithSubstepData(solverData, substepFrac < (1.0f - float.Epsilon)));
-							cmd.DispatchCompute(s_solverCS, kernelInterpolate, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.Interpolate);
-						}
-					}
-					*/
 
 					// volume impulse is only applied for first substep
 					if (substepCount > 1)
@@ -1600,7 +1619,7 @@ namespace Unity.DemoTeam.Hair
 			volumeData.buffersReadback._VolumeLODStage.ScheduleCopy(cmd, volumeData.buffers._VolumeLODStage);
 		}
 
-		public static void PushVolumeSettings(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume, float deltaTime)
+		public static void PushVolumeStepFrame(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume, float deltaTime)
 		{
 			ref var volumeConstants = ref volumeData.constants;
 			ref var volumeKeywords = ref volumeData.keywords;

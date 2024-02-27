@@ -896,7 +896,7 @@ namespace Unity.DemoTeam.Hair
 			execState.accumulatedTimeChunked -= (stepDesc.dt * stepDesc.count);
 
 			// apply limits
-			if (simulationActive)
+			if (stepDesc.dt > 0.0f && simulationActive)
 			{
 				stepDesc.count = Mathf.Max(stepDesc.count, settingsExecutive.updateStepsMin ? settingsExecutive.updateStepsMinValue : stepDesc.count);
 				stepDesc.count = Mathf.Min(stepDesc.count, settingsExecutive.updateStepsMax ? settingsExecutive.updateStepsMaxValue : stepDesc.count);
@@ -939,20 +939,25 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				HairSim.PushSolverLOD(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), GetSettingsRendering(strandGroupInstances[i]), volumeData);
+				HairSim.PushSolverLOD(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), GetSettingsRendering(strandGroupInstances[i]), volumeData, stepDesc.dt * stepDesc.count);
 			}
 
 			HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
 			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, (float)execState.accumulatedTimeSession);
+			HairSim.PushVolumeStepFrame(cmd, ref volumeData, settingsVolumetrics, stepDesc.dt);
 
 			if (stepDesc.count == 0 || HairSim.PrepareVolumeData(ref volumeData, settingsVolumetrics, solverData.Length + 1))
 			{
-				HairSim.PushVolumeSettings(cmd, ref volumeData, settingsVolumetrics, stepDesc.dt);
 				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, 1.0f);
 			}
 
 			if (stepDesc.count >= 1)
 			{
+				for (int i = 0; i != solverData.Length; i++)
+				{
+					HairSim.PushSolverStepFrame(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), stepDesc.dt);
+				}
+
 				for (int k = 0; k != stepDesc.count; k++)
 				{
 					float stepFracLo = (k + 0) / (float)stepDesc.count;
@@ -960,16 +965,11 @@ namespace Unity.DemoTeam.Hair
 
 					for (int i = 0; i != solverData.Length; i++)
 					{
-						ref readonly var settingsPhysics = ref GetSettingsPhysics(strandGroupInstances[i]);
-
-						HairSim.PushSolverSettings(cmd, ref solverData[i], settingsPhysics, stepDesc.dt);
-						HairSim.PushSolverStep(cmd, ref solverData[i], settingsPhysics, volumeData, stepFracLo, stepFracHi);
+						HairSim.PushSolverStep(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), volumeData, stepFracLo, stepFracHi);
 					}
 
 					//TODO substep volume environment (interpolate colliders and emitters)
 					//HairSim.SubstepVolumeEnvironment(cmd, ref volumeData, stepFracHi);
-
-					HairSim.PushVolumeSettings(cmd, ref volumeData, settingsVolumetrics, stepDesc.dt);
 					HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracHi);
 
 					if (onSimulationStateChanged != null)
@@ -1224,7 +1224,7 @@ namespace Unity.DemoTeam.Hair
 				case SettingsExecutive.UpdateRate.Fixed60Hz: return 1.0f / 60.0f;
 				case SettingsExecutive.UpdateRate.Fixed90Hz: return 1.0f / 90.0f;
 				case SettingsExecutive.UpdateRate.Fixed120Hz: return 1.0f / 120.0f;
-				case SettingsExecutive.UpdateRate.CustomTimeStep: return settingsExecutive.updateTimeStep;
+				case SettingsExecutive.UpdateRate.CustomTimeStep: return Mathf.Max(0.0f, settingsExecutive.updateTimeStep);
 				default: return 0.0f;
 			}
 		}
@@ -1504,11 +1504,12 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != solverData.Length; i++)
 				{
-					HairSim.PushSolverLOD(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), GetSettingsRendering(strandGroupInstances[i]), volumeData);
+					HairSim.PushSolverLODInit(cmd, solverData[i]);
+					HairSim.PushSolverLOD(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), GetSettingsRendering(strandGroupInstances[i]), volumeData, 1.0f);
 				}
 
 				HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
-				HairSim.PushVolumeSettings(cmd, ref volumeData, settingsVolumetrics, 1.0f);
+				HairSim.PushVolumeStepFrame(cmd, ref volumeData, settingsVolumetrics, 1.0f);
 				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, 1.0f);
 
 				for (int i = 0; i != solverData.Length; i++)
