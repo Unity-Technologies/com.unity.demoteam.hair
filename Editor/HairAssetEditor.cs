@@ -40,11 +40,30 @@ namespace Unity.DemoTeam.Hair
 		Vector2 previewAngle;
 		float previewZoom;
 
+		HairSim.VolumeData previewDataShared;
 		HairSim.SolverData[] previewData;
 		string previewDataChecksum;
+		int[] previewLOD;
 
 		void OnEnable()
 		{
+			_settingsBasic = serializedObject.FindProperty(nameof(HairAsset.settingsBasic));
+			_settingsCustom = serializedObject.FindProperty(nameof(HairAsset.settingsCustom));
+			_settingsCustom_settingsResolve = _settingsCustom.FindPropertyRelative(nameof(HairAsset.SettingsCustom.settingsResolve));
+			_settingsAlembic = serializedObject.FindProperty(nameof(HairAsset.settingsAlembic));
+			_settingsAlembic_settingsResolve = _settingsAlembic.FindPropertyRelative(nameof(HairAsset.SettingsAlembic.settingsResolve));
+			_settingsProcedural = serializedObject.FindProperty(nameof(HairAsset.settingsProcedural));
+			_settingsLODClusters = serializedObject.FindProperty(nameof(HairAsset.settingsLODClusters));
+			_settingsLODClusters_baseLOD = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLOD));
+			_settingsLODClusters_baseLODParamsGenerated = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLODParamsGenerated));
+			_settingsLODClusters_baseLODParamsUVMapped = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLODParamsUVMapped));
+			_settingsLODClusters_highLOD = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLOD));
+			_settingsLODClusters_highLODParamsAutomatic = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLODParamsAutomatic));
+			_settingsLODClusters_highLODParamsManual = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLODParamsManual));
+
+			_strandGroups = serializedObject.FindProperty(nameof(HairAsset.strandGroups));
+			_strandGroupsAutoBuild = serializedObject.FindProperty(nameof(HairAsset.strandGroupsAutoBuild));
+
 			previewMaterial = new Material(HairMaterialUtility.GetCurrentPipelineDefault());
 			previewAngle = Vector2.zero;
 			previewZoom = 0.0f;
@@ -66,23 +85,6 @@ namespace Unity.DemoTeam.Hair
 			{
 				previewRenderer.lights[i].enabled = false;
 			}
-
-			_settingsBasic = serializedObject.FindProperty(nameof(HairAsset.settingsBasic));
-			_settingsCustom = serializedObject.FindProperty(nameof(HairAsset.settingsCustom));
-			_settingsCustom_settingsResolve = _settingsCustom.FindPropertyRelative(nameof(HairAsset.SettingsCustom.settingsResolve));
-			_settingsAlembic = serializedObject.FindProperty(nameof(HairAsset.settingsAlembic));
-			_settingsAlembic_settingsResolve = _settingsAlembic.FindPropertyRelative(nameof(HairAsset.SettingsAlembic.settingsResolve));
-			_settingsProcedural = serializedObject.FindProperty(nameof(HairAsset.settingsProcedural));
-			_settingsLODClusters = serializedObject.FindProperty(nameof(HairAsset.settingsLODClusters));
-			_settingsLODClusters_baseLOD = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLOD));
-			_settingsLODClusters_baseLODParamsGenerated = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLODParamsGenerated));
-			_settingsLODClusters_baseLODParamsUVMapped = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.baseLODParamsUVMapped));
-			_settingsLODClusters_highLOD = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLOD));
-			_settingsLODClusters_highLODParamsAutomatic = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLODParamsAutomatic));
-			_settingsLODClusters_highLODParamsManual = _settingsLODClusters.FindPropertyRelative(nameof(HairAsset.SettingsLODClusters.highLODParamsManual));
-
-			_strandGroups = serializedObject.FindProperty(nameof(HairAsset.strandGroups));
-			_strandGroupsAutoBuild = serializedObject.FindProperty(nameof(HairAsset.strandGroupsAutoBuild));
 		}
 
 		void OnDisable()
@@ -517,26 +519,47 @@ namespace Unity.DemoTeam.Hair
 										previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
 									}
 
-									HairSim.BindSolverData(previewMaterial, previewData[i]);
+									ref var previewBuffersShared = ref previewDataShared.buffers;
+									{
+										ref readonly var bufferIDs = ref HairSim.VolumeData.s_bufferIDs;
+										previewMaterial.SetBuffer(bufferIDs._Bounds, previewBuffersShared._Bounds);
+										previewMaterial.SetBuffer(bufferIDs._BoundsPrev, previewBuffersShared._Bounds);
+									}
+
+									ref var previewBuffers = ref previewData[i].buffers;
+									unsafe
+									{
+										ref readonly var bufferIDs = ref HairSim.SolverData.s_bufferIDs;
+										previewMaterial.SetConstantBuffer(bufferIDs.SolverCBuffer, previewBuffers.SolverCBuffer, 0, sizeof(HairSim.SolverCBuffer));
+										previewMaterial.SetBuffer(bufferIDs._RootUV, previewBuffers._RootUV);
+										previewMaterial.SetBuffer(bufferIDs._RootScale, previewBuffers._RootScale);
+										previewMaterial.SetBuffer(bufferIDs._LODGuideCount, previewBuffers._LODGuideCount);
+										previewMaterial.SetBuffer(bufferIDs._LODGuideIndex, previewBuffers._LODGuideIndex);
+										previewMaterial.SetBuffer(bufferIDs._LODGuideCarry, previewBuffers._LODGuideCarry);
+										previewMaterial.SetBuffer(bufferIDs._LODGuideReach, previewBuffers._LODGuideReach);
+										previewMaterial.SetBuffer(bufferIDs._StagingVertex, previewBuffers._StagingVertex);
+										previewMaterial.SetBuffer(bufferIDs._StagingVertexPrev, previewBuffers._StagingVertex);
+										previewMaterial.SetBuffer(bufferIDs._SolverLODStage, previewBuffers._SolverLODStage);
+										previewMaterial.SetBuffer(bufferIDs._SolverLODRange, previewBuffers._SolverLODRange);
+									}
 
 									previewMaterial.SetInt("_DecodeVertexCount", 1);
 									previewMaterial.SetInt("_DecodeVertexWidth", 0);
 
-									switch (meshLines?.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+									if (meshLines != null)
 									{
-										case VertexAttributeFormat.Float32://TODO replace runtime compatibility with asset versioning / upgrade
-											previewMaterial.SetInt("_DecodeVertexComponentWidth", 32);
-											break;
+										switch (meshLines.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+										{
+											case VertexAttributeFormat.UNorm16:
+												previewMaterial.SetInt("_DecodeVertexComponentValue", ushort.MaxValue);
+												previewMaterial.SetInt("_DecodeVertexComponentWidth", 16);
+												break;
 
-										case VertexAttributeFormat.UNorm16:
-											previewMaterial.SetInt("_DecodeVertexComponentValue", ushort.MaxValue);
-											previewMaterial.SetInt("_DecodeVertexComponentWidth", 16);
-											break;
-
-										case VertexAttributeFormat.UNorm8:
-											previewMaterial.SetInt("_DecodeVertexComponentValue", byte.MaxValue);
-											previewMaterial.SetInt("_DecodeVertexComponentWidth", 8);
-											break;
+											case VertexAttributeFormat.UNorm8:
+												previewMaterial.SetInt("_DecodeVertexComponentValue", byte.MaxValue);
+												previewMaterial.SetInt("_DecodeVertexComponentWidth", 8);
+												break;
+										}
 									}
 
 									previewRenderer.BeginPreview(rect, GUIStyle.none);
@@ -546,6 +569,15 @@ namespace Unity.DemoTeam.Hair
 								}
 							}
 							EditorGUILayout.EndVertical();
+
+							using (new EditorGUI.DisabledScope(hairAsset.strandGroups[i].lodCount < 2))
+							{
+								var selectedLOD = EditorGUILayout.IntSlider("Preview LOD", previewLOD[i], 0, hairAsset.strandGroups[i].lodCount - 1);
+								if (selectedLOD != previewLOD[i])
+								{
+									InitializePreviewLOD(i, selectedLOD);
+								}
+							}
 
 							using (new EditorGUI.DisabledScope(true))
 							{
@@ -568,6 +600,8 @@ namespace Unity.DemoTeam.Hair
 
 		void ReleasePreviewData()
 		{
+			HairSim.ReleaseVolumeData(ref previewDataShared);
+
 			if (previewData != null)
 			{
 				for (int i = 0; i != previewData.Length; i++)
@@ -578,6 +612,7 @@ namespace Unity.DemoTeam.Hair
 
 			previewData = null;
 			previewDataChecksum = string.Empty;
+			previewLOD = null;
 		}
 
 		void InitializePreviewData(HairAsset hairAsset)
@@ -591,9 +626,15 @@ namespace Unity.DemoTeam.Hair
 			if (strandGroups == null)
 				return;
 
-			unsafe
+			previewData = new HairSim.SolverData[strandGroups.Length];
+			previewLOD = new int[strandGroups.Length];
+
+			using (var cmd = HairSimUtility.ScopedCommandBuffer.Get())
 			{
-				previewData = new HairSim.SolverData[strandGroups.Length];
+				using (var dummyBounds = new NativeArray<HairSim.LODBounds>(1, Allocator.Temp))
+				{
+					CreateBufferWithNativeData(ref previewDataShared.buffers._Bounds, dummyBounds);
+				}
 
 				for (int i = 0; i != previewData.Length; i++)
 				{
@@ -601,66 +642,109 @@ namespace Unity.DemoTeam.Hair
 
 					ref var previewBuffers = ref previewData[i].buffers;
 					ref var previewConstants = ref previewData[i].constants;
-
-					HairSim.PrepareSolverData(ref previewData[i], strandGroup.strandCount, strandGroup.strandParticleCount, strandGroup.lodCount);
 					{
-						previewData[i].memoryLayout = strandGroup.particleMemoryLayout;
+						HairAssetUtility.DeclareParticleStride(strandGroup, out var strandParticleOffset, out var strandParticleStride);
 
 						previewConstants._StrandCount = (uint)strandGroup.strandCount;
 						previewConstants._StrandParticleCount = (uint)strandGroup.strandParticleCount;
+						previewConstants._StrandParticleOffset = (uint)strandParticleOffset;
+						previewConstants._StrandParticleStride = (uint)strandParticleStride;
+						previewConstants._LODCount = (uint)strandGroup.lodCount;
 
-						switch (previewData[i].memoryLayout)
-						{
-							case HairAsset.MemoryLayout.Interleaved:
-								previewConstants._StrandParticleOffset = 1;
-								previewConstants._StrandParticleStride = previewConstants._StrandCount;
-								break;
-
-							case HairAsset.MemoryLayout.Sequential:
-								previewConstants._StrandParticleOffset = previewConstants._StrandParticleCount;
-								previewConstants._StrandParticleStride = 1;
-								break;
-						}
+						previewConstants._GroupScale = 1.0f;
+						previewConstants._GroupMaxParticleInterval = strandGroup.maxStrandLength / (previewConstants._StrandParticleCount - 1);
+						previewConstants._GroupMaxParticleDiameter = strandGroup.maxStrandDiameter;
+						previewConstants._GroupBoundsIndex = 0;
 
 						previewConstants._StagingSubdivision = 0;
 						previewConstants._StagingVertexFormat = (uint)HairSim.StagingVertexFormat.Uncompressed;
-						previewConstants._StagingVertexStride = sizeof(float) * 4;
+						previewConstants._StagingVertexStride = sizeof(float) * 3;
 
 						previewConstants._StagingStrandVertexCount = previewConstants._StrandParticleCount;
 						previewConstants._StagingStrandVertexOffset = previewConstants._StrandParticleOffset;
+
+						previewConstants._RenderLODMethod = (uint)HairSim.RenderLODSelection.Manual;
+						previewConstants._RenderLODClipThreshold = 0.05f;//TODO remove this once HairVertex implements hard upper bound
 					}
 
-					using (var stagingData = new NativeArray<Vector4>(strandGroup.particlePosition.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+					unsafe
 					{
-						fixed (void* sourcePtr = strandGroup.particlePosition)
-						{
-							UnsafeUtility.MemCpyStride(stagingData.GetUnsafePtr(), sizeof(Vector4), sourcePtr, sizeof(Vector3), sizeof(Vector3), stagingData.Length);
-						}
-
-						previewBuffers._ParticlePosition.SetData(stagingData);
+						HairSimUtility.CreateBuffer(ref previewBuffers.SolverCBuffer, string.Empty, 1, sizeof(HairSim.SolverCBuffer), ComputeBufferType.Constant);
+						HairSimUtility.PushConstantBufferData(cmd, previewBuffers.SolverCBuffer, previewConstants);
 					}
 
-					previewBuffers._LODGuideCount.SetData(strandGroup.lodGuideCount);
-					previewBuffers._LODGuideIndex.SetData(strandGroup.lodGuideIndex);
-					previewBuffers._LODGuideCarry.SetData(strandGroup.lodGuideCarry);
-					previewBuffers._LODGuideReach.SetData(strandGroup.lodGuideReach);
+					CreateBufferWithData(ref previewBuffers._RootUV, strandGroup.rootUV);
+					CreateBufferWithData(ref previewBuffers._RootScale, strandGroup.rootScale);
+					CreateBufferWithData(ref previewBuffers._LODGuideCount, strandGroup.lodGuideCount);
+					CreateBufferWithData(ref previewBuffers._LODGuideIndex, strandGroup.lodGuideIndex);
+					CreateBufferWithData(ref previewBuffers._LODGuideCarry, strandGroup.lodGuideCarry);
+					CreateBufferWithData(ref previewBuffers._LODGuideReach, strandGroup.lodGuideReach);
+					CreateBufferWithData(ref previewBuffers._StagingVertex, strandGroup.particlePosition, ComputeBufferType.Raw);
 
-					//previewConstants._RenderLODIndexLo = (uint)strandGroup.lodCount - 1;
-					//previewConstants._RenderLODIndexHi = (uint)strandGroup.lodCount - 1;
-					//previewConstants._RenderLODBlendFraction = 1.0f;
+					InitializePreviewLOD(i, strandGroup.lodCount - 1);
 				}
 
-				using (var cmd = HairSimUtility.ScopedCommandBuffer.Get())
+				Graphics.ExecuteCommandBuffer(cmd);
+			}
+
+			previewDataChecksum = hairAsset.checksum;
+		}
+
+		void InitializePreviewLOD(int i, int lodIndex)
+		{
+			using (var lodDescs = new NativeArray<HairSim.LODIndices>((int)HairSim.SolverLODStage.__COUNT, Allocator.Temp))
+			using (var lodRange = new NativeArray<Vector2Int>((int)HairSim.SolverLODRange.__COUNT, Allocator.Temp))
+			{
+				unsafe
 				{
-					for (int i = 0; i != previewData.Length; i++)
+					static HairSim.LODIndices MakeLODDesc(int lodIndex) => new HairSim.LODIndices
 					{
-						HairSim.PushSolverStepBegin(cmd, ref previewData[i], HairSim.SettingsPhysics.defaults, 1.0f);
-					}
+						lodIndexLo = (uint)lodIndex,
+						lodIndexHi = (uint)lodIndex,
+						lodBlendFrac = 0.0f,
+					};
 
-					Graphics.ExecuteCommandBuffer(cmd);
+					var lodDescsPtr = (HairSim.LODIndices*)lodDescs.GetUnsafePtr();
+					var lodRangePtr = (Vector2Int*)lodRange.GetUnsafePtr();
+
+					var lodIndexCeil = Mathf.Max(0, (int)previewData[i].constants._LODCount - 1);
+					var lodIndexDesc = MakeLODDesc(Mathf.Clamp(lodIndex, 0, lodIndexCeil));
+
+					lodDescsPtr[(int)HairSim.SolverLODStage.Physics] = lodIndexDesc;
+					lodDescsPtr[(int)HairSim.SolverLODStage.Rendering] = lodIndexDesc;
+					lodRangePtr[(int)HairSim.SolverLODRange.Render] = new Vector2Int(0, (int)previewData[i].constants._StrandCount);
+
+					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODStage, lodDescs);
+					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODRange, lodRange);
 				}
+			}
 
-				previewDataChecksum = hairAsset.checksum;
+			previewLOD[i] = lodIndex;
+		}
+
+		static void CreateBufferWithData<T>(ref ComputeBuffer buffer, T[] data, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged
+		{
+			unsafe
+			{
+				var elementCount = data.Length;
+				var elementStride = UnsafeUtility.SizeOf<T>();
+
+				HairSimUtility.CreateBuffer(ref buffer, string.Empty, elementCount, elementStride, type);
+
+				buffer.SetData(data);
+			}
+		}
+
+		static void CreateBufferWithNativeData<T>(ref ComputeBuffer buffer, NativeArray<T> data, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged
+		{
+			unsafe
+			{
+				var elementCount = data.Length;
+				var elementStride = sizeof(T);
+
+				HairSimUtility.CreateBuffer(ref buffer, string.Empty, elementCount, elementStride, type);
+
+				buffer.SetData(data);
 			}
 		}
 
