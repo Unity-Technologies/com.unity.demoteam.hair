@@ -19,16 +19,15 @@
 #endif
 
 #include "HairSimData.hlsl"
-#include "HairSimDebugDrawColors.hlsl"
-#include "HairSimComputeVolumeUtility.hlsl"
 #include "HairSimComputeLOD.hlsl"
+#include "HairSimDebugDrawColors.hlsl"
 
 #ifndef UNITY_PREV_MATRIX_I_M// not defined by e.g. URP graphs prior to 2021.2.x
 #define UNITY_PREV_MATRIX_I_M UNITY_MATRIX_I_M
 #endif
 
-#define STRAND_PARTICLE_OFFSET	_StagingStrandVertexOffset
 #define STRAND_PARTICLE_COUNT	_StagingStrandVertexCount
+#define STRAND_PARTICLE_OFFSET	_StagingStrandVertexOffset
 
 #define DECLARE_STRAND(x)													\
 	const uint strandIndex = x;												\
@@ -372,7 +371,7 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 	{
 		v.surfacePosition = surfaceOffsetWS + curvePositionRWS;
 		v.surfaceNormal = surfaceNormalWS;
-		v.surfaceTangent = surfaceTangentWS;	
+		v.surfaceTangent = surfaceTangentWS;
 		v.surfaceVelocity = curvePositionRWS - curvePositionRWSPrev;
 		v.surfaceNormalTS = GetSurfaceNormalTS(id.tubularUV);
 		v.surfaceUV = GetSurfaceUV(id.tubularUV);//TODO scroll to handle twist / change in view direction

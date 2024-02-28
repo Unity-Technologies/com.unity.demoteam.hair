@@ -23,10 +23,8 @@
 //
 // Unity.DemoTeam.Hair.HairSim+StagingVertexFormat:  static fields
 //
-#define STAGINGVERTEXFORMAT_UNDEFINED (0)
-#define STAGINGVERTEXFORMAT_COMPRESSED (1)
-#define STAGINGVERTEXFORMAT_UNCOMPRESSED (2)
-#define STAGINGVERTEXFORMAT_UNCOMPRESSED_PT (3)
+#define STAGINGVERTEXFORMAT_COMPRESSED (0)
+#define STAGINGVERTEXFORMAT_UNCOMPRESSED (1)
 
 //
 // Unity.DemoTeam.Hair.HairSim+SolverLODSelection:  static fields

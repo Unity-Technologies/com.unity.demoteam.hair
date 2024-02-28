@@ -242,7 +242,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._RootFrameSubstep, "RootFrame_t", strandCount, particleStrideVector4);
 
 				changed |= CreateBuffer(ref solverBuffers._SolverLODStage, "SolverLODStage", (int)SolverLODStage.__COUNT, sizeof(LODIndices));
-				changed |= CreateBuffer(ref solverBuffers._SolverLODRange, "SolverLODRange", (int)SolverLODDispatchRange.__COUNT, particleStrideVector2);
+				changed |= CreateBuffer(ref solverBuffers._SolverLODRange, "SolverLODRange", (int)SolverLODRange.__COUNT, particleStrideVector2);
 				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT, particleStrideVector4, ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
 
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector3);
@@ -1083,7 +1083,7 @@ namespace Unity.DemoTeam.Hair
 			var subdivisionCountChanged = (subdivisionCount != solverConstants._StagingSubdivision);
 			var subdivisionSegmentCount = (subdivisionCount + 1) * (solverConstants._StrandParticleCount - 1);
 
-			var stagingVertexFormat = StagingVertexFormat.Undefined;
+			var stagingVertexFormat = (StagingVertexFormat)0;
 			var stagingVertexStride = 0;
 
 			unsafe
