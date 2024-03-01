@@ -214,9 +214,6 @@ float3 LoadStagingPosition(const uint i, const LODBounds lodBounds)
 		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
 			return asfloat(_StagingVertex.Load3(i * _StagingVertexStride));
 
-		case STAGINGVERTEXFORMAT_UNCOMPRESSED_PT:
-			return _ParticlePosition[i].xyz;
-
 		default:
 			return 0;
 	}
@@ -233,9 +230,6 @@ float3 LoadStagingPositionPrev(const uint i, const LODBounds lodBoundsPrev)
 
 		case STAGINGVERTEXFORMAT_UNCOMPRESSED:
 			return asfloat(_StagingVertexPrev.Load3(i * _StagingVertexStride));
-
-		case STAGINGVERTEXFORMAT_UNCOMPRESSED_PT:
-			return _ParticlePositionPrev[i].xyz;
 
 		default:
 			return 0;

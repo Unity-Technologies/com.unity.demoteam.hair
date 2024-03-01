@@ -259,7 +259,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[GenerateHLSL]
-		public enum SolverLODDispatchRange
+		public enum SolverLODRange
 		{
 			Solve					= 0,
 			Interpolate				= 1,
@@ -317,10 +317,8 @@ namespace Unity.DemoTeam.Hair
 		[GenerateHLSL]
 		public enum StagingVertexFormat
 		{
-			Undefined		= 0,
-			Compressed		= 1,
-			Uncompressed	= 2,
-			UncompressedPT	= 3,
+			Compressed		= 0,
+			Uncompressed	= 1,
 		}
 
 		public struct VolumeData
