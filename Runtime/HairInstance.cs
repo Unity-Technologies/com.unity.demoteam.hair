@@ -536,7 +536,7 @@ namespace Unity.DemoTeam.Hair
 
 					//remove old SkinAttachment
 					{
-						if (container != null && container.TryGetComponent(out SkinAttachment oldAttachment))
+						if (container != null && container.TryGetComponent(out LegacySkinAttachment oldAttachment))
 						{
 							CoreUtils.Destroy(oldAttachment);
 						}
