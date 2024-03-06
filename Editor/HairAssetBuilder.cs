@@ -809,6 +809,28 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			// sanitize vertex features
+			if (info.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter))
+			{
+				var invalidRootDiameter = 0;
+				{
+					for (int i = 0; i != info.curveCount; i++)
+					{
+						var j = info.curveVertexOffset[i];
+						if (j < info.vertexDataDiameter.Length && info.vertexDataDiameter[j] <= 0.0f)
+						{
+							invalidRootDiameter++;
+						}
+					}
+				}
+
+				if (invalidRootDiameter > 0)
+				{
+					Debug.LogWarningFormat("Discarding alembic curve set diameters due to {0} (out of {1}) curves having degenerate root diameter.", invalidRootDiameter, info.curveCount);
+					info.vertexFeatures ^= HairAssetProvisional.CurveSet.VertexFeatures.Diameter;
+				}
+			}
+
 			// done
 			return info;
 		}

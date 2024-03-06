@@ -70,7 +70,7 @@ namespace Unity.DemoTeam.Hair
 						out_1.mappedDirection = in_0.mappedDirection;
 						out_1.mappedParameters = in_0.mappedParameters;
 
-						out_1.tipScale = 1.0f;
+						out_1.tipScale = HairAsset.SharedDefaults.defaultTipScale;
 						out_1.tipScaleOffset = HairAsset.SharedDefaults.defaultTipScaleOffset;
 					}
 
@@ -101,9 +101,9 @@ namespace Unity.DemoTeam.Hair
 						out_1.rootUVFallback = in_0.rootUVConstant;
 
 						out_1.strandDiameter = __1__SettingsResolve.StrandDiameter.UseFallback;
-						out_1.strandDiameterScale = 1.0f;
+						out_1.strandDiameterScale = 0.01f;
 						out_1.strandDiameterFallback = HairAsset.SharedDefaults.defaultStrandDiameter;
-						out_1.tipScaleFallback = 1.0f;
+						out_1.tipScaleFallback = HairAsset.SharedDefaults.defaultTipScale;
 						out_1.tipScaleFallbackOffset = HairAsset.SharedDefaults.defaultTipScaleOffset;
 
 						out_1.exportAttributes = false;
