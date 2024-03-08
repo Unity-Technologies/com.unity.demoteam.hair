@@ -80,7 +80,7 @@ namespace Unity.DemoTeam.Hair
 
 			// data accessible by GPU
 			public SolverBuffers<ComputeBuffer> buffers;
-			public SolverTextures<RenderTexture> textures;
+			public SolverTextures<Texture> textures;
 
 			// data accessible by GPU + CPU
 			public SolverCBufferRoots constantsRoots;
@@ -391,7 +391,7 @@ namespace Unity.DemoTeam.Hair
 
 			// data accessible by GPU
 			public VolumeBuffers<ComputeBuffer> buffers;
-			public VolumeTextures<RenderTexture> textures;
+			public VolumeTextures<Texture> textures;
 
 			// data accessible by GPU + CPU
 			public VolumeCBufferEnvironment constantsEnvironment;

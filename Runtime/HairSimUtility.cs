@@ -81,45 +81,50 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
-		public static bool CreateVolume(ref RenderTexture volume, string name, int cellCount, RenderTextureFormat cellFormat)
+		public static bool CreateVolume(ref Texture volume, string name, int cellCount, RenderTextureFormat cellFormat)
 		{
-			if (volume != null && volume.width == cellCount && volume.format == cellFormat)
+			var volumeRT = volume as RenderTexture;
+			if (volumeRT != null && volumeRT.width == cellCount && volumeRT.format == cellFormat)
 				return false;
 
-			if (volume != null)
-				volume.Release();
+			if (volumeRT != null)
+				volumeRT.Release();
 
 			//Debug.Log("creating volume " + name);
-			volume = new RenderTexture(MakeVolumeDesc(cellCount, cellFormat));
-			volume.wrapMode = TextureWrapMode.Clamp;
-			volume.hideFlags = HideFlags.HideAndDontSave;
-			volume.name = name;
-			volume.Create();
+			volumeRT = new RenderTexture(MakeVolumeDesc(cellCount, cellFormat));
+			volumeRT.wrapMode = TextureWrapMode.Clamp;
+			volumeRT.hideFlags = HideFlags.HideAndDontSave;
+			volumeRT.name = name;
+			volumeRT.Create();
+			volume = volumeRT;
 			return true;
 		}
 
-		public static bool CreateVolume(ref RenderTexture volume, string name, int cellCount, GraphicsFormat cellFormat)
+		public static bool CreateVolume(ref Texture volume, string name, int cellCount, GraphicsFormat cellFormat)
 		{
-			if (volume != null && volume.width == cellCount && volume.graphicsFormat == cellFormat)
+			var volumeRT = volume as RenderTexture;
+			if (volumeRT != null && volumeRT.width == cellCount && volumeRT.graphicsFormat == cellFormat)
 				return false;
 
-			if (volume != null)
-				volume.Release();
+			if (volumeRT != null)
+				volumeRT.Release();
 
 			//Debug.Log("creating volume " + name);
-			volume = new RenderTexture(MakeVolumeDesc(cellCount, cellFormat));
-			volume.wrapMode = TextureWrapMode.Clamp;
-			volume.hideFlags = HideFlags.HideAndDontSave;
-			volume.name = name;
-			volume.Create();
+			volumeRT = new RenderTexture(MakeVolumeDesc(cellCount, cellFormat));
+			volumeRT.wrapMode = TextureWrapMode.Clamp;
+			volumeRT.hideFlags = HideFlags.HideAndDontSave;
+			volumeRT.name = name;
+			volumeRT.Create();
+			volume = volumeRT;
 			return true;
 		}
 
-		public static void ReleaseVolume(ref RenderTexture volume)
+		public static void ReleaseVolume(ref Texture volume)
 		{
-			if (volume != null)
+			var volumeRT = volume as RenderTexture;
+			if (volumeRT != null)
 			{
-				volume.Release();
+				volumeRT.Release();
 				volume = null;
 			}
 		}
@@ -212,7 +217,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			void BindConstantBuffer(int nameID, ComputeBuffer cbuffer);
 			void BindComputeBuffer(int nameID, ComputeBuffer buffer);
-			void BindComputeTexture(int nameID, RenderTexture texture);
+			void BindComputeTexture(int nameID, Texture texture);
 			void BindKeyword(string name, bool value);
 		}
 
@@ -229,7 +234,7 @@ namespace Unity.DemoTeam.Hair
 
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cs.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cs.SetBuffer(kernel, nameID, buffer);
-			public void BindComputeTexture(int nameID, RenderTexture texture) => cs.SetTexture(kernel, nameID, texture);
+			public void BindComputeTexture(int nameID, Texture texture) => cs.SetTexture(kernel, nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cs, name, value);
 		}
 
@@ -248,7 +253,7 @@ namespace Unity.DemoTeam.Hair
 
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cmd.SetComputeConstantBufferParam(cs, nameID, cbuffer, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cmd.SetComputeBufferParam(cs, kernel, nameID, buffer);
-			public void BindComputeTexture(int nameID, RenderTexture texture) => cmd.SetComputeTextureParam(cs, kernel, nameID, texture);
+			public void BindComputeTexture(int nameID, Texture texture) => cmd.SetComputeTextureParam(cs, kernel, nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
 		}
 
@@ -256,7 +261,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => Shader.SetGlobalConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => Shader.SetGlobalBuffer(nameID, buffer);
-			public void BindComputeTexture(int nameID, RenderTexture texture) => Shader.SetGlobalTexture(nameID, texture);
+			public void BindComputeTexture(int nameID, Texture texture) => Shader.SetGlobalTexture(nameID, texture);
 			public void BindKeyword(string name, bool value)
 			{
 				if (value)
@@ -277,7 +282,7 @@ namespace Unity.DemoTeam.Hair
 
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cmd.SetGlobalConstantBuffer(cbuffer, nameID, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cmd.SetGlobalBuffer(nameID, buffer);
-			public void BindComputeTexture(int nameID, RenderTexture texture) => cmd.SetGlobalTexture(nameID, texture);
+			public void BindComputeTexture(int nameID, Texture texture) => cmd.SetGlobalTexture(nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
 		}
 
@@ -292,7 +297,7 @@ namespace Unity.DemoTeam.Hair
 
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => mat.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => mat.SetBuffer(nameID, buffer);
-			public void BindComputeTexture(int nameID, RenderTexture texture) => mat.SetTexture(nameID, texture);
+			public void BindComputeTexture(int nameID, Texture texture) => mat.SetTexture(nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(mat, name, value);
 		}
 

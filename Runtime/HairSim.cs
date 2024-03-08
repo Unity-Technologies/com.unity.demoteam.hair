@@ -1498,7 +1498,7 @@ namespace Unity.DemoTeam.Hair
 
 					// update sdf
 					if (boundarySDFIndex != -1)
-						volumeTextures._BoundarySDF = boundaryList[boundarySDFIndex].sdf.sdfTexture as RenderTexture;
+						volumeTextures._BoundarySDF = boundaryList[boundarySDFIndex].sdf.sdfTexture;
 					else
 						volumeTextures._BoundarySDF = null;
 
