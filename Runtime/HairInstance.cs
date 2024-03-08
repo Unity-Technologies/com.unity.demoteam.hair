@@ -672,55 +672,13 @@ namespace Unity.DemoTeam.Hair
 				return settings.explicitDataRegistry;
 			}
 
-			SkinAttachmentDataRegistry storage = null;
+
 			if (groupInstance.sceneObjects.rootMeshAttachment != null)
-			{
-				storage = groupInstance.sceneObjects.rootMeshAttachment.DataStorage;
+			{	
+				var currentStorage = groupInstance.sceneObjects.rootMeshAttachment.DataStorage;
+				return currentStorage;
 			}
-
-#if UNITY_EDITOR
-			if(storage == null)
-			{
-				string assetPath;
-
-#if UNITY_2021_2_OR_NEWER
-				var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
-#else
-				var prefabStage = UnityEditor.Experimental.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
-#endif
-
-				var isPrefabInstance =  PrefabUtility.IsPartOfPrefabInstance(this);
-				var isPartOfPrefabScene = prefabStage.IsPartOfPrefabContents(gameObject);
-				if (isPrefabInstance)
-				{
-					assetPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
-				}
-				else if (isPartOfPrefabScene)
-				{
-					assetPath = prefabStage.assetPath;
-				}
-				else
-				{
-					HairAsset hairAsset = groupInstance.groupAssetReference.hairAsset;
-					assetPath = AssetDatabase.GetAssetPath(hairAsset);
-				}
-
-
-				string storagePath = Path.GetDirectoryName(assetPath) + "/" + Path.GetFileNameWithoutExtension(assetPath) + "_AttachmentDataRegistry" + ".asset";
-				if (AssetDatabase.AssetPathExists(storagePath))
-				{
-					storage = (SkinAttachmentDataRegistry)AssetDatabase.LoadAssetAtPath(storagePath, typeof(SkinAttachmentDataRegistry));
-				}
-
-				if(storage == null)
-				{
-					storage = ScriptableObject.CreateInstance<SkinAttachmentDataRegistry>();
-					AssetDatabase.CreateAsset(storage, storagePath);
-				}
-			}
-
-#endif
-			return storage;
+			return null;
 		}
 #endif
 		#endregion
