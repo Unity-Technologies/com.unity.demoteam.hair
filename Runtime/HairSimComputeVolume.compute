@@ -111,7 +111,7 @@
 
 #if VOLUME_SPLAT_CLUSTERS
   #define CHECK_SPLAT(x)	\
-	if (x >= _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE].w * _StrandParticleCount) return;
+	if (x >= _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE * 4 + 3] * _StrandParticleCount) return;
 #else
   #define CHECK_SPLAT(x)	\
 	if (x >= _StrandCount * _StrandParticleCount) return;
@@ -119,7 +119,7 @@
 
 #if VOLUME_SPLAT_CLUSTERS && LAYOUT_INTERLEAVED
   #define DECLARE_SPLAT_PARTICLE_UNCHECKED(x)	\
-	const uint particleIndex = _StrandCount * (x / _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE].w) + (x % _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE].w);
+	const uint particleIndex = _StrandCount * (x / _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE * 4 + 3]) + (x % _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE * 4 + 3]);
 #else
   #define DECLARE_SPLAT_PARTICLE_UNCHECKED(x)	\
 	const uint particleIndex = x;
@@ -130,7 +130,7 @@
 	DECLARE_SPLAT_PARTICLE_UNCHECKED(x);
 
 #define CHECK_STRAND(x)			(x < _StrandCount)
-#define CHECK_STRAND_SOLVER(x)	(x < _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE].w)
+#define CHECK_STRAND_SOLVER(x)	(x < _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE * 4 + 3])
 
 #define DECLARE_STRAND_UNCHECKED(x)											\
 	const uint strandIndex = x;												\
@@ -1554,6 +1554,14 @@ uint4 ResolveDrawParallelCells(uint3 cellCount, uint cellVertexCount)
 	return uint4(cellCount.x * cellCount.y * cellCount.z * cellVertexCount, 1, 0, 0);
 }
 
+void WriteIndirectArgs(uint dispatchArgsIndex, uint4 args )
+{
+	_VolumeLODDispatch[dispatchArgsIndex * 4] = args.x;
+	_VolumeLODDispatch[dispatchArgsIndex * 4 + 1] = args.y;
+	_VolumeLODDispatch[dispatchArgsIndex * 4 + 2] = args.z;
+	_VolumeLODDispatch[dispatchArgsIndex * 4 + 3] = args.w;
+}
+
 [numthreads(1, 1, 1)]
 void KLODSelection(
 	uint3 groupIdx : SV_GroupID,
@@ -1583,9 +1591,9 @@ void KLODSelection(
 	_VolumeLODStage[VOLUMELODSTAGE_RESOLVE] = lodDesc;
 
 	// update lod dispatch
-	_VolumeLODDispatch[VOLUMELODDISPATCH_RESOLVE]			= ResolveDispatchParallelCells(lodDesc.volumeCellCount);
-	_VolumeLODDispatch[VOLUMELODDISPATCH_RASTER_POINTS]		= ResolveDrawParallelCells(lodDesc.volumeCellCount, 1);
-	_VolumeLODDispatch[VOLUMELODDISPATCH_RASTER_VECTORS]	= ResolveDrawParallelCells(lodDesc.volumeCellCount, 2);
+	WriteIndirectArgs(VOLUMELODDISPATCH_RESOLVE, ResolveDispatchParallelCells(lodDesc.volumeCellCount));
+	WriteIndirectArgs(VOLUMELODDISPATCH_RASTER_POINTS, ResolveDrawParallelCells(lodDesc.volumeCellCount, 1));
+	WriteIndirectArgs(VOLUMELODDISPATCH_RASTER_VECTORS, ResolveDrawParallelCells(lodDesc.volumeCellCount, 2));
 }
 
 #endif//F_LOD

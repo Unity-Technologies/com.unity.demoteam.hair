@@ -243,7 +243,7 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref solverBuffers._SolverLODStage, "SolverLODStage", (int)SolverLODStage.__COUNT, sizeof(LODIndices));
 				changed |= CreateBuffer(ref solverBuffers._SolverLODRange, "SolverLODRange", (int)SolverLODRange.__COUNT, particleStrideVector2);
-				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT, particleStrideVector4, ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
+				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT * 4, sizeof(uint), ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
 
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector3);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStrideVector4);
@@ -304,7 +304,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref volumeBuffers._BoundsCoverage, "BoundsCoverage", boundsCount, particleStrideVector2);
 
 				changed |= CreateBuffer(ref volumeBuffers._VolumeLODStage, "VolumeLODStage", (int)VolumeLODStage.__COUNT__, sizeof(VolumeLODGrid));
-				changed |= CreateBuffer(ref volumeBuffers._VolumeLODDispatch, "VolumeLODDispatch", (int)VolumeLODDispatch.__COUNT__, sizeof(uint) * 4, ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
+				changed |= CreateBuffer(ref volumeBuffers._VolumeLODDispatch, "VolumeLODDispatch", (int)VolumeLODDispatch.__COUNT__ * 4, sizeof(uint), ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
 
 				if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsTextureAtomics))
 				{
@@ -836,7 +836,7 @@ namespace Unity.DemoTeam.Hair
 
 			// add reentrant -> interpolated
 			BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolateAdd, solverData);
-			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolateAdd, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.InterpolateAdd);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolateAdd, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.InterpolateAdd));
 		}
 
 		public static void PushSolverStepBegin(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, float deltaTime)
@@ -935,7 +935,7 @@ namespace Unity.DemoTeam.Hair
 
 			// promote interpolated -> simulated
 			BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolatePromote, solverData);
-			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolatePromote, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.InterpolatePromote);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolatePromote, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.InterpolatePromote));
 		}
 
 		public static void PushSolverStep(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, in VolumeData volumeData, float stepFracLo, float stepFracHi)
@@ -1010,7 +1010,7 @@ namespace Unity.DemoTeam.Hair
 							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepRootsFraction);
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KRootsSubstep, solverData);
-							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)substepRootsDispatch);
+							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(substepRootsDispatch));
 						}
 					}
 
@@ -1031,7 +1031,7 @@ namespace Unity.DemoTeam.Hair
 
 						BindVolumeData(cmd, s_solverCS, solveKernel, volumeData);
 						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepRootsFraction < (1.0f - float.Epsilon)));
-						cmd.DispatchCompute(s_solverCS, solveKernel, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)solveDispatch);
+						cmd.DispatchCompute(s_solverCS, solveKernel, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(solveDispatch));
 					}
 
 					// volume impulse is only applied for first substep
@@ -1056,7 +1056,7 @@ namespace Unity.DemoTeam.Hair
 				using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
 				{
 					BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolate, WithSubstepData(solverData, stepFracHi < (1.0f - float.Epsilon)));
-					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.Interpolate);
+					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.Interpolate));
 				}
 			}
 		}
@@ -1068,7 +1068,7 @@ namespace Unity.DemoTeam.Hair
 				using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
 				{
 					BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolate, solverData);
-					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.Interpolate);
+					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.Interpolate));
 				}
 			}
 		}
@@ -1133,12 +1133,12 @@ namespace Unity.DemoTeam.Hair
 
 				BindVolumeData(cmd, s_solverCS, stagingKernel, volumeData);
 				BindSolverData(cmd, s_solverCS, stagingKernel, solverData);
-				cmd.DispatchCompute(s_solverCS, stagingKernel, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.Staging);
+				cmd.DispatchCompute(s_solverCS, stagingKernel, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.Staging));
 
 				if (stagingBufferHistoryReset)
 				{
 					BindSolverData(cmd, s_solverCS, SolverKernels.KStagingHistory, solverData);
-					cmd.DispatchCompute(s_solverCS, SolverKernels.KStagingHistory, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)SolverLODDispatch.Staging);
+					cmd.DispatchCompute(s_solverCS, SolverKernels.KStagingHistory, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.Staging));
 				}
 			}
 		}
@@ -1706,7 +1706,7 @@ namespace Unity.DemoTeam.Hair
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_0_Clear))
 			{
 				BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeClear, volumeData);
-				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeClear, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeClear, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 			}
 		}
 
@@ -1724,7 +1724,7 @@ namespace Unity.DemoTeam.Hair
 						{
 							BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplat, volumeData);
 							BindSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplat, solverData);
-							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplat, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)transferDispatch);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplat, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(transferDispatch));
 						}
 						break;
 
@@ -1734,22 +1734,22 @@ namespace Unity.DemoTeam.Hair
 							{
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatDensity, volumeData);
 								BindSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatDensity, solverData);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatDensity, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)transferDispatch);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatDensity, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(transferDispatch));
 							}
 
 							using (new ProfilingScope(cmd, MarkersGPU.Volume_1_Splat_VelocityXYZ))
 							{
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, volumeData);
 								BindSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, solverData);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)transferDispatch);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityX, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(transferDispatch));
 
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, volumeData);
 								BindSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, solverData);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)transferDispatch);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityY, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(transferDispatch));
 
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, volumeData);
 								BindSolverData(cmd, s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, solverData);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, solverData.buffers._SolverLODDispatch, (uint)solverData.buffers._SolverLODDispatch.stride * (uint)transferDispatch);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeSplatVelocityZ, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(transferDispatch));
 							}
 						}
 						break;
@@ -1772,7 +1772,7 @@ namespace Unity.DemoTeam.Hair
 
 									BindVolumeData(cmd, volumeData);
 									BindSolverData(cmd, solverData);
-									cmd.DrawProceduralIndirect(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, solverData.buffers._SolverLODDispatch, (int)solverData.buffers._SolverLODDispatch.stride * (int)rasterDispatchPoints);
+									cmd.DrawProceduralIndirect(Matrix4x4.identity, s_volumeRasterMat, 0, MeshTopology.Points, solverData.buffers._SolverLODDispatch, (int)GetSolverLODDispatchOffset(rasterDispatchPoints));
 								}
 							}
 							else
@@ -1800,7 +1800,7 @@ namespace Unity.DemoTeam.Hair
 
 									BindVolumeData(cmd, volumeData);
 									BindSolverData(cmd, solverData);
-									cmd.DrawProceduralIndirect(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, solverData.buffers._SolverLODDispatch, (int)solverData.buffers._SolverLODDispatch.stride * (int)rasterDispatchQuads);
+									cmd.DrawProceduralIndirect(Matrix4x4.identity, s_volumeRasterMat, 1, MeshTopology.Quads, solverData.buffers._SolverLODDispatch, (int)GetSolverLODDispatchOffset(rasterDispatchQuads));
 								}
 							}
 						}
@@ -1820,7 +1820,7 @@ namespace Unity.DemoTeam.Hair
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_2_Resolve))
 						{
 							BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeResolve, volumeData);
-							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolve, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolve, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 						}
 					}
 					break;
@@ -1831,7 +1831,7 @@ namespace Unity.DemoTeam.Hair
 						using (new ProfilingScope(cmd, MarkersGPU.Volume_2_ResolveRaster))
 						{
 							BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeResolveRaster, volumeData);
-							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolveRaster, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeResolveRaster, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 						}
 					}
 					break;
@@ -1841,14 +1841,14 @@ namespace Unity.DemoTeam.Hair
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_3_Divergence))
 			{
 				BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeDivergence, volumeData);
-				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeDivergence, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeDivergence, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 			}
 
 			// pressure eos (initial guess)
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_4_PressureEOS))
 			{
 				BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumePressureEOS, volumeData);
-				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureEOS, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureEOS, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 			}
 
 			// pressure solve (jacobi)
@@ -1858,7 +1858,7 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != settingsVolume.pressureIterations; i++)
 				{
-					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureSolve, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+					cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureSolve, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 
 					CoreUtils.Swap(ref volumeData.textures._VolumePressure, ref volumeData.textures._VolumePressureNext);
 					cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumePressureSolve, VolumeData.s_textureIDs._VolumePressure, volumeData.textures._VolumePressure);
@@ -1870,7 +1870,7 @@ namespace Unity.DemoTeam.Hair
 			using (new ProfilingScope(cmd, MarkersGPU.Volume_6_PressureGradient))
 			{
 				BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumePressureGradient, volumeData);
-				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureGradient, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureGradient, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 			}
 
 			// scattering probe
@@ -1890,12 +1890,12 @@ namespace Unity.DemoTeam.Hair
 								cmd.GetTemporaryRT(VolumeData.s_textureIDs._VolumeDensityComp, MakeVolumeDesc((int)settingsVolume.gridResolution, RenderTextureFormat.RHalf));
 
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScatteringPrep, volumeData);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScatteringPrep, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScatteringPrep, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScattering, volumeData);
 								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensity, VolumeData.s_textureIDs._VolumeDensityComp);
 								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScattering, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScattering, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 
 								cmd.ReleaseTemporaryRT(VolumeData.s_textureIDs._VolumeDensityComp);
 							}
@@ -1905,7 +1905,7 @@ namespace Unity.DemoTeam.Hair
 							{
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScattering, volumeData);
 								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScattering, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScattering, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 							}
 							break;
 					}
@@ -1929,12 +1929,12 @@ namespace Unity.DemoTeam.Hair
 								cmd.GetTemporaryRT(VolumeData.s_textureIDs._VolumeDensityComp, MakeVolumeDesc((int)settingsVolume.gridResolution, RenderTextureFormat.RHalf));
 
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeWindPrep, volumeData);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeWindPrep, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeWindPrep, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeWind, volumeData);
 								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeWind, VolumeData.s_textureIDs._VolumeDensity, VolumeData.s_textureIDs._VolumeDensityComp);
 								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeWind, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeWind, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeWind, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 
 								cmd.ReleaseTemporaryRT(VolumeData.s_textureIDs._VolumeDensityComp);
 							}
@@ -1944,7 +1944,7 @@ namespace Unity.DemoTeam.Hair
 							{
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeWind, volumeData);
 								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeWind, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeWind, volumeData.buffers._VolumeLODDispatch, (uint)volumeData.buffers._VolumeLODDispatch.stride * (uint)VolumeLODDispatch.Resolve);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeWind, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 							}
 							break;
 					}
@@ -2025,14 +2025,14 @@ namespace Unity.DemoTeam.Hair
 				// cell density
 				if (settingsDebugging.drawCellDensity)
 				{
-					cmd.DrawProceduralIndirect(Matrix4x4.identity, s_debugDrawMat, (int)DebugDrawPass.VolumeCellDensity, MeshTopology.Points, volumeData.buffers._VolumeLODDispatch, (int)volumeData.buffers._VolumeLODDispatch.stride * (int)VolumeLODDispatch.RasterPoints);
+					cmd.DrawProceduralIndirect(Matrix4x4.identity, s_debugDrawMat, (int)DebugDrawPass.VolumeCellDensity, MeshTopology.Points, volumeData.buffers._VolumeLODDispatch, (int)GetVolumeLODDispatchOffset(VolumeLODDispatch.RasterPoints));
 					//cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_VOLUME_CELL_DENSITY, MeshTopology.Points, GetVolumeCellCount(volumeData), 1);
 				}
 
 				// cell gradient
 				if (settingsDebugging.drawCellGradient)
 				{
-					cmd.DrawProceduralIndirect(Matrix4x4.identity, s_debugDrawMat, (int)DebugDrawPass.VolumeCellGradient, MeshTopology.Lines, volumeData.buffers._VolumeLODDispatch, (int)volumeData.buffers._VolumeLODDispatch.stride * (int)VolumeLODDispatch.RasterVectors);
+					cmd.DrawProceduralIndirect(Matrix4x4.identity, s_debugDrawMat, (int)DebugDrawPass.VolumeCellGradient, MeshTopology.Lines, volumeData.buffers._VolumeLODDispatch, (int)GetVolumeLODDispatchOffset(VolumeLODDispatch.RasterVectors));
 					//cmd.DrawProcedural(Matrix4x4.identity, s_debugDrawMat, DEBUG_PASS_VOLUME_CELL_GRADIENT, MeshTopology.Lines, 2 * GetVolumeCellCount(volumeData), 1);
 				}
 
@@ -2088,7 +2088,15 @@ namespace Unity.DemoTeam.Hair
 
 		//TODO move elsewhere
 		//maybe 'HairSimDataUtility' ?
+		static uint GetVolumeLODDispatchOffset(VolumeLODDispatch disp)
+		{
+			return (uint)disp * 4 * 4;
+		}
 
+		static uint GetSolverLODDispatchOffset(SolverLODDispatch disp)
+		{
+			return (uint)disp * 4 * 4;
+		}
 		public static Bounds GetSolverBounds(in SolverData solverData, in VolumeData volumeData)
 		{
 			var boundsBuffer = volumeData.buffersReadback._Bounds.GetData<LODBounds>();
