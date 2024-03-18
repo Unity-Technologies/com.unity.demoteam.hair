@@ -728,6 +728,14 @@ uint ResolveCount(uint2 range)
 		return 0;
 }
 
+void WriteIndirectArgs(uint dispatchArgsIndex, uint4 args )
+{
+	_SolverLODDispatch[dispatchArgsIndex * 4] = args.x;
+	_SolverLODDispatch[dispatchArgsIndex * 4 + 1] = args.y;
+	_SolverLODDispatch[dispatchArgsIndex * 4 + 2] = args.z;
+	_SolverLODDispatch[dispatchArgsIndex * 4 + 3] = args.w;
+}
+
 [numthreads(1, 1, 1)]
 void KLODSelectionInit(
 	uint3 groupIdx : SV_GroupID,
@@ -875,19 +883,19 @@ void KLODSelection(
 	uint countInterpolatePromote	= ResolveCount(rangeInterpolatePromote);
 	uint countRender				= ResolveCount(rangeRender);
 
-	_SolverLODDispatch[SOLVERLODDISPATCH_SOLVE]					= ResolveDispatchParallelStrands(countSolve);
-	_SolverLODDispatch[SOLVERLODDISPATCH_SOLVE_GROUP_PARTICLES]	= ResolveDispatchParallelParticlesEachStrand(countSolve);
-	_SolverLODDispatch[SOLVERLODDISPATCH_INTERPOLATE]			= ResolveDispatchParallelStrands(countInterpolate);
-	_SolverLODDispatch[SOLVERLODDISPATCH_INTERPOLATE_ADD]		= ResolveDispatchParallelStrands(countInterpolateAdd);
-	_SolverLODDispatch[SOLVERLODDISPATCH_INTERPOLATE_PROMOTE]	= ResolveDispatchParallelStrands(countInterpolatePromote);
-	_SolverLODDispatch[SOLVERLODDISPATCH_STAGING]				= ResolveDispatchParallelStrands(countRender);
-	_SolverLODDispatch[SOLVERLODDISPATCH_STAGING_REENTRANT]		= ResolveDispatchParallelStrands(0);//TODO
-	_SolverLODDispatch[SOLVERLODDISPATCH_TRANSFER]				= ResolveDispatchParallelParticles(countSolve);
-	_SolverLODDispatch[SOLVERLODDISPATCH_TRANSFER_ALL]			= ResolveDispatchParallelParticles(countRender);
-	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_POINTS]			= ResolveDrawParallelParticles(countSolve, 1);
-	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_POINTS_ALL]		= ResolveDrawParallelParticles(countRender, 1);
-	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_QUADS]			= ResolveDrawParallelParticles(countSolve, 8);
-	_SolverLODDispatch[SOLVERLODDISPATCH_RASTER_QUADS_ALL]		= ResolveDrawParallelParticles(countRender, 8);
+	WriteIndirectArgs(SOLVERLODDISPATCH_SOLVE, ResolveDispatchParallelStrands(countSolve));
+	WriteIndirectArgs(SOLVERLODDISPATCH_SOLVE_GROUP_PARTICLES, ResolveDispatchParallelParticlesEachStrand(countSolve));
+	WriteIndirectArgs(SOLVERLODDISPATCH_INTERPOLATE, ResolveDispatchParallelStrands(countInterpolate));
+	WriteIndirectArgs(SOLVERLODDISPATCH_INTERPOLATE_ADD, ResolveDispatchParallelStrands(countInterpolateAdd));
+	WriteIndirectArgs(SOLVERLODDISPATCH_INTERPOLATE_PROMOTE, ResolveDispatchParallelStrands(countInterpolatePromote));
+	WriteIndirectArgs(SOLVERLODDISPATCH_STAGING, ResolveDispatchParallelStrands(countRender));
+	WriteIndirectArgs(SOLVERLODDISPATCH_STAGING_REENTRANT, ResolveDispatchParallelStrands(0));//TODO
+	WriteIndirectArgs(SOLVERLODDISPATCH_TRANSFER, ResolveDispatchParallelParticles(countSolve));
+	WriteIndirectArgs(SOLVERLODDISPATCH_TRANSFER_ALL, ResolveDispatchParallelParticles(countRender));
+	WriteIndirectArgs(SOLVERLODDISPATCH_RASTER_POINTS, ResolveDrawParallelParticles(countSolve, 1));
+	WriteIndirectArgs(SOLVERLODDISPATCH_RASTER_POINTS_ALL, ResolveDrawParallelParticles(countRender, 1));
+	WriteIndirectArgs(SOLVERLODDISPATCH_RASTER_QUADS, ResolveDrawParallelParticles(countSolve, 8));
+	WriteIndirectArgs(SOLVERLODDISPATCH_RASTER_QUADS_ALL, ResolveDrawParallelParticles(countRender, 8));
 }
 
 #endif//F_LOD
