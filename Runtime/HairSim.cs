@@ -303,8 +303,8 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref volumeBuffers._BoundsGeometry, "BoundsGeometry", boundsCount, sizeof(LODGeometry));
 				changed |= CreateBuffer(ref volumeBuffers._BoundsCoverage, "BoundsCoverage", boundsCount, particleStrideVector2);
 
-				changed |= CreateBuffer(ref volumeBuffers._VolumeLODStage, "VolumeLODStage", (int)VolumeLODStage.__COUNT__, sizeof(VolumeLODGrid));
-				changed |= CreateBuffer(ref volumeBuffers._VolumeLODDispatch, "VolumeLODDispatch", (int)VolumeLODDispatch.__COUNT__ * 4, sizeof(uint), ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
+				changed |= CreateBuffer(ref volumeBuffers._VolumeLODStage, "VolumeLODStage", (int)VolumeLODStage.__COUNT, sizeof(VolumeLODGrid));
+				changed |= CreateBuffer(ref volumeBuffers._VolumeLODDispatch, "VolumeLODDispatch", (int)VolumeLODDispatch.__COUNT * 4, sizeof(uint), ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
 
 				if (s_runtimeFlags.HasFlag(RuntimeFlags.SupportsTextureAtomics))
 				{
@@ -2088,15 +2088,6 @@ namespace Unity.DemoTeam.Hair
 
 		//TODO move elsewhere
 		//maybe 'HairSimDataUtility' ?
-		static uint GetVolumeLODDispatchOffset(VolumeLODDispatch disp)
-		{
-			return (uint)disp * 4 * 4;
-		}
-
-		static uint GetSolverLODDispatchOffset(SolverLODDispatch disp)
-		{
-			return (uint)disp * 4 * 4;
-		}
 		public static Bounds GetSolverBounds(in SolverData solverData, in VolumeData volumeData)
 		{
 			var boundsBuffer = volumeData.buffersReadback._Bounds.GetData<LODBounds>();
@@ -2149,6 +2140,16 @@ namespace Unity.DemoTeam.Hair
 			{
 				return new VolumeLODGrid();
 			}
+		}
+
+		static uint GetSolverLODDispatchOffset(SolverLODDispatch index)
+		{
+			return (uint)index * 4 * sizeof(uint);
+		}
+
+		static uint GetVolumeLODDispatchOffset(VolumeLODDispatch index)
+		{
+			return (uint)index * 4 * sizeof(uint);
 		}
 	}
 }
