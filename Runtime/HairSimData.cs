@@ -518,7 +518,7 @@ namespace Unity.DemoTeam.Hair
 		public enum VolumeLODStage
 		{
 			Resolve			= 0,
-			__COUNT__
+			__COUNT
 		}
 
 		[GenerateHLSL]
@@ -527,7 +527,7 @@ namespace Unity.DemoTeam.Hair
 			Resolve			= 0,
 			RasterPoints	= 1,
 			RasterVectors	= 2,
-			__COUNT__
+			__COUNT
 		}
 
 		[GenerateHLSL(needAccessors = false)]

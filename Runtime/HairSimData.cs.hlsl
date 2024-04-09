@@ -37,7 +37,7 @@
 // Unity.DemoTeam.Hair.HairSim+VolumeLODStage:  static fields
 //
 #define VOLUMELODSTAGE_RESOLVE (0)
-#define VOLUMELODSTAGE___COUNT__ (1)
+#define VOLUMELODSTAGE___COUNT (1)
 
 //
 // Unity.DemoTeam.Hair.HairSim+SolverLODDispatch:  static fields
@@ -97,7 +97,7 @@
 #define VOLUMELODDISPATCH_RESOLVE (0)
 #define VOLUMELODDISPATCH_RASTER_POINTS (1)
 #define VOLUMELODDISPATCH_RASTER_VECTORS (2)
-#define VOLUMELODDISPATCH___COUNT__ (3)
+#define VOLUMELODDISPATCH___COUNT (3)
 
 //
 // Unity.DemoTeam.Hair.HairSim+RenderFeatures:  static fields

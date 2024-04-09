@@ -1554,12 +1554,12 @@ uint4 ResolveDrawParallelCells(uint3 cellCount, uint cellVertexCount)
 	return uint4(cellCount.x * cellCount.y * cellCount.z * cellVertexCount, 1, 0, 0);
 }
 
-void WriteIndirectArgs(uint dispatchArgsIndex, uint4 args )
+void WriteIndirectDispatch(uint index, uint4 args)
 {
-	_VolumeLODDispatch[dispatchArgsIndex * 4] = args.x;
-	_VolumeLODDispatch[dispatchArgsIndex * 4 + 1] = args.y;
-	_VolumeLODDispatch[dispatchArgsIndex * 4 + 2] = args.z;
-	_VolumeLODDispatch[dispatchArgsIndex * 4 + 3] = args.w;
+	_VolumeLODDispatch[index * 4 + 0] = args.x;
+	_VolumeLODDispatch[index * 4 + 1] = args.y;
+	_VolumeLODDispatch[index * 4 + 2] = args.z;
+	_VolumeLODDispatch[index * 4 + 3] = args.w;
 }
 
 [numthreads(1, 1, 1)]
@@ -1591,9 +1591,9 @@ void KLODSelection(
 	_VolumeLODStage[VOLUMELODSTAGE_RESOLVE] = lodDesc;
 
 	// update lod dispatch
-	WriteIndirectArgs(VOLUMELODDISPATCH_RESOLVE, ResolveDispatchParallelCells(lodDesc.volumeCellCount));
-	WriteIndirectArgs(VOLUMELODDISPATCH_RASTER_POINTS, ResolveDrawParallelCells(lodDesc.volumeCellCount, 1));
-	WriteIndirectArgs(VOLUMELODDISPATCH_RASTER_VECTORS, ResolveDrawParallelCells(lodDesc.volumeCellCount, 2));
+	WriteIndirectDispatch(VOLUMELODDISPATCH_RESOLVE,		ResolveDispatchParallelCells(lodDesc.volumeCellCount));
+	WriteIndirectDispatch(VOLUMELODDISPATCH_RASTER_POINTS,	ResolveDrawParallelCells(lodDesc.volumeCellCount, 1));
+	WriteIndirectDispatch(VOLUMELODDISPATCH_RASTER_VECTORS,	ResolveDrawParallelCells(lodDesc.volumeCellCount, 2));
 }
 
 #endif//F_LOD
