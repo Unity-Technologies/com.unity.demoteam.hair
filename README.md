@@ -21,7 +21,7 @@
 		- Scatter strands on built-in primitives, or on user specified meshes
 		- Shape strands using simple parameters like length and curl
 		- Plug in your own generators for custom placement
-	+ Clustering / Level of detail
+	+ Hierarchical clustering / Level of detail
 		- Build clusters and LOD chain automatically from spatial relationships
 		- Can also assign artist-provided clump maps + optionally refine them
 		- Supports root-, strand-, and simplified strand-level clusters
@@ -51,10 +51,7 @@
 		- Global position
 		- Global rotation
 	+ Level of detail support
-		- Allows simulating partial set of strands (e.g. at a distance, or for art reasons)
-		- Volume-based effects also work for partial set of strands
-		- Seamless LOD blending while simulation is running
-		
+
 * Rendering
 	+ Supports all current rendering pipelines
 		- Built-in RP
@@ -70,7 +67,17 @@
 		- Render strands as view facing triangle strips w/ tangent space normals
 		- Render high quality strands using the upcoming compute-based HDRP line renderer
 		[ *depends on **Unity >= 2023.1.0a21*** ]
+	+ Level of detail support
 
+* Level of detail
+	+ Seamless level of detail for both simulation and rendering
+	+ Automatic level of detail selection based on viewport coverage
+		- Reduce runtime workload by processing only visible set of strands
+		- Preserve global coverage as strands individually transition to subpixel
+		- LOD scale/bias supported both per-group and per-material
+	+ Volume-accurate reduction enabled by hierarchical clustering
+		- Reduced set of strands geometry retains volume of full geometry
+		- Volume-based effects remain intact for reduced set of strands
 
 ## Installation
 
