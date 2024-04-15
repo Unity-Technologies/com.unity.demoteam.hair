@@ -41,7 +41,7 @@
 			- Allows targeting uniform density
 			- Allows targeting initial pose density
 		- Applies pressure to soften strand-strand collisions
-		- Exposes directional opacity to HDRP physical shading model
+		- Exposes scattering probe to HDRP physical shading model
 	+ Fully configurable set of constraints
 		- Boundary collision w/ friction
 		- Particle-particle distance (soft, hard)
@@ -68,6 +68,7 @@
 	+ Multiple modes of rendering
 		- Render strands as simple line primitives
 		- Render strands as view facing triangle strips w/ tangent space normals
+		- Render strands as (view facing, for now) tube geometry w/ object space normals
 		- Render high quality strands using the upcoming compute-based HDRP line renderer
 		[ *depends on **Unity >= 2023.1.0a21*** ]
 
