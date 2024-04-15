@@ -5,6 +5,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [unreleased]
+
+### Added
+
+- Added support for seamless, automatic render LOD with coverage-preserving decimation based on hierarchical clustering.
+- Added support for GPU based LOD selection, including GPU root bounds, GPU frustum culling.
+- Added support for data/settings migration from older versions of the package.
+- Added asset-level support for per-strand diameter and tapering.
+- Added asset-level support for per-vertex attributes (uv, width) for shader graph.
+- Added more optional fields to HairAssetProvisional.CurveSet for custom curve data: curveDataTexCoord, curveDataDiameter, curveDataTapering.
+- Added LOD slider to HairAsset group preview.
+- Added LOD indicator to HairInstance gizmos.
+- Added simulation state to HairInstance inspector.
+- Added per-material lod scale and bias to HairVertex node.
+
+### Changed
+
+- Moved all LOD dependent GPU workloads (most of them) to indirect dispatch.
+- Substantially improved performance of constraint solver for primary strands (1.5x-2.5x on Turing.)
+- Substantially improved performance of interpolation pass for non-primary strands.
+- Refactored settings blocks in HairAsset.
+- Refactored settings blocks in HairInstance.
+- Refactored HairVertex graph outputs. (NOTE: Not yet final!)
+- Updated the SRP default material to include default connections for motion vector and width.
+- Updated the draw strand roots debug option to also include tangents and bitangents.
+- Improved prefab handling.
+
+### Fixed
+
+- Fixed an issue with bad cast causing Texture3D to be ignored when supplied as static SDF.
+- Fixed an issue with first frame initialization on 2021.2+.
+- Fixed various regressions after restructuring.
+- Fixed a memory leak in TriMeshBuffers.
+
+### Removed
+
+- Removed C# double definitions of most named GPU resources.
+- Removed shader keyword for defining PSIZE (now always defined).
+- Removed some old code.
+
+
 ## [0.12.0-exp.1] - 2024-04-15
 
 ### Added
@@ -117,6 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.12.0-exp.1...HEAD
 [0.12.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.11.0-exp.1...0.12.0-exp.1
 [0.11.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.10.0-exp.1...0.11.0-exp.1
 [0.10.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.9.1-exp.1...0.10.0-exp.1
