@@ -1392,8 +1392,17 @@ void KBoundsGather(
 			_GroupMaxParticleDiameter * 0.5
 		);
 
-		rootMinU = FloatToUnsignedSortable(asuint(rootPos - rootExt));
-		rootMaxU = FloatToUnsignedSortable(asuint(rootPos + rootExt));
+		if(AnyIsNaN(rootPos) || AnyIsNaN(rootExt))
+		{
+			rootMinU = 0xFFFFFFFFu;
+			rootMaxU = 0x00000000u;
+		} else
+		{
+			rootMinU = FloatToUnsignedSortable(asuint(rootPos - rootExt));
+			rootMaxU = FloatToUnsignedSortable(asuint(rootPos + rootExt));
+		}
+		
+		
 	}
 	else
 	{
