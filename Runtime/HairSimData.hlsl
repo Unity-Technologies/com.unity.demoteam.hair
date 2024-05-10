@@ -26,6 +26,12 @@
 #endif
 
 #if HAIRSIM_WRITEABLE_SOLVERDATA
+#define HAIRSIM_SOLVERDISPATCH RWBuffer
+#else
+#define HAIRSIM_SOLVERDISPATCH Buffer
+#endif
+
+#if HAIRSIM_WRITEABLE_SOLVERDATA
 #define HAIRSIM_RENDERDATA RWByteAddressBuffer
 #else
 #define HAIRSIM_RENDERDATA ByteAddressBuffer
@@ -43,7 +49,7 @@ HAIRSIM_SOLVERINPUT<float4> _RootFrameSubstep;			// quat(xyz,w): ...
 
 HAIRSIM_SOLVERDATA<LODIndices> _SolverLODStage;			// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
 HAIRSIM_SOLVERDATA<uint2> _SolverLODRange;				// xy: dispatch strand range [begin, end)
-HAIRSIM_SOLVERDATA<uint> _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
+HAIRSIM_SOLVERDISPATCH<uint> _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
 
 HAIRSIM_SOLVERINIT<float3> _InitialParticleOffset;		// xyz: initial particle offset from strand root
 HAIRSIM_SOLVERINIT<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
@@ -74,6 +80,12 @@ HAIRSIM_RENDERDATA _StagingVertexPrev;					// xyz: ...
 #define HAIRSIM_VOLUMEBOUNDS RWStructuredBuffer
 #else
 #define HAIRSIM_VOLUMEBOUNDS StructuredBuffer
+#endif
+
+#if HAIRSIM_WRITEABLE_VOLUMEBOUNDS
+#define HAIRSIM_VOLUMEDISPATCH RWBuffer
+#else
+#define HAIRSIM_VOLUMEDISPATCH Buffer
 #endif
 
 #if SHADER_API_METAL
@@ -117,7 +129,7 @@ HAIRSIM_VOLUMEBOUNDS<LODGeometry> _BoundsGeometry;	// array(LODGeometry): bounds
 HAIRSIM_VOLUMEBOUNDS<float2> _BoundsCoverage;		// xy: bounds coverage (unbiased ceiling)
 
 HAIRSIM_VOLUMEBOUNDS<VolumeLODGrid> _VolumeLODStage;// array(VolumeLODGrid): grid properties
-HAIRSIM_VOLUMEBOUNDS<uint> _VolumeLODDispatch;		// xyz: num groups, w: num grid cells in one dimension
+HAIRSIM_VOLUMEDISPATCH<uint> _VolumeLODDispatch;	// xyz: num groups, w: num grid cells in one dimension
 
 HAIRSIM_VOLUMEACCU<int> _AccuWeight;				// x: fp accumulated weight
 HAIRSIM_VOLUMEACCU<int> _AccuWeight0;				// x: fp accumulated target weight
