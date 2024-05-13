@@ -632,7 +632,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KInitializePostVolume, numX, numY, numZ);
 		}
 
-		public static void PushSolverRoots(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref SolverData solverData, Mesh rootMesh, in Matrix4x4 rootMeshMatrix, in Quaternion rootMeshSkinningRotation, float deltaTime)
+		public static void PushSolverRoots(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref SolverData solverData, Mesh rootMesh, in Matrix4x4 rootMeshMatrix, in Quaternion rootMeshSkinningRotation, int stepCount)
 		{
 			ref var solverBuffers = ref solverData.buffers;
 			ref var solverConstantsRoots = ref solverData.constantsRoots;
@@ -680,7 +680,7 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, solverData.buffers.SolverCBufferRoots, solverConstantsRoots);
 
 			// update roots
-			if (deltaTime > 0.0f)
+			if (stepCount > 0)
 			{
 				CoreUtils.Swap(ref solverBuffers._RootPosition, ref solverBuffers._RootPositionPrev);
 				CoreUtils.Swap(ref solverBuffers._RootFrame, ref solverBuffers._RootFramePrev);
@@ -813,12 +813,12 @@ namespace Unity.DemoTeam.Hair
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KLODSelectionInit, 1, 1, 1);
 		}
 
-		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, in SettingsRendering settingsRendering, in VolumeData volumeData, float deltaTime)
+		public static void PushSolverLOD(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, in SettingsRendering settingsRendering, in VolumeData volumeData, int stepCount)
 		{
 			ref var solverConstants = ref solverData.constants;
 
 			// derive constants
-			solverConstants._SolverLODMethod = ((uint)settingsPhysics.kLODSelection & 0xffffu) | (deltaTime > 0.0f ? 0x10000u : 0x00000u);
+			solverConstants._SolverLODMethod = ((uint)settingsPhysics.kLODSelection & 0xffffu) | (stepCount > 0 ? 0x10000u : 0x00000u);
 			solverConstants._SolverLODCeiling = settingsPhysics.kLODCeiling;
 			solverConstants._SolverLODScale = settingsPhysics.kLODScale;
 			solverConstants._SolverLODBias = (settingsPhysics.kLODSelection == SolverLODSelection.Manual) ? settingsPhysics.kLODSelectionValue : settingsPhysics.kLODBias;
@@ -1023,9 +1023,14 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != substepCount; i++)
 				{
-					var substepRootsFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
-					if (substepRootsFraction < (1.0f - float.Epsilon))
+					var substepFractionPrev = Mathf.Lerp(stepFracLo, stepFracHi, (i) / (float)substepCount);
+					var substepFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
+
+					// check if substep required
+					var substep = substepFraction < (1.0f - 1e-5f);
+					if (substep)
 					{
+						// substep roots
 						using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepRoots))
 						{
 							var substepRootsInterpolated = (i == substepCount - 1);
@@ -1034,7 +1039,7 @@ namespace Unity.DemoTeam.Hair
 								SolverLODDispatch.Solve;
 
 							//TODO move into cbuffer?
-							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepRootsFraction);
+							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepFraction);
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KRootsSubstep, solverData);
 							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(substepRootsDispatch));
@@ -1042,15 +1047,17 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					// substep boundaries
+					//TODO skip if at fraction one, similar to roots
 					{
-						var substepFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
-						var substepFractionPrev = Mathf.Lerp(stepFracLo, stepFracHi, (i + 0) / (float)substepCount);
-
 						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFraction", substepFraction);
 						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionPrev", substepFractionPrev);
 
+						int numX = (Conf.MAX_BOUNDARIES + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
+						int numY = 1;
+						int numZ = 1;
+
 						BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesSubstep, volumeData);
-						cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesSubstep, 1, 1, 1);
+						cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesSubstep, numX, numY, numZ);
 					}
 
 					//Debug.Log("substep " + i + ": " + (substepFrac < (1.0f - float.Epsilon)) + " (lo " + stepFracLo + " hi " + stepFracHi + ")");
@@ -1069,7 +1076,7 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						BindVolumeData(cmd, s_solverCS, solveKernel, volumeData);
-						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepRootsFraction < (1.0f - float.Epsilon)));
+						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepFraction < (1.0f - float.Epsilon)));
 						cmd.DispatchCompute(s_solverCS, solveKernel, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(solveDispatch));
 					}
 
@@ -1403,7 +1410,7 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsEnvironment);
 		}
 
-		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, float time)
+		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount, double elapsedTime)
 		{
 			ref var volumeConstantsScene = ref volumeData.constantsEnvironment;
 			ref var volumeTextures = ref volumeData.textures;
@@ -1557,6 +1564,11 @@ namespace Unity.DemoTeam.Hair
 						{
 							ptrRemap[i] = volumeData.boundaryPrevHandle.IndexOf(ptrHandle[i]);
 						}
+
+						for (int i = boundaryCount; i != Conf.MAX_BOUNDARIES; i++)
+						{
+							ptrRemap[i] = -1;
+						}
 					}
 
 					// write blend params
@@ -1599,34 +1611,17 @@ namespace Unity.DemoTeam.Hair
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryShapeNext, bufShape);
 
 					// update previous frame info
+					if (stepCount > 0)
 					{
-						//TODO
-						// AffineInterpolate(bufMatrix, bufMatrixA, bufMatrixQ, stepFracHi)
+						volumeData.boundaryPrevHandle.CopyFrom(bufHandle);
+						volumeData.boundaryPrevMatrix.CopyFrom(bufMatrix);
+						
+						//TODO adjust bufMatrix to correspond to outcome (final substep in frame)
+						//		e.g. AffineInterpolate(bufMatrix, bufMatrixA, bufMatrixQ, stepFracHi)
 					}
 
-					volumeData.boundaryPrevHandle.CopyFrom(bufHandle);
-					volumeData.boundaryPrevMatrix.CopyFrom(bufMatrix);//TODO adjust to correspond to outcome (final substep in frame), see incomplete scope above
-					volumeData.boundaryPrevCount = boundaryCount;
-					volumeData.boundaryPrevCountDiscard = boundaryList.Count - boundaryCount;
-
-					/* TODO remove
-					// world to previous world
-					if (ptrXformPrevIndex != -1)
-						ptrMatrixW2PrevW[i] = ptrXformPrev[ptrXformPrevIndex].matrix * ptrMatrixInv[i];
-					else
-						ptrMatrixW2PrevW[i] = Matrix4x4.identity;
-
-					// world to UVW for discrete
-					if (i < volumeConstantsScene._BoundaryDelimDiscrete && boundarySDFIndex != -1)
-					{
-						ptrMatrixInv[i] = boundaryList[boundarySDFIndex].sdf.worldToUVW;
-					}
-					// world to prim for cube
-					else if (i < volumeConstantsScene._BoundaryDelimCube && i >= firstIndexCube)
-					{
-						ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i].WithoutScale());
-					}
-					*/
+					volumeData.boundaryCount = boundaryCount;
+					volumeData.boundaryCountDiscard = boundaryList.Count - boundaryCount;
 
 					/* TODO remove
 					fixed (void* outShape = volumeConstantsScene._CB_BoundaryShape)
@@ -1680,7 +1675,7 @@ namespace Unity.DemoTeam.Hair
 
 					// derive constants
 					volumeConstantsScene._WindEmitterCount = (uint)Mathf.Min(Conf.MAX_EMITTERS, emitterList.Length);
-					volumeConstantsScene._WindEmitterClock = time;
+					volumeConstantsScene._WindEmitterClock = (float)elapsedTime;
 
 					// update emitter data
 					for (int i = 0; i != volumeConstantsScene._WindEmitterCount; i++)
@@ -1699,8 +1694,15 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsScene);
 
 			// advance boundaries
-			BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesAdvance, volumeData);
-			cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesAdvance, 1, 1, 1);
+			if (stepCount > 0)
+			{
+				int numX = (Conf.MAX_BOUNDARIES + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
+				int numY = 1;
+				int numZ = 1;
+
+				BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesAdvance, volumeData);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesAdvance, numX, numY, numZ);
+			}
 		}
 
 		public static void PushVolumeLOD(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume)
@@ -1721,14 +1723,12 @@ namespace Unity.DemoTeam.Hair
 			volumeData.buffersReadback._VolumeLODStage.ScheduleCopy(cmd, volumeData.buffers._VolumeLODStage);
 		}
 
-		public static void PushVolumeStepBegin(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume, float deltaTime)
+		public static void PushVolumeStepBegin(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume)
 		{
 			ref var volumeConstants = ref volumeData.constants;
 			ref var volumeKeywords = ref volumeData.keywords;
 
 			// derive constants
-			volumeConstants._VolumeDT = deltaTime;
-
 			var allGroupsAvgRestSpan = volumeConstants._AllGroupsAvgParticleDiameter + volumeConstants._AllGroupsAvgParticleMargin;
 			var allGroupsAvgRestDensity = (volumeConstants._AllGroupsAvgParticleDiameter * volumeConstants._AllGroupsAvgParticleDiameter) / (allGroupsAvgRestSpan * allGroupsAvgRestSpan);
 

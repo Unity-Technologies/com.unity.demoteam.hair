@@ -1725,7 +1725,7 @@ void KBoundariesAdvance(
 	if (i >= MAX_BOUNDARIES)
 		return;
 
-	uint j = _BoundaryRemap[i];
+	int j = _BoundaryRemap[i];
 	if (j != -1)
 	{
 		_BoundaryShapePrev[i] = _BoundaryShape[j];

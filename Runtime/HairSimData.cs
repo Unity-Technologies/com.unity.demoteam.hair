@@ -419,8 +419,8 @@ namespace Unity.DemoTeam.Hair
 			// data accessible by CPU
 			public NativeArray<int> boundaryPrevHandle;
 			public NativeArray<Matrix4x4> boundaryPrevMatrix;
-			public int boundaryPrevCount;
-			public int boundaryPrevCountDiscard;
+			public int boundaryCount;
+			public int boundaryCountDiscard;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
@@ -480,15 +480,14 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			// 6
-			#region Volume Resolve (14 float, 56 bytes)
-			public float _VolumeDT;
+			#region Volume Resolve (13 float, 52 bytes)
 			public uint _VolumeFeatures;
 
-			// +2
+			// +1
 			public float _TargetDensityScale;
 			public float _TargetDensityInfluence;
 
-			// +4
+			// +3
 			public float _ScatteringProbeUnitWidth;
 			public uint _ScatteringProbeSubsteps;
 			public uint _ScatteringProbeSamplesTheta;
@@ -496,17 +495,17 @@ namespace Unity.DemoTeam.Hair
 			public float _ScatteringProbeOccluderDensity;
 			public float _ScatteringProbeOccluderMargin;
 
-			// +10
+			// +9
 			public uint _WindPropagationSubsteps;
 			public float _WindPropagationExtinction;
 			public float _WindPropagationOccluderDensity;
 			public float _WindPropagationOccluderMargin;
 
-			// +14
+			// +13
 			#endregion
 
-			// 20 --> 20 (pad to 16 byte boundary)
-			//public float __vcbpad1;
+			// 19 --> 20 (pad to 16 byte boundary)
+			public float __vcbpad1;
 			//public float __vcbpad2;
 			//public float __vcbpad3;
 		}

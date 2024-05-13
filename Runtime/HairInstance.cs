@@ -130,35 +130,45 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
+		public struct ExecutiveStep
+		{
+			public int countRaw;
+			public int count;
+			public float dt;
+			public float hi;
+
+			public static readonly ExecutiveStep defaults = new ExecutiveStep()
+			{
+				countRaw = 0,
+				count = 0,
+				dt = 0.0f,
+				hi = 1.0f,
+			};
+		}
+
 		public struct ExecutiveState
 		{
-			public struct TimeStepDesc
-			{
-				public float dt;
-				public int count;
-				public int countRaw;
-				public float countSmooth;
+			public float accumulatedTime;
 
-				public static readonly TimeStepDesc defaults = new TimeStepDesc()
-				{
-					dt = 1.0f / 60.0f,
-					count = 1,
-					countRaw = 1,
-					countSmooth = 1.0f,
-				};
-			}
+			public double elapsedTime;
+			public double elapsedTimeRaw;
 
-			public double accumulatedTimeSession;
-			public float accumulatedTimeChunked;
+			//public NativeQueue<TimeStepDesc> stepHistory;
 
-			public TimeStepDesc stepDesc;
+			public int lastStepCount;
+			public int lastStepCountRaw;
+			public float lastStepCountSmooth;
 
 			public static readonly ExecutiveState defaults = new ExecutiveState()
 			{
-				accumulatedTimeChunked = 0.0f,
-				accumulatedTimeSession = 0.0f,
+				accumulatedTime = 0.0f,
 
-				stepDesc = TimeStepDesc.defaults,
+				elapsedTime = 0.0f,
+				elapsedTimeRaw = 0.0f,
+				
+				lastStepCount = 0,
+				lastStepCountRaw = 0,
+				lastStepCountSmooth = 0,
 			};
 		}
 
@@ -667,54 +677,52 @@ namespace Unity.DemoTeam.Hair
 		}
 		#endregion
 
-		ExecutiveState.TimeStepDesc UpdateExecutiveState(float dt)
+		public ExecutiveStep UpdateExecutiveState(float dt)
 		{
-			// accumulate time
-			var simulationActive = GetSimulationActive();
-			if (simulationActive)
+			var stepDesc = new ExecutiveStep();
 			{
-				execState.accumulatedTimeSession += dt;
-				execState.accumulatedTimeChunked += dt;
-			}
-			else
-			{
-				execState.accumulatedTimeChunked = 0.0f;
+				stepDesc.countRaw = 0;
+				stepDesc.count = 0;
+				stepDesc.dt = 0.0f;
+				stepDesc.hi = 1.0f;
 			}
 
-			// prepare time step
-			ref var stepDesc = ref execState.stepDesc;
+			if (GetSimulationActive())
 			{
-				stepDesc.dt = GetSimulationTimeStep();
-				stepDesc.count = (stepDesc.dt > 0.0f && simulationActive) ? Mathf.FloorToInt(execState.accumulatedTimeChunked / stepDesc.dt) : 0;
-				stepDesc.countRaw = stepDesc.count;
+				var simulationTimeStep = GetSimulationTimeStep();
+				if (simulationTimeStep > 0.0f)
+				{
+					execState.accumulatedTime += dt;
+
+					var accumulatedStepCount = Mathf.FloorToInt(execState.accumulatedTime / simulationTimeStep);
+					if (accumulatedStepCount > 0)
+					{
+						var minStepCount = settingsExecutive.updateStepsMin ? settingsExecutive.updateStepsMinValue : accumulatedStepCount;
+						var maxStepCount = settingsExecutive.updateStepsMax ? settingsExecutive.updateStepsMaxValue : accumulatedStepCount;
+
+						stepDesc.countRaw = accumulatedStepCount;
+						stepDesc.count = Mathf.Clamp(accumulatedStepCount, minStepCount, maxStepCount);
+						stepDesc.dt = simulationTimeStep;
+						stepDesc.hi = (simulationTimeStep * accumulatedStepCount) / execState.accumulatedTime;
+					}
+
+					execState.accumulatedTime -= simulationTimeStep * accumulatedStepCount;
+				}
+
+				execState.elapsedTime += stepDesc.dt * stepDesc.count;
+				execState.elapsedTimeRaw += dt;
 			}
 
-			// deduct time step from accumulated time
-			execState.accumulatedTimeChunked -= (stepDesc.dt * stepDesc.count);
+			//timeState.stepHistory.Enqueue(stepDesc);
 
-			// apply limits
-			if (stepDesc.dt > 0.0f && simulationActive)
-			{
-				stepDesc.count = Mathf.Max(stepDesc.count, settingsExecutive.updateStepsMin ? settingsExecutive.updateStepsMinValue : stepDesc.count);
-				stepDesc.count = Mathf.Min(stepDesc.count, settingsExecutive.updateStepsMax ? settingsExecutive.updateStepsMaxValue : stepDesc.count);
-			}
+			execState.lastStepCount = stepDesc.count;
+			execState.lastStepCountRaw = stepDesc.countRaw;
+			execState.lastStepCountSmooth = Mathf.Lerp(execState.lastStepCountSmooth, stepDesc.count, 1.0f - Mathf.Pow(0.01f, dt / 0.2f));
 
-			// apply smoothing (note: only used for ui)
-			stepDesc.countSmooth = Mathf.Lerp(stepDesc.countSmooth, stepDesc.count, 1.0f - Mathf.Pow(0.01f, dt / 0.2f));
-
-			// update history
-			if (simulationActive)
-			{
-				//TODO record history
-				//execState.stepHistoryHead = (execState.stepHistoryHead + 1) % execState.stepHistoryLength;
-				//execState.stepHistory[execState.stepHistoryHead] = stepDesc;
-			}
-
-			// done
 			return stepDesc;
 		}
 
-		void UpdateSystemState(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, in ExecutiveState.TimeStepDesc stepDesc)
+		void UpdateSystemState(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, in ExecutiveStep stepDesc)
 		{
 			for (int i = 0; i != solverData.Length; i++)
 			{
@@ -722,7 +730,7 @@ namespace Unity.DemoTeam.Hair
 				var rootMeshMatrix = strandGroupInstances[i].sceneObjects.rootMeshFilter.transform.localToWorldMatrix;
 				var rootMeshSkinningRotation = GetRootMeshSkinningRotation(strandGroupInstances[i], GetSettingsSkinning(strandGroupInstances[i]));
 
-				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh, rootMeshMatrix, rootMeshSkinningRotation, stepDesc.dt * stepDesc.count);
+				HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh, rootMeshMatrix, rootMeshSkinningRotation, stepDesc.count);
 			}
 
 			for (int i = 0; i != solverData.Length; i++)
@@ -736,16 +744,16 @@ namespace Unity.DemoTeam.Hair
 
 			for (int i = 0; i != solverData.Length; i++)
 			{
-				HairSim.PushSolverLOD(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), GetSettingsRendering(strandGroupInstances[i]), volumeData, stepDesc.dt * stepDesc.count);
+				HairSim.PushSolverLOD(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), GetSettingsRendering(strandGroupInstances[i]), volumeData, stepDesc.count);
 			}
 
 			HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
-			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, (float)execState.accumulatedTimeSession);
-			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics, stepDesc.dt);
+			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count, execState.elapsedTime);
+			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
 
 			if (stepDesc.count == 0 || HairSim.PrepareVolumeData(ref volumeData, settingsVolumetrics, solverData.Length + 1))
 			{
-				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, 1.0f);
+				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracHi: 1.0f);
 			}
 
 			if (stepDesc.count >= 1)
@@ -1120,14 +1128,10 @@ namespace Unity.DemoTeam.Hair
 			if (InitializeRuntimeData())
 			{
 				var stepDesc = UpdateExecutiveState(dt);
-
-				UpdateSystemState(cmd, cmdFlags, stepDesc);
-				UpdateSceneState();
-
-				//if (Time.renderedFrameCount % 60 == 0)
-				//{
-				//	Debug.Log("t " + (Time.renderedFrameCount / 60) + " bounds-coverage: " + volumeData.buffersReadback._BoundsCoverage.GetData<Vector2>()[0]);
-				//}
+				{
+					UpdateSystemState(cmd, cmdFlags, stepDesc);
+					UpdateSceneState();
+				}
 
 				return true;
 			}
@@ -1287,7 +1291,7 @@ namespace Unity.DemoTeam.Hair
 					var rootMeshMatrix = strandGroupInstances[i].sceneObjects.rootMeshFilter.transform.localToWorldMatrix;
 					var rootMeshSkinningRotation = GetRootMeshSkinningRotation(strandGroupInstances[i], GetSettingsSkinning(strandGroupInstances[i]));
 
-					HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh, rootMeshMatrix, rootMeshSkinningRotation, 1.0f);
+					HairSim.PushSolverRoots(cmd, cmdFlags, ref solverData[i], rootMesh, rootMeshMatrix, rootMeshSkinningRotation, stepCount: 1);
 					HairSim.PushSolverRootsHistory(cmd, solverData[i]);
 				}
 
@@ -1309,12 +1313,12 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != solverData.Length; i++)
 				{
 					HairSim.PushSolverLODInit(cmd, solverData[i]);
-					HairSim.PushSolverLOD(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), GetSettingsRendering(strandGroupInstances[i]), volumeData, 1.0f);
+					HairSim.PushSolverLOD(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), GetSettingsRendering(strandGroupInstances[i]), volumeData, stepCount: 1);
 				}
 
 				HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
-				HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics, 1.0f);
-				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, 1.0f);
+				HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
+				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracHi: 1.0f);
 				HairSim.PushVolumeStepEnd(cmd, volumeData);
 
 				for (int i = 0; i != solverData.Length; i++)

@@ -258,7 +258,7 @@ namespace Unity.DemoTeam.Hair
 				ref var simActive = ref hairInstance.settingsExecutive.updateSimulation;
 
 				var simState = (simAllowed && simActive) ? "Running" : (simAllowed ? "Paused" : "Stopped");
-				var simTime = hairInstance.execState.accumulatedTimeSession;
+				var simTime = hairInstance.execState.elapsedTime;
 				var simTxt = string.Format(System.Globalization.CultureInfo.InvariantCulture, "Simulation state: {0}\nElapsed time: {1:F3}s", simState, simTime);
 
 				using (new ColorScope(simActive ? Color.green : Color.yellow, simAllowed ? ColorType.BackgroundColor : ColorType.None))
@@ -310,12 +310,12 @@ namespace Unity.DemoTeam.Hair
 						if (s_indicator)
 						{
 							var stepsMin = hairInstance.settingsExecutive.updateStepsMin ? hairInstance.settingsExecutive.updateStepsMinValue : 0;
-							var stepsMax = hairInstance.settingsExecutive.updateStepsMax ? hairInstance.settingsExecutive.updateStepsMaxValue : (int)Mathf.Ceil(hairInstance.execState.stepDesc.countSmooth);
+							var stepsMax = hairInstance.settingsExecutive.updateStepsMax ? hairInstance.settingsExecutive.updateStepsMaxValue : (int)Mathf.Ceil(hairInstance.execState.lastStepCountSmooth);
 							if (stepsMax == 0)
 								stepsMax = 1;
 
 							var stepDT = hairInstance.GetSimulationTimeStep();
-							var stepCount = hairInstance.execState.stepDesc.countSmooth;
+							var stepCount = hairInstance.execState.lastStepCountSmooth;
 
 							var rectWidth = rect.width;
 							var rectWidthStep = rectWidth / stepsMax;
@@ -323,7 +323,7 @@ namespace Unity.DemoTeam.Hair
 
 							rect.width = rectWidthCount;
 							{
-								using (new ColorScope(hairInstance.execState.stepDesc.countRaw > hairInstance.execState.stepDesc.count ? Color.red : Color.green, ColorType.Color))
+								using (new ColorScope(hairInstance.execState.lastStepCountRaw > hairInstance.execState.lastStepCount ? Color.red : Color.green, ColorType.Color))
 								{
 									EditorGUI.HelpBox(rect, string.Empty, MessageType.None);
 								}
@@ -584,7 +584,7 @@ namespace Unity.DemoTeam.Hair
 
 						EditorGUILayout.LabelField(countTxt, HairGUIStyles.statusBox, GUILayout.ExpandWidth(true));
 
-						var countDiscarded = hairInstance.volumeData.boundaryPrevCountDiscard;
+						var countDiscarded = hairInstance.volumeData.boundaryCountDiscard;
 						if (countDiscarded > 0)
 						{
 							using (new ColorScope(Color.Lerp(Color.red, Color.yellow, 0.5f)))
