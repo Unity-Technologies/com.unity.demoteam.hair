@@ -112,6 +112,8 @@ namespace Unity.DemoTeam.Hair
 
 		static class VolumeKernels
 		{
+			public static int KBoundariesAdvance;
+			public static int KBoundariesSubstep;
 			public static int KBoundsClear;
 			public static int KBoundsGather;
 			public static int KBoundsResolve;
@@ -290,11 +292,22 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref volumeBuffers._LODFrustum, "LODFrustum", Conf.MAX_FRUSTUMS, sizeof(LODFrustum));
 
-				changed |= CreateBuffer(ref volumeBuffers._BoundaryShape, "BoundaryShape", Conf.MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryRemap, "BoundaryRemap", Conf.MAX_BOUNDARIES, sizeof(int));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixNext, "BoundaryMatrixNext", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixPrevA, "BoundaryMatrixPrevA", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixPrevQ, "BoundaryMatrixPrevQ", Conf.MAX_BOUNDARIES, sizeof(Quaternion));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrix, "BoundaryMatrix", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixInv, "BoundaryMatrixInv", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
-				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixW2PrevW, "BoundaryMatrixW2PrevW", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixInvStep, "BoundaryMatrixInvStep", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryShapeNext, "BoundaryShapeNext", Conf.MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryShapePrev, "BoundaryShapePrev", Conf.MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryShape, "BoundaryShape", Conf.MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
 
+				//TODO
+				//changed |= CreateBuffer(ref volumeBuffers._WindEmitterRemap, "WindEmitterRemap", Conf.MAX_EMITTERS, sizeof(int));
+				//changed |= CreateBuffer(ref volumeBuffers._WindEmitterDataNext, "WindEmitterDataNext", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
+				//changed |= CreateBuffer(ref volumeBuffers._WindEmitterDataPrev, "WindEmitterDataPrev", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
+				//changed |= CreateBuffer(ref volumeBuffers._WindEmitterData, "WindEmitterData", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
 				changed |= CreateBuffer(ref volumeBuffers._WindEmitter, "WindEmitter", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
 
 				changed |= CreateBuffer(ref volumeBuffers._BoundsMinMaxU, "BoundsMinMaxU", boundsCount * 2, particleStrideVector3);
@@ -408,10 +421,16 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref volumeBuffers._LODFrustum);
 
-			ReleaseBuffer(ref volumeBuffers._BoundaryShape);
+			ReleaseBuffer(ref volumeBuffers._BoundaryRemap);
+			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixNext);
+			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixPrevA);
+			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixPrevQ);
 			ReleaseBuffer(ref volumeBuffers._BoundaryMatrix);
 			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixInv);
-			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixW2PrevW);
+			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixInvStep);
+			ReleaseBuffer(ref volumeBuffers._BoundaryShapeNext);
+			ReleaseBuffer(ref volumeBuffers._BoundaryShapePrev);
+			ReleaseBuffer(ref volumeBuffers._BoundaryShape);
 
 			ReleaseBuffer(ref volumeBuffers._WindEmitter);
 
@@ -454,8 +473,10 @@ namespace Unity.DemoTeam.Hair
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._BoundsCoverage);
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._VolumeLODStage);
 
-			if (volumeData.boundaryPrevXform.IsCreated)
-				volumeData.boundaryPrevXform.Dispose();
+			if (volumeData.boundaryPrevHandle.IsCreated)
+				volumeData.boundaryPrevHandle.Dispose();
+			if (volumeData.boundaryPrevMatrix.IsCreated)
+				volumeData.boundaryPrevMatrix.Dispose();
 
 			volumeData = new VolumeData();
 		}
@@ -531,10 +552,16 @@ namespace Unity.DemoTeam.Hair
 
 			target.BindComputeBuffer(volumeBufferIDs._LODFrustum, volumeBuffers._LODFrustum);
 
-			target.BindComputeBuffer(volumeBufferIDs._BoundaryShape, volumeBuffers._BoundaryShape);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryRemap, volumeBuffers._BoundaryRemap);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixNext, volumeBuffers._BoundaryMatrixNext);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixPrevA, volumeBuffers._BoundaryMatrixPrevA);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixPrevQ, volumeBuffers._BoundaryMatrixPrevQ);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrix, volumeBuffers._BoundaryMatrix);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixInv, volumeBuffers._BoundaryMatrixInv);
-			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixW2PrevW, volumeBuffers._BoundaryMatrixW2PrevW);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixInvStep, volumeBuffers._BoundaryMatrixInvStep);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryShapeNext, volumeBuffers._BoundaryShapeNext);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryShapePrev, volumeBuffers._BoundaryShapePrev);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryShape, volumeBuffers._BoundaryShape);
 
 			target.BindComputeBuffer(volumeBufferIDs._WindEmitter, volumeBuffers._WindEmitter);
 
@@ -1014,6 +1041,18 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
+					// substep boundaries
+					{
+						var substepFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
+						var substepFractionPrev = Mathf.Lerp(stepFracLo, stepFracHi, (i + 0) / (float)substepCount);
+
+						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFraction", substepFraction);
+						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionPrev", substepFractionPrev);
+
+						BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesSubstep, volumeData);
+						cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesSubstep, 1, 1, 1);
+					}
+
 					//Debug.Log("substep " + i + ": " + (substepFrac < (1.0f - float.Epsilon)) + " (lo " + stepFracLo + " hi " + stepFracHi + ")");
 
 					using (new ProfilingScope(cmd, MarkersGPU.Solver_SolveConstraints))
@@ -1373,54 +1412,46 @@ namespace Unity.DemoTeam.Hair
 			volumeConstantsScene._WorldGravity = settingsEnvironment.gravityRotation * (Physics.gravity * settingsEnvironment.gravityScale);
 
 			// capture boundaries
-			using (var bufShape = new NativeArray<HairBoundary.RuntimeShape.Data>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var bufXform = new NativeArray<HairBoundary.RuntimeTransform>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufRemap = new NativeArray<int>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufHandle = new NativeArray<int>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (var bufMatrix = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var bufMatrixInv = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var bufMatrixW2PrevW = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufMatrixA = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufMatrixQ = new NativeArray<Quaternion>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufShape = new NativeArray<HairBoundary.RuntimeShape.Data>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
-				if (volumeData.boundaryPrevXform.IsCreated && volumeData.boundaryPrevXform.Length != Conf.MAX_BOUNDARIES)
-					volumeData.boundaryPrevXform.Dispose();
-				if (volumeData.boundaryPrevXform.IsCreated == false)
-					volumeData.boundaryPrevXform = new NativeArray<HairBoundary.RuntimeTransform>(Conf.MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+				if (volumeData.boundaryPrevHandle.IsCreated && volumeData.boundaryPrevHandle.Length != Conf.MAX_BOUNDARIES)
+					volumeData.boundaryPrevHandle.Dispose();
+				if (volumeData.boundaryPrevHandle.IsCreated == false)
+					volumeData.boundaryPrevHandle = new NativeArray<int>(Conf.MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+
+				if (volumeData.boundaryPrevMatrix.IsCreated && volumeData.boundaryPrevMatrix.Length != Conf.MAX_BOUNDARIES)
+					volumeData.boundaryPrevMatrix.Dispose();
+				if (volumeData.boundaryPrevMatrix.IsCreated == false)
+					volumeData.boundaryPrevMatrix = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
 				unsafe
 				{
-					var ptrShape = (HairBoundary.RuntimeShape.Data*)bufShape.GetUnsafePtr();
-					var ptrXform = (HairBoundary.RuntimeTransform*)bufXform.GetUnsafePtr();
-					var ptrXformPrev = (HairBoundary.RuntimeTransform*)volumeData.boundaryPrevXform.GetUnsafePtr();
-
+					var ptrRemap = (int*)bufRemap.GetUnsafePtr();
+					var ptrHandle = (int*)bufHandle.GetUnsafePtr();
 					var ptrMatrix = (Matrix4x4*)bufMatrix.GetUnsafePtr();
-					var ptrMatrixInv = (Matrix4x4*)bufMatrixInv.GetUnsafePtr();
-					var ptrMatrixW2PrevW = (Matrix4x4*)bufMatrixW2PrevW.GetUnsafePtr();
+					var ptrMatrixA = (Matrix4x4*)bufMatrixA.GetUnsafePtr();
+					var ptrMatrixQ = (Quaternion*)bufMatrixQ.GetUnsafePtr();
+					var ptrShape = (HairBoundary.RuntimeShape.Data*)bufShape.GetUnsafePtr();
 
-					// gather boundary shapes
+					// gather boundaries
 					//TODO expose or always enable the volumeSort option which sorts active boundaries by distance
 					var boundaryList = HairBoundaryUtility.Gather(settingsEnvironment.boundaryResident, settingsEnvironment.boundaryCapture, GetVolumeBounds(volumeData), settingsEnvironment.boundaryCaptureLayer, captureSort: false, (settingsEnvironment.boundaryCaptureMode == SettingsEnvironment.BoundaryCaptureMode.IncludeColliders));
+
+					var boundaryCountDiscrete = 0;
+					var boundaryCountCapsule = 0;
+					var boundaryCountSphere = 0;
+					var boundaryCountTorus = 0;
+					var boundaryCountCube = 0;
 					var boundaryCount = 0;
+
 					var boundarySDFIndex = -1;
 					var boundarySDFCellSize = 0.0f;
-
-					// count boundaries
-					var boundaryCountDiscrete = 0u;
-					var boundaryCountCapsule = 0u;
-					var boundaryCountSphere = 0u;
-					var boundaryCountTorus = 0u;
-					var boundaryCountCube = 0u;
-
-					for (int i = 0; i != boundaryList.Count; i++)
-					{
-						var data = boundaryList[i];
-						if (data.type == HairBoundary.RuntimeData.Type.SDF)
-						{
-							boundaryCountDiscrete++;
-							boundaryCount++;
-							boundarySDFIndex = i;
-							boundarySDFCellSize = Mathf.Max(boundarySDFCellSize, data.sdf.worldCellSize);
-							break;
-						}
-					}
-
+					 
 					foreach (var data in boundaryList)
 					{
 						if (data.type == HairBoundary.RuntimeData.Type.Shape)
@@ -1435,119 +1466,169 @@ namespace Unity.DemoTeam.Hair
 
 							boundaryCount++;
 						}
+						else
+						{
+							if (boundarySDFIndex == -1)// only include first discrete
+							{
+								boundarySDFIndex = boundaryCount;
+								boundarySDFCellSize = Mathf.Max(boundarySDFCellSize, data.sdf.sdfCellSize);
+
+								boundaryCountDiscrete++;
+								boundaryCount++;
+							}
+						}
 
 						if (boundaryCount == Conf.MAX_BOUNDARIES)
 							break;
 					}
 
-					volumeConstantsScene._BoundaryDelimDiscrete = boundaryCountDiscrete;
-					volumeConstantsScene._BoundaryDelimCapsule = boundaryCountCapsule + volumeConstantsScene._BoundaryDelimDiscrete;
-					volumeConstantsScene._BoundaryDelimSphere = boundaryCountSphere + volumeConstantsScene._BoundaryDelimCapsule;
-					volumeConstantsScene._BoundaryDelimTorus = boundaryCountTorus + volumeConstantsScene._BoundaryDelimSphere;
-					volumeConstantsScene._BoundaryDelimCube = boundaryCountCube + volumeConstantsScene._BoundaryDelimTorus;
+					// prepare delimiters
+					var firstIndexDiscrete = 0;
+					var firstIndexCapsule = firstIndexDiscrete + boundaryCountDiscrete;
+					var firstIndexSphere = firstIndexCapsule + boundaryCountCapsule;
+					var firstIndexTorus = firstIndexSphere + boundaryCountSphere;
+					var firstIndexCube = firstIndexTorus + boundaryCountTorus;
+					var firstIndexEnd = firstIndexCube + boundaryCountCube;
+
+					// update constants
+					volumeConstantsScene._BoundaryDelimDiscrete = (uint)firstIndexCapsule;
+					volumeConstantsScene._BoundaryDelimCapsule = (uint)firstIndexSphere;
+					volumeConstantsScene._BoundaryDelimSphere = (uint)firstIndexTorus;
+					volumeConstantsScene._BoundaryDelimTorus = (uint)firstIndexCube;
+					volumeConstantsScene._BoundaryDelimCube = (uint)firstIndexEnd;
 
 					volumeConstantsScene._BoundaryWorldEpsilon = (boundarySDFIndex != -1) ? boundarySDFCellSize * 0.2f : 1e-4f;
 					volumeConstantsScene._BoundaryWorldMargin = settingsEnvironment.defaultSolidMargin * 0.01f;
 
-					// pack boundaries
-					int firstIndexDiscrete = 0;
-					int firstIndexCapsule = (int)volumeConstantsScene._BoundaryDelimDiscrete;
-					int firstIndexSphere = (int)volumeConstantsScene._BoundaryDelimCapsule;
-					int firstIndexTorus = (int)volumeConstantsScene._BoundaryDelimSphere;
-					int firstIndexCube = (int)volumeConstantsScene._BoundaryDelimTorus;
-
-					int writeIndexDiscrete = firstIndexDiscrete;
-					int writeIndexCapsule = firstIndexCapsule;
-					int writeIndexSphere = firstIndexSphere;
-					int writeIndexTorus = firstIndexTorus;
-					int writeIndexCube = firstIndexCube;
-					int writeCount = 0;
-
+					// assign discrete texture
 					if (boundarySDFIndex != -1)
 					{
-						ptrXform[writeIndexDiscrete] = boundaryList[boundarySDFIndex].xform;
-						ptrShape[writeIndexDiscrete++] = new HairBoundary.RuntimeShape.Data();
-						writeCount++;
+						volumeTextures._BoundarySDF = (boundarySDFIndex != -1) ? boundaryList[boundarySDFIndex].sdf.sdfTexture : null;
 					}
 
-					foreach (HairBoundary.RuntimeData data in boundaryList)
+					// write attributes
 					{
-						if (data.type == HairBoundary.RuntimeData.Type.Shape)
-						{
-							int writeIndex = -1;
+						var writeIndexDiscrete = firstIndexDiscrete;
+						var writeIndexCapsule = firstIndexCapsule;
+						var writeIndexSphere = firstIndexSphere;
+						var writeIndexTorus = firstIndexTorus;
+						var writeIndexCube = firstIndexCube;
+						var writeCount = 0;
 
-							switch (data.shape.type)
+						foreach (var data in boundaryList)
+						{
+							var writeIndex = -1;
+
+							if (data.type == HairBoundary.RuntimeData.Type.Shape)
 							{
-								case HairBoundary.RuntimeShape.Type.Capsule: writeIndex = writeIndexCapsule++; break;
-								case HairBoundary.RuntimeShape.Type.Sphere: writeIndex = writeIndexSphere++; break;
-								case HairBoundary.RuntimeShape.Type.Torus: writeIndex = writeIndexTorus++; break;
-								case HairBoundary.RuntimeShape.Type.Cube: writeIndex = writeIndexCube++; break;
+								switch (data.shape.type)
+								{
+									case HairBoundary.RuntimeShape.Type.Capsule: writeIndex = writeIndexCapsule++; break;
+									case HairBoundary.RuntimeShape.Type.Sphere: writeIndex = writeIndexSphere++; break;
+									case HairBoundary.RuntimeShape.Type.Torus: writeIndex = writeIndexTorus++; break;
+									case HairBoundary.RuntimeShape.Type.Cube: writeIndex = writeIndexCube++; break;
+								}
+							}
+							else
+							{
+								if (writeIndexDiscrete == 0)// only include one first discrete
+								{
+									writeIndex = writeIndexDiscrete++;
+								}
 							}
 
 							if (writeIndex != -1)
 							{
-								ptrXform[writeIndex] = data.xform;
+								ptrHandle[writeIndex] = data.xform.handle;
+								ptrMatrix[writeIndex] = data.xform.matrix;
 								ptrShape[writeIndex] = data.shape.data;
+
 								writeCount++;
 							}
-						}
 
-						if (writeCount == Conf.MAX_BOUNDARIES)
-							break;
+							if (writeCount == Conf.MAX_BOUNDARIES)
+								break;
+						}
 					}
 
-					// update sdf
-					if (boundarySDFIndex != -1)
-						volumeTextures._BoundarySDF = boundaryList[boundarySDFIndex].sdf.sdfTexture;
-					else
-						volumeTextures._BoundarySDF = null;
-
-					// update matrices
-					for (int i = 0; i != boundaryCount; i++)
+					// write remapping (current -> previous)
 					{
-						int ptrXformPrevIndex = -1;
-
-						for (int j = 0; j != volumeData.boundaryPrevCount; j++)
+						for (int i = 0; i != boundaryCount; i++)
 						{
-							if (ptrXformPrev[j].handle == ptrXform[i].handle)
+							ptrRemap[i] = volumeData.boundaryPrevHandle.IndexOf(ptrHandle[i]);
+						}
+					}
+
+					// write blend params
+					{
+						for (int i = 0; i != boundaryCount; i++)
+						{
+							var j = ptrRemap[i];
+							if (j != -1)
 							{
-								ptrXformPrevIndex = j;
-								break;
+								// Ma * M = Mb
+								// M = Ma^-1 * Mb
+								// ..
+								// Mb_t = Ma * M(t)
+								//
+								// where Ma is the transform of the current frame
+								//   and Mb is the transform of the last substep transform of the previous frame
+
+								var Ma = ptrMatrix[i];
+								var Mb = volumeData.boundaryPrevMatrix[j];
+
+								var M = Matrix4x4.Inverse(Ma) * Mb;
+								var q = (Quaternion)svd.svdRotation((float3x3)((float4x4)M));
+
+								ptrMatrixA[i] = M;
+								ptrMatrixQ[i] = q;
+							}
+							else
+							{
+								ptrMatrixA[i] = Matrix4x4.identity;
+								ptrMatrixQ[i] = Quaternion.identity;
 							}
 						}
-
-						ptrMatrix[i] = ptrXform[i].matrix;
-						ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i]);
-
-						// world to previous world
-						if (ptrXformPrevIndex != -1)
-							ptrMatrixW2PrevW[i] = ptrXformPrev[ptrXformPrevIndex].matrix * ptrMatrixInv[i];
-						else
-							ptrMatrixW2PrevW[i] = Matrix4x4.identity;
-
-						// world to UVW for discrete
-						if (i < volumeConstantsScene._BoundaryDelimDiscrete && boundarySDFIndex != -1)
-						{
-							ptrMatrixInv[i] = boundaryList[boundarySDFIndex].sdf.worldToUVW;
-						}
-						// world to prim for cube
-						else if (i < volumeConstantsScene._BoundaryDelimCube && i >= firstIndexCube)
-						{
-							ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i].WithoutScale());
-						}
 					}
 
+					// update buffers
+					PushComputeBufferData(cmd, volumeData.buffers._BoundaryRemap, bufRemap);
+					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixNext, bufMatrix);
+					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixPrevA, bufMatrixA);
+					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixPrevQ, bufMatrixQ);
+					PushComputeBufferData(cmd, volumeData.buffers._BoundaryShapeNext, bufShape);
+
 					// update previous frame info
-					volumeData.boundaryPrevXform.CopyFrom(bufXform);
+					{
+						//TODO
+						// AffineInterpolate(bufMatrix, bufMatrixA, bufMatrixQ, stepFracHi)
+					}
+
+					volumeData.boundaryPrevHandle.CopyFrom(bufHandle);
+					volumeData.boundaryPrevMatrix.CopyFrom(bufMatrix);//TODO adjust to correspond to outcome (final substep in frame), see incomplete scope above
 					volumeData.boundaryPrevCount = boundaryCount;
 					volumeData.boundaryPrevCountDiscard = boundaryList.Count - boundaryCount;
 
-					// update buffers
-					PushComputeBufferData(cmd, volumeData.buffers._BoundaryShape, bufShape);
-					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrix, bufMatrix);
-					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixInv, bufMatrixInv);
-					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixW2PrevW, bufMatrixW2PrevW);
+					/* TODO remove
+					// world to previous world
+					if (ptrXformPrevIndex != -1)
+						ptrMatrixW2PrevW[i] = ptrXformPrev[ptrXformPrevIndex].matrix * ptrMatrixInv[i];
+					else
+						ptrMatrixW2PrevW[i] = Matrix4x4.identity;
 
+					// world to UVW for discrete
+					if (i < volumeConstantsScene._BoundaryDelimDiscrete && boundarySDFIndex != -1)
+					{
+						ptrMatrixInv[i] = boundaryList[boundarySDFIndex].sdf.worldToUVW;
+					}
+					// world to prim for cube
+					else if (i < volumeConstantsScene._BoundaryDelimCube && i >= firstIndexCube)
+					{
+						ptrMatrixInv[i] = Matrix4x4.Inverse(ptrMatrix[i].WithoutScale());
+					}
+					*/
+
+					/* TODO remove
 					fixed (void* outShape = volumeConstantsScene._CB_BoundaryShape)
 					fixed (void* outMatrix = volumeConstantsScene._CB_BoundaryMatrix)
 					fixed (void* outMatrixInv = volumeConstantsScene._CB_BoundaryMatrixInv)
@@ -1570,6 +1651,7 @@ namespace Unity.DemoTeam.Hair
 						CopyTransformRows3x4((Vector4*)outMatrixInv, ptrMatrixInv, boundaryCount);
 						CopyTransformRows3x4((Vector4*)outMatrixW2PrevW, ptrMatrixW2PrevW, boundaryCount);
 					}
+					*/
 				}
 			}
 
@@ -1615,6 +1697,10 @@ namespace Unity.DemoTeam.Hair
 
 			// update cbuffer
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsScene);
+
+			// advance boundaries
+			BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesAdvance, volumeData);
+			cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesAdvance, 1, 1, 1);
 		}
 
 		public static void PushVolumeLOD(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume)

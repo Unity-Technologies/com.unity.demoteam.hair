@@ -43,7 +43,7 @@ namespace Unity.DemoTeam.Hair
 			if (collider == null || collider.isTrigger)
 				return;
 
-			if (HairBoundary.TryGetComponentShape(collider, ref item))
+			if (HairBoundary.TryGetComponentData(collider, ref item))
 			{
 				if (mask.Contains(item.xform.handle) == false)
 				{
@@ -152,7 +152,7 @@ namespace Unity.DemoTeam.Hair
 			switch (data.type)
 			{
 				case HairBoundary.RuntimeData.Type.SDF:
-					return SdDiscrete(p, data.sdf);
+					return SdDiscrete(p, data);
 
 				case HairBoundary.RuntimeData.Type.Shape:
 					{
@@ -161,7 +161,7 @@ namespace Unity.DemoTeam.Hair
 							case HairBoundary.RuntimeShape.Type.Capsule: return SdCapsule(p, data.shape.data);
 							case HairBoundary.RuntimeShape.Type.Sphere: return SdSphere(p, data.shape.data);
 							case HairBoundary.RuntimeShape.Type.Torus: return SdTorus(p, data.shape.data);
-							case HairBoundary.RuntimeShape.Type.Cube: return SdCube(p, data.shape.data, Matrix4x4.Inverse(data.xform.matrix.WithoutScale()));
+							case HairBoundary.RuntimeShape.Type.Cube: return SdCube(p, data.shape.data, Matrix4x4.Inverse(data.xform.matrix));
 						}
 					}
 					break;
@@ -169,7 +169,7 @@ namespace Unity.DemoTeam.Hair
 			return 1e+7f;
 		}
 
-		public static float SdDiscrete(in Vector3 p, in HairBoundary.RuntimeSDF sdf) => SdDiscrete(p, sdf.worldToUVW, sdf.sdfTexture as Texture3D);
+		public static float SdDiscrete(in Vector3 p, in HairBoundary.RuntimeData data) => SdDiscrete(p, Matrix4x4.Inverse(data.xform.matrix), data.sdf.sdfTexture as Texture3D);
 		public static float SdDiscrete(in Vector3 p, in Matrix4x4 invM, Texture3D sdf)
 		{
 			float3 uvw = mul(invM, float4(p, 1.0f)).xyz;
@@ -223,6 +223,11 @@ namespace Unity.DemoTeam.Hair
 		public static float SdCube(float3 p, in float3 extent, in float4x4 invM)
 		{
 			p = mul(invM, float4(p, 1.0f)).xyz;
+			// assuming TRS, can apply scale post-transform to preserve primitive scale
+			// T R S x_local = x_world
+			//       x_local = S^-1 R^-1 T^-1 x_world 
+			//     S x_local = S S^-1 R^-1 T^-1 world
+			p *= 2.0f * extent;
 
 			// see: "distance functions" by Inigo Quilez
 			// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm

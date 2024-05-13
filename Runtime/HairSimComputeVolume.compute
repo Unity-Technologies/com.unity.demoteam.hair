@@ -1,6 +1,8 @@
-﻿//#pragma use_dxc
-//#pragma enable_d3d11_debug_symbols
+﻿#pragma use_dxc
+#pragma enable_d3d11_debug_symbols
 
+#pragma kernel KBoundariesAdvance				THREAD_GROUP_SIZE=64	F_BOUNDARIES
+#pragma kernel KBoundariesSubstep				THREAD_GROUP_SIZE=64	F_BOUNDARIES
 #pragma kernel KBoundsClear						THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsGather					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsResolve					THREAD_GROUP_SIZE=64	F_BOUNDS
@@ -82,6 +84,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl"
 
+#define HAIRSIM_WRITEABLE_VOLUMESUBSTEP (F_BOUNDARIES)
 #define HAIRSIM_WRITEABLE_VOLUMEBOUNDS (F_BOUNDS || F_LOD)
 #define HAIRSIM_WRITEABLE_VOLUMEACCU (F_CLEAR || F_SPLAT)
 #define HAIRSIM_WRITEABLE_VOLUMEDATA (F_RESOLVE || F_DIVERGENCE || F_PRESSURE)
@@ -1597,3 +1600,246 @@ void KLODSelection(
 }
 
 #endif//F_LOD
+
+//--------------------
+// kernels boundaries
+
+#if F_BOUNDARIES
+
+float3x3 AffineInterpolateUpper3x3(float3x3 A, float4 q, float t)
+{
+	// A = QR
+	// Q^-1 A = R
+
+	float3x3 Q_inv = QMat3x3(QConjugate(q));
+	float3x3 R = mul(Q_inv, A);
+	float3x3 I = float3x3(
+		1.0, 0.0, 0.0,
+		0.0, 1.0, 0.0,
+		0.0, 0.0, 1.0);
+
+	float3x3 Q_t = QMat3x3(QSlerp(MakeQuaternionIdentity(), q, t));
+	float3x3 R_t = lerp(I, R, t);
+	float3x3 A_t = mul(Q_t, R_t);
+
+	return A_t;
+}
+
+float3x4 AffineInterpolate3x4(float3x4 M, float4 q, float t)
+{
+	// M = | A T |
+
+	float3x3 A_t = AffineInterpolateUpper3x3((float3x3)M, q, t);
+	float3 T_t = M._m03_m13_m23 * t;
+
+	return float3x4(
+		A_t._m00, A_t._m01, A_t._m02, T_t.x,
+		A_t._m10, A_t._m11, A_t._m12, T_t.y,
+		A_t._m20, A_t._m21, A_t._m22, T_t.z);
+}
+
+float4x4 AffineInterpolate4x4(float4x4 M, float4 q, float t)
+{
+	// M = | A T |
+	//     | 0 1 |
+	
+	float3x3 A_t = AffineInterpolateUpper3x3((float3x3)M, q, t);
+	float3 T_t = M._m03_m13_m23 * t;
+
+	return float4x4(
+		A_t._m00, A_t._m01, A_t._m02, T_t.x,
+		A_t._m10, A_t._m11, A_t._m12, T_t.y,
+		A_t._m20, A_t._m21, A_t._m22, T_t.z,
+		0.0, 0.0, 0.0, 1.0);
+}
+
+float3x3 AffineInverseUpper3x3(float3x3 A)
+{
+	float3 c0 = A._m00_m10_m20;
+	float3 c1 = A._m01_m11_m21;
+	float3 c2 = A._m02_m12_m22;
+	
+	float3 cp0x1 = cross(c0, c1);
+	float3 cp1x2 = cross(c1, c2);
+	float3 cp2x0 = cross(c2, c0);
+
+	return float3x3(cp1x2, cp2x0, cp0x1) / dot(c0, cp1x2);
+}
+
+float4x4 AffineInverse4x4(float4x4 M)
+{
+	// | A T |
+	// | 0 1 |
+
+	float3x3 A_inv = AffineInverseUpper3x3((float3x3)M);
+	float3 T_inv = -mul(A_inv, M._m03_m13_m23);
+
+	return float4x4(
+		A_inv._m00, A_inv._m01, A_inv._m02, T_inv.x,
+		A_inv._m10, A_inv._m11, A_inv._m12, T_inv.y,
+		A_inv._m20, A_inv._m21, A_inv._m22, T_inv.z,
+		0.0, 0.0, 0.0, 1.0);
+}
+
+float3x4 AffineMul3x4(float3x4 Ma, float3x4 Mb)
+{
+	// Ma x Mb  =  | A Ta |  x  | B Tb |
+	//             | 0 1  |     | 0 1  |
+	//
+	//          =  | mul(A,B)  mul(A,Tb)+Ta |
+	//             | 0         1            |
+
+	float3x3 A = (float3x3)Ma;
+	float3x3 B = (float3x3)Mb;
+
+	float3x3 AB = mul(A, B);
+	float3 ATb = mul(A, Mb._m03_m13_m23);
+	float3 Ta = Ma._m03_m13_m23;
+
+	return float3x4(
+		AB._m00, AB._m01, AB._m02, ATb.x + Ta.x,
+		AB._m10, AB._m11, AB._m12, ATb.y + Ta.y,
+		AB._m20, AB._m21, AB._m22, ATb.z + Ta.z);
+}
+
+float4x4 AffineMul4x4(float4x4 Ma, float4x4 Mb)
+{
+	return mul(Ma, Mb);
+}
+
+float _SubstepFraction;
+float _SubstepFractionPrev;
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KBoundariesAdvance(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	uint i = worldIdx.x;
+	if (i >= MAX_BOUNDARIES)
+		return;
+
+	uint j = _BoundaryRemap[i];
+	if (j != -1)
+	{
+		_BoundaryShapePrev[i] = _BoundaryShape[j];
+	}
+	else
+	{
+		_BoundaryShapePrev[i] = _BoundaryShapeNext[i];
+	}
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KBoundariesSubstep(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	uint i = worldIdx.x;
+	if (i >= MAX_BOUNDARIES)
+		return;
+
+	// compute substep boundary transform
+	{
+		// Ma * M = Mb
+		// M = Ma^-1 * Mb
+		// ..
+		// Mb_t = Ma * M(t)
+		//
+		// where Ma is the transform of the current frame
+		//   and Mb is the transform of the last substep transform of the previous frame
+
+		float4x4 Ma = _BoundaryMatrixNext[i];
+		float4x4 M = _BoundaryMatrixPrevA[i];
+		float4 q = _BoundaryMatrixPrevQ[i];
+
+		float4x4 M_t = AffineInterpolate4x4(M, q, 1.0 - _SubstepFraction);
+		float4x4 M_t_prev = AffineInterpolate4x4(M, q, 1.0 - _SubstepFractionPrev);
+
+		float4x4 Mb_t = AffineMul4x4(Ma, M_t);
+		float4x4 Mb_t_prev = AffineMul4x4(Ma, M_t_prev);
+
+		float4x4 Mb_t_inv = AffineInverse4x4(Mb_t);
+		float4x4 Mb_t_inv_step = AffineMul4x4(Mb_t_prev, Mb_t_inv);
+
+		_BoundaryMatrix[i] = Mb_t;
+		_BoundaryMatrixInv[i] = Mb_t_inv;
+		_BoundaryMatrixInvStep[i] = Mb_t_inv_step;
+	}
+
+	// compute substep boundary shape
+	{
+		float t = _SubstepFraction;
+
+		BoundaryShape g0 = _BoundaryShapePrev[i];
+		BoundaryShape g1 = _BoundaryShapeNext[i];
+		BoundaryShape gt;
+
+		// shapes blend differently depending on type
+		{
+			// shape    |  float3     float      float3     float
+			// -------------------------------------------------------
+			// discrete |  __pad      __pad      __pad      __pad
+			// capsule  |  centerA    radius     centerB    __pad
+			// sphere   |  center     radius     __pad      __pad
+			// torus    |  center     radiusA    axis       radiusB
+			// cube     |  center     rotf16x    extent     rotf16y
+		}
+		if (i < _BoundaryDelimDiscrete)
+		{
+			//          :
+			// discrete |  __pad      __pad      __pad      __pad
+		}
+		else if (i < _BoundaryDelimSphere)
+		{
+			//          :
+			// capsule  |  centerA    radius     centerB    __pad
+			// sphere   |  center     radius     __pad      __pad
+			gt.pA = lerp(g0.pA, g1.pA, t);
+			gt.tA = lerp(g0.tA, g1.tA, t);
+			gt.pB = lerp(g0.pB, g1.pB, t);
+		}
+		else if (i < _BoundaryDelimTorus)
+		{
+			//          :
+			// torus    |  center     radiusA    axis       radiusB
+			gt.pA = lerp(g0.pA, g1.pA, t);
+			gt.tA = lerp(g0.tA, g1.tA, t);
+			gt.pB = QMul(QSlerp(MakeQuaternionIdentity(), MakeQuaternionFromTo(g0.pB, g1.pB), t), g0.pB);
+			gt.tB = lerp(g0.tB, g1.tB, t);
+		}
+		else if (i < _BoundaryDelimCube)
+		{
+			//          :
+			// cube     |  center     rotf16x    extent     rotf16y
+#if BOUNDARIES_OPT_PACK_CUBE
+			float4 q0 = QDecode16(asuint(float2(g0.tA, g0.tB)));
+			float4 q1 = QDecode16(asuint(float2(g1.tA, g1.tB)));
+			uint2 qt16 = QEncode16(QSlerp(q0, q1, t));
+			gt.pA = lerp(g0.pA, g1.pA, t);
+			gt.tA = asfloat(qt16.x);
+			gt.pB = lerp(g0.pB, g1.pB, t);
+			gt.tB = asfloat(qt16.y);
+#else
+			gt.pA = lerp(g0.pA, g1.pA, t);
+			gt.pB = lerp(g0.pB, g1.pB, t);
+#endif
+		}
+
+		_BoundaryShape[i] = gt;
+	}
+}
+
+#endif//F_BOUNDARIES

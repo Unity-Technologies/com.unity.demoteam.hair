@@ -17,9 +17,7 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _settingsSphere;
 		SerializedProperty _settingsTorus;
 		SerializedProperty _settingsCube;
-
 		SerializedProperty _settingsSDF;
-		SerializedProperty _settingsSDF_kSDFRigidTransform;
 
 		void OnEnable()
 		{
@@ -31,9 +29,7 @@ namespace Unity.DemoTeam.Hair
 			_settingsSphere = serializedObject.FindProperty(nameof(HairBoundary.settingsSphere));
 			_settingsTorus = serializedObject.FindProperty(nameof(HairBoundary.settingsTorus));
 			_settingsCube = serializedObject.FindProperty(nameof(HairBoundary.settingsCube));
-
 			_settingsSDF = serializedObject.FindProperty(nameof(HairBoundary.settingsSDF));
-			_settingsSDF_kSDFRigidTransform = _settingsSDF.FindPropertyRelative(nameof(HairBoundary.SettingsSDF.kSDFRigidTransform));
 		}
 
 		public override bool UseDefaultMargins()
@@ -73,8 +69,7 @@ namespace Unity.DemoTeam.Hair
 			var selectedType = (HairBoundary.Settings.Type)_settings_type.intValue;
 
 			//TODO move to ValidationGUI
-			if (selectedMode == HairBoundary.Settings.Mode.BindToComponent && selectedType == HairBoundary.Settings.Type.DiscreteSDF ||
-				selectedMode == HairBoundary.Settings.Mode.Standalone && hairBoundary.settingsSDF.source == HairBoundary.SettingsSDF.SDFSource.SDFComponent)
+			if (selectedMode == HairBoundary.Settings.Mode.BindToComponent && selectedType == HairBoundary.Settings.Type.DiscreteSDF)
 			{
 #if !HAS_PACKAGE_DEMOTEAM_MESHTOSDF
 				using (new EditorGUI.IndentLevelScope())
@@ -88,11 +83,6 @@ namespace Unity.DemoTeam.Hair
 			{
 				using (new EditorGUI.IndentLevelScope())
 				{
-					if (selectedType == HairBoundary.Settings.Type.DiscreteSDF)
-					{
-						EditorGUILayout.PropertyField(_settingsSDF_kSDFRigidTransform);
-					}
-
 					if (HairBoundary.TryGetMatchingComponent(hairBoundary, out var component))
 					{
 						using (new ColorScope(Color.white))

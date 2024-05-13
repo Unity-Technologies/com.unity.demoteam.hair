@@ -24,11 +24,11 @@ namespace Unity.DemoTeam.Hair
 
 			public enum Type
 			{
-				DiscreteSDF,// binds to component -> SDFTexture (requires Unity.DemoTeam.MeshToSDF)
-				Capsule,    // binds to component -> CapsuleCollider
-				Sphere,     // binds to component -> SphereCollider
+				DiscreteSDF,// can bind to component -> SDFTexture (requires Unity.DemoTeam.MeshToSDF)
+				Capsule,    // can bind to component -> CapsuleCollider
+				Sphere,     // can bind to component -> SphereCollider
 				Torus,
-				Cube,       // binds to component -> BoxCollider
+				Cube,       // can bind to component -> BoxCollider
 				Any,
 			}
 
@@ -97,37 +97,14 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsSDF
 		{
-			public enum SDFSource
-			{
-				Texture,
-				SDFComponent,
-			}
-
-			public SDFSource source;
-			[VisibleIf(nameof(source), SDFSource.Texture), FormerlySerializedAs("kSDF")]
+			[FormerlySerializedAs("kSDF")]
 			public Texture kSDFTexture;
-			[VisibleIf(nameof(source), SDFSource.Texture)]
-			public Bounds kSDFWorldBounds;
-#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-			[VisibleIf(nameof(source), SDFSource.SDFComponent)]
-			public SDFTexture kSDFComponent;
-#endif
-
-			[ToggleGroup, Tooltip("Enable this if the SDF will undergo rigid transformation (e.g. if the entire field will be translated, rotated, or scaled)")]
-			public bool kSDFRigidTransform;
-			[ToggleGroupItem(withLabel = true), Tooltip("Rigid transform origin -- this is used specifically to improve friction calculations when strands collide with a moving field")]
-			public Transform kSDFRigidTransformOrigin;
+			public Vector3 kSDFWorldSize;
 
 			public static readonly SettingsSDF defaults = new SettingsSDF
 			{
-				source = SDFSource.Texture,
 				kSDFTexture = null,
-				kSDFWorldBounds = new Bounds(Vector3.zero, Vector3.one),
-#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-				kSDFComponent = null,
-#endif
-				kSDFRigidTransform = false,
-				kSDFRigidTransformOrigin = null,
+				kSDFWorldSize = Vector3.one,
 			};
 		}
 	}

@@ -132,9 +132,13 @@ namespace Unity.DemoTeam.Hair
 
 		void DrawGizmosRuntimeSDF(in RuntimeData data)
 		{
-			Gizmos.color = Color.red;
-			Gizmos.matrix = Matrix4x4.Inverse(data.sdf.worldToUVW);
-			Gizmos.DrawWireCube(Vector3.one * 0.5f, Vector3.one);
+			var localCenter = 0.5f * Vector3.one;
+			var localExtent = Vector3.one;
+			{
+				Gizmos.color = Color.red;
+				Gizmos.matrix = data.xform.matrix;
+				Gizmos.DrawWireCube(localCenter, localExtent);
+			}
 		}
 	}
 }
