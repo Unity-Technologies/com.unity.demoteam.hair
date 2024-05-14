@@ -750,43 +750,42 @@ namespace Unity.DemoTeam.Hair
 			HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
 			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count, execState.elapsedTime);
 			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
-
-			if (stepDesc.count == 0 || HairSim.PrepareVolumeData(ref volumeData, settingsVolumetrics, solverData.Length + 1))
 			{
-				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracHi: 1.0f);
-			}
-
-			if (stepDesc.count >= 1)
-			{
-				for (int i = 0; i != solverData.Length; i++)
+				var stepVolume = HairSim.PrepareVolumeData(ref volumeData, settingsVolumetrics, solverData.Length + 1);
+				if (stepVolume || stepDesc.count == 0)
 				{
-					HairSim.PushSolverStepBegin(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), stepDesc.dt);
+					HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo: 0.0f, stepFracHi: 1.0f / Mathf.Max(1, stepDesc.count));
 				}
 
-				for (int k = 0; k != stepDesc.count; k++)
+				if (stepDesc.count >= 1)
 				{
-					float stepFracLo = (k + 0) / (float)stepDesc.count;
-					float stepFracHi = (k + 1) / (float)stepDesc.count;
+					for (int i = 0; i != solverData.Length; i++)
+					{
+						HairSim.PushSolverStepBegin(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), stepDesc.dt);
+					}
+
+					for (int k = 0; k != stepDesc.count; k++)
+					{
+						float stepFracLo = (k + 0) / (float)stepDesc.count;
+						float stepFracHi = (k + 1) / (float)stepDesc.count;
+
+						for (int i = 0; i != solverData.Length; i++)
+						{
+							HairSim.PushSolverStep(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), volumeData, stepFracLo, stepFracHi);
+						}
+
+						HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo, stepFracHi);
+
+						if (onSimulationStateChanged != null)
+							onSimulationStateChanged(cmd);
+					}
 
 					for (int i = 0; i != solverData.Length; i++)
 					{
-						HairSim.PushSolverStep(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), volumeData, stepFracLo, stepFracHi);
+						HairSim.PushSolverStepEnd(cmd, solverData[i], volumeData);
 					}
-
-					//TODO substep volume environment (interpolate colliders and emitters)
-					//HairSim.SubstepVolumeEnvironment(cmd, ref volumeData, stepFracHi);
-					HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracHi);
-
-					if (onSimulationStateChanged != null)
-						onSimulationStateChanged(cmd);
-				}
-
-				for (int i = 0; i != solverData.Length; i++)
-				{
-					HairSim.PushSolverStepEnd(cmd, solverData[i], volumeData);
 				}
 			}
-
 			HairSim.PushVolumeStepEnd(cmd, volumeData);
 
 			for (int i = 0; i != solverData.Length; i++)
@@ -1179,8 +1178,6 @@ namespace Unity.DemoTeam.Hair
 			// ensure that readback buffers are ready first frame
 			AsyncGPUReadback.WaitAllRequests();
 
-			//Debug.Log("(in init) bounds: " + HairSim.GetVolumeBounds(volumeData) + " --------------------------------------------------------------------");
-
 			// ready
 			return true;
 		}
@@ -1237,6 +1234,7 @@ namespace Unity.DemoTeam.Hair
 
 						unsafe
 						{
+							//TODO remove
 							/*
 							using (var particlePositionAligned = new NativeArray<Vector4>(groupAsset.strandCount * groupAsset.strandParticleCount, Allocator.Persistent, NativeArrayOptions.ClearMemory))
 							{
@@ -1318,7 +1316,7 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
 				HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
-				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracHi: 1.0f);
+				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo: 0.0f, stepFracHi: 0.0f);
 				HairSim.PushVolumeStepEnd(cmd, volumeData);
 
 				for (int i = 0; i != solverData.Length; i++)

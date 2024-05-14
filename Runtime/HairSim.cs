@@ -1023,12 +1023,12 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != substepCount; i++)
 				{
-					var substepFractionPrev = Mathf.Lerp(stepFracLo, stepFracHi, (i) / (float)substepCount);
-					var substepFraction = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
+					var substepFracLo = Mathf.Lerp(stepFracLo, stepFracHi, (i + 0) / (float)substepCount);
+					var substepFracHi = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
 
 					// check if substep required
-					var substep = substepFraction < (1.0f - 1e-5f);
-					if (substep)
+					var substepRequired = substepFracHi < (1.0f - 1e-5f);
+					if (substepRequired)
 					{
 						// substep roots
 						using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepRoots))
@@ -1039,7 +1039,7 @@ namespace Unity.DemoTeam.Hair
 								SolverLODDispatch.Solve;
 
 							//TODO move into cbuffer?
-							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepFraction);
+							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepFracHi);
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KRootsSubstep, solverData);
 							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(substepRootsDispatch));
@@ -1049,8 +1049,8 @@ namespace Unity.DemoTeam.Hair
 					// substep boundaries
 					//TODO skip if at fraction one, similar to roots
 					{
-						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFraction", substepFraction);
-						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionPrev", substepFractionPrev);
+						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionLo", substepFracLo);
+						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionHi", substepFracHi);
 
 						int numX = (Conf.MAX_BOUNDARIES + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
 						int numY = 1;
@@ -1061,7 +1061,6 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					//Debug.Log("substep " + i + ": " + (substepFrac < (1.0f - float.Epsilon)) + " (lo " + stepFracLo + " hi " + stepFracHi + ")");
-
 					using (new ProfilingScope(cmd, MarkersGPU.Solver_SolveConstraints))
 					{
 						if (Conf.SECOND_ORDER_UPDATE != 0)
@@ -1076,7 +1075,7 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						BindVolumeData(cmd, s_solverCS, solveKernel, volumeData);
-						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepFraction < (1.0f - float.Epsilon)));
+						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepRequired));
 						cmd.DispatchCompute(s_solverCS, solveKernel, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(solveDispatch));
 					}
 
@@ -1613,11 +1612,10 @@ namespace Unity.DemoTeam.Hair
 					// update previous frame info
 					if (stepCount > 0)
 					{
-						volumeData.boundaryPrevHandle.CopyFrom(bufHandle);
-						volumeData.boundaryPrevMatrix.CopyFrom(bufMatrix);
-						
 						//TODO adjust bufMatrix to correspond to outcome (final substep in frame)
 						//		e.g. AffineInterpolate(bufMatrix, bufMatrixA, bufMatrixQ, stepFracHi)
+						volumeData.boundaryPrevHandle.CopyFrom(bufHandle);
+						volumeData.boundaryPrevMatrix.CopyFrom(bufMatrix);
 					}
 
 					volumeData.boundaryCount = boundaryCount;
@@ -1767,10 +1765,30 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBuffer, volumeConstants);
 		}
 
-		public static void PushVolumeStep(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in SettingsVolume settingsVolume, SolverData[] solverData, float stepFracHi)
+		public static void PushVolumeStep(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in SettingsVolume settingsVolume, SolverData[] solverData, float stepFracLo, float stepFracHi)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.Volume))
 			{
+				if (stepFracHi > 0.0f)
+				{
+					// substep boundaries
+					//TODO skip if at fraction one, similar to roots
+					{
+						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionLo", stepFracLo);
+						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionHi", stepFracHi);
+
+						int numX = (Conf.MAX_BOUNDARIES + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
+						int numY = 1;
+						int numZ = 1;
+
+						BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesSubstep, volumeData);
+						cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesSubstep, numX, numY, numZ);
+					}
+
+					// substep emitters
+					//TODO
+				}
+
 				HairSim.PushVolumeClear(cmd, ref volumeData, settingsVolume);
 
 				for (int i = 0; i != solverData.Length; i++)

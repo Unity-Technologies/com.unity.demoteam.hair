@@ -1707,8 +1707,8 @@ float4x4 AffineMul4x4(float4x4 Ma, float4x4 Mb)
 	return mul(Ma, Mb);
 }
 
-float _SubstepFraction;
-float _SubstepFractionPrev;
+float _SubstepFractionLo;
+float _SubstepFractionHi;
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void KBoundariesAdvance(
@@ -1765,8 +1765,8 @@ void KBoundariesSubstep(
 		float4x4 M = _BoundaryMatrixPrevA[i];
 		float4 q = _BoundaryMatrixPrevQ[i];
 
-		float4x4 M_t = AffineInterpolate4x4(M, q, 1.0 - _SubstepFraction);
-		float4x4 M_t_prev = AffineInterpolate4x4(M, q, 1.0 - _SubstepFractionPrev);
+		float4x4 M_t = AffineInterpolate4x4(M, q, 1.0 - _SubstepFractionHi);
+		float4x4 M_t_prev = AffineInterpolate4x4(M, q, 1.0 - _SubstepFractionLo);
 
 		float4x4 Mb_t = AffineMul4x4(Ma, M_t);
 		float4x4 Mb_t_prev = AffineMul4x4(Ma, M_t_prev);
@@ -1781,7 +1781,7 @@ void KBoundariesSubstep(
 
 	// compute substep boundary shape
 	{
-		float t = _SubstepFraction;
+		float t = _SubstepFractionHi;
 
 		BoundaryShape g0 = _BoundaryShapePrev[i];
 		BoundaryShape g1 = _BoundaryShapeNext[i];
