@@ -703,7 +703,25 @@ namespace Unity.DemoTeam.Hair
 						stepDesc.countRaw = accumulatedStepCount;
 						stepDesc.count = Mathf.Clamp(accumulatedStepCount, minStepCount, maxStepCount);
 						stepDesc.dt = simulationTimeStep;
-						stepDesc.hi = (simulationTimeStep * accumulatedStepCount) / execState.accumulatedTime;
+
+						// method A: align per-frame data with simulation time steps
+						//
+						//           accu + accu = a
+						//      .---------.--------------.
+						//      :         :              :
+						// F----X---------F--------------F - - -
+						//      :
+						//      : dt   dt   dt
+						//      O----S----S----X---------|
+						//      :              :         :
+						//      '--------------'---------'
+						//          (dt * n)   :    b
+						//                     :
+						//                     '- blend fraction
+						{
+							//TODO put this to use pending changes to root interpolation and staging resolve
+							stepDesc.hi = (simulationTimeStep * accumulatedStepCount) / execState.accumulatedTime;
+						}
 					}
 
 					execState.accumulatedTime -= simulationTimeStep * accumulatedStepCount;
