@@ -221,7 +221,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 #if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-		public static RuntimeData GetRuntimeSDF(SDFTexture sdfComponent) => GetRuntimeSDF(sdfComponent.transform, sdfComponent.sdf, sdfComponent.voxelBounds.size);
+		public static RuntimeData GetRuntimeSDF(SDFTexture sdfComponent) => GetRuntimeSDF(sdfComponent.transform.GetInstanceID(), sdfComponent.transform, sdfComponent.sdf, sdfComponent.voxelBounds.size);
 #endif
 		public static RuntimeData GetRuntimeSDF(Transform transform, in SettingsSDF settings) => GetRuntimeSDF(transform.GetInstanceID(), transform, settings.kSDFTexture, settings.kSDFWorldSize);
 		public static RuntimeData GetRuntimeSDF(int handle, Transform transform, Texture sdfTexture, in Vector3 sdfWorldSize)
