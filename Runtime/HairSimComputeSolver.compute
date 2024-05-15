@@ -1,5 +1,5 @@
-﻿//#pragma use_dxc
-//#pragma enable_d3d11_debug_symbols
+﻿#pragma use_dxc
+#pragma enable_d3d11_debug_symbols
 
 #pragma kernel KRoots									THREAD_GROUP_SIZE=64	F_INPUT
 #pragma kernel KRootsHistory							THREAD_GROUP_SIZE=64	F_INPUT

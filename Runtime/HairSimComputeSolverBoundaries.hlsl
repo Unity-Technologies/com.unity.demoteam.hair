@@ -6,7 +6,6 @@
 
 #define BOUNDARIES_OPT_HINT_LOOP 1
 #define BOUNDARIES_OPT_PACK_CUBE 0
-#define BOUNDARIES_OPT_CBUF_DATA 0
 #if GROUPSHARED_BOUNDARY_DATA
 #define BOUNDARIES_OPT_GROUP_MEM 0// requires call to PrepareBoundaryData(threadIndex, threadCount)
 #endif
@@ -115,9 +114,14 @@ float SdCube(float3 p, const float3 extent, const float3x4 invM)
 #endif
 {
 #if BOUNDARIES_OPT_PACK_CUBE
-	p = QMul(f16tof32(uint4(rotf16, rotf16 >> 16)), p - center);
+	p = QMul(QDecode16(rotf16), p - center);
 #else
 	p = mul(invM, float4(p, 1.0));
+	// assuming TRS, can apply scale post-transform to preserve primitive scale
+	// T R S x_local = x_world
+	//       x_local = S^-1 R^-1 T^-1 x_world 
+	//     S x_local = S S^-1 R^-1 T^-1 world
+	p *= 2.0 * extent;
 #endif
 
 	// see: "distance functions" by Inigo Quilez
@@ -138,9 +142,14 @@ float4 SdgCube(float3 p, const float3 extent, const float3x4 invM)
 	// SdCube extended to include gradient in .yzw
 
 #if BOUNDARIES_OPT_PACK_CUBE
-	p = QMul(f16tof32(uint4(rotf16, rotf16 >> 16)), p - center);
+	p = QMul(QDecode16(rotf16), p - center);
 #else
 	p = mul(invM, float4(p, 1.0));
+	// assuming TRS, can apply scale post-transform to preserve primitive scale
+	// T R S x_local = x_world
+	//       x_local = S^-1 R^-1 T^-1 x_world 
+	//     S x_local = S S^-1 R^-1 T^-1 world
+	p *= 2.0 * extent;
 #endif
 
 	const float3 b = extent;
@@ -222,46 +231,10 @@ float4 SdgCube(const float3 p, const BoundaryShape cube, const float3x4 invM)
 //--------------------
 // boundary accessors
 
-#if BOUNDARIES_OPT_CBUF_DATA
-
-BoundaryShape __GetBoundaryShape(const uint i)
-{
-	BoundaryShape shape = {
-		_CB_BoundaryShape[i * 2 + 0],
-		_CB_BoundaryShape[i * 2 + 1]
-	};
-	return shape;
-}
-float3x4 __GetBoundaryMatrix(const uint i)
-{
-	return float3x4(
-		_CB_BoundaryMatrix[i * 3 + 0],
-		_CB_BoundaryMatrix[i * 3 + 1],
-		_CB_BoundaryMatrix[i * 3 + 2]);
-}
-float3x4 __GetBoundaryMatrixInv(const uint i)
-{
-	return float3x4(
-		_CB_BoundaryMatrixInv[i * 3 + 0],
-		_CB_BoundaryMatrixInv[i * 3 + 1],
-		_CB_BoundaryMatrixInv[i * 3 + 2]);
-}
-float3x4 __GetBoundaryMatrixW2PrevW(const uint i)
-{
-	return float3x4(
-		_CB_BoundaryMatrixW2PrevW[i * 3 + 0],
-		_CB_BoundaryMatrixW2PrevW[i * 3 + 1],
-		_CB_BoundaryMatrixW2PrevW[i * 3 + 2]);
-}
-
-#else
-
 #define __GetBoundaryShape(i) _BoundaryShape[i]
 #define __GetBoundaryMatrix(i) (float3x4)_BoundaryMatrix[i]
 #define __GetBoundaryMatrixInv(i) (float3x4)_BoundaryMatrixInv[i]
-#define __GetBoundaryMatrixW2PrevW(i) (float3x4)_BoundaryMatrixW2PrevW[i]
-
-#endif
+#define __GetBoundaryMatrixInvStep(i) (float3x4)_BoundaryMatrixInvStep[i]
 
 #if BOUNDARIES_OPT_GROUP_MEM
 
@@ -273,7 +246,7 @@ groupshared float3x4 gs_boundaryMatrixW2PrevW[MAX_BOUNDARIES];
 #define GetBoundaryShape(i) gs_boundaryShape[i]
 #define GetBoundaryMatrix(i) gs_boundaryMatrix[i]
 #define GetBoundaryMatrixInv(i) gs_boundaryMatrixInv[i]
-#define GetBoundaryMatrixW2PrevW(i) gs_boundaryMatrixW2PrevW[i]
+#define GetBoundaryMatrixInvStep(i) gs_boundaryMatrixInvStep[i]
 
 void PrepareBoundaryData(const uint threadIndex, const uint threadCount)
 {
@@ -284,7 +257,7 @@ void PrepareBoundaryData(const uint threadIndex, const uint threadCount)
 			gs_boundaryShape[i] = __GetBoundaryShape(i);
 			gs_boundaryMatrix[i] = __GetBoundaryMatrix(i);
 			gs_boundaryMatrixInv[i] = __GetBoundaryMatrixInv(i);
-			gs_boundaryMatrixW2PrevW[i] = __GetBoundaryMatrixW2PrevW(i);
+			gs_boundaryMatrixInvStep[i] = __GetBoundaryMatrixInvStep(i);
 		}
 	}
 
@@ -296,7 +269,7 @@ void PrepareBoundaryData(const uint threadIndex, const uint threadCount)
 #define GetBoundaryShape(i) __GetBoundaryShape(i)
 #define GetBoundaryMatrix(i) __GetBoundaryMatrix(i)
 #define GetBoundaryMatrixInv(i) __GetBoundaryMatrixInv(i)
-#define GetBoundaryMatrixW2PrevW(i) __GetBoundaryMatrixW2PrevW(i)
+#define GetBoundaryMatrixInvStep(i) __GetBoundaryMatrixInvStep(i)
 
 void PrepareBoundaryData(const uint threadIndex, const uint threadCount) { }
 

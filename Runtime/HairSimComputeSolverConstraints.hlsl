@@ -85,12 +85,12 @@ void SolveCollisionFrictionConstraint(
 
 			depth -= (_BoundaryWorldMargin + margin);
 
-			//... float4x4 M_prev = mul(_BoundaryMatrixPrev[index], _BoundaryMatrixInv[index]);
-			const float3x4 M_prev = GetBoundaryMatrixW2PrevW(index);
+			//... float4x4 M_inv_step = mul(_BoundaryMatrixPrev[index], _BoundaryMatrixInv[index]);
+			const float3x4 M_inv_step = GetBoundaryMatrixInvStep(index);
 
 			const float3 x_star = p + normal * depth;
-			//... float3 x_delta = (x_star - x0) - (x_star - mul(M_prev, float4(x_star, 1.0)));
-			const float3 x_delta = mul(M_prev, float4(x_star, 1.0)) - x0;
+			//... float3 x_delta = (x_star - x0) - (x_star - mul(M_inv_step, float4(x_star, 1.0)));
+			const float3 x_delta = mul(M_inv_step, float4(x_star, 1.0)) - x0;
 			const float3 x_delta_tan = x_delta - dot(x_delta, normal) * normal;
 
 			d += normal * depth;

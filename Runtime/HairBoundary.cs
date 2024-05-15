@@ -28,17 +28,28 @@ namespace Unity.DemoTeam.Hair
 		public SettingsCube settingsCube = SettingsCube.defaults;
 		public SettingsSDF settingsSDF = SettingsSDF.defaults;
 
-		//-------------------------
-		// runtime data: transform
+		//--------------
+		// runtime data
+
+		public struct RuntimeData
+		{
+			public enum Type
+			{
+				Shape,
+				SDF,
+			};
+
+			public Type type;
+			public RuntimeTransform xform;
+			public RuntimeShape shape;
+			public RuntimeSDF sdf;
+		}
 
 		public struct RuntimeTransform
 		{
 			public int handle;
 			public Matrix4x4 matrix;
 		}
-
-		//---------------------
-		// runtime data: shape
 
 		public struct RuntimeShape
 		{
@@ -52,12 +63,13 @@ namespace Unity.DemoTeam.Hair
 
 			public struct Data
 			{
-				//  shape   |  float3     float      float3     float
-				//  -------------------------------------------------------
-				//  capsule |  centerA    radius     centerB    __pad
-				//  sphere  |  center     radius     __pad      __pad
-				//  torus   |  center     radiusA    axis       radiusB
-				//  cube    |  center     rotf16x    extent     rotf16y
+				// shape    |  float3     float      float3     float
+				// -------------------------------------------------------
+				// discrete |  __pad      __pad      __pad      __pad
+				// capsule  |  centerA    radius     centerB    __pad
+				// sphere   |  center     radius     __pad      __pad
+				// torus    |  center     radiusA    axis       radiusB
+				// cube     |  center     rotf16x    extent     rotf16y
 
 				public Vector3 pA; public float tA;
 				public Vector3 pB; public float tB;
@@ -66,6 +78,15 @@ namespace Unity.DemoTeam.Hair
 			public Type type;
 			public Data data;
 		}
+
+		public struct RuntimeSDF
+		{
+			public Texture sdfTexture;
+			public float sdfCellSize;
+		}
+
+		//--------------------
+		// runtime conversion
 
 		public static RuntimeData GetRuntimeCapsule(CapsuleCollider collider) => GetRuntimeCapsule(collider.GetInstanceID(), collider.transform, collider.center, collider.direction, collider.height, collider.radius);
 		public static RuntimeData GetRuntimeCapsule(Transform transform, in SettingsCapsule settings) => GetRuntimeCapsule(transform.GetInstanceID(), transform, Vector3.zero, (int)settings.direction, settings.height, settings.radius);
@@ -199,75 +220,48 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
-		//-------------------
-		// runtime data: sdf
-
-		public struct RuntimeSDF
+#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
+		public static RuntimeData GetRuntimeSDF(SDFTexture sdfComponent) => GetRuntimeSDF(sdfComponent.transform, sdfComponent.sdf, sdfComponent.voxelBounds.size);
+#endif
+		public static RuntimeData GetRuntimeSDF(Transform transform, in SettingsSDF settings) => GetRuntimeSDF(transform.GetInstanceID(), transform, settings.kSDFTexture, settings.kSDFWorldSize);
+		public static RuntimeData GetRuntimeSDF(int handle, Transform transform, Texture sdfTexture, in Vector3 sdfWorldSize)
 		{
-			public Texture sdfTexture;
-			public float worldCellSize;
-			public Matrix4x4 worldToUVW;
-		}
-
-		public static RuntimeData GetRuntimeSDF(Transform sourceTransform, Texture sdfTexture, in Bounds worldBounds)
-		{
-			var worldSize = worldBounds.size;
-			var worldCellSize = worldSize / sdfTexture.width;
-			var worldSizeToUVW = new Vector3(1.0f / worldSize.x, 1.0f / worldSize.y, 1.0f / worldSize.z);
+			var sdfTextureResolution = Vector3.one;
+			{	
+				if (sdfTexture is Texture3D)
+				{
+					var sdfTexture3D = (Texture3D)sdfTexture;
+					{
+						sdfTextureResolution.x = sdfTexture3D.width;
+						sdfTextureResolution.y = sdfTexture3D.height;
+						sdfTextureResolution.z = sdfTexture3D.depth;
+					}
+				}
+				else if (sdfTexture is RenderTexture)
+				{
+					var sdfTexture3D = (RenderTexture)sdfTexture;
+					{
+						sdfTextureResolution.x = sdfTexture3D.width;
+						sdfTextureResolution.y = sdfTexture3D.height;
+						sdfTextureResolution.z = sdfTexture3D.depth;
+					}
+				}
+			}
 
 			return new RuntimeData
 			{
 				type = RuntimeData.Type.SDF,
 				xform = new RuntimeTransform
 				{
-					handle = sourceTransform?.GetInstanceID() ?? 0,
-					matrix = sourceTransform?.localToWorldMatrix ?? Matrix4x4.identity,
+					handle = transform.GetInstanceID(),
+					matrix = Matrix4x4.TRS(transform.position, transform.rotation, sdfWorldSize) * Matrix4x4.Translate(-0.5f * Vector3.one),
 				},
 				sdf = new RuntimeSDF()
 				{
 					sdfTexture = sdfTexture,
-					worldCellSize = worldCellSize.CMax(),
-					worldToUVW = Matrix4x4.Scale(worldSizeToUVW) * Matrix4x4.Translate(-worldBounds.min),
+					sdfCellSize = sdfWorldSize.CMul(sdfTextureResolution.Rcp()).CMax(),
 				},
 			};
-		}
-
-#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-		public static RuntimeData GetRuntimeSDF(Transform sourceTransform, SDFTexture sdfComponent)
-		{
-			return new RuntimeData
-			{
-				type = RuntimeData.Type.SDF,
-				xform = new RuntimeTransform
-				{
-					handle = sourceTransform?.GetInstanceID() ?? 0,
-					matrix = sourceTransform?.localToWorldMatrix ?? Matrix4x4.identity,
-				},
-				sdf = new RuntimeSDF
-				{
-					sdfTexture = sdfComponent.sdf,
-					worldCellSize = sdfComponent.voxelSize,
-					worldToUVW = sdfComponent.worldToSDFTexCoords,
-				},
-			};
-		}
-#endif
-
-		//--------------
-		// runtime data
-
-		public struct RuntimeData
-		{
-			public enum Type
-			{
-				Shape,
-				SDF,
-			};
-
-			public Type type;
-			public RuntimeTransform xform;
-			public RuntimeShape shape;
-			public RuntimeSDF sdf;
 		}
 
 		//-----------
@@ -279,16 +273,12 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (TryGetMatchingComponent(boundary, out var component))
 				{
-					return
-						TryGetComponentShape(component, ref data) ||
-						TryGetComponentSDF(component, ref data, sourceTransform: boundary.settingsSDF.kSDFRigidTransform ? boundary.settingsSDF.kSDFRigidTransformOrigin : null);
+					return TryGetComponentData(component, ref data);
 				}
 			}
 			else
 			{
-				return
-					TryGetStandaloneShape(boundary, ref data) ||
-					TryGetStandaloneSDF(boundary, ref data, sourceTransform: boundary.settingsSDF.kSDFRigidTransform ? boundary.settingsSDF.kSDFRigidTransformOrigin : null);
+				return TryGetStandaloneData(boundary, ref data);
 			}
 			return false;
 		}
@@ -330,10 +320,17 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static bool TryGetComponentShape(Component component, ref RuntimeData data)
+		public static bool TryGetComponentData(Component component, ref RuntimeData data)
 		{
 			if (component is Collider)
 			{
+#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
+				if (component is SDFTexture)
+				{
+					data = GetRuntimeSDF(component as SDFTexture); return (data.sdf.sdfTexture != null);
+				}
+				else
+#endif
 				if (component is CapsuleCollider)
 				{
 					data = GetRuntimeCapsule(component as CapsuleCollider); return true;
@@ -350,62 +347,22 @@ namespace Unity.DemoTeam.Hair
 			return false;
 		}
 
-		public static bool TryGetComponentSDF(Component component, ref RuntimeData data, Transform sourceTransform)
-		{
-#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-			if (component is SDFTexture)
-			{
-				var sdfComponent = component as SDFTexture;
-				if (sdfComponent.sdf != null)
-				{
-					data = GetRuntimeSDF(sourceTransform, sdfComponent); return true;
-				}
-			}
-#endif
-			return false;
-		}
-
-		public static bool TryGetStandaloneShape(HairBoundary boundary, ref RuntimeData data)
+		public static bool TryGetStandaloneData(HairBoundary boundary, ref RuntimeData data)
 		{
 			switch (boundary.settings.type)
 			{
-				case Settings.Type.Capsule: data = GetRuntimeCapsule(boundary.transform, boundary.settingsCapsule); return true;
-				case Settings.Type.Sphere: data = GetRuntimeSphere(boundary.transform, boundary.settingsSphere); return true;
-				case Settings.Type.Torus: data = GetRuntimeTorus(boundary.transform, boundary.settingsTorus); return true;
-				case Settings.Type.Cube: data = GetRuntimeCube(boundary.transform, boundary.settingsCube); return true;
+				case Settings.Type.DiscreteSDF:
+					data = GetRuntimeSDF(boundary.transform, boundary.settingsSDF); return (data.sdf.sdfTexture != null);
+				case Settings.Type.Capsule:
+					data = GetRuntimeCapsule(boundary.transform, boundary.settingsCapsule); return true;
+				case Settings.Type.Sphere:
+					data = GetRuntimeSphere(boundary.transform, boundary.settingsSphere); return true;
+				case Settings.Type.Torus:
+					data = GetRuntimeTorus(boundary.transform, boundary.settingsTorus); return true;
+				case Settings.Type.Cube:
+					data = GetRuntimeCube(boundary.transform, boundary.settingsCube); return true;
 				default: return false;
 			}
-		}
-
-		public static bool TryGetStandaloneSDF(HairBoundary boundary, ref RuntimeData data, Transform sourceTransform)
-		{
-			if (boundary.settings.type == Settings.Type.DiscreteSDF)
-			{
-				switch (boundary.settingsSDF.source)
-				{
-					case SettingsSDF.SDFSource.Texture:
-						{
-							if (boundary.settingsSDF.kSDFTexture != null)
-							{
-								data = GetRuntimeSDF(sourceTransform, boundary.settingsSDF.kSDFTexture, boundary.settingsSDF.kSDFWorldBounds);
-								return true;
-							}
-						}
-						break;
-#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-					case SettingsSDF.SDFSource.SDFComponent:
-						{
-							if (boundary.settingsSDF.kSDFComponent != null)
-							{
-								data = GetRuntimeSDF(sourceTransform, boundary.settingsSDF.kSDFComponent);
-								return true;
-							}
-						}
-						break;
-#endif
-				}
-			}
-			return false;
 		}
 	}
 }

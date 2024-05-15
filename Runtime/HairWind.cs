@@ -26,8 +26,22 @@ namespace Unity.DemoTeam.Hair
 			s_emitters.Remove(this);
 		}
 
-		//-----------------------
-		// runtime data: emitter
+		//--------------
+		// runtime data
+
+		public struct RuntimeData
+		{
+			public enum Type
+			{
+				Directional,
+				Spherical,
+				Turbine,
+				Plane,
+			}
+
+			public Type type;
+			public RuntimeEmitter emitter;
+		}
 
 		public struct RuntimeEmitter
 		{
@@ -45,6 +59,9 @@ namespace Unity.DemoTeam.Hair
 			public float jw;	// jitter resolution
 			public float jp;	// jitter planar
 		}
+
+		//--------------------
+		// runtime conversion
 
 		public static SettingsFlow MakeSettingsFlow(WindZone windZone)
 		{
@@ -160,23 +177,6 @@ namespace Unity.DemoTeam.Hair
 					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
 				}
 			};
-		}
-
-		//--------------
-		// runtime data
-
-		public struct RuntimeData
-		{
-			public enum Type
-			{
-				Directional,
-				Spherical,
-				Turbine,
-				Plane,
-			}
-
-			public Type type;
-			public RuntimeEmitter emitter;
 		}
 
 		//-----------

@@ -330,17 +330,32 @@ namespace Unity.DemoTeam.Hair
 				public T VolumeCBuffer;				// constant buffer
 
 				public T _LODFrustum;				// array(LODFrustum): observer properties (camera properties and frustum planes)
-				
-				public T _BoundaryShape;			// array(HairBoundary.RuntimeShape.Data)
-				public T _BoundaryMatrix;			// array(float4x4): local to world
-				public T _BoundaryMatrixInv;		// array(float4x4): world to local
-				public T _BoundaryMatrixW2PrevW;	// array(float4x4): world to previous world
 
+				public T _BoundaryRemap;			// PUSH per frame
+				public T _BoundaryMatrixNext;		// PUSH per frame
+				public T _BoundaryMatrixPrevA;		// PUSH per frame
+				public T _BoundaryMatrixPrevQ;		// PUSH per frame
+				public T _BoundaryMatrix;			// COMPUTE per step (volume or solver)
+				public T _BoundaryMatrixInv;		// COMPUTE per step (volume or solver)
+				public T _BoundaryMatrixInvStep;	// COMPUTE per step (volume or solver)
+				public T _BoundaryShapeNext;		// PUSH per frame
+				public T _BoundaryShapePrev;		// COMPUTE per frame
+				public T _BoundaryShape;			// COMPUTE per step (volume or solver)
+				//public T _BoundaryShape;			// array(HairBoundary.RuntimeShape.Data)
+				//public T _BoundaryMatrix;			// array(float4x4): local to world
+				//public T _BoundaryMatrixInv;		// array(float4x4): world to local
+				//public T _BoundaryMatrixW2PrevW;	// array(float4x4): world to previous world
+
+				//TODO
+				//public T _WindEmitterRemap;
+				//public T _WindEmitterDataPrev;
+				//public T _WindEmitterDataNext;
+				//public T _WindEmitterData;
 				public T _WindEmitter;				// array(HairWind.RuntimeEmitter)
 
 				public T _BoundsMinMaxU;			// xyz: bounds min/max (unsigned sortable)
-				public T _Bounds;					// array(LODBounds): bounds (center, extent, radius)
-				public T _BoundsPrev;				// array(LODBounds): bounds (center, extent, radius)
+				public T _Bounds;					// array(LODBounds): bounds (center, extent, radius, reach)
+				public T _BoundsPrev;				// array(LODBounds): bounds (center, extent, radius, reach)
 				public T _BoundsGeometry;			// array(LODGeometry): bounds geometry description (dimensions for coverage)
 				public T _BoundsCoverage;			// xy: bounds coverage (unbiased ceiling)
 
@@ -402,10 +417,10 @@ namespace Unity.DemoTeam.Hair
 			public VolumeBuffers<HairSimUtility.AsyncReadbackBuffer> buffersReadback;
 
 			// data accessible by CPU
-			public NativeArray<HairBoundary.RuntimeTransform> boundaryPrevXform;
-			public int boundaryPrevCount;
-			public int boundaryPrevCountDiscard;
-			public int boundaryPrevCountUnknown;
+			public NativeArray<int> boundaryPrevHandle;
+			public NativeArray<Matrix4x4> boundaryPrevMatrix;
+			public int boundaryCount;
+			public int boundaryCountDiscard;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
@@ -440,15 +455,6 @@ namespace Unity.DemoTeam.Hair
 			public float __ecbpad1;
 			public float __ecbpad2;
 			//public float __ecbpad3;
-
-			[HLSLArray(2 * Conf.MAX_BOUNDARIES, typeof(Vector4))]
-			public fixed float _CB_BoundaryShape[8 * Conf.MAX_BOUNDARIES];
-			[HLSLArray(3 * Conf.MAX_BOUNDARIES, typeof(Vector4))]
-			public fixed float _CB_BoundaryMatrix[12 * Conf.MAX_BOUNDARIES];
-			[HLSLArray(3 * Conf.MAX_BOUNDARIES, typeof(Vector4))]
-			public fixed float _CB_BoundaryMatrixInv[12 * Conf.MAX_BOUNDARIES];
-			[HLSLArray(3 * Conf.MAX_BOUNDARIES, typeof(Vector4))]
-			public fixed float _CB_BoundaryMatrixW2PrevW[12 * Conf.MAX_BOUNDARIES];
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
@@ -474,15 +480,14 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			// 6
-			#region Volume Resolve (14 float, 56 bytes)
-			public float _VolumeDT;
+			#region Volume Resolve (13 float, 52 bytes)
 			public uint _VolumeFeatures;
 
-			// +2
+			// +1
 			public float _TargetDensityScale;
 			public float _TargetDensityInfluence;
 
-			// +4
+			// +3
 			public float _ScatteringProbeUnitWidth;
 			public uint _ScatteringProbeSubsteps;
 			public uint _ScatteringProbeSamplesTheta;
@@ -490,17 +495,17 @@ namespace Unity.DemoTeam.Hair
 			public float _ScatteringProbeOccluderDensity;
 			public float _ScatteringProbeOccluderMargin;
 
-			// +10
+			// +9
 			public uint _WindPropagationSubsteps;
 			public float _WindPropagationExtinction;
 			public float _WindPropagationOccluderDensity;
 			public float _WindPropagationOccluderMargin;
 
-			// +14
+			// +13
 			#endregion
 
-			// 20 --> 20 (pad to 16 byte boundary)
-			//public float __vcbpad1;
+			// 19 --> 20 (pad to 16 byte boundary)
+			public float __vcbpad1;
 			//public float __vcbpad2;
 			//public float __vcbpad3;
 		}

@@ -1,8 +1,8 @@
 #ifndef __HAIRSIMCOMPUTEQUATERNION_HLSL__
 #define __HAIRSIMCOMPUTEQUATERNION_HLSL__
 
-//------------
-// quaternion
+//----------------------
+// quaternion functions
 
 float4 QConjugate(float4 q)
 {
@@ -59,6 +59,40 @@ float4 QSlerp(float4 a, float4 b, float t)
 	}
 }
 
+float3x3 QMat3x3(float4 q)
+{
+	float3 c0 = QMul(q, float3(1.0, 0.0, 0.0));
+	float3 c1 = QMul(q, float3(0.0, 1.0, 0.0));
+	float3 c2 = QMul(q, float3(0.0, 0.0, 1.0));
+
+	return float3x3(
+		c0.x, c1.x, c2.x,
+		c0.y, c1.y, c2.y,
+		c0.z, c1.z, c2.z);
+}
+
+float4 QDecomposeTwist(float4 q, float3 axis)
+{
+	// see: "Component of a quaternion rotation around an axis"
+	// https://stackoverflow.com/a/22401169
+
+	float3 v = float3(q.x, q.y, q.z);
+	float dn = dot(v, axis);
+	float3 p = dn * axis;
+	float4 r = float4(p.x, p.y, p.z, q.w);
+
+	if (dot(r, r) < 1e-5)
+		return float4(0.0, 0.0, 0.0, 1.0);
+
+	if (dn < 0.0)
+		return normalize(-r);
+	else
+		return normalize(r);
+}
+
+//-------------------------
+// quaternion constructors
+
 float4 MakeQuaternionIdentity()
 {
 	return float4(0.0, 0.0, 0.0, 1.0);
@@ -108,6 +142,20 @@ float4 MakeQuaternionFromToWithFallback(float3 u, float3 v, float3 w)
 		q.w = s;
 	}
 	return normalize(q);
+}
+
+float4 MakeQuaternionLookAtBasis(float3 forwardRef, float3 forward, float3 upRef, float3 up)
+{
+	float4 rotForward = MakeQuaternionFromTo(forwardRef, forward);
+	float4 rotForwardTwist = MakeQuaternionFromToWithFallback(QMul(rotForward, upRef), up, forward);
+	return QMul(rotForwardTwist, rotForward);
+}
+
+float4 MakeQuaternionLookAt(float3 forward, float3 up)
+{
+	float3 unityForward = float3(0, 0, 1);
+	float3 unityUp = float3(0, 1, 0);
+	return MakeQuaternionLookAtBasis(unityForward, forward, unityUp, up);
 }
 
 float4 MakeQuaternionFromBend(float3 p0, float3 p1, float3 p2)
@@ -164,43 +212,8 @@ float4 NextQuaternionFromBendRMF(float3 p0, float3 p1, float3 p2, float4 q1)
 #endif
 }
 
-float4 MakeQuaternionLookAtBasis(float3 forwardRef, float3 forward, float3 upRef, float3 up)
-{
-	float4 rotForward = MakeQuaternionFromTo(forwardRef, forward);
-	float4 rotForwardTwist = MakeQuaternionFromToWithFallback(QMul(rotForward, upRef), up, forward);
-
-	return QMul(rotForwardTwist, rotForward);
-}
-
-float4 MakeQuaternionLookAt(float3 forward, float3 up)
-{
-	float3 unityForward = float3(0, 0, 1);
-	float3 unityUp = float3(0, 1, 0);
-
-	return MakeQuaternionLookAtBasis(unityForward, forward, unityUp, up);
-}
-
-float4 QDecomposeTwist(float4 q, float3 axis)
-{
-	// see: "Component of a quaternion rotation around an axis"
-	// https://stackoverflow.com/a/22401169
-
-	float3 v = float3(q.x, q.y, q.z);
-	float dn = dot(v, axis);
-	float3 p = dn * axis;
-	float4 r = float4(p.x, p.y, p.z, q.w);
-
-	if (dot(r, r) < 1e-5)
-		return MakeQuaternionIdentity();
-
-	if (dn < 0.0)
-		return normalize(-r);
-	else
-		return normalize(r);
-}
-
-//-------------
-// compression
+//--------------------------------
+// quaternion storage/compression
 
 float4 QDecode16(uint2 q16)
 {

@@ -76,6 +76,12 @@ HAIRSIM_RENDERDATA _StagingVertexPrev;					// xyz: ...
 //-------------
 // volume data
 
+#if HAIRSIM_WRITEABLE_VOLUMESUBSTEP
+#define HAIRSIM_VOLUMESUBSTEP RWStructuredBuffer
+#else
+#define HAIRSIM_VOLUMESUBSTEP StructuredBuffer
+#endif
+
 #if HAIRSIM_WRITEABLE_VOLUMEBOUNDS
 #define HAIRSIM_VOLUMEBOUNDS RWStructuredBuffer
 #else
@@ -123,8 +129,8 @@ HAIRSIM_RENDERDATA _StagingVertexPrev;					// xyz: ...
 StructuredBuffer<LODFrustum> _LODFrustum;
 
 HAIRSIM_VOLUMEBOUNDS<uint3> _BoundsMinMaxU;			// xyz: bounds min/max (unsigned sortable)
-HAIRSIM_VOLUMEBOUNDS<LODBounds> _Bounds;			// array(LODBounds): bounds (center, extent, radius)
-HAIRSIM_VOLUMEBOUNDS<LODBounds> _BoundsPrev;		// array(LODBounds): bounds (center, extent, radius)
+HAIRSIM_VOLUMEBOUNDS<LODBounds> _Bounds;			// array(LODBounds): bounds (center, extent, radius, reach)
+HAIRSIM_VOLUMEBOUNDS<LODBounds> _BoundsPrev;		// array(LODBounds): bounds (center, extent, radius, reach)
 HAIRSIM_VOLUMEBOUNDS<LODGeometry> _BoundsGeometry;	// array(LODGeometry): bounds geometry description (dimensions for coverage)
 HAIRSIM_VOLUMEBOUNDS<float2> _BoundsCoverage;		// xy: bounds coverage (unbiased ceiling)
 
@@ -155,25 +161,34 @@ SamplerState _Volume_trilinear_clamp;
 //-------------------
 // volume boundaries
 
-Texture3D<float> _BoundarySDF;
-
 struct BoundaryShape
 {
-	//  shape   |  float3     float      float3     float
-	//  -------------------------------------------------------
-	//  capsule |  centerA    radius     centerB    __pad
-	//  sphere  |  center     radius     __pad      __pad
-	//  torus   |  center     radiusA    axis       radiusB
-	//  cube    |  center     rotf16x    extent     rotf16y
+	// shape    |  float3     float      float3     float
+	// -------------------------------------------------------
+	// discrete |  __pad      __pad      __pad      __pad
+	// capsule  |  centerA    radius     centerB    __pad
+	// sphere   |  center     radius     __pad      __pad
+	// torus    |  center     radiusA    axis       radiusB
+	// cube     |  center     rotf16x    extent     rotf16y
 
 	float3 pA; float tA;
 	float3 pB; float tB;
 };
 
-StructuredBuffer<BoundaryShape> _BoundaryShape;
-StructuredBuffer<float4x4> _BoundaryMatrix;
-StructuredBuffer<float4x4> _BoundaryMatrixInv;
-StructuredBuffer<float4x4> _BoundaryMatrixW2PrevW;
+StructuredBuffer<int> _BoundaryRemap;
+
+StructuredBuffer<float4x4> _BoundaryMatrixNext;
+StructuredBuffer<float4x4> _BoundaryMatrixPrevA;
+StructuredBuffer<float4> _BoundaryMatrixPrevQ;
+HAIRSIM_VOLUMESUBSTEP<float4x4> _BoundaryMatrix;
+HAIRSIM_VOLUMESUBSTEP<float4x4> _BoundaryMatrixInv;
+HAIRSIM_VOLUMESUBSTEP<float4x4> _BoundaryMatrixInvStep;
+
+StructuredBuffer<BoundaryShape> _BoundaryShapeNext;
+HAIRSIM_VOLUMESUBSTEP<BoundaryShape> _BoundaryShapePrev;
+HAIRSIM_VOLUMESUBSTEP<BoundaryShape> _BoundaryShape;
+
+Texture3D<float> _BoundarySDF;
 
 //-------------
 // volume wind
