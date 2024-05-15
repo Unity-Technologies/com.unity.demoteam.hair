@@ -1436,10 +1436,8 @@ namespace Unity.DemoTeam.Hair
 								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleExtTexCoord, "ParticleExtTexCoord", particleTexCoordAvailable ? particleCount : 1, sizeof(Vector2));
 								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleExtDiameter, "ParticleExtDiameter", particleDiameterAvailable ? particleCount : 1, sizeof(Vector2));
 
-								if (particleTexCoordAvailable)
-									uploadCtx.SetData(solverBuffers._ParticleExtTexCoord, groupAsset.particleTexCoord);
-								if (particleDiameterAvailable)
-									uploadCtx.SetData(solverBuffers._ParticleExtDiameter, groupAsset.particleDiameter);
+								if (particleTexCoordAvailable) uploadCtx.SetData(solverBuffers._ParticleExtTexCoord, groupAsset.particleTexCoord);
+								if (particleDiameterAvailable) uploadCtx.SetData(solverBuffers._ParticleExtDiameter, groupAsset.particleDiameter);
 							}
 						}
 
