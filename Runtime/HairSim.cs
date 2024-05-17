@@ -1033,8 +1033,9 @@ namespace Unity.DemoTeam.Hair
 						var substepFracHi = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
 
 						// substep roots
-						//TODO skip substepping if stepFracLo, stepFracHi is [0, 1]
+						//TODO skip substepping if range stepFracLo, stepFracHi is [0, 1]
 						{
+							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._SubstepFractionLo, substepFracLo);
 							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._SubstepFractionHi, substepFracHi);
 
 							var substepRootsInterpolated = (i == substepCount - 1);
@@ -1409,7 +1410,7 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsEnvironment);
 		}
 
-		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount, double elapsedTime)
+		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount)
 		{
 			ref var volumeConstantsScene = ref volumeData.constantsEnvironment;
 			ref var volumeTextures = ref volumeData.textures;
@@ -1657,7 +1658,6 @@ namespace Unity.DemoTeam.Hair
 
 					// write constants
 					volumeConstantsScene._WindEmitterCount = (uint)emitterCount;
-					volumeConstantsScene._WindEmitterClock = (float)elapsedTime;
 
 					// write attributes
 					{
@@ -1784,15 +1784,22 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBuffer, volumeConstants);
 		}
 
-		public static void PushVolumeStep(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in SettingsVolume settingsVolume, SolverData[] solverData, float stepFracLo, float stepFracHi)
+		public static void PushVolumeStep(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in SettingsVolume settingsVolume, SolverData[] solverData, float stepFracLo, float stepFracHi, double stepTimeHi)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.Volume))
 			{
-				//TODO skip substepping if stepFracLo, stepFracHi is [0, 1]
+				// update clock
+				{
+					volumeData.constantsEnvironment._WindEmitterClock = (float)stepTimeHi;
+					PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeData.constantsEnvironment);
+				}
+
+				// substep
+				//TODO skip substepping if range stepFracLo, stepFracHi is [0, 1]
 				if (stepFracHi > 0.0f)
 				{
-					cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionLo", stepFracLo);
-					cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionHi", stepFracHi);
+					cmd.SetComputeFloatParam(s_volumeCS, UniformIDs._SubstepFractionLo, stepFracLo);
+					cmd.SetComputeFloatParam(s_volumeCS, UniformIDs._SubstepFractionHi, stepFracHi);
 
 					// substep boundaries
 					{
