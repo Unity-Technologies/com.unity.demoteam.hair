@@ -34,12 +34,12 @@
 StructuredBuffer<float2> _RootUV;						// xy: root uv
 StructuredBuffer<float4> _RootScale;					// xy: root scale (length, diameter normalized to maximum within group), z: tip scale offset, w: tip scale
 
-HAIRSIM_SOLVERINPUT<float4> _RootPosition;				// xyz: strand root position, w: -
+HAIRSIM_SOLVERINPUT<float4> _RootPositionNext;			// xyz: strand root position, w: -
 HAIRSIM_SOLVERINPUT<float4> _RootPositionPrev;			// xyz: ...
-HAIRSIM_SOLVERINPUT<float4> _RootPositionSubstep;		// xyz: ...
-HAIRSIM_SOLVERINPUT<float4> _RootFrame;					// quat(xyz,w): strand root material frame where (0,1,0) is tangent to curve
+HAIRSIM_SOLVERINPUT<float4> _RootPosition;				// xyz: ...
+HAIRSIM_SOLVERINPUT<float4> _RootFrameNext;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent to curve
 HAIRSIM_SOLVERINPUT<float4> _RootFramePrev;				// quat(xyz,w): ...
-HAIRSIM_SOLVERINPUT<float4> _RootFrameSubstep;			// quat(xyz,w): ...
+HAIRSIM_SOLVERINPUT<float4> _RootFrame;					// quat(xyz,w): ...
 
 HAIRSIM_SOLVERDATA<LODIndices> _SolverLODStage;			// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
 HAIRSIM_SOLVERDATA<uint2> _SolverLODRange;				// xy: dispatch strand range [begin, end)
@@ -56,8 +56,8 @@ HAIRSIM_SOLVERDATA<float3> _ParticleVelocity;			// xyz: velocity
 HAIRSIM_SOLVERINIT<float3> _ParticleVelocityPrev;		// xyz: ...
 HAIRSIM_SOLVERDATA<float3> _ParticleCorrection;			// xyz: ftl distance correction
 
-StructuredBuffer<float2> _ParticleExtTexCoord;			// xy: optional particle uv
-StructuredBuffer<float> _ParticleExtDiameter;			// x: optional particle diameter
+StructuredBuffer<float2> _ParticleOptTexCoord;			// xy: optional particle uv
+StructuredBuffer<float> _ParticleOptDiameter;			// x: optional particle diameter
 
 StructuredBuffer<uint> _LODGuideCount;					// x: lod index -> num. guides
 StructuredBuffer<uint> _LODGuideIndex;					// x: lod index * strand count + strand index -> guide index

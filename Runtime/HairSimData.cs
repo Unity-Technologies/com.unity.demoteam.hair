@@ -29,12 +29,12 @@ namespace Unity.DemoTeam.Hair
 				public T _RootUV;						// xy: root uv
 				public T _RootScale;					// xy: root scale (length, diameter normalized to maximum within group), z: tip scale offset, w: tip scale
 
-				public T _RootPosition;					// xyz: strand root position, w: -
+				public T _RootPositionNext;				// xyz: strand root position, w: -
 				public T _RootPositionPrev;				// xyz: ...
-				public T _RootPositionSubstep;			// xyz: ...
-				public T _RootFrame;					// quat(xyz,w): strand root material frame where (0,1,0) is tangent to curve
+				public T _RootPosition;					// xyz: ...
+				public T _RootFrameNext;				// quat(xyz,w): strand root material frame where (0,1,0) is tangent to curve
 				public T _RootFramePrev;				// quat(xyz,w): ...
-				public T _RootFrameSubstep;				// quat(xyz,w): ...
+				public T _RootFrame;					// quat(xyz,w): ...
 
 				public T _SolverLODStage;				// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
 				public T _SolverLODRange;				// xy: dispatch strand range [begin, end)
@@ -51,8 +51,8 @@ namespace Unity.DemoTeam.Hair
 				public T _ParticleVelocityPrev;			// xyz: ...
 				public T _ParticleCorrection;			// xyz: ftl distance correction
 
-				public T _ParticleExtTexCoord;			// xy: optional particle uv
-				public T _ParticleExtDiameter;			// x: optional particle diameter
+				public T _ParticleOptTexCoord;			// xy: optional particle uv
+				public T _ParticleOptDiameter;			// x: optional particle diameter
 
 				public T _LODGuideCount;				// x: lod index -> num. guides
 				public T _LODGuideIndex;				// x: lod index * strand count + strand index -> guide index
@@ -331,19 +331,19 @@ namespace Unity.DemoTeam.Hair
 
 				public T _LODFrustum;				// array(LODFrustum): observer properties (camera properties and frustum planes)
 
-				public T _BoundaryMatrixNext;		// upload per frame, array(float4x4)
-				public T _BoundaryMatrixPrevA;		// upload per frame, array(float4x4)
-				public T _BoundaryMatrixPrevQ;		// upload per frame, array(float4)
+				public T _BoundaryMatrixNext;		// push per frame, array(float4x4)
+				public T _BoundaryMatrixPrevA;		// push per frame, array(float4x4)
+				public T _BoundaryMatrixPrevQ;		// push per frame, array(float4)
 				public T _BoundaryMatrix;			// compute per step (volume or group), array(float4x4): local to world
 				public T _BoundaryMatrixInv;		// compute per step (volume or group), array(float4x4): world to local
 				public T _BoundaryMatrixInvStep;	// compute per step (volume or group), array(float4x4): world to previous world
-				public T _BoundaryShapeNext;		// upload per frame, array(HairBoundary.RuntimeShape.Data)
-				public T _BoundaryShapePrevLUT;		// upload per frame, array(int)
+				public T _BoundaryShapeNext;		// push per frame, array(HairBoundary.RuntimeShape.Data)
+				public T _BoundaryShapePrevLUT;		// push per frame, array(int)
 				public T _BoundaryShapePrev;		// compute per frame, array(HairBoundary.RuntimeShape.Data)
 				public T _BoundaryShape;			// compute per step (volume or group), array(HairBoundary.RuntimeShape.Data)
 
-				public T _WindEmitterNext;			// upload per frame, array(HairWind.RuntimeEmitter)
-				public T _WindEmitterPrevLUT;		// upload per frame, array(int)
+				public T _WindEmitterNext;			// push per frame, array(HairWind.RuntimeEmitter)
+				public T _WindEmitterPrevLUT;		// push per frame, array(int)
 				public T _WindEmitterPrev;			// compute per frame, array(HairWind.RuntimeEmitter)
 				public T _WindEmitter;				// compute per step (volume), array(HairWind.RuntimeEmitter)
 

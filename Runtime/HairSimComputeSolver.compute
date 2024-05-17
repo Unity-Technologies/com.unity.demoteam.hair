@@ -597,8 +597,8 @@ void KRoots(
 	float3 rootMeshNormalOS = asfloat(_RootMeshNormal.Load3(strandIndex * _RootMeshNormalStride + _RootMeshNormalOffset));
 
 	RootResolve(
-		_RootPosition[strandIndex].xyz,
-		_RootFrame[strandIndex],
+		_RootPositionNext[strandIndex].xyz,
+		_RootFrameNext[strandIndex],
 		rootMeshPositionOS,
 		rootMeshTangentOS,
 		rootMeshNormalOS
@@ -618,8 +618,11 @@ void KRootsHistory(
 {
 	DECLARE_STRAND(worldIdx.x)
 
-	_RootPositionPrev[strandIndex] = _RootPosition[strandIndex];
-	_RootFramePrev[strandIndex] = _RootFrame[strandIndex];
+	_RootPositionPrev[strandIndex] = _RootPositionNext[strandIndex];
+	_RootPosition[strandIndex] = _RootPositionNext[strandIndex];
+
+	_RootFramePrev[strandIndex] = _RootFrameNext[strandIndex];
+	_RootFrame[strandIndex] = _RootFrameNext[strandIndex];
 }
 
 float3 BlendPosition(float3 p0, float3 p1, float t)
@@ -640,7 +643,8 @@ float4 BlendQuaternion(float4 q0, float4 q1, float t)
 	return QSlerp(q0, q1, t);
 }
 
-float _RootSubstepFraction;
+float _SubstepFractionLo;
+float _SubstepFractionHi;
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void KRootsSubstep(
@@ -655,15 +659,17 @@ void KRootsSubstep(
 {
 	DECLARE_STRAND(worldIdx.x);
 
-	_RootPositionSubstep[strandIndex].xyz = BlendPosition(
-		_RootPositionPrev[strandIndex].xyz,
-		_RootPosition[strandIndex].xyz,
-		_RootSubstepFraction);
+	float t = _SubstepFractionHi;
 
-	_RootFrameSubstep[strandIndex] = BlendQuaternion(
+	_RootPosition[strandIndex].xyz = BlendPosition(
+		_RootPositionPrev[strandIndex].xyz,
+		_RootPositionNext[strandIndex].xyz,
+		t);
+
+	_RootFrame[strandIndex] = BlendQuaternion(
 		_RootFramePrev[strandIndex],
-		_RootFrame[strandIndex],
-		_RootSubstepFraction);
+		_RootFrameNext[strandIndex],
+		t);
 }
 
 #endif//F_INPUT

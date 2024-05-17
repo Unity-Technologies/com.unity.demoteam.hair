@@ -1393,7 +1393,7 @@ void KBoundsGather(
 
 	if (CHECK_STRAND(strandIndex))
 	{
-		float3 rootPos = _RootPosition[strandIndex].xyz;
+		float3 rootPos = _RootPositionNext[strandIndex].xyz;
 		float3 rootExt = _GroupBoundsPadding * max(
 			_GroupMaxParticleInterval * (_StrandParticleCount - 1),
 			_GroupMaxParticleDiameter * 0.5
@@ -1730,10 +1730,10 @@ void KBoundariesAdvance(
 		return;
 
 	int j = _BoundaryShapePrevLUT[i];
-	if (j != -1)
-		_BoundaryShapePrev[i] = _BoundaryShape[j];
-	else
+	if (j == -1)
 		_BoundaryShapePrev[i] = _BoundaryShapeNext[i];
+	else
+		_BoundaryShapePrev[i] = _BoundaryShape[j];
 }
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
@@ -1847,7 +1847,7 @@ void KBoundariesSubstep(
 //------------------
 // kernels emitters
 
-#if F_EMITTERS||true
+#if F_EMITTERS
 
 float _SubstepFractionLo;
 float _SubstepFractionHi;
@@ -1868,10 +1868,10 @@ void KEmittersAdvance(
 		return;
 
 	int j = _WindEmitterPrevLUT[i];
-	if (j != -1)
-		_WindEmitterPrev[i] = _WindEmitter[j];
-	else
+	if (j == -1)
 		_WindEmitterPrev[i] = _WindEmitterNext[i];
+	else
+		_WindEmitterPrev[i] = _WindEmitter[j];
 }
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
@@ -1933,9 +1933,8 @@ void KEmittersSubstep(
 		gt.jp = lerp(g0.jp, g1.jp, t);
 #endif
 
-		if (isnan(gt.t0)) gt.t0 = g1.t0;
-		if (isnan(gt.h0)) gt.h0 = g1.h0;
-		if (isnan(gt.m)) gt.m = g1.m;
+		if (isnan(gt.h0) || isinf(gt.h0)) gt.h0 = g1.h0;
+		if (isnan(gt.m) || isinf(gt.m)) gt.m = g1.m;
 		
 		_WindEmitter[i] = gt;
 	}

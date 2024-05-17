@@ -1227,7 +1227,9 @@ namespace Unity.DemoTeam.Hair
 							//solverConstants._GroupMaxParticleInterval
 							//solverConstants._GroupMaxParticleDiameter
 							//solverConstants._GroupAvgParticleDiameter
+							//solverConstants._GroupAvgParticleMargin
 							solverConstants._GroupBoundsIndex = (uint)i;
+							//solverConstants._GroupBoundsPadding
 
 							HairSimUtility.PushConstantBufferData(cmd, solverData[i].buffers.SolverCBuffer, solverConstants);
 						}
@@ -1252,19 +1254,6 @@ namespace Unity.DemoTeam.Hair
 
 						unsafe
 						{
-							//TODO remove
-							/*
-							using (var particlePositionAligned = new NativeArray<Vector4>(groupAsset.strandCount * groupAsset.strandParticleCount, Allocator.Persistent, NativeArrayOptions.ClearMemory))
-							{
-								fixed (void* groupAssetParticlePositionPtr = groupAsset.particlePosition)
-								{
-									UnsafeUtility.MemCpyStride(particlePositionAligned.GetUnsafePtr(), sizeof(Vector4), groupAssetParticlePositionPtr, sizeof(Vector3), sizeof(Vector3), groupAsset.strandCount * groupAsset.strandParticleCount);
-								}
-
-								uploadCtx.SetData(solverBuffers._ParticlePosition, particlePositionAligned);
-							}
-							*/
-
 							// optional particle features
 							//TODO defer allocation and upload to staging (let render settings decide if material should be able to access)
 							{
@@ -1272,11 +1261,11 @@ namespace Unity.DemoTeam.Hair
 								var particleTexCoordAvailable = groupAsset.particleFeatures.HasFlag(HairAsset.StrandGroup.ParticleFeatures.TexCoord);
 								var particleDiameterAvailable = groupAsset.particleFeatures.HasFlag(HairAsset.StrandGroup.ParticleFeatures.Diameter);
 
-								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleExtTexCoord, "ParticleExtTexCoord", particleTexCoordAvailable ? particleCount : 1, sizeof(Vector2));
-								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleExtDiameter, "ParticleExtDiameter", particleDiameterAvailable ? particleCount : 1, sizeof(Vector2));
+								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleOptTexCoord, "ParticleOptTexCoord", particleTexCoordAvailable ? particleCount : 1, sizeof(Vector2));
+								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleOptDiameter, "ParticleOptDiameter", particleDiameterAvailable ? particleCount : 1, sizeof(Vector2));
 
-								if (particleTexCoordAvailable) uploadCtx.SetData(solverBuffers._ParticleExtTexCoord, groupAsset.particleTexCoord);
-								if (particleDiameterAvailable) uploadCtx.SetData(solverBuffers._ParticleExtDiameter, groupAsset.particleDiameter);
+								if (particleTexCoordAvailable) uploadCtx.SetData(solverBuffers._ParticleOptTexCoord, groupAsset.particleTexCoord);
+								if (particleDiameterAvailable) uploadCtx.SetData(solverBuffers._ParticleOptDiameter, groupAsset.particleDiameter);
 							}
 						}
 
