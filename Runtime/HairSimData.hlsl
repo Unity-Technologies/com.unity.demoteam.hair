@@ -163,8 +163,6 @@ struct BoundaryShape
 	float3 pB; float tB;
 };
 
-StructuredBuffer<int> _BoundaryRemap;
-
 StructuredBuffer<float4x4> _BoundaryMatrixNext;
 StructuredBuffer<float4x4> _BoundaryMatrixPrevA;
 StructuredBuffer<float4> _BoundaryMatrixPrevQ;
@@ -172,7 +170,8 @@ HAIRSIM_VOLUMESUBSTEP<float4x4> _BoundaryMatrix;
 HAIRSIM_VOLUMESUBSTEP<float4x4> _BoundaryMatrixInv;
 HAIRSIM_VOLUMESUBSTEP<float4x4> _BoundaryMatrixInvStep;
 
-StructuredBuffer<BoundaryShape> _BoundaryShapeNext;
+StructuredBuffer<BoundaryShape>	_BoundaryShapeNext;
+StructuredBuffer<int> _BoundaryShapePrevLUT;
 HAIRSIM_VOLUMESUBSTEP<BoundaryShape> _BoundaryShapePrev;
 HAIRSIM_VOLUMESUBSTEP<BoundaryShape> _BoundaryShape;
 
@@ -198,7 +197,10 @@ struct WindEmitter
 	float jp;	// jitter planar
 };
 
-StructuredBuffer<WindEmitter> _WindEmitter;
+StructuredBuffer<WindEmitter> _WindEmitterNext;
+StructuredBuffer<int> _WindEmitterPrevLUT;
+HAIRSIM_VOLUMESUBSTEP<WindEmitter> _WindEmitterPrev;
+HAIRSIM_VOLUMESUBSTEP<WindEmitter> _WindEmitter;
 
 //---------
 // utility

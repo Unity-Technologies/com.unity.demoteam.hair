@@ -322,7 +322,8 @@ namespace Unity.DemoTeam.Hair
 
 		public static bool TryGetComponentData(Component component, ref RuntimeData data)
 		{
-			if (component is Collider)
+			var collider = component as Collider;
+			if (collider != null && collider.isTrigger == false)
 			{
 #if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
 				if (component is SDFTexture)

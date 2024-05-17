@@ -172,7 +172,7 @@ namespace Unity.DemoTeam.Hair
 			// show participating solid boundaries
 			{
 				var volumeBounds = HairSim.GetVolumeBounds(volumeData);
-				var volumeBoundaries = HairBoundaryUtility.Gather(settingsEnvironment.boundaryResident, settingsEnvironment.boundaryCapture, volumeBounds, settingsEnvironment.boundaryCaptureLayer, captureSort: false, settingsEnvironment.boundaryCaptureMode == HairSim.SettingsEnvironment.BoundaryCaptureMode.IncludeColliders);
+				var volumeBoundaries = SpatialComponentFilter<HairBoundary, HairBoundary.RuntimeData, HairBoundaryProxy>.Gather(settingsEnvironment.boundaryResident, settingsEnvironment.boundaryCapture, volumeBounds, settingsEnvironment.boundaryCaptureLayer, volumeSort: false, settingsEnvironment.boundaryCaptureMode == HairSim.SettingsEnvironment.BoundaryCaptureMode.IncludeColliders);
 
 				for (int i = 0; i != volumeBoundaries.Count; i++)
 				{
@@ -192,10 +192,13 @@ namespace Unity.DemoTeam.Hair
 			// show participating wind emitters
 			if (settingsVolumetrics.windPropagation)
 			{
-				foreach (var emitter in HairWind.s_emitters)
+				var volumeBounds = HairSim.GetVolumeBounds(volumeData);
+				var volumeEmitters = SpatialComponentFilter<HairWind, HairWind.RuntimeData, HairWindProxy>.Gather(settingsEnvironment.emitterResident, settingsEnvironment.emitterCapture, volumeBounds, settingsEnvironment.emitterCaptureLayer, volumeSort: false, settingsEnvironment.emitterCaptureMode == HairSim.SettingsEnvironment.EmitterCaptureMode.IncludeWindZones);
+
+				for (int i = 0; i != volumeEmitters.Count; i++)
 				{
-					if (emitter != null && emitter.isActiveAndEnabled)
-						emitter.DrawGizmos(volumeData.constantsEnvironment._WindEmitterClock, Time.deltaTime);
+					//TODO redo
+					//volumeEmitters[i].DrawGizmos(volumeData.constantsEnvironment._WindEmitterClock, Time.deltaTime);
 				}
 			}
 		}

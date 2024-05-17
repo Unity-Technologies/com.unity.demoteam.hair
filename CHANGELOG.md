@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added support for subframe interpolation of per-frame collision boundaries.
+- Added support for subframe interpolation of per-frame wind emitters.
 
 
 ## [0.13.0-exp.1] - 2024-04-16

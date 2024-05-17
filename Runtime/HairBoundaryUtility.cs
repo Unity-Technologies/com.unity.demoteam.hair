@@ -1,149 +1,25 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 using static Unity.Mathematics.math;
 
 namespace Unity.DemoTeam.Hair
 {
+	public struct HairBoundaryProxy : ISpatialComponentProxy<HairBoundary, HairBoundary.RuntimeData>
+	{
+		public bool TryGetData(HairBoundary component, ref HairBoundary.RuntimeData data)
+			=> HairBoundary.TryGetData(component, ref data);
+		public bool TryGetComponentData(Component component, ref HairBoundary.RuntimeData data)
+			=> HairBoundary.TryGetComponentData(component, ref data);
+
+		public int ResolveDataHandle(in HairBoundary.RuntimeData data)
+			=> data.xform.handle;
+		public float ResolveDataDistance(in HairBoundary.RuntimeData data, in Vector3 p)
+			=> HairBoundaryUtility.SdBoundary(p, data);
+	}
+
 	public static class HairBoundaryUtility
 	{
-		public const int MAX_OVERLAP_COUNT = 32;
-
-		static Collider[] s_managedColliders = new Collider[MAX_OVERLAP_COUNT];
-		static List<HairBoundary> s_managedBoundaries = new List<HairBoundary>();
-
-		static HashSet<int> s_gatherMask = new HashSet<int>();
-		static List<HairBoundary.RuntimeData> s_gatherList = new List<HairBoundary.RuntimeData>();
-		static List<HairBoundary.RuntimeData> s_gatherListVolume = new List<HairBoundary.RuntimeData>();
-
-		//-----------
-		// filtering
-
-		public static void FilterBoundary(HairBoundary boundary, HashSet<int> mask, List<HairBoundary.RuntimeData> list, ref HairBoundary.RuntimeData item)
-		{
-			if (boundary == null || boundary.isActiveAndEnabled == false)
-				return;
-
-			if (HairBoundary.TryGetData(boundary, ref item))
-			{
-				if (mask.Contains(item.xform.handle) == false)
-				{
-					mask.Add(item.xform.handle);
-					list.Add(item);
-				}
-			}
-		}
-
-		public static void FilterCollider(Collider collider, HashSet<int> mask, List<HairBoundary.RuntimeData> list, ref HairBoundary.RuntimeData item)
-		{
-			if (collider == null || collider.isTrigger)
-				return;
-
-			if (HairBoundary.TryGetComponentData(collider, ref item))
-			{
-				if (mask.Contains(item.xform.handle) == false)
-				{
-					mask.Add(item.xform.handle);
-					list.Add(item);
-				}
-			}
-		}
-
-		public static List<HairBoundary.RuntimeData> Gather(HairBoundary[] resident, bool capture, in Bounds captureBounds, LayerMask captureLayer, bool captureSort, bool includeColliders, Allocator allocator = Allocator.Temp)
-		{
-			var item = new HairBoundary.RuntimeData();
-
-			s_gatherMask.Clear();
-			s_gatherList.Clear();
-			s_gatherListVolume.Clear();
-
-			// gather resident
-			if (resident != null)
-			{
-				foreach (var boundary in resident)
-				{
-					FilterBoundary(boundary, s_gatherMask, s_gatherList, ref item);
-				}
-			}
-
-			// gather from bounds
-			if (capture)
-			{
-				var boundaryBuffer = s_managedBoundaries;
-				var colliderBuffer = s_managedColliders;
-				var colliderCount = Physics.OverlapBoxNonAlloc(captureBounds.center, captureBounds.extents, colliderBuffer, Quaternion.identity, captureLayer, QueryTriggerInteraction.Collide);
-
-				// filter bound / standalone
-				for (int i = 0; i != colliderCount; i++)
-				{
-					colliderBuffer[i].GetComponents(s_managedBoundaries);
-
-					foreach (var boundary in s_managedBoundaries)
-					{
-						FilterBoundary(boundary, s_gatherMask, s_gatherListVolume, ref item);
-					}
-				}
-
-				// filter untagged colliders
-				if (includeColliders)
-				{
-					for (int i = 0; i != colliderCount; i++)
-					{
-						FilterCollider(colliderBuffer[i], s_gatherMask, s_gatherListVolume, ref item);
-					}
-				}
-
-				// sort and append
-				unsafe
-				{
-					using (var sortedIndices = new NativeArray<ulong>(s_gatherListVolume.Count, Allocator.Temp))
-					{
-						var sortedIndicesPtr = (ulong*)sortedIndices.GetUnsafePtr();
-
-						var captureOrigin = captureBounds.center;
-						var captureExtent = captureBounds.extents.Abs().CMax();
-
-						for (int i = 0; i != s_gatherListVolume.Count; i++)
-						{
-							var volumeSortValue = 0u;
-							if (captureSort)
-							{
-								var sdClippedDoubleExtent = Mathf.Clamp(SdBoundary(captureOrigin, s_gatherListVolume[i]) / captureExtent, -1.0f, 1.0f);
-								var udClippedDoubleExtent = Mathf.Clamp01(sdClippedDoubleExtent * 0.5f + 0.5f);
-								{
-									volumeSortValue = (uint)(udClippedDoubleExtent * UInt16.MaxValue);
-								}
-							}
-
-							var sortDistance = ((ulong)volumeSortValue) << 48;
-							var sortHandle = (((ulong)s_gatherListVolume[i].xform.handle) << 16) & 0xffffffff0000uL;
-							var sortIndex = ((ulong)i) & 0xffffuL;
-							{
-								sortedIndicesPtr[i] = sortDistance | sortHandle | sortIndex;
-							}
-						}
-
-						sortedIndices.Sort();
-
-						for (int i = 0; i != s_gatherListVolume.Count; i++)
-						{
-							var index = (int)(sortedIndicesPtr[i] & 0xffffuL);
-							{
-								s_gatherList.Add(s_gatherListVolume[index]);
-							}
-						}
-					}
-				}
-			}
-
-			// done
-			return s_gatherList;
-		}
-
 		//-----------------
 		// signed distance
 

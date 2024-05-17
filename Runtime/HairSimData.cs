@@ -331,27 +331,21 @@ namespace Unity.DemoTeam.Hair
 
 				public T _LODFrustum;				// array(LODFrustum): observer properties (camera properties and frustum planes)
 
-				public T _BoundaryRemap;			// PUSH per frame
-				public T _BoundaryMatrixNext;		// PUSH per frame
-				public T _BoundaryMatrixPrevA;		// PUSH per frame
-				public T _BoundaryMatrixPrevQ;		// PUSH per frame
-				public T _BoundaryMatrix;			// COMPUTE per step (volume or solver)
-				public T _BoundaryMatrixInv;		// COMPUTE per step (volume or solver)
-				public T _BoundaryMatrixInvStep;	// COMPUTE per step (volume or solver)
-				public T _BoundaryShapeNext;		// PUSH per frame
-				public T _BoundaryShapePrev;		// COMPUTE per frame
-				public T _BoundaryShape;			// COMPUTE per step (volume or solver)
-				//public T _BoundaryShape;			// array(HairBoundary.RuntimeShape.Data)
-				//public T _BoundaryMatrix;			// array(float4x4): local to world
-				//public T _BoundaryMatrixInv;		// array(float4x4): world to local
-				//public T _BoundaryMatrixW2PrevW;	// array(float4x4): world to previous world
+				public T _BoundaryMatrixNext;		// upload per frame, array(float4x4)
+				public T _BoundaryMatrixPrevA;		// upload per frame, array(float4x4)
+				public T _BoundaryMatrixPrevQ;		// upload per frame, array(float4)
+				public T _BoundaryMatrix;			// compute per step (volume or group), array(float4x4): local to world
+				public T _BoundaryMatrixInv;		// compute per step (volume or group), array(float4x4): world to local
+				public T _BoundaryMatrixInvStep;	// compute per step (volume or group), array(float4x4): world to previous world
+				public T _BoundaryShapeNext;		// upload per frame, array(HairBoundary.RuntimeShape.Data)
+				public T _BoundaryShapePrevLUT;		// upload per frame, array(int)
+				public T _BoundaryShapePrev;		// compute per frame, array(HairBoundary.RuntimeShape.Data)
+				public T _BoundaryShape;			// compute per step (volume or group), array(HairBoundary.RuntimeShape.Data)
 
-				//TODO
-				//public T _WindEmitterRemap;
-				//public T _WindEmitterDataPrev;
-				//public T _WindEmitterDataNext;
-				//public T _WindEmitterData;
-				public T _WindEmitter;				// array(HairWind.RuntimeEmitter)
+				public T _WindEmitterNext;			// upload per frame, array(HairWind.RuntimeEmitter)
+				public T _WindEmitterPrevLUT;		// upload per frame, array(int)
+				public T _WindEmitterPrev;			// compute per frame, array(HairWind.RuntimeEmitter)
+				public T _WindEmitter;				// compute per step (volume), array(HairWind.RuntimeEmitter)
 
 				public T _BoundsMinMaxU;			// xyz: bounds min/max (unsigned sortable)
 				public T _Bounds;					// array(LODBounds): bounds (center, extent, radius, reach)
@@ -421,6 +415,10 @@ namespace Unity.DemoTeam.Hair
 			public NativeArray<Matrix4x4> boundaryPrevMatrix;
 			public int boundaryCount;
 			public int boundaryCountDiscard;
+
+			public NativeArray<int> emitterPrevHandle;
+			public int emitterCount;
+			public int emitterCountDiscard;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]

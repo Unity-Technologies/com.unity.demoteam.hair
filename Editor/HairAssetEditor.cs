@@ -522,8 +522,8 @@ namespace Unity.DemoTeam.Hair
 									ref var previewBuffersShared = ref previewDataShared.buffers;
 									{
 										ref readonly var bufferIDs = ref HairSim.VolumeData.s_bufferIDs;
-										previewMaterial.SetBuffer(bufferIDs._Bounds, previewBuffersShared._Bounds);
 										previewMaterial.SetBuffer(bufferIDs._BoundsPrev, previewBuffersShared._Bounds);
+										previewMaterial.SetBuffer(bufferIDs._Bounds, previewBuffersShared._Bounds);
 									}
 
 									ref var previewBuffers = ref previewData[i].buffers;

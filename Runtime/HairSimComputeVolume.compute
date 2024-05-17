@@ -1,8 +1,6 @@
 ﻿#pragma use_dxc
 #pragma enable_d3d11_debug_symbols
 
-#pragma kernel KBoundariesAdvance				THREAD_GROUP_SIZE=64	F_BOUNDARIES
-#pragma kernel KBoundariesSubstep				THREAD_GROUP_SIZE=64	F_BOUNDARIES
 #pragma kernel KBoundsClear						THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsGather					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsResolve					THREAD_GROUP_SIZE=64	F_BOUNDS
@@ -10,6 +8,7 @@
 #pragma kernel KBoundsHistory					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsCoverage					THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KLODSelection					THREAD_GROUP_SIZE=1		F_LOD
+
 #pragma kernel KVolumeClear						F_CLEAR
 #pragma kernel KVolumeSplat						F_SPLAT
 #pragma kernel KVolumeSplatDensity				F_SPLAT
@@ -26,6 +25,11 @@
 #pragma kernel KVolumeScattering				F_SCATTERING
 #pragma kernel KVolumeWindPrep					F_WIND
 #pragma kernel KVolumeWind						F_WIND
+
+#pragma kernel KBoundariesAdvance				THREAD_GROUP_SIZE=64	F_BOUNDARIES
+#pragma kernel KBoundariesSubstep				THREAD_GROUP_SIZE=64	F_BOUNDARIES
+#pragma kernel KEmittersAdvance					THREAD_GROUP_SIZE=64	F_EMITTERS
+#pragma kernel KEmittersSubstep					THREAD_GROUP_SIZE=64	F_EMITTERS
 
 //----------
 // features
@@ -84,11 +88,11 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl"
 
-#define HAIRSIM_WRITEABLE_VOLUMESUBSTEP (F_BOUNDARIES)
 #define HAIRSIM_WRITEABLE_VOLUMEBOUNDS (F_BOUNDS || F_LOD)
 #define HAIRSIM_WRITEABLE_VOLUMEACCU (F_CLEAR || F_SPLAT)
 #define HAIRSIM_WRITEABLE_VOLUMEDATA (F_RESOLVE || F_DIVERGENCE || F_PRESSURE)
 #define HAIRSIM_WRITEABLE_VOLUMEOPTS (F_CLEAR || F_SCATTERING || F_WIND)
+#define HAIRSIM_WRITEABLE_VOLUMESUBSTEP (F_BOUNDARIES || F_EMITTERS)
 
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
@@ -1725,15 +1729,11 @@ void KBoundariesAdvance(
 	if (i >= MAX_BOUNDARIES)
 		return;
 
-	int j = _BoundaryRemap[i];
+	int j = _BoundaryShapePrevLUT[i];
 	if (j != -1)
-	{
 		_BoundaryShapePrev[i] = _BoundaryShape[j];
-	}
 	else
-	{
 		_BoundaryShapePrev[i] = _BoundaryShapeNext[i];
-	}
 }
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
@@ -1843,3 +1843,102 @@ void KBoundariesSubstep(
 }
 
 #endif//F_BOUNDARIES
+
+//------------------
+// kernels emitters
+
+#if F_EMITTERS||true
+
+float _SubstepFractionLo;
+float _SubstepFractionHi;
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KEmittersAdvance(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	uint i = worldIdx.x;
+	if (i >= MAX_EMITTERS)
+		return;
+
+	int j = _WindEmitterPrevLUT[i];
+	if (j != -1)
+		_WindEmitterPrev[i] = _WindEmitter[j];
+	else
+		_WindEmitterPrev[i] = _WindEmitterNext[i];
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KEmittersSubstep(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	uint i = worldIdx.x;
+	if (i >= MAX_EMITTERS)
+		return;
+
+	// compute substep wind emitter
+	{
+		float t = _SubstepFractionHi;
+
+		WindEmitter g0 = _WindEmitterPrev[i];
+		WindEmitter g1 = _WindEmitterNext[i];
+		WindEmitter gt;
+
+#if 0
+		#define slerp(n0, n1, t) QMul(QSlerp(MakeQuaternionIdentity(), MakeQuaternionFromTo(n0, n1), t), n0)
+		#define DECLARE_BLEND(ATTR, FN) gt.ATTR = FN(g0.ATTR, g1.ATTR, t);
+		{
+			DECLARE_BLEND(p, lerp)
+			DECLARE_BLEND(n, slerp)
+		
+			DECLARE_BLEND(t0, lerp)
+			DECLARE_BLEND(h0, lerp)
+			DECLARE_BLEND(m, lerp)
+			
+			DECLARE_BLEND(v, lerp)
+			DECLARE_BLEND(A, lerp)
+			DECLARE_BLEND(f, lerp)
+
+			DECLARE_BLEND(jd, lerp)
+			DECLARE_BLEND(jw, lerp)
+			DECLARE_BLEND(jp, lerp)
+		}
+#else
+		gt.p = lerp(g0.p, g1.p, t);
+		gt.n = QMul(QSlerp(MakeQuaternionIdentity(), MakeQuaternionFromTo(g0.n, g1.n), t), g0.n);
+		
+		gt.t0 = lerp(g0.t0, g1.t0, t);
+		gt.h0 = lerp(g0.h0, g1.h0, t);
+		gt.m = lerp(g0.m, g1.m, t);
+
+		gt.v = lerp(g0.v, g1.v, t);
+		gt.A = lerp(g0.A, g1.A, t);
+		gt.f = lerp(g0.f, g1.f, t);
+		
+		gt.jd = lerp(g0.jd, g1.jd, t);
+		gt.jw = lerp(g0.jw, g1.jw, t);
+		gt.jp = lerp(g0.jp, g1.jp, t);
+#endif
+
+		if (isnan(gt.t0)) gt.t0 = g1.t0;
+		if (isnan(gt.h0)) gt.h0 = g1.h0;
+		if (isnan(gt.m)) gt.m = g1.m;
+		
+		_WindEmitter[i] = gt;
+	}
+}
+
+#endif//F_EMITTERS

@@ -1,30 +1,17 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Mathematics;
 
 namespace Unity.DemoTeam.Hair
 {
 	[ExecuteAlways]
 	public partial class HairWind : MonoBehaviour
 	{
-		public static HashSet<HairWind> s_emitters = new HashSet<HairWind>();
-
 		public SettingsEmitter settingsEmitter = SettingsEmitter.defaults;
 		public SettingsDirectional settingsDirectional = SettingsDirectional.defaults;
 		public SettingsSpherical settingsSpherical = SettingsSpherical.defaults;
 		public SettingsTurbine settingsTurbine = SettingsTurbine.defaults;
 		public SettingsFlow settingsFlow = SettingsFlow.defaults;
-
-		private void OnEnable()
-		{
-			s_emitters.Add(this);
-		}
-
-		private void OnDisable()
-		{
-			s_emitters.Remove(this);
-		}
 
 		//--------------
 		// runtime data
@@ -40,7 +27,13 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public Type type;
+			public RuntimeTransform xform;
 			public RuntimeEmitter emitter;
+		}
+
+		public struct RuntimeTransform
+		{
+			public int handle;
 		}
 
 		public struct RuntimeEmitter
@@ -83,6 +76,10 @@ namespace Unity.DemoTeam.Hair
 			return new RuntimeData
 			{
 				type = RuntimeData.Type.Directional,
+				xform = new RuntimeTransform
+				{
+					handle = transform.GetInstanceID(),
+				},
 				emitter = new RuntimeEmitter
 				{
 					p = transform.position,
@@ -109,6 +106,10 @@ namespace Unity.DemoTeam.Hair
 			return new RuntimeData
 			{
 				type = RuntimeData.Type.Spherical,
+				xform = new RuntimeTransform
+				{
+					handle = transform.GetInstanceID(),
+				},
 				emitter = new RuntimeEmitter
 				{
 					p = transform.position,
@@ -159,6 +160,10 @@ namespace Unity.DemoTeam.Hair
 			return new RuntimeData
 			{
 				type = RuntimeData.Type.Turbine,
+				xform = new RuntimeTransform
+				{
+					handle = transform.GetInstanceID(),
+				},
 				emitter = new RuntimeEmitter
 				{
 					p = transform.position - t0 * transform.forward,
