@@ -1,5 +1,5 @@
-﻿#pragma use_dxc
-#pragma enable_d3d11_debug_symbols
+﻿//#pragma use_dxc
+//#pragma enable_d3d11_debug_symbols
 
 #pragma kernel KBoundsClear						THREAD_GROUP_SIZE=64	F_BOUNDS
 #pragma kernel KBoundsGather					THREAD_GROUP_SIZE=64	F_BOUNDS
@@ -1794,7 +1794,7 @@ void KBoundariesSubstep(
 
 		BoundaryShape g0 = _BoundaryShapePrev[i];
 		BoundaryShape g1 = _BoundaryShapeNext[i];
-		BoundaryShape gt;
+		BoundaryShape gt = g1;
 
 		// shapes blend differently depending on type
 		{
@@ -1904,7 +1904,7 @@ void KEmittersSubstep(
 
 		WindEmitter g0 = _WindEmitterPrev[i];
 		WindEmitter g1 = _WindEmitterNext[i];
-		WindEmitter gt;
+		WindEmitter gt = g1;
 
 #if 0
 		#define slerp(n0, n1, t) QMul(QSlerp(MakeQuaternionIdentity(), MakeQuaternionFromTo(n0, n1), t), n0)
