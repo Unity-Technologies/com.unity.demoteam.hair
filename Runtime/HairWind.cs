@@ -29,6 +29,7 @@ namespace Unity.DemoTeam.Hair
 			public Type type;
 			public RuntimeTransform xform;
 			public RuntimeEmitter emitter;
+			public RuntimeGizmo gizmo;
 		}
 
 		public struct RuntimeTransform
@@ -51,6 +52,14 @@ namespace Unity.DemoTeam.Hair
 			public float jd;	// jitter displacement
 			public float jw;	// jitter resolution
 			public float jp;	// jitter planar
+		}
+
+		public struct RuntimeGizmo
+		{
+			public Quaternion rotation;
+			public float turbineBaseWidth;
+			public float turbineNozzleWidth;
+			public float turbineNozzleOffset;
 		}
 
 		//--------------------
@@ -97,6 +106,10 @@ namespace Unity.DemoTeam.Hair
 					jw = flow.timingJitterResolution,
 					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
 				},
+				gizmo = new RuntimeGizmo
+				{
+					rotation = transform.rotation,
+				},
 			};
 		}
 
@@ -126,7 +139,11 @@ namespace Unity.DemoTeam.Hair
 					jd = flow.timingJitter ? flow.timingJitterDisplacement : 0.0f,
 					jw = flow.timingJitterResolution,
 					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
-				}
+				},
+				gizmo = new RuntimeGizmo
+				{
+					rotation = transform.rotation,
+				},
 			};
 		}
 
@@ -180,7 +197,13 @@ namespace Unity.DemoTeam.Hair
 					jd = flow.timingJitter ? flow.timingJitterDisplacement : 0.0f,
 					jw = flow.timingJitterResolution,
 					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
-				}
+				},
+				gizmo = new RuntimeGizmo
+				{
+					rotation = transform.rotation,
+					turbineNozzleWidth = turbine.nozzleWidth * lossyScaleAbsMax,
+					turbineNozzleOffset = turbine.nozzleOffset * lossyScaleAbsMax,
+				},
 			};
 		}
 

@@ -195,10 +195,9 @@ namespace Unity.DemoTeam.Hair
 				var volumeBounds = HairSim.GetVolumeBounds(volumeData);
 				var volumeEmitters = SpatialComponentFilter<HairWind, HairWind.RuntimeData, HairWindProxy>.Gather(settingsEnvironment.emitterResident, settingsEnvironment.emitterCapture, volumeBounds, settingsEnvironment.emitterCaptureLayer, volumeSort: false, settingsEnvironment.emitterCaptureMode == HairSim.SettingsEnvironment.EmitterCaptureMode.IncludeWindZones);
 
-				for (int i = 0; i != volumeEmitters.Count; i++)
+				for (int i = 0; i != Mathf.Min(volumeEmitters.Count, HairSim.Conf.MAX_EMITTERS); i++)
 				{
-					//TODO redo
-					//volumeEmitters[i].DrawGizmos(volumeData.constantsEnvironment._WindEmitterClock, Time.deltaTime);
+					HairWind.DrawGizmosRuntimeData(volumeEmitters[i], Time.time, Time.deltaTime, active: true, selected: false);
 				}
 			}
 		}

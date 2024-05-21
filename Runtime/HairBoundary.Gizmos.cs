@@ -4,23 +4,29 @@ using UnityEngine.Serialization;
 
 namespace Unity.DemoTeam.Hair
 {
-	public partial class HairBoundary : MonoBehaviour
+	public partial class HairBoundary
 	{
-		public void OnDrawGizmosSelected()
+		void OnDrawGizmosSelected()
 		{
 			var data = new RuntimeData();
-
-			if (TryGetData(this, ref data))
 			{
-				switch (data.type)
+				if (TryGetData(this, ref data))
 				{
-					case RuntimeData.Type.Shape: DrawGizmosRuntimeShape(data); break;
-					case RuntimeData.Type.SDF: DrawGizmosRuntimeSDF(data); break;
+					DrawGizmosRuntimeData(data);
 				}
 			}
 		}
 
-		void DrawGizmosRuntimeShape(in RuntimeData data)
+		static void DrawGizmosRuntimeData(in RuntimeData data)
+		{
+			switch (data.type)
+			{
+				case RuntimeData.Type.Shape: DrawGizmosRuntimeShape(data); break;
+				case RuntimeData.Type.SDF: DrawGizmosRuntimeSDF(data); break;
+			}
+		}
+
+		static void DrawGizmosRuntimeShape(in RuntimeData data)
 		{
 			Gizmos.color = Color.red;
 			Gizmos.matrix = data.xform.matrix;
@@ -130,7 +136,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void DrawGizmosRuntimeSDF(in RuntimeData data)
+		static void DrawGizmosRuntimeSDF(in RuntimeData data)
 		{
 			var localCenter = 0.5f * Vector3.one;
 			var localExtent = Vector3.one;

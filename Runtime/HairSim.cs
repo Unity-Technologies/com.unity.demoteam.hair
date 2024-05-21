@@ -1441,7 +1441,6 @@ namespace Unity.DemoTeam.Hair
 					// gather boundaries
 					//TODO expose or always enable the volumeSort option which sorts active boundaries by distance
 					var boundaryList = SpatialComponentFilter<HairBoundary, HairBoundary.RuntimeData, HairBoundaryProxy>.Gather(settingsEnvironment.boundaryResident, settingsEnvironment.boundaryCapture, GetVolumeBounds(volumeData), settingsEnvironment.boundaryCaptureLayer, volumeSort: false, (settingsEnvironment.boundaryCaptureMode == SettingsEnvironment.BoundaryCaptureMode.IncludeColliders));
-
 					var boundaryCountDiscrete = 0;
 					var boundaryCountCapsule = 0;
 					var boundaryCountSphere = 0;
@@ -1654,7 +1653,7 @@ namespace Unity.DemoTeam.Hair
 
 					// gather emitters
 					var emitterList = SpatialComponentFilter<HairWind, HairWind.RuntimeData, HairWindProxy>.Gather(settingsEnvironment.emitterResident, settingsEnvironment.emitterCapture, GetVolumeBounds(volumeData), settingsEnvironment.emitterCaptureLayer, volumeSort: false, (settingsEnvironment.emitterCaptureMode == SettingsEnvironment.EmitterCaptureMode.IncludeWindZones));
-					var emitterCount = Mathf.Min(Conf.MAX_EMITTERS, emitterList.Count);
+					var emitterCount = Mathf.Min(emitterList.Count, Conf.MAX_EMITTERS);
 
 					// write constants
 					volumeConstantsScene._WindEmitterCount = (uint)emitterCount;
