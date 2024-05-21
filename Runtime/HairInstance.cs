@@ -160,8 +160,8 @@ namespace Unity.DemoTeam.Hair
 		{
 			public float accumulatedTime;
 
-			public double elapsedTime;
 			public double elapsedTimeRaw;
+			public double elapsedTime;
 
 			//public NativeQueue<TimeStepDesc> stepHistory;
 
@@ -888,8 +888,8 @@ namespace Unity.DemoTeam.Hair
 					execState.accumulatedTime -= simulationTimeStep * accumulatedStepCount;
 				}
 
-				execState.elapsedTime += stepDesc.dt * stepDesc.count;
 				execState.elapsedTimeRaw += dt;
+				execState.elapsedTime += stepDesc.dt * stepDesc.count;
 			}
 
 			//timeState.stepHistory.Enqueue(stepDesc);
@@ -927,13 +927,20 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
-			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count, execState.elapsedTime);
+			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count);
 			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
 			{
+				//var frameTimeLo = execState.elapsedTime - stepDesc.count * stepDesc.dt;
+				//var frameTimeHi = execState.elapsedTime;
+
 				var stepVolume = HairSim.PrepareVolumeData(ref volumeData, settingsVolumetrics, solverData.Length + 1);
 				if (stepVolume || stepDesc.count == 0)
 				{
-					HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo: 0.0f, stepFracHi: 1.0f / Mathf.Max(1, stepDesc.count));
+					var stepFracLo = 0.0f;
+					var stepFracHi = 1.0f / Mathf.Max(1, stepDesc.count);
+					var stepTimeHi = execState.elapsedTime - stepDesc.dt * (Mathf.Max(1, stepDesc.count) - 1);
+
+					HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo, stepFracHi, stepTimeHi);
 				}
 
 				if (stepDesc.count >= 1)
@@ -945,15 +952,16 @@ namespace Unity.DemoTeam.Hair
 
 					for (int k = 0; k != stepDesc.count; k++)
 					{
-						float stepFracLo = (k + 0) / (float)stepDesc.count;
-						float stepFracHi = (k + 1) / (float)stepDesc.count;
+						var stepFracLo = (k + 0) / (float)stepDesc.count;
+						var stepFracHi = (k + 1) / (float)stepDesc.count;
+						var stepTimeHi = execState.elapsedTime - stepDesc.dt * (stepDesc.count - 1 - k);
 
 						for (int i = 0; i != solverData.Length; i++)
 						{
 							HairSim.PushSolverStep(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), volumeData, stepFracLo, stepFracHi);
 						}
 
-						HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo, stepFracHi);
+						HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo, stepFracHi, stepTimeHi);
 
 						if (onSimulationStateChanged != null)
 							onSimulationStateChanged(cmd);
@@ -1388,7 +1396,9 @@ namespace Unity.DemoTeam.Hair
 							//solverConstants._GroupMaxParticleInterval
 							//solverConstants._GroupMaxParticleDiameter
 							//solverConstants._GroupAvgParticleDiameter
+							//solverConstants._GroupAvgParticleMargin
 							solverConstants._GroupBoundsIndex = (uint)i;
+							//solverConstants._GroupBoundsPadding
 
 							HairSimUtility.PushConstantBufferData(cmd, solverData[i].buffers.SolverCBuffer, solverConstants);
 						}
@@ -1413,19 +1423,6 @@ namespace Unity.DemoTeam.Hair
 
 						unsafe
 						{
-							//TODO remove
-							/*
-							using (var particlePositionAligned = new NativeArray<Vector4>(groupAsset.strandCount * groupAsset.strandParticleCount, Allocator.Persistent, NativeArrayOptions.ClearMemory))
-							{
-								fixed (void* groupAssetParticlePositionPtr = groupAsset.particlePosition)
-								{
-									UnsafeUtility.MemCpyStride(particlePositionAligned.GetUnsafePtr(), sizeof(Vector4), groupAssetParticlePositionPtr, sizeof(Vector3), sizeof(Vector3), groupAsset.strandCount * groupAsset.strandParticleCount);
-								}
-
-								uploadCtx.SetData(solverBuffers._ParticlePosition, particlePositionAligned);
-							}
-							*/
-
 							// optional particle features
 							//TODO defer allocation and upload to staging (let render settings decide if material should be able to access)
 							{
@@ -1433,11 +1430,11 @@ namespace Unity.DemoTeam.Hair
 								var particleTexCoordAvailable = groupAsset.particleFeatures.HasFlag(HairAsset.StrandGroup.ParticleFeatures.TexCoord);
 								var particleDiameterAvailable = groupAsset.particleFeatures.HasFlag(HairAsset.StrandGroup.ParticleFeatures.Diameter);
 
-								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleExtTexCoord, "ParticleExtTexCoord", particleTexCoordAvailable ? particleCount : 1, sizeof(Vector2));
-								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleExtDiameter, "ParticleExtDiameter", particleDiameterAvailable ? particleCount : 1, sizeof(Vector2));
+								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleOptTexCoord, "ParticleOptTexCoord", particleTexCoordAvailable ? particleCount : 1, sizeof(Vector2));
+								HairSimUtility.CreateBuffer(ref solverData[i].buffers._ParticleOptDiameter, "ParticleOptDiameter", particleDiameterAvailable ? particleCount : 1, sizeof(Vector2));
 
-								if (particleTexCoordAvailable) uploadCtx.SetData(solverBuffers._ParticleExtTexCoord, groupAsset.particleTexCoord);
-								if (particleDiameterAvailable) uploadCtx.SetData(solverBuffers._ParticleExtDiameter, groupAsset.particleDiameter);
+								if (particleTexCoordAvailable) uploadCtx.SetData(solverBuffers._ParticleOptTexCoord, groupAsset.particleTexCoord);
+								if (particleDiameterAvailable) uploadCtx.SetData(solverBuffers._ParticleOptDiameter, groupAsset.particleDiameter);
 							}
 						}
 
@@ -1493,7 +1490,7 @@ namespace Unity.DemoTeam.Hair
 
 				HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
 				HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
-				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo: 0.0f, stepFracHi: 0.0f);
+				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo: 0.0f, stepFracHi: 0.0f, stepTimeHi: 0.0);
 				HairSim.PushVolumeStepEnd(cmd, volumeData);
 
 				for (int i = 0; i != solverData.Length; i++)

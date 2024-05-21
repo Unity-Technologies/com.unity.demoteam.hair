@@ -49,7 +49,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public static ProfilingSampler Roots;
 			public static ProfilingSampler Solver;
-			public static ProfilingSampler Solver_SubstepRoots;
+			public static ProfilingSampler Solver_SubstepScene;
 			public static ProfilingSampler Solver_SolveConstraints;
 			public static ProfilingSampler Solver_Interpolate;
 			public static ProfilingSampler Solver_Staging;
@@ -75,7 +75,9 @@ namespace Unity.DemoTeam.Hair
 		static class UniformIDs
 		{
 			// solver
-			public static int _RootSubstepFraction;
+			//TODO move into per-step cbuffer?
+			public static int _SubstepFractionLo;
+			public static int _SubstepFractionHi;
 
 			// debug
 			public static int _DebugCluster;
@@ -112,8 +114,7 @@ namespace Unity.DemoTeam.Hair
 
 		static class VolumeKernels
 		{
-			public static int KBoundariesAdvance;
-			public static int KBoundariesSubstep;
+			// bounds
 			public static int KBoundsClear;
 			public static int KBoundsGather;
 			public static int KBoundsResolve;
@@ -121,6 +122,8 @@ namespace Unity.DemoTeam.Hair
 			public static int KBoundsHistory;
 			public static int KBoundsCoverage;
 			public static int KLODSelection;
+
+			// grid
 			public static int KVolumeClear;
 			public static int KVolumeSplat;
 			public static int KVolumeSplatDensity;
@@ -137,6 +140,12 @@ namespace Unity.DemoTeam.Hair
 			public static int KVolumeScattering;
 			public static int KVolumeWindPrep;
 			public static int KVolumeWind;
+
+			// scene
+			public static int KBoundariesAdvance;
+			public static int KBoundariesSubstep;
+			public static int KEmittersAdvance;
+			public static int KEmittersSubstep;
 		}
 
 		//TODO move to conf
@@ -236,12 +245,12 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._RootUV, "RootUV", strandCount, particleStrideVector2);
 				changed |= CreateBuffer(ref solverBuffers._RootScale, "RootScale", strandCount, particleStrideVector4);
 
-				changed |= CreateBuffer(ref solverBuffers._RootPosition, "RootPosition_0", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverBuffers._RootPositionNext, "RootPosition_0", strandCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._RootPositionPrev, "RootPosition_1", strandCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverBuffers._RootPositionSubstep, "RootPosition_t", strandCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverBuffers._RootFrame, "RootFrame_0", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverBuffers._RootPosition, "RootPosition_2", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverBuffers._RootFrameNext, "RootFrame_0", strandCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._RootFramePrev, "RootFrame_1", strandCount, particleStrideVector4);
-				changed |= CreateBuffer(ref solverBuffers._RootFrameSubstep, "RootFrame_t", strandCount, particleStrideVector4);
+				changed |= CreateBuffer(ref solverBuffers._RootFrame, "RootFrame_2", strandCount, particleStrideVector4);
 
 				changed |= CreateBuffer(ref solverBuffers._SolverLODStage, "SolverLODStage", (int)SolverLODStage.__COUNT, sizeof(LODIndices));
 				changed |= CreateBuffer(ref solverBuffers._SolverLODRange, "SolverLODRange", (int)SolverLODRange.__COUNT, particleStrideVector2);
@@ -292,7 +301,6 @@ namespace Unity.DemoTeam.Hair
 
 				changed |= CreateBuffer(ref volumeBuffers._LODFrustum, "LODFrustum", Conf.MAX_FRUSTUMS, sizeof(LODFrustum));
 
-				changed |= CreateBuffer(ref volumeBuffers._BoundaryRemap, "BoundaryRemap", Conf.MAX_BOUNDARIES, sizeof(int));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixNext, "BoundaryMatrixNext", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixPrevA, "BoundaryMatrixPrevA", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixPrevQ, "BoundaryMatrixPrevQ", Conf.MAX_BOUNDARIES, sizeof(Quaternion));
@@ -300,19 +308,19 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixInv, "BoundaryMatrixInv", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryMatrixInvStep, "BoundaryMatrixInvStep", Conf.MAX_BOUNDARIES, sizeof(Matrix4x4));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryShapeNext, "BoundaryShapeNext", Conf.MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
+				changed |= CreateBuffer(ref volumeBuffers._BoundaryShapePrevLUT, "BoundaryShapePrevLUT", Conf.MAX_BOUNDARIES, sizeof(int));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryShapePrev, "BoundaryShapePrev", Conf.MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
 				changed |= CreateBuffer(ref volumeBuffers._BoundaryShape, "BoundaryShape", Conf.MAX_BOUNDARIES, sizeof(HairBoundary.RuntimeShape.Data));
 
-				//TODO
-				//changed |= CreateBuffer(ref volumeBuffers._WindEmitterRemap, "WindEmitterRemap", Conf.MAX_EMITTERS, sizeof(int));
-				//changed |= CreateBuffer(ref volumeBuffers._WindEmitterDataNext, "WindEmitterDataNext", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
-				//changed |= CreateBuffer(ref volumeBuffers._WindEmitterDataPrev, "WindEmitterDataPrev", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
-				//changed |= CreateBuffer(ref volumeBuffers._WindEmitterData, "WindEmitterData", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
+				changed |= CreateBuffer(ref volumeBuffers._WindEmitterNext, "WindEmitterNext", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
+				changed |= CreateBuffer(ref volumeBuffers._WindEmitterPrevLUT, "WindEmitterPrevLUT", Conf.MAX_EMITTERS, sizeof(int));
+				changed |= CreateBuffer(ref volumeBuffers._WindEmitterPrev, "WindEmitterPrev", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
 				changed |= CreateBuffer(ref volumeBuffers._WindEmitter, "WindEmitter", Conf.MAX_EMITTERS, sizeof(HairWind.RuntimeEmitter));
 
 				changed |= CreateBuffer(ref volumeBuffers._BoundsMinMaxU, "BoundsMinMaxU", boundsCount * 2, particleStrideVector3);
-				changed |= CreateBuffer(ref volumeBuffers._Bounds, "Bounds", boundsCount, sizeof(LODBounds));
 				changed |= CreateBuffer(ref volumeBuffers._BoundsPrev, "BoundsPrev", boundsCount, sizeof(LODBounds));
+				changed |= CreateBuffer(ref volumeBuffers._Bounds, "Bounds", boundsCount, sizeof(LODBounds));
+
 				changed |= CreateBuffer(ref volumeBuffers._BoundsGeometry, "BoundsGeometry", boundsCount, sizeof(LODGeometry));
 				changed |= CreateBuffer(ref volumeBuffers._BoundsCoverage, "BoundsCoverage", boundsCount, particleStrideVector2);
 
@@ -355,6 +363,7 @@ namespace Unity.DemoTeam.Hair
 				CreateReadbackBuffer(ref volumeData.buffersReadback._Bounds, volumeBuffers._Bounds);
 				CreateReadbackBuffer(ref volumeData.buffersReadback._BoundsCoverage, volumeBuffers._BoundsCoverage);
 				CreateReadbackBuffer(ref volumeData.buffersReadback._VolumeLODStage, volumeBuffers._VolumeLODStage);
+				//CreateReadbackBuffer(ref volumeData.buffersReadback._WindEmitter, volumeBuffers._WindEmitter);
 
 				return changed;
 			}
@@ -370,12 +379,12 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverBuffers._RootUV);
 			ReleaseBuffer(ref solverBuffers._RootScale);
 
-			ReleaseBuffer(ref solverBuffers._RootPosition);
+			ReleaseBuffer(ref solverBuffers._RootPositionNext);
 			ReleaseBuffer(ref solverBuffers._RootPositionPrev);
-			ReleaseBuffer(ref solverBuffers._RootPositionSubstep);
-			ReleaseBuffer(ref solverBuffers._RootFrame);
+			ReleaseBuffer(ref solverBuffers._RootPosition);
+			ReleaseBuffer(ref solverBuffers._RootFrameNext);
 			ReleaseBuffer(ref solverBuffers._RootFramePrev);
-			ReleaseBuffer(ref solverBuffers._RootFrameSubstep);
+			ReleaseBuffer(ref solverBuffers._RootFrame);
 
 			ReleaseBuffer(ref solverBuffers._SolverLODStage);
 			ReleaseBuffer(ref solverBuffers._SolverLODRange);
@@ -392,8 +401,8 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverBuffers._ParticleVelocityPrev);
 			ReleaseBuffer(ref solverBuffers._ParticleCorrection);
 
-			ReleaseBuffer(ref solverBuffers._ParticleExtTexCoord);
-			ReleaseBuffer(ref solverBuffers._ParticleExtDiameter);
+			ReleaseBuffer(ref solverBuffers._ParticleOptTexCoord);
+			ReleaseBuffer(ref solverBuffers._ParticleOptDiameter);
 
 			ReleaseBuffer(ref solverBuffers._LODGuideCount);
 			ReleaseBuffer(ref solverBuffers._LODGuideIndex);
@@ -421,7 +430,6 @@ namespace Unity.DemoTeam.Hair
 
 			ReleaseBuffer(ref volumeBuffers._LODFrustum);
 
-			ReleaseBuffer(ref volumeBuffers._BoundaryRemap);
 			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixNext);
 			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixPrevA);
 			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixPrevQ);
@@ -429,14 +437,18 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixInv);
 			ReleaseBuffer(ref volumeBuffers._BoundaryMatrixInvStep);
 			ReleaseBuffer(ref volumeBuffers._BoundaryShapeNext);
+			ReleaseBuffer(ref volumeBuffers._BoundaryShapePrevLUT);
 			ReleaseBuffer(ref volumeBuffers._BoundaryShapePrev);
 			ReleaseBuffer(ref volumeBuffers._BoundaryShape);
 
+			ReleaseBuffer(ref volumeBuffers._WindEmitterNext);
+			ReleaseBuffer(ref volumeBuffers._WindEmitterPrevLUT);
+			ReleaseBuffer(ref volumeBuffers._WindEmitterPrev);
 			ReleaseBuffer(ref volumeBuffers._WindEmitter);
 
 			ReleaseBuffer(ref volumeBuffers._BoundsMinMaxU);
-			ReleaseBuffer(ref volumeBuffers._Bounds);
 			ReleaseBuffer(ref volumeBuffers._BoundsPrev);
+			ReleaseBuffer(ref volumeBuffers._Bounds);
 			ReleaseBuffer(ref volumeBuffers._BoundsGeometry);
 			ReleaseBuffer(ref volumeBuffers._BoundsCoverage);
 
@@ -472,11 +484,11 @@ namespace Unity.DemoTeam.Hair
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._Bounds);
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._BoundsCoverage);
 			ReleaseReadbackBuffer(ref volumeData.buffersReadback._VolumeLODStage);
+			//ReleaseReadbackBuffer(ref volumeData.buffersReadback._WindEmitter);
 
-			if (volumeData.boundaryPrevHandle.IsCreated)
-				volumeData.boundaryPrevHandle.Dispose();
-			if (volumeData.boundaryPrevMatrix.IsCreated)
-				volumeData.boundaryPrevMatrix.Dispose();
+			ReleaseCPUBuffer(ref volumeData.boundaryPrevHandle);
+			ReleaseCPUBuffer(ref volumeData.boundaryPrevMatrix);
+			ReleaseCPUBuffer(ref volumeData.emitterPrevHandle);
 
 			volumeData = new VolumeData();
 		}
@@ -495,12 +507,12 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(SolverData.s_bufferIDs._RootUV, solverBuffers._RootUV);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._RootScale, solverBuffers._RootScale);
 
-			target.BindComputeBuffer(SolverData.s_bufferIDs._RootPosition, solverBuffers._RootPosition);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._RootPositionNext, solverBuffers._RootPositionNext);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._RootPositionPrev, solverBuffers._RootPositionPrev);
-			target.BindComputeBuffer(SolverData.s_bufferIDs._RootPositionSubstep, solverBuffers._RootPositionSubstep);
-			target.BindComputeBuffer(SolverData.s_bufferIDs._RootFrame, solverBuffers._RootFrame);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._RootPosition, solverBuffers._RootPosition);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._RootFrameNext, solverBuffers._RootFrameNext);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._RootFramePrev, solverBuffers._RootFramePrev);
-			target.BindComputeBuffer(SolverData.s_bufferIDs._RootFrameSubstep, solverBuffers._RootFrameSubstep);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._RootFrame, solverBuffers._RootFrame);
 
 			target.BindComputeBuffer(SolverData.s_bufferIDs._InitialParticleOffset, solverBuffers._InitialParticleOffset);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._InitialParticleFrameDelta, solverBuffers._InitialParticleFrameDelta);
@@ -517,8 +529,8 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticleVelocityPrev, solverBuffers._ParticleVelocityPrev);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticleCorrection, solverBuffers._ParticleCorrection);
 
-			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticleExtTexCoord, solverBuffers._ParticleExtTexCoord);
-			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticleExtDiameter, solverBuffers._ParticleExtDiameter);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticleOptTexCoord, solverBuffers._ParticleOptTexCoord);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticleOptDiameter, solverBuffers._ParticleOptDiameter);
 
 			target.BindComputeBuffer(SolverData.s_bufferIDs._LODGuideCount, solverBuffers._LODGuideCount);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._LODGuideIndex, solverBuffers._LODGuideIndex);
@@ -552,7 +564,6 @@ namespace Unity.DemoTeam.Hair
 
 			target.BindComputeBuffer(volumeBufferIDs._LODFrustum, volumeBuffers._LODFrustum);
 
-			target.BindComputeBuffer(volumeBufferIDs._BoundaryRemap, volumeBuffers._BoundaryRemap);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixNext, volumeBuffers._BoundaryMatrixNext);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixPrevA, volumeBuffers._BoundaryMatrixPrevA);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixPrevQ, volumeBuffers._BoundaryMatrixPrevQ);
@@ -560,14 +571,18 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixInv, volumeBuffers._BoundaryMatrixInv);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryMatrixInvStep, volumeBuffers._BoundaryMatrixInvStep);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryShapeNext, volumeBuffers._BoundaryShapeNext);
+			target.BindComputeBuffer(volumeBufferIDs._BoundaryShapePrevLUT, volumeBuffers._BoundaryShapePrevLUT);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryShapePrev, volumeBuffers._BoundaryShapePrev);
 			target.BindComputeBuffer(volumeBufferIDs._BoundaryShape, volumeBuffers._BoundaryShape);
 
+			target.BindComputeBuffer(volumeBufferIDs._WindEmitterNext, volumeBuffers._WindEmitterNext);
+			target.BindComputeBuffer(volumeBufferIDs._WindEmitterPrevLUT, volumeBuffers._WindEmitterPrevLUT);
+			target.BindComputeBuffer(volumeBufferIDs._WindEmitterPrev, volumeBuffers._WindEmitterPrev);
 			target.BindComputeBuffer(volumeBufferIDs._WindEmitter, volumeBuffers._WindEmitter);
 
 			target.BindComputeBuffer(volumeBufferIDs._BoundsMinMaxU, volumeBuffers._BoundsMinMaxU);
-			target.BindComputeBuffer(volumeBufferIDs._Bounds, volumeBuffers._Bounds);
 			target.BindComputeBuffer(volumeBufferIDs._BoundsPrev, volumeBuffers._BoundsPrev);
+			target.BindComputeBuffer(volumeBufferIDs._Bounds, volumeBuffers._Bounds);
 			target.BindComputeBuffer(volumeBufferIDs._BoundsGeometry, volumeBuffers._BoundsGeometry);
 			target.BindComputeBuffer(volumeBufferIDs._BoundsCoverage, volumeBuffers._BoundsCoverage);
 
@@ -679,11 +694,11 @@ namespace Unity.DemoTeam.Hair
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.buffers.SolverCBufferRoots, solverConstantsRoots);
 
-			// update roots
+			// conditionally advance roots
 			if (stepCount > 0)
 			{
-				CoreUtils.Swap(ref solverBuffers._RootPosition, ref solverBuffers._RootPositionPrev);
-				CoreUtils.Swap(ref solverBuffers._RootFrame, ref solverBuffers._RootFramePrev);
+				CoreUtils.Swap(ref solverBuffers._RootPositionPrev, ref solverBuffers._RootPosition);
+				CoreUtils.Swap(ref solverBuffers._RootFramePrev, ref solverBuffers._RootFrame);
 			}
 
 			using (new ProfilingScope(cmd, MarkersGPU.Roots))
@@ -720,8 +735,8 @@ namespace Unity.DemoTeam.Hair
 
 					BindSolverData(cmd, solverData);
 
-					cmd.SetRandomWriteTarget(1, solverData.buffers._RootPosition);
-					cmd.SetRandomWriteTarget(2, solverData.buffers._RootFrame);
+					cmd.SetRandomWriteTarget(1, solverData.buffers._RootPositionNext);
+					cmd.SetRandomWriteTarget(2, solverData.buffers._RootFrameNext);
 					cmd.DrawMesh(rootMesh, Matrix4x4.identity, s_solverRootsMat);
 					cmd.ClearRandomWriteTargets();
 				}
@@ -1005,17 +1020,6 @@ namespace Unity.DemoTeam.Hair
 					break;
 			}
 
-			static SolverData WithSubstepData(in SolverData data, bool dataSubstep)
-			{
-				var dataCopy = data;
-				if (dataSubstep)
-				{
-					CoreUtils.Swap(ref dataCopy.buffers._RootPositionSubstep, ref dataCopy.buffers._RootPosition);
-					CoreUtils.Swap(ref dataCopy.buffers._RootFrameSubstep, ref dataCopy.buffers._RootFrame);
-				}
-				return dataCopy;
-			}
-
 			using (new ProfilingScope(cmd, MarkersGPU.Solver))
 			{
 				var substepConstantsBackup = solverData.constants;
@@ -1023,41 +1027,38 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != substepCount; i++)
 				{
-					var substepFracLo = Mathf.Lerp(stepFracLo, stepFracHi, (i + 0) / (float)substepCount);
-					var substepFracHi = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
-
-					// check if substep required
-					var substepRequired = substepFracHi < (1.0f - 1e-5f);
-					if (substepRequired)
+					using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepScene))
 					{
+						var substepFracLo = Mathf.Lerp(stepFracLo, stepFracHi, (i + 0) / (float)substepCount);
+						var substepFracHi = Mathf.Lerp(stepFracLo, stepFracHi, (i + 1) / (float)substepCount);
+
 						// substep roots
-						using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepRoots))
+						//TODO skip substepping if range stepFracLo, stepFracHi is [0, 1]
 						{
+							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._SubstepFractionLo, substepFracLo);
+							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._SubstepFractionHi, substepFracHi);
+
 							var substepRootsInterpolated = (i == substepCount - 1);
 							var substepRootsDispatch = (volumeData.keywords.VOLUME_SPLAT_CLUSTERS == false) && substepRootsInterpolated ?
 								SolverLODDispatch.Staging :
 								SolverLODDispatch.Solve;
 
-							//TODO move into cbuffer?
-							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._RootSubstepFraction, substepFracHi);
-
 							BindSolverData(cmd, s_solverCS, SolverKernels.KRootsSubstep, solverData);
 							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(substepRootsDispatch));
 						}
-					}
 
-					// substep boundaries
-					//TODO skip if at fraction one, similar to roots
-					{
-						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionLo", substepFracLo);
-						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionHi", substepFracHi);
+						// substep boundaries
+						{
+							cmd.SetComputeFloatParam(s_volumeCS, UniformIDs._SubstepFractionLo, substepFracLo);
+							cmd.SetComputeFloatParam(s_volumeCS, UniformIDs._SubstepFractionHi, substepFracHi);
 
-						int numX = (Conf.MAX_BOUNDARIES + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
-						int numY = 1;
-						int numZ = 1;
+							int numX = (Conf.MAX_BOUNDARIES + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
+							int numY = 1;
+							int numZ = 1;
 
-						BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesSubstep, volumeData);
-						cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesSubstep, numX, numY, numZ);
+							BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesSubstep, volumeData);
+							cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesSubstep, numX, numY, numZ);
+						}
 					}
 
 					//Debug.Log("substep " + i + ": " + (substepFrac < (1.0f - float.Epsilon)) + " (lo " + stepFracLo + " hi " + stepFracHi + ")");
@@ -1075,7 +1076,7 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						BindVolumeData(cmd, s_solverCS, solveKernel, volumeData);
-						BindSolverData(cmd, s_solverCS, solveKernel, WithSubstepData(solverData, substepRequired));
+						BindSolverData(cmd, s_solverCS, solveKernel, solverData);
 						cmd.DispatchCompute(s_solverCS, solveKernel, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(solveDispatch));
 					}
 
@@ -1100,7 +1101,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				using (new ProfilingScope(cmd, MarkersGPU.Solver_Interpolate))
 				{
-					BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolate, WithSubstepData(solverData, stepFracHi < (1.0f - float.Epsilon)));
+					BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolate, solverData);
 					cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolate, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.Interpolate));
 				}
 			}
@@ -1379,7 +1380,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			ref var volumeConstantsEnvironment = ref volumeData.constantsEnvironment;
 
-			// capture frustums
+			// update frustums
 			using (var frustums = AcquireLODFrustums(CameraType.Game | CameraType.SceneView, Allocator.Temp))
 			{
 				//int i = 0;
@@ -1398,7 +1399,7 @@ namespace Unity.DemoTeam.Hair
 				//	Debug.Log("frustum.plane5 = " + frustum.plane5);
 				//}
 
-				// derive constants
+				// write constants
 				volumeConstantsEnvironment._LODFrustumCount = (uint)frustums.Length;
 
 				// update buffers
@@ -1409,15 +1410,15 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsEnvironment);
 		}
 
-		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount, double elapsedTime)
+		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount)
 		{
 			ref var volumeConstantsScene = ref volumeData.constantsEnvironment;
 			ref var volumeTextures = ref volumeData.textures;
 
-			// capture gravity
+			// update gravity
 			volumeConstantsScene._WorldGravity = settingsEnvironment.gravityRotation * (Physics.gravity * settingsEnvironment.gravityScale);
 
-			// capture boundaries
+			// update boundaries
 			using (var bufRemap = new NativeArray<int>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (var bufHandle = new NativeArray<int>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (var bufMatrix = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
@@ -1425,15 +1426,8 @@ namespace Unity.DemoTeam.Hair
 			using (var bufMatrixQ = new NativeArray<Quaternion>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (var bufShape = new NativeArray<HairBoundary.RuntimeShape.Data>(Conf.MAX_BOUNDARIES, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
-				if (volumeData.boundaryPrevHandle.IsCreated && volumeData.boundaryPrevHandle.Length != Conf.MAX_BOUNDARIES)
-					volumeData.boundaryPrevHandle.Dispose();
-				if (volumeData.boundaryPrevHandle.IsCreated == false)
-					volumeData.boundaryPrevHandle = new NativeArray<int>(Conf.MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
-
-				if (volumeData.boundaryPrevMatrix.IsCreated && volumeData.boundaryPrevMatrix.Length != Conf.MAX_BOUNDARIES)
-					volumeData.boundaryPrevMatrix.Dispose();
-				if (volumeData.boundaryPrevMatrix.IsCreated == false)
-					volumeData.boundaryPrevMatrix = new NativeArray<Matrix4x4>(Conf.MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+				CreateCPUBuffer(ref volumeData.boundaryPrevHandle, Conf.MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+				CreateCPUBuffer(ref volumeData.boundaryPrevMatrix, Conf.MAX_BOUNDARIES, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
 				unsafe
 				{
@@ -1446,8 +1440,7 @@ namespace Unity.DemoTeam.Hair
 
 					// gather boundaries
 					//TODO expose or always enable the volumeSort option which sorts active boundaries by distance
-					var boundaryList = HairBoundaryUtility.Gather(settingsEnvironment.boundaryResident, settingsEnvironment.boundaryCapture, GetVolumeBounds(volumeData), settingsEnvironment.boundaryCaptureLayer, captureSort: false, (settingsEnvironment.boundaryCaptureMode == SettingsEnvironment.BoundaryCaptureMode.IncludeColliders));
-
+					var boundaryList = SpatialComponentFilter<HairBoundary, HairBoundary.RuntimeData, HairBoundaryProxy>.Gather(settingsEnvironment.boundaryResident, settingsEnvironment.boundaryCapture, GetVolumeBounds(volumeData), settingsEnvironment.boundaryCaptureLayer, volumeSort: false, (settingsEnvironment.boundaryCaptureMode == SettingsEnvironment.BoundaryCaptureMode.IncludeColliders));
 					var boundaryCountDiscrete = 0;
 					var boundaryCountCapsule = 0;
 					var boundaryCountSphere = 0;
@@ -1496,7 +1489,7 @@ namespace Unity.DemoTeam.Hair
 					var firstIndexCube = firstIndexTorus + boundaryCountTorus;
 					var firstIndexEnd = firstIndexCube + boundaryCountCube;
 
-					// update constants
+					// write constants
 					volumeConstantsScene._BoundaryDelimDiscrete = (uint)firstIndexCapsule;
 					volumeConstantsScene._BoundaryDelimCapsule = (uint)firstIndexSphere;
 					volumeConstantsScene._BoundaryDelimSphere = (uint)firstIndexTorus;
@@ -1506,11 +1499,8 @@ namespace Unity.DemoTeam.Hair
 					volumeConstantsScene._BoundaryWorldEpsilon = (boundarySDFIndex != -1) ? boundarySDFCellSize * 0.2f : 1e-4f;
 					volumeConstantsScene._BoundaryWorldMargin = settingsEnvironment.defaultSolidMargin * 0.01f;
 
-					// assign discrete texture
-					if (boundarySDFIndex != -1)
-					{
-						volumeTextures._BoundarySDF = (boundarySDFIndex != -1) ? boundaryList[boundarySDFIndex].sdf.sdfTexture : null;
-					}
+					// write textures
+					volumeTextures._BoundarySDF = (boundarySDFIndex != -1) ? boundaryList[boundarySDFIndex].sdf.sdfTexture : null;
 
 					// write attributes
 					{
@@ -1537,7 +1527,7 @@ namespace Unity.DemoTeam.Hair
 							}
 							else
 							{
-								if (writeIndexDiscrete == 0)// only include one first discrete
+								if (writeIndexDiscrete == 0)// only include first discrete
 								{
 									writeIndex = writeIndexDiscrete++;
 								}
@@ -1603,11 +1593,11 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					// update buffers
-					PushComputeBufferData(cmd, volumeData.buffers._BoundaryRemap, bufRemap);
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixNext, bufMatrix);
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixPrevA, bufMatrixA);
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryMatrixPrevQ, bufMatrixQ);
 					PushComputeBufferData(cmd, volumeData.buffers._BoundaryShapeNext, bufShape);
+					PushComputeBufferData(cmd, volumeData.buffers._BoundaryShapePrevLUT, bufRemap);
 
 					// update previous frame info
 					if (stepCount > 0)
@@ -1648,50 +1638,67 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			// capture emitters
+			// update emitters
+			using (var bufRemap = new NativeArray<int>(Conf.MAX_EMITTERS, Allocator.Temp, NativeArrayOptions.ClearMemory))
+			using (var bufHandle = new NativeArray<int>(Conf.MAX_EMITTERS, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			using (var bufEmitter = new NativeArray<HairWind.RuntimeEmitter>(Conf.MAX_EMITTERS, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
+				CreateCPUBuffer(ref volumeData.emitterPrevHandle, Conf.MAX_EMITTERS, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+
 				unsafe
 				{
+					var ptrRemap = (int*)bufRemap.GetUnsafePtr();
+					var ptrHandle = (int*)bufHandle.GetUnsafePtr();
 					var ptrEmitter = (HairWind.RuntimeEmitter*)bufEmitter.GetUnsafePtr();
 
-					// derive emitters
-					//TODO move to HairWindUtility
-					var emitterList = new UnsafeList<HairWind.RuntimeData>(Conf.MAX_EMITTERS, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-					var emitterData = new HairWind.RuntimeData();
+					// gather emitters
+					var emitterList = SpatialComponentFilter<HairWind, HairWind.RuntimeData, HairWindProxy>.Gather(settingsEnvironment.emitterResident, settingsEnvironment.emitterCapture, GetVolumeBounds(volumeData), settingsEnvironment.emitterCaptureLayer, volumeSort: false, (settingsEnvironment.emitterCaptureMode == SettingsEnvironment.EmitterCaptureMode.IncludeWindZones));
+					var emitterCount = Mathf.Min(emitterList.Count, Conf.MAX_EMITTERS);
 
-					foreach (var emitter in HairWind.s_emitters)
+					// write constants
+					volumeConstantsScene._WindEmitterCount = (uint)emitterCount;
+
+					// write attributes
 					{
-						if (emitter == null || emitter.isActiveAndEnabled == false)
-							continue;
-
-						if (HairWind.TryGetData(emitter, ref emitterData))
+						for (int i = 0; i != emitterCount; i++)
 						{
-							emitterList.Add(emitterData);
+							ptrHandle[i] = emitterList[i].xform.handle;
+							ptrEmitter[i] = emitterList[i].emitter;
 						}
 					}
 
-					// derive constants
-					volumeConstantsScene._WindEmitterCount = (uint)Mathf.Min(Conf.MAX_EMITTERS, emitterList.Length);
-					volumeConstantsScene._WindEmitterClock = (float)elapsedTime;
-
-					// update emitter data
-					for (int i = 0; i != volumeConstantsScene._WindEmitterCount; i++)
+					// write remapping (current -> previous)
 					{
-						ptrEmitter[i] = emitterList[i].emitter;
+						for (int i = 0; i != emitterCount; i++)
+						{
+							ptrRemap[i] = volumeData.emitterPrevHandle.IndexOf(ptrHandle[i]);
+						}
+
+						for (int i = emitterCount; i != Conf.MAX_EMITTERS; i++)
+						{
+							ptrRemap[i] = -1;
+						}
 					}
 
-					emitterList.Dispose();
-
 					// update buffers
-					PushComputeBufferData(cmd, volumeData.buffers._WindEmitter, bufEmitter);
+					PushComputeBufferData(cmd, volumeData.buffers._WindEmitterNext, bufEmitter);
+					PushComputeBufferData(cmd, volumeData.buffers._WindEmitterPrevLUT, bufRemap);
+
+					// update previous frame info
+					if (stepCount > 0)
+					{
+						volumeData.emitterPrevHandle.CopyFrom(bufHandle);
+					}
+
+					volumeData.emitterCount = emitterCount;
+					volumeData.emitterCountDiscard = emitterList.Count - emitterCount;
 				}
 			}
 
 			// update cbuffer
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsScene);
 
-			// advance boundaries
+			// conditionally advance boundaries
 			if (stepCount > 0)
 			{
 				int numX = (Conf.MAX_BOUNDARIES + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
@@ -1700,6 +1707,17 @@ namespace Unity.DemoTeam.Hair
 
 				BindVolumeData(cmd, s_volumeCS, VolumeKernels.KBoundariesAdvance, volumeData);
 				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KBoundariesAdvance, numX, numY, numZ);
+			}
+
+			// conditionally advance emitters
+			if (stepCount > 0)
+			{
+				int numX = (Conf.MAX_EMITTERS + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
+				int numY = 1;
+				int numZ = 1;
+
+				BindVolumeData(cmd, s_volumeCS, VolumeKernels.KEmittersAdvance, volumeData);
+				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KEmittersAdvance, numX, numY, numZ);
 			}
 		}
 
@@ -1765,18 +1783,25 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBuffer, volumeConstants);
 		}
 
-		public static void PushVolumeStep(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in SettingsVolume settingsVolume, SolverData[] solverData, float stepFracLo, float stepFracHi)
+		public static void PushVolumeStep(CommandBuffer cmd, CommandBufferExecutionFlags cmdFlags, ref VolumeData volumeData, in SettingsVolume settingsVolume, SolverData[] solverData, float stepFracLo, float stepFracHi, double stepTimeHi)
 		{
 			using (new ProfilingScope(cmd, MarkersGPU.Volume))
 			{
+				// update clock
+				{
+					volumeData.constantsEnvironment._WindEmitterClock = (float)stepTimeHi;
+					PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeData.constantsEnvironment);
+				}
+
+				// substep
+				//TODO skip substepping if range stepFracLo, stepFracHi is [0, 1]
 				if (stepFracHi > 0.0f)
 				{
-					// substep boundaries
-					//TODO skip if at fraction one, similar to roots
-					{
-						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionLo", stepFracLo);
-						cmd.SetComputeFloatParam(s_volumeCS, "_SubstepFractionHi", stepFracHi);
+					cmd.SetComputeFloatParam(s_volumeCS, UniformIDs._SubstepFractionLo, stepFracLo);
+					cmd.SetComputeFloatParam(s_volumeCS, UniformIDs._SubstepFractionHi, stepFracHi);
 
+					// substep boundaries
+					{
 						int numX = (Conf.MAX_BOUNDARIES + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
 						int numY = 1;
 						int numZ = 1;
@@ -1786,7 +1811,33 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					// substep emitters
-					//TODO
+					{
+						int numX = (Conf.MAX_EMITTERS + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
+						int numY = 1;
+						int numZ = 1;
+
+						BindVolumeData(cmd, s_volumeCS, VolumeKernels.KEmittersSubstep, volumeData);
+						cmd.DispatchCompute(s_volumeCS, VolumeKernels.KEmittersSubstep, numX, numY, numZ);
+
+						/*
+						volumeData.buffersReadback._WindEmitter.ScheduleCopy(cmd, volumeData.buffers._WindEmitter);
+						{
+							var data = volumeData.buffersReadback._WindEmitter.GetData<HairWind.RuntimeEmitter>(true);
+							Debug.Log("---emitters---");
+							for (int i = 0; i != volumeData.constantsEnvironment._WindEmitterCount; i++)
+							{
+								var e = data[i];
+								Debug.LogFormat(
+									"p {0}\tn {1}\tt0 {2}\th0 {3}\tm {4}\t" +
+									"v {5}\tA {6}\tf {7}\t" +
+									"jd {8}\tjw {9}\tjp {10}",
+									e.p, e.n, e.t0, e.h0, e.m,
+									e.v, e.A, e.f,
+									e.jd, e.jw, e.jp);
+							}
+						}
+						*/
+					}
 				}
 
 				HairSim.PushVolumeClear(cmd, ref volumeData, settingsVolume);

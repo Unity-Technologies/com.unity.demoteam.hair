@@ -1,30 +1,17 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Mathematics;
 
 namespace Unity.DemoTeam.Hair
 {
 	[ExecuteAlways]
 	public partial class HairWind : MonoBehaviour
 	{
-		public static HashSet<HairWind> s_emitters = new HashSet<HairWind>();
-
 		public SettingsEmitter settingsEmitter = SettingsEmitter.defaults;
 		public SettingsDirectional settingsDirectional = SettingsDirectional.defaults;
 		public SettingsSpherical settingsSpherical = SettingsSpherical.defaults;
 		public SettingsTurbine settingsTurbine = SettingsTurbine.defaults;
 		public SettingsFlow settingsFlow = SettingsFlow.defaults;
-
-		private void OnEnable()
-		{
-			s_emitters.Add(this);
-		}
-
-		private void OnDisable()
-		{
-			s_emitters.Remove(this);
-		}
 
 		//--------------
 		// runtime data
@@ -40,7 +27,14 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public Type type;
+			public RuntimeTransform xform;
 			public RuntimeEmitter emitter;
+			public RuntimeGizmo gizmo;
+		}
+
+		public struct RuntimeTransform
+		{
+			public int handle;
 		}
 
 		public struct RuntimeEmitter
@@ -58,6 +52,14 @@ namespace Unity.DemoTeam.Hair
 			public float jd;	// jitter displacement
 			public float jw;	// jitter resolution
 			public float jp;	// jitter planar
+		}
+
+		public struct RuntimeGizmo
+		{
+			public Quaternion rotation;
+			public float turbineBaseWidth;
+			public float turbineNozzleWidth;
+			public float turbineNozzleOffset;
 		}
 
 		//--------------------
@@ -83,6 +85,10 @@ namespace Unity.DemoTeam.Hair
 			return new RuntimeData
 			{
 				type = RuntimeData.Type.Directional,
+				xform = new RuntimeTransform
+				{
+					handle = transform.GetInstanceID(),
+				},
 				emitter = new RuntimeEmitter
 				{
 					p = transform.position,
@@ -100,6 +106,10 @@ namespace Unity.DemoTeam.Hair
 					jw = flow.timingJitterResolution,
 					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
 				},
+				gizmo = new RuntimeGizmo
+				{
+					rotation = transform.rotation,
+				},
 			};
 		}
 
@@ -109,6 +119,10 @@ namespace Unity.DemoTeam.Hair
 			return new RuntimeData
 			{
 				type = RuntimeData.Type.Spherical,
+				xform = new RuntimeTransform
+				{
+					handle = transform.GetInstanceID(),
+				},
 				emitter = new RuntimeEmitter
 				{
 					p = transform.position,
@@ -125,7 +139,11 @@ namespace Unity.DemoTeam.Hair
 					jd = flow.timingJitter ? flow.timingJitterDisplacement : 0.0f,
 					jw = flow.timingJitterResolution,
 					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
-				}
+				},
+				gizmo = new RuntimeGizmo
+				{
+					rotation = transform.rotation,
+				},
 			};
 		}
 
@@ -159,6 +177,10 @@ namespace Unity.DemoTeam.Hair
 			return new RuntimeData
 			{
 				type = RuntimeData.Type.Turbine,
+				xform = new RuntimeTransform
+				{
+					handle = transform.GetInstanceID(),
+				},
 				emitter = new RuntimeEmitter
 				{
 					p = transform.position - t0 * transform.forward,
@@ -175,7 +197,13 @@ namespace Unity.DemoTeam.Hair
 					jd = flow.timingJitter ? flow.timingJitterDisplacement : 0.0f,
 					jw = flow.timingJitterResolution,
 					jp = (flow.timingJitterSpace == SettingsFlow.JitterSpace.Planar) ? 1.0f : 0.0f,
-				}
+				},
+				gizmo = new RuntimeGizmo
+				{
+					rotation = transform.rotation,
+					turbineNozzleWidth = turbine.nozzleWidth * lossyScaleAbsMax,
+					turbineNozzleOffset = turbine.nozzleOffset * lossyScaleAbsMax,
+				},
 			};
 		}
 

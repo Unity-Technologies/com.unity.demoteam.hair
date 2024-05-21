@@ -64,7 +64,7 @@
 		const uint strandParticleBegin = strandIndex * _StrandParticleOffset;
 		const uint strandParticleStride = _StrandParticleStride;
 
-		float3 worldPos = _RootPosition[strandIndex].xyz;
+		float3 worldPos = _RootPositionNext[strandIndex].xyz;
 
 		float4 rootFrame = _RootFrame[strandIndex];
 		float3 rootFrameAxis = float3(

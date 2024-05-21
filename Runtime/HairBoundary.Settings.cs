@@ -4,7 +4,7 @@ using UnityEngine.Serialization;
 
 namespace Unity.DemoTeam.Hair
 {
-	public partial class HairBoundary : MonoBehaviour
+	public partial class HairBoundary
 	{
 		public enum Axis
 		{

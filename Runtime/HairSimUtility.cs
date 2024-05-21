@@ -9,7 +9,36 @@ namespace Unity.DemoTeam.Hair
 	public static class HairSimUtility
 	{
 		//---------------
+		// cpu resources
+
+		public static bool CreateCPUBuffer<T>(ref NativeArray<T> buffer, int count, Allocator allocator, NativeArrayOptions options = NativeArrayOptions.UninitializedMemory) where T : unmanaged
+		{
+			if (buffer.IsCreated && buffer.Length == count)
+				return false;
+
+			if (buffer.IsCreated)
+				buffer.Dispose();
+
+			buffer = new NativeArray<T>(count, allocator, options);
+			return true;
+		}
+
+		public static void ReleaseCPUBuffer<T>(ref NativeArray<T> buffer) where T : unmanaged
+		{
+			if (buffer.IsCreated)
+				buffer.Dispose();
+		}
+
+		//---------------
 		// gpu resources
+
+		public static bool CreateBuffer<T>(ref ComputeBuffer buffer, string name, int count, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged
+		{
+			unsafe
+			{
+				return CreateBuffer(ref buffer, name, count, sizeof(T), type);
+			}
+		}
 
 		public static bool CreateBuffer(ref ComputeBuffer buffer, string name, int count, int stride, ComputeBufferType type = ComputeBufferType.Default)
 		{
@@ -35,22 +64,17 @@ namespace Unity.DemoTeam.Hair
 
 		public static bool CreateReadbackBuffer(ref AsyncReadbackBuffer bufferReadback, in ComputeBuffer buffer)
 		{
-			if (bufferReadback.buffer.IsCreated && bufferReadback.buffer.Length == (buffer.count * buffer.stride))
-				return false;
-
-			if (bufferReadback.buffer.IsCreated)
-				bufferReadback.buffer.Dispose();
-
-			//Debug.Log("creating readback buffer w/ length " + (buffer.count * buffer.stride) + " for buffer " + buffer.ToString());
-
-			bufferReadback.buffer = new NativeArray<byte>(buffer.count * buffer.stride, Allocator.Persistent);
-			return true;
+			var ret = CreateCPUBuffer(ref bufferReadback.buffer, buffer.count * buffer.stride, Allocator.Persistent);
+			if (ret)
+			{
+				//Debug.Log("created readback buffer w/ length " + (buffer.count * buffer.stride) + " for buffer " + buffer.ToString());
+			}
+			return ret;
 		}
 
 		public static void ReleaseReadbackBuffer(ref AsyncReadbackBuffer bufferReadback)
 		{
-			if (bufferReadback.buffer.IsCreated)
-				bufferReadback.buffer.Dispose();
+			ReleaseCPUBuffer(ref bufferReadback.buffer);
 		}
 
 		public static RenderTextureDescriptor MakeVolumeDesc(int cellCount, RenderTextureFormat cellFormat)

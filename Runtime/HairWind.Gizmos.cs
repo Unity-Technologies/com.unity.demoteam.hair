@@ -7,36 +7,34 @@ namespace Unity.DemoTeam.Hair
 {
 	public partial class HairWind
 	{
-		public void OnDrawGizmosSelected()
-		{
-			DrawGizmos(Time.time, Time.deltaTime, selected: true);
-		}
-
-		public void DrawGizmos(float t, float dt, bool selected = false)
+		void OnDrawGizmosSelected()
 		{
 			var data = new RuntimeData();
-
-			if (TryGetData(this, ref data))
 			{
-				DrawGizmosRuntimeEmitter(data, selected ? 1.0f : 0.5f);
-
-				if (selected)
+				if (TryGetData(this, ref data))
 				{
-					if (isActiveAndEnabled)
-					{
-						DrawGizmosRuntimeEmitterFlow(data, selected ? 1.0f : 0.5f, 256, t, dt);
-					}
-
-					//DrawGizmosRuntimeEmitterGrid(data, 16);
+					DrawGizmosRuntimeData(data, Time.time, Time.deltaTime, active: isActiveAndEnabled, selected: true);
 				}
 			}
 		}
 
-		public void DrawGizmosRuntimeEmitter(in RuntimeData data, float opacity)
+		public static void DrawGizmosRuntimeData(in RuntimeData data, float t, float dt, bool active, bool selected)
 		{
-			var lossyScaleAbs = transform.lossyScale.Abs();
-			var lossyScaleAbsMax = lossyScaleAbs.CMax();
+			DrawGizmosRuntimeEmitter(data, selected ? 1.0f : 0.5f);
 
+			if (selected)
+			{
+				if (active)
+				{
+					DrawGizmosRuntimeEmitterFlow(data, selected ? 1.0f : 0.5f, 256, t, dt);
+				}
+
+				//DrawGizmosRuntimeEmitterGrid(data, 16);
+			}
+		}
+
+		static void DrawGizmosRuntimeEmitter(in RuntimeData data, float opacity)
+		{
 			Gizmos.color = Color.Lerp(Color.clear, Color.cyan, opacity);
 			Gizmos.matrix = Matrix4x4.identity;
 
@@ -48,8 +46,8 @@ namespace Unity.DemoTeam.Hair
 						var q = p + data.emitter.n;
 						var r = p + data.emitter.n * 0.9f;
 
-						var ux = transform.right;
-						var uy = transform.up;
+						var ux = data.gizmo.rotation * Vector3.right;
+						var uy = data.gizmo.rotation * Vector3.up;
 
 						var r00 = r + ux * 0.1f;
 						var r01 = r + uy * 0.1f;
@@ -66,7 +64,7 @@ namespace Unity.DemoTeam.Hair
 
 				case RuntimeData.Type.Spherical:
 					{
-						Gizmos.matrix = Matrix4x4.TRS(data.emitter.p, transform.rotation, Vector3.one);
+						Gizmos.matrix = Matrix4x4.TRS(data.emitter.p, data.gizmo.rotation, Vector3.one);
 						Gizmos.DrawWireSphere(Vector3.zero, 0.5f);
 					}
 					break;
@@ -74,68 +72,63 @@ namespace Unity.DemoTeam.Hair
 				case RuntimeData.Type.Turbine:
 					{
 						var t0 = data.emitter.t0;
-						var t1 = t0 + settingsTurbine.nozzleOffset * lossyScaleAbsMax;
+						var t1 = t0 + data.gizmo.turbineNozzleOffset;
 
 						var h0 = data.emitter.h0;
-						var h1 = 0.5f * settingsTurbine.nozzleWidth * lossyScaleAbsMax;
+						var h1 = 0.5f * data.gizmo.turbineNozzleWidth;
 
 						var p0 = data.emitter.p + data.emitter.n * t0;
 						var p1 = data.emitter.p + data.emitter.n * t1;
 
-						var ux = transform.right;
-						var uy = transform.up;
+						var ux = data.gizmo.rotation * Vector3.right;
+						var uy = data.gizmo.rotation * Vector3.up;
 
 						Gizmos.DrawRay(p0 + uy * h0, (data.emitter.n + data.emitter.m * uy) * (t1 - t0));
 						Gizmos.DrawRay(p0 - uy * h0, (data.emitter.n - data.emitter.m * uy) * (t1 - t0));
 						Gizmos.DrawRay(p0 + ux * h0, (data.emitter.n + data.emitter.m * ux) * (t1 - t0));
 						Gizmos.DrawRay(p0 - ux * h0, (data.emitter.n - data.emitter.m * ux) * (t1 - t0));
 
-						Gizmos.matrix = Matrix4x4.TRS(p0, transform.rotation, Vector3.one);
+						Gizmos.matrix = Matrix4x4.TRS(p0, data.gizmo.rotation, Vector3.one);
 						DrawGizmosWireCircleZ(Vector3.zero, h0);
 
-						Gizmos.matrix = Matrix4x4.TRS(p1, transform.rotation, Vector3.one);
+						Gizmos.matrix = Matrix4x4.TRS(p1, data.gizmo.rotation, Vector3.one);
 						DrawGizmosWireCircleZ(Vector3.zero, h1);
 					}
 					break;
 			}
 		}
 
-		public void DrawGizmosRuntimeEmitterFlow(in RuntimeData data, float opacity, uint samples, float t, float dt)
+		static void DrawGizmosRuntimeEmitterFlow(in RuntimeData data, float opacity, uint samples, float t, float dt)
 		{
 			dt = Mathf.Clamp(dt, 1.0f / 120.0f, 1.0f / 15.0f);
 
-			var lossyScaleAbs = transform.lossyScale.Abs();
-			var lossyScaleAbsMax = lossyScaleAbs.CMax();
-
 			Gizmos.color = Color.Lerp(Color.clear, Color.cyan, opacity * 0.6f);
 			Gizmos.matrix = Matrix4x4.identity;
-
-			var size = 3.0f;
-			var ppos = this.transform.position;
 
 			var Lv = data.emitter.v + 0.5f * data.emitter.A;//TODO replace average with something that is more meaningful visually
 			var Lt = 3.0f;// flow line lifetime
 			var Ld = math.abs(Lv * Lt);
 			var Nt = math.frac(t / Lt);
 
-			var ux = this.transform.right;
-			var uy = this.transform.up;
+			var ux = data.gizmo.rotation * Vector3.right;
+			var uy = data.gizmo.rotation * Vector3.up;
 
 			for (uint i = 0; i != samples; i++)
 			{
 				var j = (uint)(i + samples * Nt) % samples;
 				var R = Mathematics.Random.CreateFromIndex(j);
 
-				var p = ppos;
+				var p = data.emitter.p;
 				{
 					switch (data.type)
 					{
 						case RuntimeData.Type.Directional:
 							{
+								var h = 3.0f;
 								var k = R.NextFloat3();
-								p.x += (k.x * 2.0f - 1.0f) * size - (0.5f * Ld) * data.emitter.n.x;
-								p.y += (k.y * 2.0f - 1.0f) * size - (0.5f * Ld) * data.emitter.n.y;
-								p.z += (k.z * 2.0f - 1.0f) * size - (0.5f * Ld) * data.emitter.n.z;
+								p.x += (k.x * 2.0f - 1.0f) * h - (0.5f * Ld) * data.emitter.n.x;
+								p.y += (k.y * 2.0f - 1.0f) * h - (0.5f * Ld) * data.emitter.n.y;
+								p.z += (k.z * 2.0f - 1.0f) * h - (0.5f * Ld) * data.emitter.n.z;
 							}
 							break;
 
@@ -147,15 +140,15 @@ namespace Unity.DemoTeam.Hair
 								p.z += 1e-4f * k.z;
 							}
 							break;
-
+								
 						case RuntimeData.Type.Turbine:
 							{
 								var k = R.NextFloat2();
-								var h = 0.5f * settingsTurbine.baseWidth * lossyScaleAbsMax + 1e-4f * data.emitter.m;
+								var h = data.emitter.h0 + 1e-4f * data.emitter.m;
 								math.sincos(2.0f * Mathf.PI * k.x, out var sina, out var cosa);
-								p.x += (k.y * cosa * h) * ux.x + (k.y * sina * h) * uy.x + (1e-4f) * data.emitter.n.x;
-								p.y += (k.y * cosa * h) * ux.y + (k.y * sina * h) * uy.y + (1e-4f) * data.emitter.n.y;
-								p.z += (k.y * cosa * h) * ux.z + (k.y * sina * h) * uy.z + (1e-4f) * data.emitter.n.z;
+								p.x += (k.y * cosa * h) * ux.x + (k.y * sina * h) * uy.x + (1e-4f + data.emitter.t0) * data.emitter.n.x;
+								p.y += (k.y * cosa * h) * ux.y + (k.y * sina * h) * uy.y + (1e-4f + data.emitter.t0) * data.emitter.n.y;
+								p.z += (k.y * cosa * h) * ux.z + (k.y * sina * h) * uy.z + (1e-4f + data.emitter.t0) * data.emitter.n.z;
 							}
 							break;
 					}
@@ -180,7 +173,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void DrawGizmosRuntimeEmitterGrid(in RuntimeData data, uint samples)
+		static void DrawGizmosRuntimeEmitterGrid(in RuntimeData data, uint samples)
 		{
 			Gizmos.color = Color.cyan;
 			Gizmos.matrix = Matrix4x4.identity;
@@ -195,7 +188,12 @@ namespace Unity.DemoTeam.Hair
 			var step = size / (samples - 1);
 
 			var pext = (0.5f * size) * Vector3.one;
-			var pmin = this.transform.position - pext;
+			var pmin = data.emitter.p - pext;
+
+			if (data.type == RuntimeData.Type.Turbine)
+			{
+				pmin += data.emitter.n * data.emitter.t0;
+			}
 
 			for (uint i = 0; i != samples; i++)
 			{
@@ -229,7 +227,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		void DrawGizmosWireCircleZ(in Vector3 center, float radius)
+		static void DrawGizmosWireCircleZ(in Vector3 center, float radius)
 		{
 			var stepCount = 16;
 			var stepTheta = (2.0f * Mathf.PI) / stepCount;
