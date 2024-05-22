@@ -261,6 +261,9 @@ namespace Unity.DemoTeam.Hair
 		public static bool TryGetComponentData(Component component, ref RuntimeData data)
 		{
 			var windZone = component as WindZone;
+			if (windZone == null)
+				windZone = component.GetComponent<WindZone>();
+
 			if (windZone != null)
 			{
 				switch (windZone.mode)

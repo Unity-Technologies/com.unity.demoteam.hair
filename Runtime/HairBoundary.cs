@@ -285,6 +285,8 @@ namespace Unity.DemoTeam.Hair
 
 		public static bool TryGetMatchingComponent(HairBoundary boundary, Settings.Type type, out Component component)
 		{
+			static Component CheckSolid(Component component) => (component != null && (component as Collider).isTrigger == false) ? component : null;
+
 			switch (type)
 			{
 #if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
@@ -292,11 +294,11 @@ namespace Unity.DemoTeam.Hair
 					component = boundary.GetComponent<SDFTexture>(); break;
 #endif
 				case Settings.Type.Capsule:
-					component = boundary.GetComponent<CapsuleCollider>(); break;
+					component = CheckSolid(boundary.GetComponent<CapsuleCollider>()); break;
 				case Settings.Type.Sphere:
-					component = boundary.GetComponent<SphereCollider>(); break;
+					component = CheckSolid(boundary.GetComponent<SphereCollider>()); break;
 				case Settings.Type.Cube:
-					component = boundary.GetComponent<BoxCollider>(); break;
+					component = CheckSolid(boundary.GetComponent<BoxCollider>()); break;
 				default:
 					component = null; break;
 			}
@@ -323,28 +325,30 @@ namespace Unity.DemoTeam.Hair
 		public static bool TryGetComponentData(Component component, ref RuntimeData data)
 		{
 			var collider = component as Collider;
-			if (collider != null && collider.isTrigger == false)
+			if (collider != null)
 			{
-#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
-				if (component is SDFTexture)
+				if (collider.isTrigger == false)
 				{
-					data = GetRuntimeSDF(component as SDFTexture); return (data.sdf.sdfTexture != null);
-				}
-				else
-#endif
-				if (component is CapsuleCollider)
-				{
-					data = GetRuntimeCapsule(component as CapsuleCollider); return true;
-				}
-				else if (component is SphereCollider)
-				{
-					data = GetRuntimeSphere(component as SphereCollider); return true;
-				}
-				else if (component is BoxCollider)
-				{
-					data = GetRuntimeCube(component as BoxCollider); return true;
+					if (component is CapsuleCollider)
+					{
+						data = GetRuntimeCapsule(component as CapsuleCollider); return true;
+					}
+					else if (component is SphereCollider)
+					{
+						data = GetRuntimeSphere(component as SphereCollider); return true;
+					}
+					else if (component is BoxCollider)
+					{
+						data = GetRuntimeCube(component as BoxCollider); return true;
+					}
 				}
 			}
+#if HAS_PACKAGE_DEMOTEAM_MESHTOSDF
+			else if (component is SDFTexture)
+			{
+				data = GetRuntimeSDF(component as SDFTexture); return (data.sdf.sdfTexture != null);
+			}
+#endif
 			return false;
 		}
 
@@ -362,7 +366,8 @@ namespace Unity.DemoTeam.Hair
 					data = GetRuntimeTorus(boundary.transform, boundary.settingsTorus); return true;
 				case Settings.Type.Cube:
 					data = GetRuntimeCube(boundary.transform, boundary.settingsCube); return true;
-				default: return false;
+				default:
+					return false;
 			}
 		}
 	}
