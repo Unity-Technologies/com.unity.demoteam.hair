@@ -980,7 +980,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolatePromote, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.InterpolatePromote));
 		}
 
-		public static void PushSolverStep(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, in VolumeData volumeData, float stepFracLo, float stepFracHi)
+		public static void PushSolverStep(CommandBuffer cmd, ref SolverData solverData, in SettingsPhysics settingsPhysics, in VolumeData volumeData, float stepFracLo, float stepFracHi, bool stepFinal)
 		{
 			var solveKernel = SolverKernels.KSolveConstraints_GaussSeidelReference;
 			var solveDispatch = SolverLODDispatch.Solve;
@@ -1038,13 +1038,13 @@ namespace Unity.DemoTeam.Hair
 							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._SubstepFractionLo, substepFracLo);
 							cmd.SetComputeFloatParam(s_solverCS, UniformIDs._SubstepFractionHi, substepFracHi);
 
-							var substepRootsInterpolated = (i == substepCount - 1);
-							var substepRootsDispatch = (volumeData.keywords.VOLUME_SPLAT_CLUSTERS == false) && substepRootsInterpolated ?
+							var resolveRootsInterpolated = stepFinal || (volumeData.keywords.VOLUME_SPLAT_CLUSTERS == false && i == substepCount - 1);
+							var resolveRootsDispatch = resolveRootsInterpolated ?
 								SolverLODDispatch.Staging :
 								SolverLODDispatch.Solve;
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KRootsSubstep, solverData);
-							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(substepRootsDispatch));
+							cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsSubstep, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(resolveRootsDispatch));
 						}
 
 						// substep boundaries

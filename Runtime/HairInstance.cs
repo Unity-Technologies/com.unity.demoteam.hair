@@ -958,7 +958,7 @@ namespace Unity.DemoTeam.Hair
 
 						for (int i = 0; i != solverData.Length; i++)
 						{
-							HairSim.PushSolverStep(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), volumeData, stepFracLo, stepFracHi);
+							HairSim.PushSolverStep(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), volumeData, stepFracLo, stepFracHi, stepFinal: k == stepDesc.count - 1);
 						}
 
 						HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo, stepFracHi, stepTimeHi);
