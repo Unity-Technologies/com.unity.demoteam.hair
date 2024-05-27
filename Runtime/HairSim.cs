@@ -1410,7 +1410,7 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsEnvironment);
 		}
 
-		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount)
+		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount, float frameFracHi)
 		{
 			ref var volumeConstantsScene = ref volumeData.constantsEnvironment;
 			ref var volumeTextures = ref volumeData.textures;
@@ -1573,7 +1573,7 @@ namespace Unity.DemoTeam.Hair
 								// Mb_t = Ma * M(t)
 								//
 								// where Ma is the transform of the current frame
-								//   and Mb is the transform of the last substep transform of the previous frame
+								//   and Mb is the transform of the last substep of the previous frame
 
 								var Ma = ptrMatrix[i];
 								var Mb = volumeData.boundaryPrevMatrix[j];
@@ -1602,10 +1602,27 @@ namespace Unity.DemoTeam.Hair
 					// update previous frame info
 					if (stepCount > 0)
 					{
-						//TODO adjust bufMatrix to correspond to outcome (final substep in frame)
-						//		e.g. AffineInterpolate(bufMatrix, bufMatrixA, bufMatrixQ, stepFracHi)
 						volumeData.boundaryPrevHandle.CopyFrom(bufHandle);
+#if false
 						volumeData.boundaryPrevMatrix.CopyFrom(bufMatrix);
+#else
+						// resolve boundaryPrevMatrix to match contents of _BoundaryMatrix after final substep in frame
+						{
+							var ptrMatrixPrev = (Matrix4x4*)volumeData.boundaryPrevMatrix.GetUnsafePtr();
+
+							for (int i = 0; i != boundaryCount; i++)
+							{
+								ref var Ma = ref ptrMatrix[i];
+								ref var M = ref ptrMatrixA[i];
+								ref var q = ref ptrMatrixQ[i];
+
+								var M_t = AffineUtility.AffineInterpolate4x4(M, ((quaternion)q).value, 1.0f - frameFracHi);
+								var Mb_t = AffineUtility.AffineMul4x4(Ma, M_t);
+
+								ptrMatrixPrev[i] = Mb_t;
+							}
+						}
+#endif
 					}
 
 					volumeData.boundaryCount = boundaryCount;

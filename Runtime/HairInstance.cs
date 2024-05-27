@@ -766,7 +766,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
-			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count);
+			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count, 1.0f);//stepDesc.hi);
 			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
 			{
 				//var frameTimeLo = execState.elapsedTime - stepDesc.count * stepDesc.dt;

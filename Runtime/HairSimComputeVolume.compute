@@ -1759,7 +1759,7 @@ void KBoundariesSubstep(
 		// Mb_t = Ma * M(t)
 		//
 		// where Ma is the transform of the current frame
-		//   and Mb is the transform of the last substep transform of the previous frame
+		//   and Mb is the transform of the last substep of the previous frame
 
 		float4x4 Ma = _BoundaryMatrixNext[i];
 		float4x4 M = _BoundaryMatrixPrevA[i];
