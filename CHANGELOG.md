@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for subframe interpolation of per-frame collision boundaries.
 - Added support for subframe interpolation of per-frame wind emitters.
 
+### Fixed
+
+- Fixed an issue with wind emitter clock not being deterministic.
+
 
 ## [0.13.0-exp.1] - 2024-04-16
 
