@@ -40,11 +40,11 @@ namespace Unity.DemoTeam.Hair
 				public T _SolverLODRange;				// xy: dispatch strand range [begin, end)
 				public T _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
 
-				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root
+				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: initial local accumulated weight (gather)
 				public T _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 				public T _InitialParticleFrameDelta16;	// xy: compressed initial particle material frame delta
 
-				public T _ParticlePosition;				// xyz: position//, w: initial local accumulated weight (gather)
+				public T _ParticlePosition;				// xyz: position
 				public T _ParticlePositionPrev;			// xyz: ...
 				public T _ParticlePositionPrevPrev;		// xyz: ...
 				public T _ParticleVelocity;				// xyz: velocity

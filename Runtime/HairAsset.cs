@@ -37,11 +37,12 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector2[] rootUV;		// root uv
 			[HideInInspector] public Vector4[] rootScale;	// root scale (length, diameter normalized to maximum within group), z: tip scale offset, w: tip scale
 
+			[HideInInspector] public ParticleFeatures particleFeatures;
+			[HideInInspector] public MemoryLayout particleMemoryLayout;
+
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public Vector2[] particleTexCoord;
 			[HideInInspector] public float[] particleDiameter;
-			[HideInInspector] public ParticleFeatures particleFeatures;
-			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
 			public int lodCount;
 

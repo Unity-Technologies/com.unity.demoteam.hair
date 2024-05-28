@@ -81,7 +81,6 @@ namespace Unity.DemoTeam.Hair
 			switch (camera.cameraType)
 			{
 				case CameraType.Game:
-				case CameraType.Preview:
 				case CameraType.SceneView:
 					return true;
 

@@ -256,7 +256,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._SolverLODRange, "SolverLODRange", (int)SolverLODRange.__COUNT, particleStrideVector2);
 				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT * 4, sizeof(uint), ComputeBufferType.Structured | ComputeBufferType.IndirectArguments);
 
-				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector3);
+				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta16, "InitialParticleFrameDelta16", particleCount, particleStrideVector2);
 
@@ -1027,6 +1027,7 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != substepCount; i++)
 				{
+					// substep per-frame scene data
 					using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepScene))
 					{
 						var substepFracLo = Mathf.Lerp(stepFracLo, stepFracHi, (i + 0) / (float)substepCount);
@@ -1810,7 +1811,7 @@ namespace Unity.DemoTeam.Hair
 					PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeData.constantsEnvironment);
 				}
 
-				// substep
+				// substep per-frame scene data
 				//TODO skip substepping if range stepFracLo, stepFracHi is [0, 1]
 				if (stepFracHi > 0.0f)
 				{
@@ -1857,14 +1858,17 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				HairSim.PushVolumeClear(cmd, ref volumeData, settingsVolume);
-
-				for (int i = 0; i != solverData.Length; i++)
+				// build the volume
 				{
-					HairSim.PushVolumeTransfer(cmd, cmdFlags, ref volumeData, settingsVolume, solverData[i]);
-				}
+					HairSim.PushVolumeClear(cmd, ref volumeData, settingsVolume);
 
-				HairSim.PushVolumeResolve(cmd, ref volumeData, settingsVolume);
+					for (int i = 0; i != solverData.Length; i++)
+					{
+						HairSim.PushVolumeTransfer(cmd, cmdFlags, ref volumeData, settingsVolume, solverData[i]);
+					}
+
+					HairSim.PushVolumeResolve(cmd, ref volumeData, settingsVolume);
+				}
 			}
 		}
 
