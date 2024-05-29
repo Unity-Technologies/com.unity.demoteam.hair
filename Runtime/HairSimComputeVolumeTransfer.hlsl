@@ -87,35 +87,34 @@ void InterlockedMaxTrilinear(HAIRSIM_VOLUMEACCU<int> volume, float value, uint3 
 	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(idx0 + h.xxx)], (int)round(value * w1.x * w1.y * w1.z));
 }
 
-void InterlockedAddParticleContribution(const VolumeLODGrid lodDesc, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
+void InterlockedAddParticleContribution(const VolumeLODGrid lodGrid, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
-	TrilinearWeights tri = VolumeWorldToCellTrilinear(lodDesc, worldPos, offset);
+	TrilinearWeights tri = VolumeWorldToCellTrilinear(lodGrid, worldPos, offset);
 	InterlockedAddTrilinear(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(lodDesc, worldPos))], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(lodGrid, worldPos))], (int) round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
 
-void InterlockedAddParticleContributionPackW(const VolumeLODGrid lodDesc, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
+void InterlockedAddParticleContributionPackW(const VolumeLODGrid lodGrid, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
-	TrilinearWeights tri = VolumeWorldToCellTrilinear(lodDesc, worldPos, offset);
+	TrilinearWeights tri = VolumeWorldToCellTrilinear(lodGrid, worldPos, offset);
 	InterlockedAddTrilinearPackW(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(lodDesc, worldPos))], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedAdd(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(lodGrid, worldPos))], (int) round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
 
-void InterlockedMaxParticleContribution(const VolumeLODGrid lodDesc, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
+void InterlockedMaxParticleContribution(const VolumeLODGrid lodGrid, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5)
 {
 #if SPLAT_TRILINEAR
-	TrilinearWeights tri = VolumeWorldToCellTrilinear(lodDesc, worldPos, offset);
+	TrilinearWeights tri = VolumeWorldToCellTrilinear(lodGrid, worldPos, offset);
 	InterlockedMaxTrilinear(volume, value * (1 << SPLAT_FRACTIONAL_BITS), tri.idx0, tri.w0, tri.w1);
 #else
-	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(lodDesc, worldPos))], (int)round(value * (1 << SPLAT_FRACTIONAL_BITS)));
+	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(lodGrid, worldPos))], (int) round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
-
 
 #endif//__HAIRSIMCOMPUTEVOLUMETRANSFER_HLSL__

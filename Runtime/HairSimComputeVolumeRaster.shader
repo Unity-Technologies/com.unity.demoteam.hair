@@ -58,12 +58,12 @@
 		//   C = cell centers
 		//   x = particle
 
-		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
-		const float3 localPos = VolumeWorldToLocal(lodDesc, _ParticlePosition[vertexID[0]].xyz) - 0.5;// subtract offset to cell center
+		const float3 localPos = VolumeWorldToLocal(lodGrid, _ParticlePosition[vertexID[0]].xyz) - 0.5;// subtract offset to cell center
 		const float3 localPosFloor = floor(localPos);
 
-		const float2 uvCellSize = 1.0 / lodDesc.volumeCellCount.xy;
+		const float2 uvCellSize = 1.0 / lodGrid.volumeCellCount.xy;
 		const float2 uv0 = uvCellSize * localPosFloor.xy;
 		const float2 uvH = uvCellSize * 2.0;
 
@@ -103,7 +103,7 @@
 		// j          0  0  0  0    1  1  1  1    0  0  0  0    1  1  1  1    (vertexID >> 2) & 1
 		// uvID       0  1  2  3    0  1  2  3    0  1  2  3    0  1  2  3    (vertexID & 3)
 
-		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
 		const uint i = (vertexID >> 3);
 		const uint j = (vertexID >> 2) & 1;
@@ -111,10 +111,10 @@
 		const uint uvID = (vertexID & 3);
 		const float2 uv = float2(((uvID >> 1) ^ uvID) & 1, uvID >> 1);
 
-		const float3 localPos = VolumeWorldToLocal(lodDesc, _ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
+		const float3 localPos = VolumeWorldToLocal(lodGrid, _ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
 		const float3 localPosFloor = floor(localPos);
 
-		const float2 uvCellSize = 1.0 / lodDesc.volumeCellCount.xy;
+		const float2 uvCellSize = 1.0 / lodGrid.volumeCellCount.xy;
 		const float2 uv0 = uvCellSize * localPosFloor.xy;
 		const float2 uvH = uvCellSize * 2.0;
 

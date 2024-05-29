@@ -191,9 +191,9 @@ float3 GetVolumeGravity(float3 x0)
 
 float3 GetVolumeImpulse(float3 x0, float3 v0)
 {
-	const VolumeLODGrid volumeDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+	const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
-	float3 volumeUVW = VolumeWorldToUVW(volumeDesc, x0);
+	float3 volumeUVW = VolumeWorldToUVW(lodGrid, x0);
 	float3 volumeImpulse = 0.0;
 
 	// add cell pressure
@@ -548,16 +548,16 @@ void KInitializePostVolume(
 {
 	DECLARE_STRAND(worldIdx.x);
 
-	const VolumeLODGrid gridDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+	const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
 	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 	{
-		float3 uvw = VolumeWorldToUVW(gridDesc, _ParticlePosition[i].xyz);
+		float3 uvw = VolumeWorldToUVW(lodGrid, _ParticlePosition[i].xyz);
 		float accu_w = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, uvw, 0).w;
 
 		// estimate pre-insertion value given trilinear sample and trilinear weights
 		{
-			accu_w *= VolumeWorldToCellTrilinearInverseMultiplier(gridDesc, _ParticlePosition[i].xyz);
+			accu_w *= VolumeWorldToCellTrilinearInverseMultiplier(lodGrid, _ParticlePosition[i].xyz);
 		}
 
 		_InitialParticleOffset[i].w = accu_w;

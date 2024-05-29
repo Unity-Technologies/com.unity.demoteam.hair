@@ -7,7 +7,7 @@ void HairVolumeUVW_float(
 	in float3 in_positionWS,
 	out float3 out_volumeUVW)
 {
-	const VolumeLODGrid volumeDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+	const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 	{
 		out_volumeUVW = VolumeWorldToUVW(volumeDesc, in_positionWS);
 	}

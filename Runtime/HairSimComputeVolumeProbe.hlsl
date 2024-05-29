@@ -20,11 +20,11 @@ real3 SphericalToCartesian(real phi, real cosTheta)
 	return SphericalToCartesian(cosPhi, sinPhi, cosTheta);
 }
 
-float EstimateStrandCount(const VolumeLODGrid lodDesc, float3 P, float3 L)
+float EstimateStrandCount(const VolumeLODGrid lodGrid, float3 P, float3 L)
 {
 	float rho_sum = 0;
 
-	VolumeTraceState trace = VolumeTraceBegin(lodDesc, P, L, 0, _ScatteringProbeSubsteps);
+	VolumeTraceState trace = VolumeTraceBegin(lodGrid, P, L, 0, _ScatteringProbeSubsteps);
 
 	if ((_VolumeFeatures & VOLUMEFEATURES_SCATTERING_FASTPATH) != 0)
 	{
@@ -37,7 +37,7 @@ float EstimateStrandCount(const VolumeLODGrid lodDesc, float3 P, float3 L)
 	{
 		while (VolumeTraceStep(trace))
 		{
-			if (BoundaryDistance(VolumeUVWToWorld(lodDesc, trace.uvw)) < _ScatteringProbeOccluderMargin * lodDesc.volumeCellRadius)
+			if (BoundaryDistance(VolumeUVWToWorld(lodGrid, trace.uvw)) < _ScatteringProbeOccluderMargin * lodGrid.volumeCellRadius)
 			{
 				rho_sum += VolumeSampleScalar(_VolumeDensity, trace.uvw) + _ScatteringProbeOccluderDensity;
 			}
@@ -48,7 +48,7 @@ float EstimateStrandCount(const VolumeLODGrid lodDesc, float3 P, float3 L)
 		}
 	}
 		
-	const float stepLength = length(VolumeWorldSize(lodDesc) * trace.uvwStep);
+	const float stepLength = length(VolumeWorldSize(lodGrid) * trace.uvwStep);
 	const float stepCapacity = max(0.0, stepLength / _ScatteringProbeUnitWidth);
 
 	return (rho_sum * stepCapacity);
@@ -69,7 +69,7 @@ float EstimateSH(int l, int m, float3 L)
 	return -1;
 }
 
-float EncodeSHCoefficient(const VolumeLODGrid lodDesc, float3 P, int l, int m)
+float EncodeSHCoefficient(const VolumeLODGrid lodGrid, float3 P, int l, int m)
 {
 	const int SAMPLES_PHI = _ScatteringProbeSamplesPhi;
 	const int SAMPLES_THETA = _ScatteringProbeSamplesTheta;
@@ -92,7 +92,7 @@ float EncodeSHCoefficient(const VolumeLODGrid lodDesc, float3 P, int l, int m)
 
 			float3 L = SphericalToCartesian(phi, cosTheta);
 
-			float value   = EstimateStrandCount(lodDesc, P, L);
+			float value   = EstimateStrandCount(lodGrid, P, L);
 			float valueSH = EstimateSH(l, m, L); 
 
 			C += value * valueSH * sinTheta * dPhi * dTheta;
@@ -103,21 +103,21 @@ float EncodeSHCoefficient(const VolumeLODGrid lodDesc, float3 P, int l, int m)
 }
 
 // Projects the neighboring density field of the cell into an L1 spherical harmonic.
-void ProjectStrandCountSH(const VolumeLODGrid lodDesc, uint3 index, inout float coefficients[4])
+void ProjectStrandCountSH(const VolumeLODGrid lodGrid, uint3 index, inout float coefficients[4])
 {
-	float3 P = VolumeIndexToWorld(lodDesc, index);
+	float3 P = VolumeIndexToWorld(lodGrid, index);
 
 	// L0
-	coefficients[0] = EncodeSHCoefficient(lodDesc, P, 0,  0);
+	coefficients[0] = EncodeSHCoefficient(lodGrid, P, 0,  0);
 
 	// L1
-	coefficients[1] = EncodeSHCoefficient(lodDesc, P, 1, -1);
-	coefficients[2] = EncodeSHCoefficient(lodDesc, P, 1,  0);
-	coefficients[3] = EncodeSHCoefficient(lodDesc, P, 1, +1);
+	coefficients[1] = EncodeSHCoefficient(lodGrid, P, 1, -1);
+	coefficients[2] = EncodeSHCoefficient(lodGrid, P, 1,  0);
+	coefficients[3] = EncodeSHCoefficient(lodGrid, P, 1, +1);
 }
 
 // Projects the neighboring density field of the cell into an L1 spherical harmonic.
-float4 ProjectStrandCountSH_L0L1(const VolumeLODGrid lodDesc, float3 P)
+float4 ProjectStrandCountSH_L0L1(const VolumeLODGrid lodGrid, float3 P)
 {
 	const int SAMPLES_PHI = _ScatteringProbeSamplesPhi;
 	const int SAMPLES_THETA = _ScatteringProbeSamplesTheta;
@@ -142,7 +142,7 @@ float4 ProjectStrandCountSH_L0L1(const VolumeLODGrid lodDesc, float3 P)
 				sinTheta * sinPhi,
 				cosTheta);
 
-			float strandCountApprox = EstimateStrandCount(lodDesc, P, L);
+			float strandCountApprox = EstimateStrandCount(lodGrid, P, L);
 			float strandCountTerm = strandCountApprox * sinTheta * dPhi * dTheta;
 
 			// L0

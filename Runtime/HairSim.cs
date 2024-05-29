@@ -2307,10 +2307,10 @@ namespace Unity.DemoTeam.Hair
 
 		public static VolumeLODGrid GetVolumeLODSelection(in VolumeData volumeData, VolumeLODStage volumeLODStage)
 		{
-			var lodDescBuffer = volumeData.buffersReadback._VolumeLODStage.GetData<VolumeLODGrid>();
-			if (lodDescBuffer.IsCreated)
+			var lodGridBuffer = volumeData.buffersReadback._VolumeLODStage.GetData<VolumeLODGrid>();
+			if (lodGridBuffer.IsCreated)
 			{
-				return lodDescBuffer[(int)volumeLODStage];
+				return lodGridBuffer[(int)volumeLODStage];
 			}
 			else
 			{

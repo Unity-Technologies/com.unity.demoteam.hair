@@ -186,11 +186,11 @@
 
 	DebugVaryings DebugVert_VolumeCellDensity(uint vertexID : SV_VertexID)
 	{
-		const VolumeLODGrid volumeDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
-		uint3 volumeIdx = VolumeFlatIndexToIndex(volumeDesc, vertexID);
+		uint3 volumeIdx = VolumeFlatIndexToIndex(vertexID);
 		float volumeDensity = _VolumeDensity[volumeIdx];
-		float3 worldPos = (volumeDensity == 0.0) ? 1e+7 : VolumeIndexToWorld(volumeDesc, volumeIdx);
+		float3 worldPos = (volumeDensity == 0.0) ? 1e+7 : VolumeIndexToWorld(lodGrid, volumeIdx);
 
 		DebugVaryings output;
 		output.positionCS = WorldToClip(worldPos);
@@ -201,11 +201,11 @@
 
 	DebugVaryings DebugVert_VolumeCellGradient(uint vertexID : SV_VertexID)
 	{
-		const VolumeLODGrid volumeDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
-		uint3 volumeIdx = VolumeFlatIndexToIndex(volumeDesc, vertexID >> 1);
+		uint3 volumeIdx = VolumeFlatIndexToIndex(vertexID >> 1);
 		float3 volumeGradient = _VolumePressureGrad[volumeIdx];
-		float3 worldPos = VolumeIndexToWorld(volumeDesc, volumeIdx);
+		float3 worldPos = VolumeIndexToWorld(lodGrid, volumeIdx);
 
 		if (vertexID & 1)
 		{
@@ -221,11 +221,11 @@
 
 	DebugVaryings DebugVert_VolumeSlice(uint vertexID : SV_VertexID)
 	{
-		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
 		float3 uvw = float3(((vertexID >> 1) ^ vertexID) & 1, vertexID >> 1, _DebugSliceOffset);
 		float3 uvwWorld = (_DebugSliceAxis == 0) ? uvw.zxy : (_DebugSliceAxis == 1 ? uvw.xzy : uvw.xyz);
-		float3 worldPos = VolumeUVWToWorld(lodDesc, uvwWorld);
+		float3 worldPos = VolumeUVWToWorld(lodGrid, uvwWorld);
 
 		uvw = uvwWorld;
 
@@ -254,11 +254,11 @@
 
 	float4 DebugFrag_VolumeSlice(DebugVaryings input) : SV_Target
 	{
-		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
 		float3 uvw = input.color.xyz;
 
-		float3 localPos = VolumeUVWToLocal(lodDesc, uvw);
+		float3 localPos = VolumeUVWToLocal(lodGrid, uvw);
 		float3 localPosFloor = round(localPos + 0.5);
 
 		float3 gridNormal = float3(_DebugSliceAxis == 0, _DebugSliceAxis == 1, _DebugSliceAxis == 2);
@@ -287,7 +287,7 @@
 		float3 volumeImpulse = VolumeSampleVector(_VolumeImpulse, uvw);
 
 #if 0
-		float3 worldPos = VolumeUVWToWorld(lodDesc, uvw);
+		float3 worldPos = VolumeUVWToWorld(lodGrid, uvw);
 		float sd = BoundaryDistance(worldPos);
 		if (abs(sd) < 0.1)
 		{
@@ -312,7 +312,7 @@
 		/*
 		if (_DebugSliceDivider == 2.0)
 		{
-			float3 step = VolumeLocalToUVW(1.0);
+			float3 step = VolumeLocalToUVW(lodGrid, 1.0);
 			float d_min = 1e+4;
 			float r_max = 0.0;
 
@@ -325,7 +325,7 @@
 						uvw.y,
 						uvw.z + j * step.z);
 
-					float vol = abs(VolumeSampleScalar(lodDesc, _VolumeDensity, uvw_xz));
+					float vol = abs(VolumeSampleScalar(lodGrid, _VolumeDensity, uvw_xz));
 					if (vol > 0.0)
 					{
 						float vol_d = length(float2(i, j));
@@ -373,16 +373,16 @@
 
 	float4 DebugFrag_VolumeIsosurface(DebugVaryings input) : SV_Target
 	{
-		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
 		const float3 worldPos = input.color.xyz;
 		const float3 worldPosCamera = -GetCameraRelativePositionWS(float3(0, 0, 0));
 		const float3 worldDir = normalize(worldPos - worldPosCamera);
 
 		const int numStepsWithinCell = _DebugIsosurfaceSubsteps;
-		const int numSteps = lodDesc.volumeCellCount.x * numStepsWithinCell;
+		const int numSteps = lodGrid.volumeCellCount.x * numStepsWithinCell;
 
-		VolumeTraceState trace = VolumeTraceBegin(lodDesc, worldPos, worldDir, 0.5, numStepsWithinCell);
+		VolumeTraceState trace = VolumeTraceBegin(lodGrid, worldPos, worldDir, 0.5, numStepsWithinCell);
 
 		float3 accuDensity = 0;
 
