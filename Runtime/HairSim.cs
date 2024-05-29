@@ -1552,7 +1552,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						for (int i = 0; i != boundaryCount; i++)
 						{
-							ptrRemap[i] = volumeData.boundaryPrevHandle.IndexOf(ptrHandle[i]);
+							ptrRemap[i] = NativeArrayExtensions.IndexOf<int>(volumeData.boundaryPrevHandle, ptrHandle[i]);
 						}
 
 						for (int i = boundaryCount; i != Conf.MAX_BOUNDARIES; i++)
@@ -1689,7 +1689,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						for (int i = 0; i != emitterCount; i++)
 						{
-							ptrRemap[i] = volumeData.emitterPrevHandle.IndexOf(ptrHandle[i]);
+							ptrRemap[i] = NativeArrayExtensions.IndexOf<int>(volumeData.emitterPrevHandle, ptrHandle[i]);
 						}
 
 						for (int i = emitterCount; i != Conf.MAX_EMITTERS; i++)
