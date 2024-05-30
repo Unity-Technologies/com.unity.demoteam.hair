@@ -517,6 +517,7 @@ namespace Unity.DemoTeam.Hair
 											previewMaterial.shader = sourceMaterial.shader;
 
 										previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
+										previewMaterial.EnableKeyword("HAIR_VERTEX_LIVE");
 									}
 
 									ref var previewBuffersShared = ref previewDataShared.buffers;
