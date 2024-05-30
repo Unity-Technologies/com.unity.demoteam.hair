@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed an issue with wind emitter clock not being deterministic.
+- Fixed some compatibility issues with Metal.
 
 
 ## [0.13.0-exp.1] - 2024-04-16
