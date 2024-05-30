@@ -940,6 +940,7 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					materialInstance.CopyPropertiesFromMaterial(materialAsset);
+					materialInstance.EnableKeyword("HAIR_VERTEX_LIVE");
 				}
 
 				if (materialInstance != null)

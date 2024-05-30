@@ -416,11 +416,11 @@ HairVertexData GetHairVertex(
 	const float3 staticTangentOS,
 	const HairVertexModifiers m = defaultHairVertexModifiers)
 {
-	if (_DecodeVertexCount > 0)
+#if HAIR_VERTEX_LIVE
 	{
 		return GetHairVertexOS(DecodeHairVertexID(packedID), m);
 	}
-	else
+#else
 	{
 		HairVertexData v = defaultHairVertexData;
 		{
@@ -430,6 +430,7 @@ HairVertexData GetHairVertex(
 		}
 		return v;
 	}
+#endif
 }
 
 //-------------
