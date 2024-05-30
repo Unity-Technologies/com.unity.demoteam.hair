@@ -31,21 +31,6 @@ namespace Unity.DemoTeam.Hair
 
 		static RuntimeFlags s_runtimeFlags;
 
-		static ComputeBuffer s_DummyComputeBuffer;
-
-		public static ComputeBuffer dummyComputeBuffer
-		{
-			get
-			{
-				if (s_DummyComputeBuffer == null || !s_DummyComputeBuffer.IsValid())
-				{
-					s_DummyComputeBuffer = new ComputeBuffer(1, sizeof(uint), ComputeBufferType.Raw);
-				}
-
-				return s_DummyComputeBuffer;
-			}
-		}
-
 		[Flags]
 		enum RuntimeFlags
 		{
@@ -552,8 +537,8 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(SolverData.s_bufferIDs._LODGuideCarry, solverBuffers._LODGuideCarry);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._LODGuideReach, solverBuffers._LODGuideReach);
 
-			target.BindComputeBuffer(SolverData.s_bufferIDs._StagingVertex, solverBuffers._StagingVertex ?? dummyComputeBuffer);
-			target.BindComputeBuffer(SolverData.s_bufferIDs._StagingVertexPrev, solverBuffers._StagingVertexPrev ?? dummyComputeBuffer);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._StagingVertex, solverBuffers._StagingVertex);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._StagingVertexPrev, solverBuffers._StagingVertexPrev);
 
 			target.BindKeyword("LAYOUT_INTERLEAVED", solverKeywords.LAYOUT_INTERLEAVED);
 			target.BindKeyword("LIVE_POSITIONS_3", solverKeywords.LIVE_POSITIONS_3);
