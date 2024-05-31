@@ -196,7 +196,6 @@ namespace Unity.DemoTeam.Hair
 					s_debugDrawPb = new MaterialPropertyBlock();
 				}
 
-
 				InitializeStructFields(ref SolverData.s_bufferIDs, (string s) => Shader.PropertyToID(s));
 				InitializeStructFields(ref SolverData.s_textureIDs, (string s) => Shader.PropertyToID(s));
 				InitializeStructFields(ref SolverData.s_externalIDs, (string s) => Shader.PropertyToID(s));
