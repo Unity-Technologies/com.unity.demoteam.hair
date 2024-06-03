@@ -25,6 +25,8 @@ namespace Unity.DemoTeam.Hair
 
 	public static class HairTopologyCache
 	{
+		const int DELAY_UNUSED = 10;
+
 		static bool s_initialized = false;
 
 		static Dictionary<ulong, Mesh> s_keyToMesh = null;
@@ -136,7 +138,7 @@ namespace Unity.DemoTeam.Hair
 
 				foreach (var pair in s_keyToUsage)
 				{
-					if (pair.Value < 0)
+					if (pair.Value + DELAY_UNUSED < 0)
 					{
 						removeKeys.Add(pair.Key);
 					}
