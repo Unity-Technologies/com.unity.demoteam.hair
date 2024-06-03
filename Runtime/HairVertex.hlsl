@@ -416,7 +416,7 @@ HairVertexData GetHairVertex(
 	const float3 staticTangentOS,
 	const HairVertexModifiers m = defaultHairVertexModifiers)
 {
-#if HAIR_VERTEX_LIVE
+#if HAIR_VERTEX_LIVE || !SHADER_STAGE_VERTEX
 	{
 		return GetHairVertexOS(DecodeHairVertexID(packedID), m);
 	}
