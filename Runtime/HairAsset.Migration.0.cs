@@ -208,6 +208,7 @@ namespace Unity.DemoTeam.Hair
 						}
 
 						// ensure valid mesh assets
+						/*REMOVED
 						{
 							static void ValidateRenderMesh(__1__StrandGroup out_1, HairAsset hairAsset, ref Mesh meshAsset, HairInstanceBuilder.FnCreateRenderMesh fnCreateRenderMesh)
 							{
@@ -238,6 +239,7 @@ namespace Unity.DemoTeam.Hair
 							ValidateRenderMesh(out_1, hairAsset, ref out_1.meshAssetStrips, HairInstanceBuilder.CreateRenderMeshStrips);
 							ValidateRenderMesh(out_1, hairAsset, ref out_1.meshAssetTubes, HairInstanceBuilder.CreateRenderMeshTubes);
 						}
+						*/
 					}
 
 					for (int i = 0; i != (data_1_strandGroups?.Length ?? 0); i++)

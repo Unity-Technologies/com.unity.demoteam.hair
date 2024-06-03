@@ -5,12 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [unreleased]
+## [0.14.0-exp.1] - 2024-06-03
 
 ### Added
 
-- Added support for subframe interpolation of per-frame collision boundaries.
-- Added support for subframe interpolation of per-frame wind emitters.
+- Added runtime topology cache to enable automatic creation and sharing of topology data between multiple hair instances (reduces runtime memory footprint.)
+- Added initial support for subframe interpolation of per-frame collision boundaries.
+- Added initial support for subframe interpolation of per-frame wind emitters.
+- Added icons for assets and components.
+
+### Fixed
+
+- Fixed a determinism issue caused by wind emitter clock not matching simulation time.
+- Fixed a few compatibility issues with Metal.
+
+### Changed
+
+- Changed default diameter scale when ingesting alembic curve widths from 1.0 to 0.01 (since alembic curve widths are often specified in cm.)
+- Changed root mesh construction to output 16 bit indices when possible.
+
+### Removed
+
+- Removed asset level topology data entirely in favour of shared runtime data, reducing per-particle storage requirements considerably (per-particle reduction of 6.5x - 12.1x, from 79-146 (min-max) to 12 bytes per particle), effectively resulting in smaller hair assets.
 
 
 ## [0.13.0-exp.1] - 2024-04-16
@@ -166,7 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
-[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.13.0-exp.1...HEAD
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.14.0-exp.1...HEAD
+[0.14.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.13.0-exp.1...0.14.0-exp.1
 [0.13.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.12.0-exp.1...0.13.0-exp.1
 [0.12.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.11.0-exp.1...0.12.0-exp.1
 [0.11.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.10.0-exp.1...0.11.0-exp.1

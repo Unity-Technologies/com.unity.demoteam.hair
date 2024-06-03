@@ -4,12 +4,14 @@
 #pragma kernel KRoots									THREAD_GROUP_SIZE=64	F_INPUT
 #pragma kernel KRootsHistory							THREAD_GROUP_SIZE=64	F_INPUT
 #pragma kernel KRootsSubstep							THREAD_GROUP_SIZE=64	F_INPUT
-#pragma kernel KInitialize								THREAD_GROUP_SIZE=64	F_INIT
-#pragma kernel KInitializePostVolume					THREAD_GROUP_SIZE=64	F_INIT
+
 #pragma kernel KLODSelectionInit						THREAD_GROUP_SIZE=1		F_LOD
 #pragma kernel KLODSelection							THREAD_GROUP_SIZE=1		F_LOD
+
+#pragma kernel KInitialize								THREAD_GROUP_SIZE=64	F_INIT
+#pragma kernel KInitializePostVolume					THREAD_GROUP_SIZE=64	F_INIT
 #pragma kernel KSolveConstraints_GaussSeidelReference	THREAD_GROUP_SIZE=64	F_SOLVE
-#pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64	F_SOLVE		GROUPSHARED_STRAND_PROPERTIES=0 GROUPSHARED_BOUNDARY_DATA=1
+#pragma kernel KSolveConstraints_GaussSeidel			THREAD_GROUP_SIZE=64	F_SOLVE		ALLOW_GROUPSHARED_STRAND_PROPERTIES=0 ALLOW_GROUPSHARED_BOUNDARY_DATA=1
 #pragma kernel KSolveConstraints_Jacobi_16				THREAD_GROUP_SIZE=16	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_16
 #pragma kernel KSolveConstraints_Jacobi_32				THREAD_GROUP_SIZE=32	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_32
 #pragma kernel KSolveConstraints_Jacobi_64				THREAD_GROUP_SIZE=64	F_SOLVE		KSolveConstraints_Jacobi=KSolveConstraints_Jacobi_64
@@ -142,7 +144,7 @@ float GetBendingRadius(uint strandIndex)
 	return _LocalCurvature * GetParticleInterval(strandIndex);
 }
 
-#if GROUPSHARED_STRAND_PROPERTIES && CHECK_POW_2(THREAD_GROUP_SIZE)
+#if ALLOW_GROUPSHARED_STRAND_PROPERTIES && CHECK_POW_2(THREAD_GROUP_SIZE)
 
 groupshared float3 gs_rootPosition[THREAD_GROUP_SIZE];
 groupshared float4 gs_rootFrame[THREAD_GROUP_SIZE];
@@ -189,9 +191,9 @@ float3 GetVolumeGravity(float3 x0)
 
 float3 GetVolumeImpulse(float3 x0, float3 v0)
 {
-	const VolumeLODGrid volumeDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+	const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
-	float3 volumeUVW = VolumeWorldToUVW(volumeDesc, x0);
+	float3 volumeUVW = VolumeWorldToUVW(lodGrid, x0);
 	float3 volumeImpulse = 0.0;
 
 	// add cell pressure
@@ -488,9 +490,9 @@ void KInitialize(
 			_ParticlePositionPrevPrev[i].xyz = (worldRootPos + worldParticleOffset);
 #endif
 
-			_ParticleVelocity[i] = float3(0.0, 0.0, 0.0);//, GetParticleInterval(strandIndex));
+			_ParticleVelocity[i] = float3(0.0, 0.0, 0.0);
 #if SECOND_ORDER_UPDATE
-			_ParticleVelocityPrev[i] = float3(0.0, 0.0, 0.0);//, GetParticleInterval(strandIndex));
+			_ParticleVelocityPrev[i] = float3(0.0, 0.0, 0.0);
 #endif
 		}
 	}
@@ -546,23 +548,19 @@ void KInitializePostVolume(
 {
 	DECLARE_STRAND(worldIdx.x);
 
-	const VolumeLODGrid gridDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+	const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
 	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 	{
-		float3 uvw = VolumeWorldToUVW(gridDesc, _ParticlePosition[i].xyz);
+		float3 uvw = VolumeWorldToUVW(lodGrid, _ParticlePosition[i].xyz);
 		float accu_w = _VolumeVelocity.SampleLevel(_Volume_trilinear_clamp, uvw, 0).w;
 
 		// estimate pre-insertion value given trilinear sample and trilinear weights
 		{
-			accu_w *= VolumeWorldToCellTrilinearInverseMultiplier(gridDesc, _ParticlePosition[i].xyz);
+			accu_w *= VolumeWorldToCellTrilinearInverseMultiplier(lodGrid, _ParticlePosition[i].xyz);
 		}
 
-// 		_ParticlePosition[i].w = accu_w;//TODO pack elsewhere?
-// 		_ParticlePositionPrev[i].w = accu_w;
-// #if SECOND_ORDER_UPDATE
-// 		_ParticlePositionPrevPrev[i].w = accu_w;
-// #endif
+		_InitialParticleOffset[i].w = accu_w;
 	}
 }
 

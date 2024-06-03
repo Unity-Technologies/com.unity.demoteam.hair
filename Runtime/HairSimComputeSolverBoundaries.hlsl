@@ -6,7 +6,7 @@
 
 #define BOUNDARIES_OPT_HINT_LOOP 1
 #define BOUNDARIES_OPT_PACK_CUBE 0
-#if GROUPSHARED_BOUNDARY_DATA
+#if ALLOW_GROUPSHARED_BOUNDARY_DATA
 #define BOUNDARIES_OPT_GROUP_MEM 0// requires call to PrepareBoundaryData(threadIndex, threadCount)
 #endif
 

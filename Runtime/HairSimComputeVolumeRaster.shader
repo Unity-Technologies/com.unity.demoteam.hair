@@ -9,6 +9,7 @@
 	#include "HairSimData.hlsl"
 	#include "HairSimComputeConfig.hlsl"
 	#include "HairSimComputeVolumeUtility.hlsl"
+	#include "HairSimComputeVolumeTransfer.hlsl"
 
 	struct SliceVaryings
 	{
@@ -57,12 +58,12 @@
 		//   C = cell centers
 		//   x = particle
 
-		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
-		const float3 localPos = VolumeWorldToLocal(lodDesc, _ParticlePosition[vertexID[0]].xyz) - 0.5;// subtract offset to cell center
+		const float3 localPos = VolumeWorldToLocal(lodGrid, _ParticlePosition[vertexID[0]].xyz) - 0.5;// subtract offset to cell center
 		const float3 localPosFloor = floor(localPos);
 
-		const float2 uvCellSize = 1.0 / lodDesc.volumeCellCount.xy;
+		const float2 uvCellSize = 1.0 / lodGrid.volumeCellCount.xy;
 		const float2 uv0 = uvCellSize * localPosFloor.xy;
 		const float2 uvH = uvCellSize * 2.0;
 
@@ -75,8 +76,7 @@
 		const float w1 = localPos.z - localPosFloor.z;
 		const float w0 = 1.0 - w1;
 
-		//TODO update this, should fetch .w from per-strand buffer
-		const float4 v = float4(_ParticleVelocity[vertexID[0]], 1.0);
+		const float4 v = float4(_ParticleVelocity[vertexID[0]], GetParticleVolumeWeight(vertexID[0]));
 		const float4 value = float4((v.xyz * v.w), v.w);
 
 		outStream.Append(MakeVertex(ndc0 + ndcH.zz, value * w0, localPos.xy, slice0));
@@ -103,7 +103,7 @@
 		// j          0  0  0  0    1  1  1  1    0  0  0  0    1  1  1  1    (vertexID >> 2) & 1
 		// uvID       0  1  2  3    0  1  2  3    0  1  2  3    0  1  2  3    (vertexID & 3)
 
-		const VolumeLODGrid lodDesc = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
+		const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
 
 		const uint i = (vertexID >> 3);
 		const uint j = (vertexID >> 2) & 1;
@@ -111,10 +111,10 @@
 		const uint uvID = (vertexID & 3);
 		const float2 uv = float2(((uvID >> 1) ^ uvID) & 1, uvID >> 1);
 
-		const float3 localPos = VolumeWorldToLocal(lodDesc, _ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
+		const float3 localPos = VolumeWorldToLocal(lodGrid, _ParticlePosition[i].xyz) - 0.5;// subtract offset to cell center
 		const float3 localPosFloor = floor(localPos);
 
-		const float2 uvCellSize = 1.0 / lodDesc.volumeCellCount.xy;
+		const float2 uvCellSize = 1.0 / lodGrid.volumeCellCount.xy;
 		const float2 uv0 = uvCellSize * localPosFloor.xy;
 		const float2 uvH = uvCellSize * 2.0;
 
@@ -124,8 +124,7 @@
 		const float w1 = localPos.z - localPosFloor.z;
 		const float w0 = 1.0 - w1;
 
-		//TODO update this, should fetch .w from per-strand buffer
-		const float4 v = float4(_ParticleVelocity[i], 1.0);
+		const float4 v = float4(_ParticleVelocity[i], GetParticleVolumeWeight(i));
 
 		SliceVaryings output;
 		output.volumePos = float4(ndc0 + ndcH * uv, 0.0, 1.0);

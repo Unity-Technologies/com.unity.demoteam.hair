@@ -149,15 +149,9 @@ namespace Unity.DemoTeam.Hair
 					if (buildFlags.HasFlag(BuildFlags.DisableLinking) == false)
 					{
 						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetRoots, hairAsset);
-						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetLines, hairAsset);
-						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetStrips, hairAsset);
-						AssetDatabase.AddObjectToAsset(hairAsset.strandGroups[i].meshAssetTubes, hairAsset);
 					}
 
 					hairAsset.strandGroups[i].meshAssetRoots.name += (":" + i);
-					hairAsset.strandGroups[i].meshAssetLines.name += (":" + i);
-					hairAsset.strandGroups[i].meshAssetStrips.name += (":" + i);
-					hairAsset.strandGroups[i].meshAssetTubes.name += (":" + i);
 				}
 			}
 
@@ -1029,27 +1023,6 @@ namespace Unity.DemoTeam.Hair
 						strandGroup.strandCount,
 						strandGroup.strandParticleCount,
 						strandGroup.particlePosition);
-
-					strandGroup.meshAssetLines = HairInstanceBuilder.CreateRenderMeshLines(
-						hideFlags,
-						strandGroup.particleMemoryLayout,
-						strandGroup.strandCount,
-						strandGroup.strandParticleCount,
-						strandGroup.bounds);
-
-					strandGroup.meshAssetStrips = HairInstanceBuilder.CreateRenderMeshStrips(
-						hideFlags,
-						strandGroup.particleMemoryLayout,
-						strandGroup.strandCount,
-						strandGroup.strandParticleCount,
-						strandGroup.bounds);
-
-					strandGroup.meshAssetTubes = HairInstanceBuilder.CreateRenderMeshTubes(
-						hideFlags,
-						strandGroup.particleMemoryLayout,
-						strandGroup.strandCount,
-						strandGroup.strandParticleCount,
-						strandGroup.bounds);
 				}
 			}
 		}

@@ -341,7 +341,7 @@ namespace Unity.DemoTeam.Hair
 				rootUVFallback = Vector2.zero,
 
 				strandDiameter = StrandDiameter.ResolveFromCurves,
-				strandDiameterScale = 1.0f,
+				strandDiameterScale = 0.01f,
 				strandDiameterFallback = SharedDefaults.defaultStrandDiameter,
 				tipScaleFallback = SharedDefaults.defaultTipScale,
 				tipScaleFallbackOffset = SharedDefaults.defaultTipScaleOffset,

@@ -33,9 +33,9 @@ namespace Unity.DemoTeam.Hair
 
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.groupContainer);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
+#if !UNITY_2021_2_OR_NEWER
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstance);
+#endif
 				}
 			}
 
@@ -152,15 +152,19 @@ namespace Unity.DemoTeam.Hair
 
 		public static unsafe void BuildMeshRoots(Mesh meshRoots, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, Vector3[] particlePosition)
 		{
+			var indexFormat = IndexFormat.UInt32;
+			var indexStride = sizeof(uint);
+			var indexCount = strandCount;
+
 			using (var rootMeshPosition = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			using (var rootMeshTangent = new NativeArray<Vector4>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			using (var rootMeshNormal = new NativeArray<Vector3>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
-			using (var indices = new NativeArray<int>(strandCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+			using (var indices = new NativeArray<byte>(indexCount * indexStride, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
 			{
 				var rootMeshPositionPtr = (Vector3*)rootMeshPosition.GetUnsafePtr();
 				var rootMeshTangentPtr = (Vector4*)rootMeshTangent.GetUnsafePtr();
 				var rootMeshNormalPtr = (Vector3*)rootMeshNormal.GetUnsafePtr();
-				var indicesPtr = (int*)indices.GetUnsafePtr();
+				var indicesPtr = (uint*)indices.GetUnsafePtr();
 
 				// write attributes
 				for (int i = 0; i != strandCount; i++)
@@ -183,9 +187,23 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// write indices
-				for (int i = 0; i != strandCount; i++)
+				for (uint i = 0; i != strandCount; i++)
 				{
 					*(indicesPtr++) = i;
+				}
+
+				if (strandCount <= UInt16.MaxValue)
+				{
+					var indicesPtrRead = (uint*)indices.GetUnsafePtr();
+					var indicesPtrWrite = (ushort*)indices.GetUnsafePtr();
+
+					for (uint i = 0; i != strandCount; i++)
+					{
+						*(indicesPtrWrite++) = (ushort)(*(indicesPtrRead++));
+					}
+
+					indexFormat = IndexFormat.UInt16;
+					indexStride = sizeof(ushort);
 				}
 
 				// apply to mesh
@@ -195,16 +213,23 @@ namespace Unity.DemoTeam.Hair
 					meshRoots.SetVertexBufferParams(meshVertexCount,
 						new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, dimension: 3, stream: 0),
 						new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, dimension: 3, stream: 1),
-						new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, dimension: 4, stream: 2)
-					);
+						new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, dimension: 4, stream: 2));
+					{
+						meshRoots.SetVertexBufferData(rootMeshPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
+						meshRoots.SetVertexBufferData(rootMeshNormal, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
+						meshRoots.SetVertexBufferData(rootMeshTangent, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
+					}
 
-					meshRoots.SetVertexBufferData(rootMeshPosition, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 0, meshUpdateFlags);
-					meshRoots.SetVertexBufferData(rootMeshNormal, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 1, meshUpdateFlags);
-					meshRoots.SetVertexBufferData(rootMeshTangent, dataStart: 0, meshBufferStart: 0, meshVertexCount, stream: 2, meshUpdateFlags);
+					meshRoots.SetIndexBufferParams(indexCount, indexFormat);
+					{
+						switch (indexFormat)
+						{
+							case IndexFormat.UInt16: meshRoots.SetIndexBufferData(indices.Reinterpret<byte, ushort>(), dataStart: 0, meshBufferStart: 0, indexCount, meshUpdateFlags); break;
+							case IndexFormat.UInt32: meshRoots.SetIndexBufferData(indices.Reinterpret<byte, uint>(), dataStart: 0, meshBufferStart: 0, indexCount, meshUpdateFlags); break;
+						}
+					}
 
-					meshRoots.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
-					meshRoots.SetIndexBufferData(indices, dataStart: 0, meshBufferStart: 0, indices.Length, meshUpdateFlags);
-					meshRoots.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length, MeshTopology.Points) { vertexCount = meshVertexCount }, meshUpdateFlags);
+					meshRoots.SetSubMesh(0, new SubMeshDescriptor(0, indexCount, MeshTopology.Points) { vertexCount = meshVertexCount }, meshUpdateFlags);
 					meshRoots.RecalculateBounds();
 				}
 			}

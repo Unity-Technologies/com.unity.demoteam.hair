@@ -40,6 +40,7 @@ namespace Unity.DemoTeam.Hair
 		Vector2 previewAngle;
 		float previewZoom;
 
+		HairTopologyDesc[] previewMeshes;
 		HairSim.VolumeData previewDataShared;
 		HairSim.SolverData[] previewData;
 		string previewDataChecksum;
@@ -499,15 +500,18 @@ namespace Unity.DemoTeam.Hair
 									}
 
 									// draw preview
-									var meshLines = hairAsset.strandGroups[i].meshAssetLines;
-									var meshCenter = hairAsset.strandGroups[i].bounds.center;
-									var meshRadius = hairAsset.strandGroups[i].bounds.extents.magnitude * Mathf.Lerp(1.0f, 0.5f, previewZoom);
+									var boundsCenter = hairAsset.strandGroups[i].bounds.center;
+									var boundsRadius = hairAsset.strandGroups[i].bounds.extents.magnitude;
+									var boundsRadiusMag = boundsRadius * Mathf.Lerp(1.0f, 0.5f, previewZoom);
 
-									var cameraDistance = meshRadius / Mathf.Sin(0.5f * Mathf.Deg2Rad * previewRenderer.cameraFieldOfView);
+									var cameraDistanceFitted = boundsRadiusMag / Mathf.Sin(0.5f * Mathf.Deg2Rad * previewRenderer.cameraFieldOfView);
 									var cameraTransform = previewRenderer.camera.transform;
 									{
 										cameraTransform.Rotate(drag.y, drag.x, 0.0f, Space.Self);
-										cameraTransform.position = meshCenter - cameraDistance * cameraTransform.forward;
+										cameraTransform.position = boundsCenter - cameraDistanceFitted * cameraTransform.forward;
+
+										previewRenderer.camera.nearClipPlane = Mathf.Max(1e-7f, cameraDistanceFitted - boundsRadius);
+										previewRenderer.camera.farClipPlane = Mathf.Max(1e-7f, cameraDistanceFitted + boundsRadius);
 									}
 
 									var sourceMaterial = HairMaterialUtility.GetCurrentPipelineDefault();
@@ -517,6 +521,7 @@ namespace Unity.DemoTeam.Hair
 											previewMaterial.shader = sourceMaterial.shader;
 
 										previewMaterial.CopyPropertiesFromMaterial(sourceMaterial);
+										previewMaterial.EnableKeyword("HAIR_VERTEX_LIVE");
 									}
 
 									ref var previewBuffersShared = ref previewDataShared.buffers;
@@ -546,9 +551,9 @@ namespace Unity.DemoTeam.Hair
 									previewMaterial.SetInt("_DecodeVertexCount", 1);
 									previewMaterial.SetInt("_DecodeVertexWidth", 0);
 
-									if (meshLines != null)
+									var mesh = HairTopologyCache.GetSharedMesh(previewMeshes[i]);
 									{
-										switch (meshLines.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
+										switch (mesh.GetVertexAttributeFormat(VertexAttribute.TexCoord0))
 										{
 											case VertexAttributeFormat.UNorm16:
 												previewMaterial.SetInt("_DecodeVertexComponentValue", ushort.MaxValue);
@@ -563,7 +568,7 @@ namespace Unity.DemoTeam.Hair
 									}
 
 									previewRenderer.BeginPreview(rect, GUIStyle.none);
-									previewRenderer.DrawMesh(meshLines, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
+									previewRenderer.DrawMesh(mesh, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
 									previewRenderer.Render(true, true);
 									previewRenderer.EndAndDrawPreview(rect);
 								}
@@ -612,7 +617,10 @@ namespace Unity.DemoTeam.Hair
 
 			previewData = null;
 			previewDataChecksum = string.Empty;
+			previewMeshes = null;
 			previewLOD = null;
+
+			EditorApplication.update -= PingPreviewMeshes;
 		}
 
 		void InitializePreviewData(HairAsset hairAsset)
@@ -626,6 +634,7 @@ namespace Unity.DemoTeam.Hair
 			if (strandGroups == null)
 				return;
 
+			previewMeshes = new HairTopologyDesc[strandGroups.Length];
 			previewData = new HairSim.SolverData[strandGroups.Length];
 			previewLOD = new int[strandGroups.Length];
 
@@ -639,6 +648,17 @@ namespace Unity.DemoTeam.Hair
 				for (int i = 0; i != previewData.Length; i++)
 				{
 					ref var strandGroup = ref strandGroups[i];
+
+					ref var previewMesh = ref previewMeshes[i];
+					{
+						previewMesh = new HairTopologyDesc
+						{
+							type = HairTopologyType.Lines,
+							strandCount = hairAsset.strandGroups[i].strandCount,
+							strandParticleCount = hairAsset.strandGroups[i].strandParticleCount,
+							memoryLayout = hairAsset.strandGroups[i].particleMemoryLayout,
+						};
+					}
 
 					ref var previewBuffers = ref previewData[i].buffers;
 					ref var previewConstants = ref previewData[i].constants;
@@ -664,6 +684,8 @@ namespace Unity.DemoTeam.Hair
 						previewConstants._StagingStrandVertexOffset = previewConstants._StrandParticleOffset;
 
 						previewConstants._RenderLODMethod = (uint)HairSim.RenderLODSelection.Manual;
+						previewConstants._RenderLODScale = 1.0f;
+						previewConstants._RenderLODBias = 0.0f;
 						previewConstants._RenderLODClipThreshold = 0.05f;//TODO remove this once HairVertex implements hard upper bound
 					}
 
@@ -688,6 +710,8 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			previewDataChecksum = hairAsset.checksum;
+
+			EditorApplication.update += PingPreviewMeshes;
 		}
 
 		void InitializePreviewLOD(int i, int lodIndex)
@@ -720,6 +744,14 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			previewLOD[i] = lodIndex;
+		}
+
+		void PingPreviewMeshes()
+		{
+			foreach (var meshDesc in previewMeshes)
+			{
+				HairTopologyCache.GetSharedMesh(meshDesc);
+			}
 		}
 
 		static void CreateBufferWithData<T>(ref ComputeBuffer buffer, T[] data, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged

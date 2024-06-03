@@ -31,7 +31,7 @@ namespace Unity.DemoTeam.Hair
 				RenderPipelineManager.beginCameraRendering += HandleBeginCameraRendering;
 				RenderPipelineManager.endCameraRendering += HandleEndCameraRendering;
 
-				s_container = new GameObject("HairSimDebugDrawContainer");
+				s_container = new GameObject(nameof(HairSimDebugDraw));
 				s_container.hideFlags = HideFlags.HideAndDontSave;
 
 #if UNITY_EDITOR
@@ -81,7 +81,6 @@ namespace Unity.DemoTeam.Hair
 			switch (camera.cameraType)
 			{
 				case CameraType.Game:
-				case CameraType.Preview:
 				case CameraType.SceneView:
 					return true;
 

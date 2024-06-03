@@ -28,96 +28,98 @@
 	worldToLocal(Q) = (3, 3, 3)
 */
 
-float3 VolumeWorldSize(const VolumeLODGrid lodDesc)
+float3 VolumeWorldSize(const VolumeLODGrid lodGrid)
 {
-	return lodDesc.volumeWorldMax.xyz - lodDesc.volumeWorldMin.xyz;
+	return lodGrid.volumeWorldMax.xyz - lodGrid.volumeWorldMin.xyz;
 }
 
-float3 VolumeWorldCellSize(const VolumeLODGrid lodDesc)
+float3 VolumeWorldCellSize(const VolumeLODGrid lodGrid)
 {
-	return VolumeWorldSize(lodDesc) / lodDesc.volumeCellCount;
+	return VolumeWorldSize(lodGrid) / _GridResolution.xxx;
 }
 
-float VolumeWorldCellVolume(const VolumeLODGrid lodDesc)
+float VolumeWorldCellVolume(const VolumeLODGrid lodGrid)
 {
-	float3 worldCellSize = VolumeWorldCellSize(lodDesc);
+	float3 worldCellSize = VolumeWorldCellSize(lodGrid);
 	return worldCellSize.x * worldCellSize.y * worldCellSize.z;
 }
 
 //-------------
 // conversions
 
-float3 VolumeWorldToUVW(const VolumeLODGrid lodDesc, float3 worldPos)
+float3 VolumeWorldToUVW(const VolumeLODGrid lodGrid, float3 worldPos)
 {
 	//TODO sanitize out of bounds?
-	float3 uvw = (worldPos - lodDesc.volumeWorldMin.xyz) / (lodDesc.volumeWorldMax.xyz - lodDesc.volumeWorldMin.xyz);
+	float3 uvw = (worldPos - lodGrid.volumeWorldMin.xyz) / (lodGrid.volumeWorldMax.xyz - lodGrid.volumeWorldMin.xyz);
 	return uvw;
 }
 
-float3 VolumeWorldToLocal(const VolumeLODGrid lodDesc, float3 worldPos)
+float3 VolumeWorldToLocal(const VolumeLODGrid lodGrid, float3 worldPos)
 {
-	float3 localPos = lodDesc.volumeCellCount.xyz * VolumeWorldToUVW(lodDesc, worldPos);
+	float3 localPos = _GridResolution.xxx * VolumeWorldToUVW(lodGrid, worldPos);
 	return localPos;
 }
 
-uint3 VolumeWorldToIndex(const VolumeLODGrid lodDesc, float3 worldPos)
+uint3 VolumeWorldToIndex(const VolumeLODGrid lodGrid, float3 worldPos)
 {
-	float3 localPos = VolumeWorldToLocal(lodDesc, worldPos);
+	float3 localPos = VolumeWorldToLocal(lodGrid, worldPos);
 	float3 localPosFloor = floor(localPos);
 	return localPosFloor;
 }
 
-float3 VolumeUVWToWorld(const VolumeLODGrid lodDesc, float3 uvw)
+float3 VolumeUVWToWorld(const VolumeLODGrid lodGrid, float3 uvw)
 {
-	return lerp(lodDesc.volumeWorldMin.xyz, lodDesc.volumeWorldMax.xyz, uvw);
+	return lerp(lodGrid.volumeWorldMin.xyz, lodGrid.volumeWorldMax.xyz, uvw);
 }
 
-float3 VolumeUVWToLocal(const VolumeLODGrid lodDesc, float3 uvw)
+float3 VolumeUVWToLocal(const VolumeLODGrid lodGrid, float3 uvw)
 {
-	float3 localPos = uvw * lodDesc.volumeCellCount;
+	float3 localPos = uvw * _GridResolution.xxx;
 	return localPos;
 }
 
-float3 VolumeLocalToUVW(const VolumeLODGrid lodDesc, float3 localPos)
+float3 VolumeLocalToUVW(const VolumeLODGrid lodGrid, float3 localPos)
 {
-	float3 uvw = localPos / lodDesc.volumeCellCount;
+	float3 uvw = localPos / _GridResolution.xxx;
 	return uvw;
 }
 
-float3 VolumeIndexToUVW(const VolumeLODGrid lodDesc, uint3 index)
+float3 VolumeIndexToUVW(const VolumeLODGrid lodGrid, uint3 index)
 {
-	float3 uvw = (index + 0.5) / lodDesc.volumeCellCount.xyz;
+	float3 uvw = (index + 0.5) / _GridResolution.xxx;
 	return uvw;
 }
 
-float3 VolumeIndexToLocal(const VolumeLODGrid lodDesc, uint3 index)
+float3 VolumeIndexToLocal(const VolumeLODGrid lodGrid, uint3 index)
 {
 	float3 localPos = index + 0.5;
 	return localPos;
 }
 
-float3 VolumeIndexToWorld(const VolumeLODGrid lodDesc, uint3 index)
+float3 VolumeIndexToWorld(const VolumeLODGrid lodGrid, uint3 index)
 {
-	float3 worldPos = lodDesc.volumeWorldMin.xyz + (index + 0.5) * VolumeWorldCellSize(lodDesc);
+	float3 worldPos = lodGrid.volumeWorldMin.xyz + (index + 0.5) * VolumeWorldCellSize(lodGrid);
 	return worldPos;
 }
 
-uint VolumeIndexToFlatIndex(const VolumeLODGrid lodDesc, uint3 index)
+uint VolumeIndexToFlatIndex(uint3 index)
 {
-	uint3 clampedIndex = min(index, lodDesc.volumeCellCount.xyz - 1);
+	uint3 gridResolution = _GridResolution.xxx;
+	uint3 clampedIndex = min(index, gridResolution - 1);
 	uint flatIndex = (
-		clampedIndex.z * (lodDesc.volumeCellCount.x * lodDesc.volumeCellCount.y) +
-		clampedIndex.y * lodDesc.volumeCellCount.x +
+		clampedIndex.z * (gridResolution.x * gridResolution.y) +
+		clampedIndex.y * gridResolution.x +
 		clampedIndex.x
 	);
 	return flatIndex;
 }
 
-uint3 VolumeFlatIndexToIndex(const VolumeLODGrid lodDesc, uint flatIndex)
+uint3 VolumeFlatIndexToIndex(uint flatIndex)
 {
-	uint x = (flatIndex % lodDesc.volumeCellCount.x);
-	uint y = (flatIndex / lodDesc.volumeCellCount.x) % lodDesc.volumeCellCount.y;
-	uint z = (flatIndex / (lodDesc.volumeCellCount.x * lodDesc.volumeCellCount.y));
+	uint3 gridResolution = _GridResolution.xxx;
+	uint x = (flatIndex % gridResolution.x);
+	uint y = (flatIndex / gridResolution.x) % gridResolution.y;
+	uint z = (flatIndex / (gridResolution.x * gridResolution.y));
 	return uint3(x, y, z);
 }
 
@@ -216,9 +218,9 @@ struct TrilinearWeights
 	float3 w1;
 };
 
-TrilinearWeights VolumeWorldToCellTrilinear(const VolumeLODGrid lodDesc, float3 worldPos, float3 offset = 0.5)
+TrilinearWeights VolumeWorldToCellTrilinear(const VolumeLODGrid lodGrid, float3 worldPos, float3 offset = 0.5)
 {
-	float3 localPos = VolumeWorldToLocal(lodDesc, worldPos) - offset;// subtracting offset to cell center
+	float3 localPos = VolumeWorldToLocal(lodGrid, worldPos) - offset;// subtracting offset to cell center
 	float3 localPosFloor = floor(localPos);
 
 	uint3 cellIdx0 = localPosFloor;
@@ -231,11 +233,11 @@ TrilinearWeights VolumeWorldToCellTrilinear(const VolumeLODGrid lodDesc, float3 
 	return tri;
 }
 
-float VolumeWorldToCellTrilinearInverseMultiplier(const VolumeLODGrid lodDesc, float3 worldPos, float3 offset = 0.5)
+float VolumeWorldToCellTrilinearInverseMultiplier(const VolumeLODGrid lodGrid, float3 worldPos, float3 offset = 0.5)
 {
 	//TODO comment/illustrate
 
-	TrilinearWeights tri = VolumeWorldToCellTrilinear(lodDesc, worldPos);
+	TrilinearWeights tri = VolumeWorldToCellTrilinear(lodGrid, worldPos);
 
 	const float3 sqw0 = tri.w0 * tri.w0;
 	const float3 sqw1 = tri.w1 * tri.w1;
@@ -257,12 +259,12 @@ float VolumeWorldToCellTrilinearInverseMultiplier(const VolumeLODGrid lodDesc, f
 //-------
 // trace
 
-float3 VolumeWorldCellStep(const VolumeLODGrid lodDesc, float3 worldDir)
+float3 VolumeWorldCellStep(const VolumeLODGrid lodGrid, float3 worldDir)
 {
 #if VOLUME_SQUARE_CELLS
 	float3 dirAbs = abs(worldDir);
 	float3 dirMax = max(dirAbs.x, max(dirAbs.y, dirAbs.z));
-	float3 step = worldDir * (VolumeWorldCellSize(lodDesc).x / dirMax);
+	float3 step = worldDir * (VolumeWorldCellSize(lodGrid).x / dirMax);
 	return step;
 #else
 	//TODO or otherwise always force VOLUME_SQUARE_CELLS ?
@@ -275,10 +277,10 @@ struct VolumeTraceState
 	float3 uvwStep;
 };
 
-VolumeTraceState VolumeTraceBegin(const VolumeLODGrid lodDesc, float3 worldPos, float3 worldDir, float cellOffset, int cellSubsteps)
+VolumeTraceState VolumeTraceBegin(const VolumeLODGrid lodGrid, float3 worldPos, float3 worldDir, float cellOffset, int cellSubsteps)
 {
-	float3 uvwStep = VolumeWorldCellStep(lodDesc, worldDir) / (lodDesc.volumeWorldMax.xyz - lodDesc.volumeWorldMin.xyz);
-	float3 uvw = VolumeWorldToUVW(lodDesc, worldPos) + cellOffset * uvwStep;
+	float3 uvwStep = VolumeWorldCellStep(lodGrid, worldDir) / (lodGrid.volumeWorldMax.xyz - lodGrid.volumeWorldMin.xyz);
+	float3 uvw = VolumeWorldToUVW(lodGrid, worldPos) + cellOffset * uvwStep;
 
 	uvwStep /= cellSubsteps;
 	uvw -= uvwStep;

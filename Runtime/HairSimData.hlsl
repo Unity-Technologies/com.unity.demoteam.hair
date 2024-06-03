@@ -51,11 +51,11 @@ HAIRSIM_SOLVERDATA<LODIndices> _SolverLODStage;			// x: lod index lo, y: lod ind
 HAIRSIM_SOLVERDATA<uint2> _SolverLODRange;				// xy: dispatch strand range [begin, end)
 HAIRSIM_SOLVERDISPATCH<uint> _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
 
-HAIRSIM_SOLVERINIT<float3> _InitialParticleOffset;		// xyz: initial particle offset from strand root
+HAIRSIM_SOLVERINIT<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: initial local accumulated weight (gather)
 HAIRSIM_SOLVERINIT<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 HAIRSIM_SOLVERINIT<uint2> _InitialParticleFrameDelta16;	// xy: compressed initial particle material frame delta
 
-HAIRSIM_SOLVERDATA<float3> _ParticlePosition;			// xyz: position//, w: initial local accumulated weight (gather)
+HAIRSIM_SOLVERDATA<float3> _ParticlePosition;			// xyz: position
 HAIRSIM_SOLVERINIT<float3> _ParticlePositionPrev;		// xyz: ...
 HAIRSIM_SOLVERINIT<float3> _ParticlePositionPrevPrev;	// xyz: ...
 HAIRSIM_SOLVERDATA<float3> _ParticleVelocity;			// xyz: velocity

@@ -4,6 +4,8 @@ Shader "Hair/Default/HairMaterialDefaultUnlit"
 
 	#pragma target 5.0
 
+	#pragma multi_compile_local_vertex HAIR_VERTEX_STATIC HAIR_VERTEX_LIVE
+
 	#include "HairMaterialCommonUnlit.hlsl"
 
 	ENDHLSL

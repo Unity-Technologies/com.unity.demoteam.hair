@@ -94,10 +94,10 @@ namespace Unity.DemoTeam.Hair
 
 				[NonSerialized] public Material materialInstance;
 
-				[NonSerialized] public Mesh meshInstanceLines;
-				[NonSerialized] public Mesh meshInstanceStrips;
-				[NonSerialized] public Mesh meshInstanceTubes;
-				[NonSerialized] public uint meshInstanceSubdivision;
+#if !UNITY_2021_2_OR_NEWER
+				[NonSerialized] public Mesh meshInstance;
+				[NonSerialized] public ulong meshInstanceKey;
+#endif
 			}
 
 			public GroupAssetReference groupAssetReference;
@@ -927,7 +927,7 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
-			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count);
+			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count, 1.0f);//stepDesc.hi);
 			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
 			{
 				//var frameTimeLo = execState.elapsedTime - stepDesc.count * stepDesc.dt;
@@ -999,76 +999,49 @@ namespace Unity.DemoTeam.Hair
 			// select mesh
 			var mesh = null as Mesh;
 			{
-				ref var meshInstanceLines = ref strandGroupInstance.sceneObjects.meshInstanceLines;
-				ref var meshInstanceStrips = ref strandGroupInstance.sceneObjects.meshInstanceStrips;
-				ref var meshInstanceTubes = ref strandGroupInstance.sceneObjects.meshInstanceTubes;
-				ref var meshInstanceSubdivision = ref strandGroupInstance.sceneObjects.meshInstanceSubdivision;
-
-				var subdivision = solverData.constants._StagingSubdivision;
-				if (subdivision != meshInstanceSubdivision)
+				if (settingsRendering.renderer != HairSim.SettingsRendering.Renderer.Disabled)
 				{
-					CoreUtils.Destroy(meshInstanceLines);
-					CoreUtils.Destroy(meshInstanceStrips);
-					CoreUtils.Destroy(meshInstanceTubes);
-					meshInstanceSubdivision = subdivision;
-				}
-
-				switch (settingsRendering.renderer)
-				{
-					case HairSim.SettingsRendering.Renderer.Disabled:
+					static HairTopologyType GetTopologyType(HairSim.SettingsRendering.Renderer renderer)
+					{
+						switch (renderer)
 						{
-							mesh = null;
+							case HairSim.SettingsRendering.Renderer.BuiltinTubes:
+								return HairTopologyType.Tubes;
+
+							case HairSim.SettingsRendering.Renderer.BuiltinStrips:
+								return HairTopologyType.Strips;
+
+							default:
+								return HairTopologyType.Lines;
 						}
-						break;
+					}
 
-					case HairSim.SettingsRendering.Renderer.BuiltinLines:
-					case HairSim.SettingsRendering.Renderer.HDRPHighQualityLines:
-						{
-							if (subdivision > 0)
-							{
-								mesh = HairInstanceBuilder.CreateRenderMeshLinesIfNull(ref meshInstanceLines, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
-							}
-							else
-							{
-								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetLines;
+					var meshDesc = new HairTopologyDesc
+					{
+						type = GetTopologyType(settingsRendering.renderer),
+						strandCount = (int)solverData.constants._StrandCount,
+						strandParticleCount = (int)solverData.constants._StagingStrandVertexCount,
+						memoryLayout = solverData.memoryLayout,
+					};
+
 #if !UNITY_2021_2_OR_NEWER
-								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceLines, strandGroupInstance.groupAssetReference.Resolve().meshAssetLines, HideFlags.HideAndDontSave);
-#endif
-							}
-						}
-						break;
+					ref var meshInstance = ref strandGroupInstance.sceneObjects.meshInstance;
+					ref var meshInstanceKey = ref strandGroupInstance.sceneObjects.meshInstanceKey;
 
-					case HairSim.SettingsRendering.Renderer.BuiltinStrips:
-						{
-							if (subdivision > 0)
-							{
-								mesh = HairInstanceBuilder.CreateRenderMeshStripsIfNull(ref meshInstanceStrips, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
-							}
-							else
-							{
-								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetStrips;
-#if !UNITY_2021_2_OR_NEWER
-								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceStrips, mesh, HideFlags.HideAndDontSave);
-#endif
-							}
-						}
-						break;
+					// if possible, keep current instance and do not touch topology cache (allow shared mesh to deallocate)
+					var meshKey = HairMeshCache.GetSortKey(meshDesc);
+					if (meshKey != meshInstanceKey || meshInstance == null)
+					{
+						CoreUtils.Destroy(meshInstance);
+						
+						meshInstance = HairInstanceBuilder.CreateMeshInstance(HairTopologyCache.GetSharedMesh(meshDesc), HideFlags.HideAndDontSave);
+						meshInstanceKey = meshKey;
+					}
 
-					case HairSim.SettingsRendering.Renderer.BuiltinTubes:
-						{
-							if (subdivision > 0)
-							{
-								mesh = HairInstanceBuilder.CreateRenderMeshTubesIfNull(ref meshInstanceTubes, HideFlags.HideAndDontSave, solverData.memoryLayout, (int)solverData.constants._StrandCount, (int)solverData.constants._StagingStrandVertexCount, new Bounds());
-							}
-							else
-							{
-								mesh = strandGroupInstance.groupAssetReference.Resolve().meshAssetTubes;
-#if !UNITY_2021_2_OR_NEWER
-								mesh = HairInstanceBuilder.CreateMeshInstanceIfNull(ref meshInstanceTubes, mesh, HideFlags.HideAndDontSave);
+					mesh = meshInstance;
+#else
+					mesh = HairTopologyCache.GetSharedMesh(meshDesc);
 #endif
-							}
-						}
-						break;
 				}
 			}
 
@@ -1101,6 +1074,7 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					materialInstance.CopyPropertiesFromMaterial(materialAsset);
+					materialInstance.EnableKeyword("HAIR_VERTEX_LIVE");
 				}
 
 				if (materialInstance != null)
@@ -1151,16 +1125,16 @@ namespace Unity.DemoTeam.Hair
 
 			// update renderer bounds
 			{
-#if UNITY_2021_2_OR_NEWER
+#if !UNITY_2021_2_OR_NEWER
+				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
+				if (mesh != null)
+					mesh.bounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
+#else
 				// starting with 2021.2 we can override renderer bounds directly
 				meshRenderer.localBounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
 
 				//TODO the world space bounds override is failing in some cases -- figure out why?
 				//meshRenderer.bounds = HairSim.GetSolverBounds(solverData, volumeData);
-#else
-				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
-				if (mesh != null)
-					mesh.bounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
 #endif
 			}
 		}
@@ -1509,9 +1483,9 @@ namespace Unity.DemoTeam.Hair
 					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
 
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
+#if !UNITY_2021_2_OR_NEWER
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstance);
+#endif
 				}
 			}
 

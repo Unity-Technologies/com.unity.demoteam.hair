@@ -82,12 +82,18 @@ float4 QDecomposeTwist(float4 q, float3 axis)
 	float4 r = float4(p.x, p.y, p.z, q.w);
 
 	if (dot(r, r) < 1e-5)
-		return float4(0.0, 0.0, 0.0, 1.0);
-
-	if (dn < 0.0)
-		return normalize(-r);
+	{
+		r = float4(0.0, 0.0, 0.0, 1.0);
+	}
 	else
-		return normalize(r);
+	{
+		if (dn < 0.0)
+			r = normalize(-r);
+		else
+			r = normalize(r);
+	}
+
+	return r;
 }
 
 //-------------------------

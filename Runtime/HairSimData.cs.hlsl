@@ -119,8 +119,8 @@ CBUFFER_START(SolverCBufferRoots)
     uint _RootMeshTangentStride;
     uint _RootMeshNormalOffset;
     uint _RootMeshNormalStride;
-    float __rcbpad1;
-    float __rcbpad2;
+    float _rcbpad1;
+    float _rcbpad2;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeLODGrid
@@ -147,8 +147,8 @@ CBUFFER_START(VolumeCBufferEnvironment)
     float _BoundaryWorldMargin;
     float _WindEmitterClock;
     uint _WindEmitterCount;
-    float __ecbpad1;
-    float __ecbpad2;
+    float _ecbpad1;
+    float _ecbpad2;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+VolumeCBuffer
@@ -174,7 +174,7 @@ CBUFFER_START(VolumeCBuffer)
     float _WindPropagationExtinction;
     float _WindPropagationOccluderDensity;
     float _WindPropagationOccluderMargin;
-    float __vcbpad1;
+    float _vcbpad1;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer
@@ -231,8 +231,8 @@ CBUFFER_START(SolverCBuffer)
     float _RenderLODScale;
     float _RenderLODBias;
     float _RenderLODClipThreshold;
-    float __scbpad1;
-    float __scbpad2;
+    float _scbpad1;
+    float _scbpad2;
 CBUFFER_END
 
 

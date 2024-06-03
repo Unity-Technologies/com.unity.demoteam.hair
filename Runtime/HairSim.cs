@@ -196,7 +196,6 @@ namespace Unity.DemoTeam.Hair
 					s_debugDrawPb = new MaterialPropertyBlock();
 				}
 
-
 				InitializeStructFields(ref SolverData.s_bufferIDs, (string s) => Shader.PropertyToID(s));
 				InitializeStructFields(ref SolverData.s_textureIDs, (string s) => Shader.PropertyToID(s));
 				InitializeStructFields(ref SolverData.s_externalIDs, (string s) => Shader.PropertyToID(s));
@@ -256,7 +255,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._SolverLODRange, "SolverLODRange", (int)SolverLODRange.__COUNT, particleStrideVector2);
 				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT * 4, sizeof(uint), ComputeBufferType.IndirectArguments);
 
-				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector3);
+				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta16, "InitialParticleFrameDelta16", particleCount, particleStrideVector2);
 
@@ -1027,6 +1026,7 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != substepCount; i++)
 				{
+					// substep per-frame scene data
 					using (new ProfilingScope(cmd, MarkersGPU.Solver_SubstepScene))
 					{
 						var substepFracLo = Mathf.Lerp(stepFracLo, stepFracHi, (i + 0) / (float)substepCount);
@@ -1410,7 +1410,7 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeConstantsEnvironment);
 		}
 
-		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount)
+		public static void PushVolumeEnvironment(CommandBuffer cmd, ref VolumeData volumeData, in SettingsEnvironment settingsEnvironment, int stepCount, float frameFracHi)
 		{
 			ref var volumeConstantsScene = ref volumeData.constantsEnvironment;
 			ref var volumeTextures = ref volumeData.textures;
@@ -1551,7 +1551,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						for (int i = 0; i != boundaryCount; i++)
 						{
-							ptrRemap[i] = volumeData.boundaryPrevHandle.IndexOf(ptrHandle[i]);
+							ptrRemap[i] = NativeArrayExtensions.IndexOf<int, int>(volumeData.boundaryPrevHandle, ptrHandle[i]);
 						}
 
 						for (int i = boundaryCount; i != Conf.MAX_BOUNDARIES; i++)
@@ -1573,7 +1573,7 @@ namespace Unity.DemoTeam.Hair
 								// Mb_t = Ma * M(t)
 								//
 								// where Ma is the transform of the current frame
-								//   and Mb is the transform of the last substep transform of the previous frame
+								//   and Mb is the transform of the last substep of the previous frame
 
 								var Ma = ptrMatrix[i];
 								var Mb = volumeData.boundaryPrevMatrix[j];
@@ -1602,10 +1602,27 @@ namespace Unity.DemoTeam.Hair
 					// update previous frame info
 					if (stepCount > 0)
 					{
-						//TODO adjust bufMatrix to correspond to outcome (final substep in frame)
-						//		e.g. AffineInterpolate(bufMatrix, bufMatrixA, bufMatrixQ, stepFracHi)
 						volumeData.boundaryPrevHandle.CopyFrom(bufHandle);
+#if false
 						volumeData.boundaryPrevMatrix.CopyFrom(bufMatrix);
+#else
+						// resolve boundaryPrevMatrix to match contents of _BoundaryMatrix after final substep in frame
+						{
+							var ptrMatrixPrev = (Matrix4x4*)volumeData.boundaryPrevMatrix.GetUnsafePtr();
+
+							for (int i = 0; i != boundaryCount; i++)
+							{
+								ref var Ma = ref ptrMatrix[i];
+								ref var M = ref ptrMatrixA[i];
+								ref var q = ref ptrMatrixQ[i];
+
+								var M_t = AffineUtility.AffineInterpolate4x4(M, ((quaternion)q).value, 1.0f - frameFracHi);
+								var Mb_t = AffineUtility.AffineMul4x4(Ma, M_t);
+
+								ptrMatrixPrev[i] = Mb_t;
+							}
+						}
+#endif
 					}
 
 					volumeData.boundaryCount = boundaryCount;
@@ -1671,7 +1688,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						for (int i = 0; i != emitterCount; i++)
 						{
-							ptrRemap[i] = volumeData.emitterPrevHandle.IndexOf(ptrHandle[i]);
+							ptrRemap[i] = NativeArrayExtensions.IndexOf<int, int>(volumeData.emitterPrevHandle, ptrHandle[i]);
 						}
 
 						for (int i = emitterCount; i != Conf.MAX_EMITTERS; i++)
@@ -1793,7 +1810,7 @@ namespace Unity.DemoTeam.Hair
 					PushConstantBufferData(cmd, volumeData.buffers.VolumeCBufferEnvironment, volumeData.constantsEnvironment);
 				}
 
-				// substep
+				// substep per-frame scene data
 				//TODO skip substepping if range stepFracLo, stepFracHi is [0, 1]
 				if (stepFracHi > 0.0f)
 				{
@@ -1840,14 +1857,17 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				HairSim.PushVolumeClear(cmd, ref volumeData, settingsVolume);
-
-				for (int i = 0; i != solverData.Length; i++)
+				// build the volume
 				{
-					HairSim.PushVolumeTransfer(cmd, cmdFlags, ref volumeData, settingsVolume, solverData[i]);
-				}
+					HairSim.PushVolumeClear(cmd, ref volumeData, settingsVolume);
 
-				HairSim.PushVolumeResolve(cmd, ref volumeData, settingsVolume);
+					for (int i = 0; i != solverData.Length; i++)
+					{
+						HairSim.PushVolumeTransfer(cmd, cmdFlags, ref volumeData, settingsVolume, solverData[i]);
+					}
+
+					HairSim.PushVolumeResolve(cmd, ref volumeData, settingsVolume);
+				}
 			}
 		}
 
@@ -2286,10 +2306,10 @@ namespace Unity.DemoTeam.Hair
 
 		public static VolumeLODGrid GetVolumeLODSelection(in VolumeData volumeData, VolumeLODStage volumeLODStage)
 		{
-			var lodDescBuffer = volumeData.buffersReadback._VolumeLODStage.GetData<VolumeLODGrid>();
-			if (lodDescBuffer.IsCreated)
+			var lodGridBuffer = volumeData.buffersReadback._VolumeLODStage.GetData<VolumeLODGrid>();
+			if (lodGridBuffer.IsCreated)
 			{
-				return lodDescBuffer[(int)volumeLODStage];
+				return lodGridBuffer[(int)volumeLODStage];
 			}
 			else
 			{

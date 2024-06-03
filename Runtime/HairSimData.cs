@@ -40,11 +40,11 @@ namespace Unity.DemoTeam.Hair
 				public T _SolverLODRange;				// xy: dispatch strand range [begin, end)
 				public T _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
 
-				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root
+				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: initial local accumulated weight (gather)
 				public T _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
 				public T _InitialParticleFrameDelta16;	// xy: compressed initial particle material frame delta
 
-				public T _ParticlePosition;				// xyz: position//, w: initial local accumulated weight (gather)
+				public T _ParticlePosition;				// xyz: position
 				public T _ParticlePositionPrev;			// xyz: ...
 				public T _ParticlePositionPrevPrev;		// xyz: ...
 				public T _ParticleVelocity;				// xyz: velocity
@@ -131,9 +131,9 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			// 34 --> 36 (pad to 16 byte boundary)
-			public float __rcbpad1;
-			public float __rcbpad2;
-			//public float __rcbpad3;
+			public float _rcbpad1;
+			public float _rcbpad2;
+			//public float _rcbpad3;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
@@ -228,9 +228,9 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			// 50 --> 52 (pad to 16 byte boundary)
-			public float __scbpad1;
-			public float __scbpad2;
-			//public float __scbpad3;
+			public float _scbpad1;
+			public float _scbpad2;
+			//public float _scbpad3;
 		}
 
 		[GenerateHLSL, Flags]
@@ -348,8 +348,8 @@ namespace Unity.DemoTeam.Hair
 				public T _WindEmitter;				// compute per step (volume), array(HairWind.RuntimeEmitter)
 
 				public T _BoundsMinMaxU;			// xyz: bounds min/max (unsigned sortable)
-				public T _Bounds;					// array(LODBounds): bounds (center, extent, radius, reach)
 				public T _BoundsPrev;				// array(LODBounds): bounds (center, extent, radius, reach)
+				public T _Bounds;					// array(LODBounds): bounds (center, extent, radius, reach)
 				public T _BoundsGeometry;			// array(LODGeometry): bounds geometry description (dimensions for coverage)
 				public T _BoundsCoverage;			// xy: bounds coverage (unbiased ceiling)
 
@@ -450,9 +450,9 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			// 14 --> 16 (pad to 16 byte boundary)
-			public float __ecbpad1;
-			public float __ecbpad2;
-			//public float __ecbpad3;
+			public float _ecbpad1;
+			public float _ecbpad2;
+			//public float _ecbpad3;
 		}
 
 		[GenerateHLSL(needAccessors = false, generateCBuffer = true), StructLayout(LayoutKind.Sequential, Pack = 16)]
@@ -503,9 +503,9 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			// 19 --> 20 (pad to 16 byte boundary)
-			public float __vcbpad1;
-			//public float __vcbpad2;
-			//public float __vcbpad3;
+			public float _vcbpad1;
+			//public float _vcbpad2;
+			//public float _vcbpad3;
 		}
 
 		[GenerateHLSL, Flags]

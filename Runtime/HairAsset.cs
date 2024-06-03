@@ -14,7 +14,7 @@ namespace Unity.DemoTeam.Hair
 	public partial class HairAsset : ScriptableObject
 	{
 		[Serializable]
-		public struct StrandGroup
+		public partial struct StrandGroup
 		{
 			[Flags]
 			public enum ParticleFeatures
@@ -37,11 +37,12 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector2[] rootUV;		// root uv
 			[HideInInspector] public Vector4[] rootScale;	// root scale (length, diameter normalized to maximum within group), z: tip scale offset, w: tip scale
 
+			[HideInInspector] public ParticleFeatures particleFeatures;
+			[HideInInspector] public MemoryLayout particleMemoryLayout;
+
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public Vector2[] particleTexCoord;
 			[HideInInspector] public float[] particleDiameter;
-			[HideInInspector] public ParticleFeatures particleFeatures;
-			[HideInInspector] public MemoryLayout particleMemoryLayout;
 
 			public int lodCount;
 
@@ -52,9 +53,6 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public float[] lodThreshold;	// f: lod index -> relative guide count [0..1]
 
 			[HideInInspector] public Mesh meshAssetRoots;
-			[HideInInspector] public Mesh meshAssetLines;
-			[HideInInspector] public Mesh meshAssetStrips;
-			[HideInInspector] public Mesh meshAssetTubes;
 		}
 
 		public SettingsBasic settingsBasic = SettingsBasic.defaults;
