@@ -94,6 +94,8 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 
+				mesh.UploadMeshData(markNoLongerReadable: true);
+
 				s_keyToMesh[key] = mesh;
 				s_keyToUsage[key] = 1;
 			}
