@@ -33,9 +33,9 @@ namespace Unity.DemoTeam.Hair
 
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.groupContainer);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceLines);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceStrips);
-					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceTubes);
+#if !UNITY_2021_2_OR_NEWER
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstance);
+#endif
 				}
 			}
 

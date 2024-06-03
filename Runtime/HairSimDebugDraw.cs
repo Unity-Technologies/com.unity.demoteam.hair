@@ -31,7 +31,7 @@ namespace Unity.DemoTeam.Hair
 				RenderPipelineManager.beginCameraRendering += HandleBeginCameraRendering;
 				RenderPipelineManager.endCameraRendering += HandleEndCameraRendering;
 
-				s_container = new GameObject("HairSimDebugDrawContainer");
+				s_container = new GameObject(nameof(HairSimDebugDraw));
 				s_container.hideFlags = HideFlags.HideAndDontSave;
 
 #if UNITY_EDITOR

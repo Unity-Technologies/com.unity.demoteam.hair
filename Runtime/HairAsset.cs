@@ -14,7 +14,7 @@ namespace Unity.DemoTeam.Hair
 	public partial class HairAsset : ScriptableObject
 	{
 		[Serializable]
-		public struct StrandGroup
+		public partial struct StrandGroup
 		{
 			[Flags]
 			public enum ParticleFeatures
@@ -53,9 +53,6 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public float[] lodThreshold;	// f: lod index -> relative guide count [0..1]
 
 			[HideInInspector] public Mesh meshAssetRoots;
-			[HideInInspector] public Mesh meshAssetLines;
-			[HideInInspector] public Mesh meshAssetStrips;
-			[HideInInspector] public Mesh meshAssetTubes;
 		}
 
 		public SettingsBasic settingsBasic = SettingsBasic.defaults;

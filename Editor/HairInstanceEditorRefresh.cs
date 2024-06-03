@@ -3,7 +3,7 @@ using UnityEditor;
 
 namespace Unity.DemoTeam.Hair
 {
-	public class HairInstanceEditorRefresh
+	public static class HairInstanceEditorRefresh
 	{
 		static bool s_initialized = false;
 
@@ -42,15 +42,18 @@ namespace Unity.DemoTeam.Hair
 		static bool AnySceneViewAlwaysRefresh()
 		{
 			var sceneViews = SceneView.sceneViews;
+			var sceneViewsActive = 0;
+
 			for (int i = 0; i != sceneViews.Count; i++)
 			{
 				var sceneView = sceneViews[i] as SceneView;
 				if (sceneView != null && sceneView.sceneViewState.alwaysRefreshEnabled)
 				{
-					return true;
+					sceneViewsActive++;
 				}
 			}
-			return false;
+
+			return (sceneViewsActive > 0);
 		}
 	}
 }
