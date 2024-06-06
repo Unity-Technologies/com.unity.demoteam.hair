@@ -229,6 +229,7 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
+					meshRoots.subMeshCount = 1;
 					meshRoots.SetSubMesh(0, new SubMeshDescriptor(0, indexCount, MeshTopology.Points) { vertexCount = meshVertexCount }, meshUpdateFlags);
 					meshRoots.RecalculateBounds();
 				}
@@ -421,6 +422,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
+				mesh.subMeshCount = 1;
 				mesh.SetSubMesh(0, new SubMeshDescriptor(0, data.indexCount, topology) { vertexCount = data.vertexCount, bounds = bounds }, meshUpdateFlags);
 				mesh.bounds = bounds;
 			}
@@ -503,7 +505,7 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static unsafe void BuildRenderMeshTubes(Mesh meshStrips, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
+		public static unsafe void BuildRenderMeshTubes(Mesh meshTubes, HairAsset.MemoryLayout memoryLayout, int strandCount, int strandParticleCount, in Bounds bounds)
 		{
 			const int numSides = 4;
 			
@@ -581,7 +583,7 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// apply to mesh
-				ApplyRenderMeshData(meshStrips, MeshTopology.Triangles, data, bounds);
+				ApplyRenderMeshData(meshTubes, MeshTopology.Triangles, data, bounds);
 			}
 		}
 

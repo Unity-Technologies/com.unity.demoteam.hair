@@ -1029,7 +1029,7 @@ namespace Unity.DemoTeam.Hair
 					ref var meshInstanceKey = ref strandGroupInstance.sceneObjects.meshInstanceKey;
 
 					// if possible, keep current instance and do not touch topology cache (allow shared mesh to deallocate)
-					var meshKey = HairMeshCache.GetSortKey(meshDesc);
+					var meshKey = HairTopologyCache.GetSortKey(meshDesc);
 					if (meshKey != meshInstanceKey || meshInstance == null)
 					{
 						CoreUtils.Destroy(meshInstance);
