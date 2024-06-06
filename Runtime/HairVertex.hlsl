@@ -417,10 +417,12 @@ HairVertexData GetHairVertex(
 	const HairVertexModifiers m = defaultHairVertexModifiers)
 {
 #if HAIR_VERTEX_LIVE || !SHADER_STAGE_VERTEX
+	if (_DecodeVertexCount > 0)
 	{
 		return GetHairVertexOS(DecodeHairVertexID(packedID), m);
 	}
-#else
+	else
+#endif
 	{
 		HairVertexData v = defaultHairVertexData;
 		{
@@ -430,7 +432,6 @@ HairVertexData GetHairVertex(
 		}
 		return v;
 	}
-#endif
 }
 
 //-------------

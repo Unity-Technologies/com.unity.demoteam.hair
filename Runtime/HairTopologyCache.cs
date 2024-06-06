@@ -40,19 +40,7 @@ namespace Unity.DemoTeam.Hair
 				s_keyToUsage = new Dictionary<ulong, int>();
 
 #if UNITY_EDITOR
-				UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += () =>
-				{
-					foreach (var mesh in s_keyToMesh.Values)
-					{
-						if (mesh != null)
-						{
-							Mesh.DestroyImmediate(mesh);
-						}
-					}
-
-					s_keyToMesh.Clear();
-					s_keyToUsage.Clear();
-				};
+				UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += () => DestroyAll();
 #endif
 
 				s_initialized = true;
@@ -81,6 +69,7 @@ namespace Unity.DemoTeam.Hair
 			}
 			else
 			{
+				//Debug.Log("f " + Time.frameCount + " create mesh (strandCount " + desc.strandCount + ")");
 				switch (desc.type)
 				{
 					case HairTopologyType.Lines:
@@ -103,6 +92,18 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			return mesh;
+		}
+
+		static void DestroyAll()
+		{
+			foreach (var pair in s_keyToMesh)
+			{
+				//Debug.Log("f " + Time.frameCount + " delete mesh (strandCount " + (pair.Key & 0xffffffff) + ") (ALL)");
+				CoreUtils.Destroy(pair.Value);
+			}
+
+			s_keyToMesh.Clear();
+			s_keyToUsage.Clear();
 		}
 
 		static void DestroyUnused()
@@ -150,7 +151,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						if (mesh != null)
 						{
-							//Debug.Log("delete mesh " + mesh.ToString() + " (strandCount " + (key&0xffffffff)+ ")");
+							//Debug.Log("f " + Time.frameCount + " delete mesh (strandCount " + (key & 0xffffffff) + ") (expire)");
 							CoreUtils.Destroy(mesh);
 						}
 					}
