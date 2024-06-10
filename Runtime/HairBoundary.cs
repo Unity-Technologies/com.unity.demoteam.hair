@@ -243,7 +243,7 @@ namespace Unity.DemoTeam.Hair
 					{
 						sdfTextureResolution.x = sdfTexture3D.width;
 						sdfTextureResolution.y = sdfTexture3D.height;
-						sdfTextureResolution.z = sdfTexture3D.depth;
+						sdfTextureResolution.z = Mathf.Max(1, sdfTexture3D.volumeDepth);
 					}
 				}
 			}
