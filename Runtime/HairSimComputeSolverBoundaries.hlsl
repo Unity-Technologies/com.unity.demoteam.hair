@@ -13,10 +13,10 @@
 //-----------------
 // boundary shapes
 
-float SdDiscrete(const float3 p, const float3x4 invM, Texture3D<float> sdf)
+float SdDiscrete(const float3 p, const float scale, const float3x4 invM, Texture3D<float> sdf)
 {
 	float3 uvw = mul(invM, float4(p, 1.0));
-	return sdf.SampleLevel(_Volume_trilinear_clamp, uvw, 0);
+	return scale * sdf.SampleLevel(_Volume_trilinear_clamp, uvw, 0);
 }
 
 float SdCapsule(const float3 p, const float3 centerA, const float3 centerB, const float radius)
@@ -119,7 +119,7 @@ float SdCube(float3 p, const float3 extent, const float3x4 invM)
 	p = mul(invM, float4(p, 1.0));
 	// assuming TRS, can apply scale post-transform to preserve primitive scale
 	// T R S x_local = x_world
-	//       x_local = S^-1 R^-1 T^-1 x_world 
+	//       x_local = S^-1 R^-1 T^-1 x_world
 	//     S x_local = S S^-1 R^-1 T^-1 world
 	p *= 2.0 * extent;
 #endif
@@ -147,7 +147,7 @@ float4 SdgCube(float3 p, const float3 extent, const float3x4 invM)
 	p = mul(invM, float4(p, 1.0));
 	// assuming TRS, can apply scale post-transform to preserve primitive scale
 	// T R S x_local = x_world
-	//       x_local = S^-1 R^-1 T^-1 x_world 
+	//       x_local = S^-1 R^-1 T^-1 x_world
 	//     S x_local = S S^-1 R^-1 T^-1 world
 	p *= 2.0 * extent;
 #endif
@@ -172,6 +172,11 @@ float4 SdgCube(float3 p, const float3 extent, const float3x4 invM)
 		else
 			return float4(q.z, 0.0, 0.0, s.z);
 	}
+}
+
+float SdDiscrete(const float3 p, const BoundaryShape discrete, const float3x4 invM, Texture3D<float> sdf)
+{
+	return SdDiscrete(p, discrete.tA, invM, sdf);
 }
 
 float SdCapsule(const float3 p, const BoundaryShape capsule)
@@ -299,7 +304,7 @@ float BoundaryDistance(const float3 p)
 	BOUNDARIES_FOR_VARS(i, 0)
 	BOUNDARIES_FOR(i, _BoundaryDelimDiscrete)
 	{
-		d = min(d, SdDiscrete(p, GetBoundaryMatrixInv(i), _BoundarySDF));
+		d = min(d, SdDiscrete(p, GetBoundaryShape(i), GetBoundaryMatrixInv(i), _BoundarySDF));
 	}
 	BOUNDARIES_FOR(i, _BoundaryDelimCapsule)
 	{
@@ -332,7 +337,7 @@ float3 BoundaryDistanceDiscrete(const float3 p)
 	BOUNDARIES_FOR_VARS(i, 0)
 	BOUNDARIES_FOR(i, _BoundaryDelimDiscrete)
 	{
-		d = min(d, SdDiscrete(p, GetBoundaryMatrixInv(i), _BoundarySDF));
+		d = min(d, SdDiscrete(p, GetBoundaryShape(i), GetBoundaryMatrixInv(i), _BoundarySDF));
 	}
 
 	return d;
@@ -345,7 +350,7 @@ uint BoundarySelect(const float3 p, const float d)
 	BOUNDARIES_FOR_VARS(i, 0)
 	BOUNDARIES_FOR(i, _BoundaryDelimDiscrete)
 	{
-		if (d == SdDiscrete(p, GetBoundaryMatrixInv(i), _BoundarySDF))
+		if (d == SdDiscrete(p, GetBoundaryShape(i), GetBoundaryMatrixInv(i), _BoundarySDF))
 			k = i;
 	}
 	BOUNDARIES_FOR(i, _BoundaryDelimCapsule)

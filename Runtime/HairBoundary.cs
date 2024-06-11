@@ -55,6 +55,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public enum Type
 			{
+				Discrete,
 				Capsule,
 				Sphere,
 				Torus,
@@ -65,7 +66,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				// shape    |  float3     float      float3     float
 				// -------------------------------------------------------
-				// discrete |  __pad      __pad      __pad      __pad
+				// discrete |  __pad      scale      __pad      __pad
 				// capsule  |  centerA    radius     centerB    __pad
 				// sphere   |  center     radius     __pad      __pad
 				// torus    |  center     radiusA    axis       radiusB
@@ -248,13 +249,40 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			// compute scale factor for euclidean distances within non-uniformly scaled aabb,
+			// given aabb initial dimensions (Lx, Ly, Lz) and aabb scale factors (Sx, Sy, Sz):
+			// d' = d * cbrt((Lx*Lx*Sx*Sx + Ly*Ly*Sy*Sy + Lz*Lz*Sz*Sz) / (Lx*Lx + Ly*Ly + Lz*Lz))
+			var sdfWorldScale = transform.lossyScale.Abs();
+			var sdfValueScale = 1.0f;//sdfWorldScale.CMin();
+			{
+				static float cbrt(float value) => Mathf.Pow(value, 1.0f / 3.0f);
+
+				var LL = sdfWorldSize.CMul(sdfWorldSize);
+				var LLsum = LL.CSum();
+				if (LLsum > 0.0f)
+				{
+					var SS = sdfWorldScale.CMul(sdfWorldScale);
+					var SSLLsum = SS.CMul(LL).CSum();
+
+					sdfValueScale = cbrt(SSLLsum / LLsum);
+				}
+			}
+
 			return new RuntimeData
 			{
 				type = RuntimeData.Type.SDF,
 				xform = new RuntimeTransform
 				{
 					handle = transform.GetInstanceID(),
-					matrix = Matrix4x4.TRS(transform.position, transform.rotation, sdfWorldSize) * Matrix4x4.Translate(-0.5f * Vector3.one),
+					matrix = Matrix4x4.TRS(transform.position, transform.rotation, sdfWorldSize.CMul(sdfWorldScale)) * Matrix4x4.Translate(-0.5f * Vector3.one),
+				},
+				shape = new RuntimeShape
+				{
+					type = RuntimeShape.Type.Discrete,
+					data = new RuntimeShape.Data
+					{
+						tA = sdfValueScale,
+					},
 				},
 				sdf = new RuntimeSDF()
 				{
@@ -285,7 +313,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static bool TryGetMatchingComponent(HairBoundary boundary, Settings.Type type, out Component component)
 		{
-			static Component CheckSolid(Component component) => (component != null && (component as Collider).isTrigger == false) ? component : null;
+			static Component FilterSolid(Collider collider) => (collider != null && collider.isTrigger == false) ? collider : null;
 
 			switch (type)
 			{
@@ -294,11 +322,11 @@ namespace Unity.DemoTeam.Hair
 					component = boundary.GetComponent<SDFTexture>(); break;
 #endif
 				case Settings.Type.Capsule:
-					component = CheckSolid(boundary.GetComponent<CapsuleCollider>()); break;
+					component = FilterSolid(boundary.GetComponent<CapsuleCollider>()); break;
 				case Settings.Type.Sphere:
-					component = CheckSolid(boundary.GetComponent<SphereCollider>()); break;
+					component = FilterSolid(boundary.GetComponent<SphereCollider>()); break;
 				case Settings.Type.Cube:
-					component = CheckSolid(boundary.GetComponent<BoxCollider>()); break;
+					component = FilterSolid(boundary.GetComponent<BoxCollider>()); break;
 				default:
 					component = null; break;
 			}

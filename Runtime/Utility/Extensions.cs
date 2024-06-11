@@ -65,6 +65,11 @@ namespace Unity.DemoTeam.Hair
 			return Mathf.Max(Mathf.Max(value.x, value.y), value.z);
 		}
 
+		public static float CSum(this Vector3 value)
+		{
+			return value.x + value.y + value.z;
+		}
+
 		public static Vector3 Rcp(this Vector3 value)
 		{
 			return new Vector3
