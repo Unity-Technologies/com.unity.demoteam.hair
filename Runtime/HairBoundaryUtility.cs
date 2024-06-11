@@ -45,11 +45,11 @@ namespace Unity.DemoTeam.Hair
 			return 1e+7f;
 		}
 
-		public static float SdDiscrete(in Vector3 p, in HairBoundary.RuntimeData data) => SdDiscrete(p, Matrix4x4.Inverse(data.xform.matrix), data.sdf.sdfTexture as Texture3D);
-		public static float SdDiscrete(in Vector3 p, in Matrix4x4 invM, Texture3D sdf)
+		public static float SdDiscrete(in Vector3 p, in HairBoundary.RuntimeData data) => SdDiscrete(p, data.shape.data.tA, Matrix4x4.Inverse(data.xform.matrix), data.sdf.sdfTexture as Texture3D);
+		public static float SdDiscrete(in Vector3 p, in float scale, in Matrix4x4 invM, Texture3D sdf)
 		{
 			float3 uvw = mul(invM, float4(p, 1.0f)).xyz;
-			return sdf.GetPixelBilinear(uvw.x, uvw.y, uvw.z).r;
+			return scale * sdf.GetPixelBilinear(uvw.x, uvw.y, uvw.z).r;
 		}
 
 		public static float SdCapsule(in float3 p, in HairBoundary.RuntimeShape.Data capsule) => SdCapsule(p, capsule.pA, capsule.pB, capsule.tA);
@@ -101,7 +101,7 @@ namespace Unity.DemoTeam.Hair
 			p = mul(invM, float4(p, 1.0f)).xyz;
 			// assuming TRS, can apply scale post-transform to preserve primitive scale
 			// T R S x_local = x_world
-			//       x_local = S^-1 R^-1 T^-1 x_world 
+			//       x_local = S^-1 R^-1 T^-1 x_world
 			//     S x_local = S S^-1 R^-1 T^-1 world
 			p *= 2.0f * extent;
 
