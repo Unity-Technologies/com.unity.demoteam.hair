@@ -599,7 +599,7 @@ void KVolumePressureEOS(
 #endif
 	{
 	  #if VOLUME_REST_AT_ZERO
-		_VolumePressure[worldIdx] = max(0.0, rho / _TargetDensityScale - rho0) * (_TargetDensityInfluence * VolumeWorldCellSize(lodGrid).x * VolumeWorldCellSize(lodGrid).x);;
+		_VolumePressure[worldIdx] = max(0.0, rho / _TargetDensityScale - rho0) * (_TargetDensityInfluence * VolumeWorldCellSize(lodGrid).x * VolumeWorldCellSize(lodGrid).x);
 	  #else
 		_VolumePressure[worldIdx] = (rho / _TargetDensityScale - rho0) * (_TargetDensityInfluence * VolumeWorldCellSize(lodGrid).x * VolumeWorldCellSize(lodGrid).x);
 	  #endif
@@ -1022,6 +1022,111 @@ float ValueNoiseFractal(float3 x, const uint octaves = 3, const float persistenc
 	return v / max(1.0, s);
 }
 
+//#define ABSORB(x) SphericalCellCrossSection(x)
+#define ABSORB(x) pow(abs(x), 2.0 / 3.0)
+
+float WindTransmittanceSegment(const VolumeLODGrid lodGrid, const float3 p, const float3 n, const float nd)
+{
+	float T = 1.0;
+	///*
+	{
+		VolumeTraceState trace = VolumeTraceBegin(lodGrid, p, n, 1.0, _WindPropagationSubsteps);
+
+		float S = length(VolumeWorldCellStep(lodGrid, n)) / _WindPropagationSubsteps;
+		float R = nd - (S * _WindPropagationSubsteps);// == remaining trace distance to emitter
+		float k = _WindPropagationExtinction * S;
+
+		if ((_VolumeFeatures & VOLUMEFEATURES_WIND_FASTPATH) != 0)
+		{
+			while (T > 1e-5 && R >= 0.0 && VolumeTraceStep(trace))
+			{
+				T *= exp(-ABSORB(VolumeSampleScalar(_VolumeDensity, trace.uvw)) * k);
+				R -= S;
+			}
+		}
+		else
+		{
+			while (T > 1e-5 && R >= 0.0 && VolumeTraceStep(trace))
+			{
+				if (BoundaryDistance(VolumeUVWToWorld(lodGrid, trace.uvw)) < _WindPropagationOccluderMargin * lodGrid.volumeCellRadius)
+				{
+					T = 0.0;
+				}
+				else
+				{
+					T *= exp(-ABSORB(VolumeSampleScalar(_VolumeDensity, trace.uvw)) * k);
+					R -= S;
+				}
+			}
+		}
+
+		//TODO handle boundaries outside the discrete volume?
+		//if (R > 0.0 && VolumeTraceEnded(trace))
+		//{
+		//	// need to compute distance to closest solid along emitter ray
+		//	//	- march sdf within conservative total bounds?
+		//	//	- add ray-primitive intersection?
+		//	if (BoundaryIntersection(VolumeUVWToWorld(trace.uvw, -n))
+		//	{
+		//		T = 0.0;
+		//	}
+		//}
+	}
+	//*/
+	return T;
+}
+
+float WindTransmittanceBackground(const VolumeLODGrid lodGrid, const float3 p, const float3 n)
+{
+	float T = 1.0;
+	///*
+	{
+		VolumeTraceState trace = VolumeTraceBegin(lodGrid, p, n, 1.0, _WindPropagationSubsteps);
+
+		float S = length(VolumeWorldCellStep(lodGrid, n)) / _WindPropagationSubsteps;
+		float A = 1.0;
+		float k = _WindPropagationExtinction * S;
+		
+		if ((_VolumeFeatures & VOLUMEFEATURES_WIND_FASTPATH) != 0)
+		{
+			while (T > 1e-5 && A > 0.0 && VolumeTraceStep(trace))
+			{
+				A = ABSORB(VolumeSampleScalar(_VolumeDensity, trace.uvw));
+				T *= exp(-A * k);
+			}
+		}
+		else
+		{
+			while (T > 1e-5 && A > 0.0 && VolumeTraceStep(trace))
+			{
+				if (BoundaryDistance(VolumeUVWToWorld(lodGrid, trace.uvw)) < _WindPropagationOccluderMargin * lodGrid.volumeCellRadius)
+				{
+					T = 0.0;
+				}
+				else
+				{
+					A = ABSORB(VolumeSampleScalar(_VolumeDensity, trace.uvw));
+					T *= exp(-A * k);
+				}
+			}
+		}
+	}
+	//*/
+	return T;
+}
+
+float3 WindDragImpulse(const float3 v, const float3 v0, const float k)
+{
+	float3 u = v - v0;
+	float ud = length(u);
+	
+	// note: drag force
+	// Fd = 0.5 rho |u|^2 Cd A
+	//    = 0.5 rho u |u| Cd A
+
+	return 0.5 * (u * ud) * k;
+}
+
 [numthreads(THREAD_GROUP_SIZE_XY, THREAD_GROUP_SIZE_XY, 1)]
 void KVolumeWind(
 	uint3 groupIdx : SV_GroupID,
@@ -1043,148 +1148,133 @@ void KVolumeWind(
 		return;
 	}
 
-	// gather impulses
-	float4 Lsum = 0.0;
+	// compute absorption factor (surface area) of current cell
+	float A = ABSORB(saturate(0.1 + rho));
 
-	for (uint i = 0; i != _WindEmitterCount; i++)
+	// compute position of current cell
+	float3 p = VolumeIndexToWorld(lodGrid, worldIdx);
+
+	// load velocity in current cell
+	float3 v0 = _VolumeVelocity[worldIdx].xyz;
+
+	// since we don't have an active flow field for the wind, we accumulate
+	// and average a drag impulse based on the transmitted relative flow of
+	// all active emitters, as well as the transmitted relative flow of a
+	// zero-flow background ahead of the current cell.
+	float4 Lsum = float4(0.0, 0.0, 0.0, 0.0);
 	{
-		const WindEmitter wind = _WindEmitter[i];
-
-		float3 p = VolumeIndexToWorld(lodGrid, worldIdx);
-		float3 r = p - wind.p;
-
-		float t = dot(wind.n, r);
-		float h = wind.m * (t - wind.t0) + wind.h0;
-
-		float3 a = r - wind.n * t;
-		float bb = dot(a, a);
-
-		// check if cell center is inside emitter volume
-		//TODO handle partial overlap?
-		if (isinf(wind.h0) || (t >= wind.t0 && bb <= h * h))
+		// add impulses from active emitters
+		for (uint i = 0; i != _WindEmitterCount; i++)
 		{
-			// compute trace direction and distance from emitter base
-			float3 n = (wind.m == 0.0) ? wind.n : normalize(r) * (t < 0.0 ? -1.0 : 1.0);
-			float nd = dot(n, r) * (1.0 - wind.t0 / (t + 1e-5));
+			const WindEmitter wind = _WindEmitter[i];
 
-			// compute transmittance ahead of current cell
-			float T = 1.0;
+			float3 r = p - wind.p;
+
+			float t = dot(wind.n, r);
+			float h = wind.m * (t - wind.t0) + wind.h0;
+
+			float3 a = r - wind.n * t;
+			float bb = dot(a, a);
+
+			// consider emitter if cell center is inside emitter volume
+			//TODO handle partial overlap?
+			if (isinf(wind.h0) || (t >= wind.t0 && bb <= h * h))
 			{
-				VolumeTraceState trace = VolumeTraceBegin(lodGrid, p, -n, 1.0, _WindPropagationSubsteps);
+				// compute trace direction and distance from emitter base
+				float3 n = (wind.m == 0.0) ? wind.n : normalize(r) * (t < 0.0 ? -1.0 : 1.0);
+				float nd = dot(n, r) * (1.0 - wind.t0 / (t + 1e-5));
 
-				float S = length(VolumeWorldCellStep(lodGrid, -n)) / _WindPropagationSubsteps;
-				float R = nd - (S * _WindPropagationSubsteps);// remaining trace distance to emitter
-				float k = _WindPropagationExtinction * S;
+				// compute transmittance from current cell to emitter base
+				float T = WindTransmittanceSegment(lodGrid, p, -n, nd);
 
-//#define ABSORB(x) SphericalCellCrossSection(x)
-#define ABSORB(x) pow(abs(x), 2.0 / 3.0)
-
-				if ((_VolumeFeatures & VOLUMEFEATURES_WIND_FASTPATH) != 0)
+				// compute unobstructed attenuated flow
+				float3 v;
 				{
-					while (T > 1e-5 && R >= 0.0 && VolumeTraceStep(trace))
+					// note: various approaches to attenuation
+					//
+					//	Ka: inf at x=0
+					//		Ka(x,t) => 1 / x^2
+					//
+					//	Kb: inf at x=0, one at x=-t, x=t
+					//		Kb(x,t) => 1 / (x/t)^2
+					//		Kb(x,t) => t^2 / x^2
+					//
+					//	Kc: h at x=0, one at x=-t, x=t
+					//		Kc(x,t,h) => (t^2 + (t^2 + e) / (h - 1 + e)) / (x^2 + (t^2 + e) / (h - 1 + e))
+					//
+					//	Kd: |t|+1 at x=0, one at x=-t, x=t
+					//		Kd(x,t) => (t^2 + (t^2 + e) / (|t| + e)) / (x^2 + (t^2 + e) / (|t| + e))
+					//		Kd(x,t) => (t^2 * (|t| + e) + t^2 + e) / (x^2 * (|t| + e) + t^2 + e)
+					//
+					//	Ke: |t|^2+1 at x=0, one at x=-t, x=t
+					//		Ke(x,t) => (t^2 * (|t| + e) + |t| + e) / (x^2 * (|t| + e) + |t| + e)
+					//		Ke(x,t) => (t^2 + 1) / (x^2 + 1)
+					//
+					//	Kf: [1..h] at x=0, one at x=-t, x=t
+					//		Kf(x,t,h) => (t^2 + (t^2 + 1) / (h - 1 + e)) / (x^2 + (t^2 + 1) / (h - 1 + e))
+					//		Kf(x,t,h) => (e * t^2 + t^2 * h + 1) / (x^2 * (h - 1 + e) + t^2 + 1)
+					//		Kf(x,t,h) => (t^2 * h + 1) / (x^2 * (h - 1) + t^2 + 1)
+					//
+					//	Kg: TODO half at x=-s, x=s, one at x=-1, x=t
+	
+					float va = (wind.m == 0.0) ? 1.0 : (wind.t0 * wind.t0 * 2.0f + 1.0f) / (nd * nd * (2.0f - 1.0f) + wind.t0 * wind.t0 + 1.0f);// (using Kf)
+					float vd = isinf(wind.h0) ? dot(r, n) : nd;
+					float vt = vd / (wind.v + wind.A);
+					float vc = wind.f * (vt - _WindEmitterClock);
+
+					if (wind.jd > 0.0)
 					{
-						T *= exp(-ABSORB(VolumeSampleScalar(_VolumeDensity, trace.uvw)) * k);
-						R -= S;
-					}
-				}
-				else
-				{
-					while (T > 1e-5 && R >= 0.0 && VolumeTraceStep(trace))
-					{
-						if (BoundaryDistance(VolumeUVWToWorld(lodGrid, trace.uvw)) < _WindPropagationOccluderMargin * lodGrid.volumeCellRadius)
-						{
-							T = 0.0;
-						}
+						if (isinf(wind.m))// spherical emitter
+							vc += wind.jd * (ValueNoiseFractal(wind.jw * (p - wind.jp * n * (vd - 0.5))) * 2.0 - 1.0);
 						else
-						{
-							T *= exp(-ABSORB(VolumeSampleScalar(_VolumeDensity, trace.uvw)) * k);
-							R -= S;
-						}
+							vc += wind.jd * (ValueNoiseFractal(wind.jw * (p - wind.jp * n * vd)) * 2.0 - 1.0);
 					}
+
+					float vf = wind.v + wind.A * (0.5 * cos(2.0 * PI * vc) + 0.5);
+					
+					v = (va * vf) * n;
 				}
 
-				//TODO handle boundaries outside the discrete volume
-				//if (R > 0.0 && VolumeTraceEnded(trace))
-				//{
-				//	// need to compute distance to closest solid along emitter ray
-				//	//	- march sdf within conservative total bounds?
-				//	//	- add ray-primitive intersection?
-				//	if (BoundaryIntersection(VolumeUVWToWorld(trace.uvw, -n))
-				//	{
-				//		T = 0.0;
-				//	}
-				//}
+				// compute drag impulse
+				float3 L = WindDragImpulse(v, v0, saturate(T / A));
+				float Lw = length(L);
+				if (Lw > 0.0)
+				{
+					Lsum.xyz += Lw * L;
+					Lsum.w += Lw;
+				}
 			}
+		}
 
-			// compute absorption in current cell
-			float A = ABSORB(saturate(0.1 + rho));
-
-			// note: approach to attenuation
-			//
-			//	Ka: inf at x=0
-			//		Ka(x,t) => 1 / x^2
-			//
-			//	Kb: inf at x=0, one at x=-t, x=t
-			//		Kb(x,t) => 1 / (x/t)^2
-			//		Kb(x,t) => t^2 / x^2
-			//
-			//	Kc: h at x=0, one at x=-t, x=t
-			//		Kc(x,t,h) => (t^2 + (t^2 + e) / (h - 1 + e)) / (x^2 + (t^2 + e) / (h - 1 + e))
-			//
-			//	Kd: |t|+1 at x=0, one at x=-t, x=t
-			//		Kd(x,t) => (t^2 + (t^2 + e) / (|t| + e)) / (x^2 + (t^2 + e) / (|t| + e))
-			//		Kd(x,t) => (t^2 * (|t| + e) + t^2 + e) / (x^2 * (|t| + e) + t^2 + e)
-			//
-			//	Ke: |t|^2+1 at x=0, one at x=-t, x=t
-			//		Ke(x,t) => (t^2 * (|t| + e) + |t| + e) / (x^2 * (|t| + e) + |t| + e)
-			//		Ke(x,t) => (t^2 + 1) / (x^2 + 1)
-			//
-			//	Kf: [1..h] at x=0, one at x=-t, x=t
-			//		Kf(x,t,h) => (t^2 + (t^2 + 1) / (h - 1 + e)) / (x^2 + (t^2 + 1) / (h - 1 + e))
-			//		Kf(x,t,h) => (e * t^2 + t^2 * h + 1) / (x^2 * (h - 1 + e) + t^2 + 1)
-			//		Kf(x,t,h) => (t^2 * h + 1) / (x^2 * (h - 1) + t^2 + 1)
-			//
-			//	Kg: TODO half at x=-s, x=s, one at x=-1, x=t
-
-			// compute flow in current cell
-			float va = (wind.m == 0.0) ? 1.0 : (wind.t0 * wind.t0 * 2.0f + 1.0f) / (nd * nd * (2.0f - 1.0f) + wind.t0 * wind.t0 + 1.0f);// (using Kf)
-			float vd = isinf(wind.h0) ? dot(r, n) : nd;
-			float vt = vd / (wind.v + wind.A);
-			float vc = wind.f * (vt - _WindEmitterClock);
-
-			if (wind.jd > 0.0)
+		// add impulse from zero-flow background
+		{
+			// consider background if cell velocity is non-zero
+			float v0dd = dot(v0, v0);
+			if (v0dd > 0.0)
 			{
-				if (isinf(wind.m))// spherical emitter
-					vc += wind.jd * (ValueNoiseFractal(wind.jw * (p - wind.jp * n * (vd - 0.5))) * 2.0 - 1.0);
-				else
-					vc += wind.jd * (ValueNoiseFractal(wind.jw * (p - wind.jp * n * vd)) * 2.0 - 1.0);
+				// compute transmittance from current cell to background
+				float T = WindTransmittanceBackground(lodGrid, p, v0 * rsqrt(v0dd));
+			
+				// compute drag impulse
+				float3 L = WindDragImpulse(0.0, v0, saturate(T / A));
+				float Lw = length(L);
+				if (Lw > 0.0)
+				{
+					Lsum.xyz += Lw * L;
+					Lsum.w += Lw;
+				}
 			}
-
-			float vf = wind.v + wind.A * (0.5 * cos(2.0 * PI * vc) + 0.5);
-			float3 v = (va * vf) * n;
-
-			// calc delta velocity
-			float3 u = saturate(T / A) * v - _VolumeVelocity[worldIdx].xyz;
-			float ud = length(u);
-
-			// note: drag force
-			// Fd = 0.5 rho |u|^2 Cd A
-			//    = 0.5 rho u |u| Cd A
-
-			// calc impulse
-			float3 L = 0.5 * (u * ud);
-			float Lw = length(L);
-				
-			// add to sum
-			Lsum.xyz += Lw * L;
-			Lsum.w += Lw;
 		}
 	}
-
+	
 	// apply weighted average
 	if (Lsum.w > 0.0)
-	{	
-		_VolumeImpulse[worldIdx].xyz += (Lsum.xyz / Lsum.w) * (_DT * _Substeps);//TODO this does not look correct
+	{
+		_VolumeImpulse[worldIdx].xyz = (Lsum.xyz / Lsum.w) * (_VolumeDT);
+	}
+	else
+	{
+		_VolumeImpulse[worldIdx].xyz = 0.0;
 	}
 }
 

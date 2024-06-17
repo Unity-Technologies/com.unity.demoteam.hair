@@ -162,6 +162,7 @@ CBUFFER_START(VolumeCBuffer)
     float _AllGroupsAvgParticleMargin;
     uint _CombinedBoundsIndex;
     uint _VolumeFeatures;
+    float _VolumeDT;
     float _TargetDensityScale;
     float _TargetDensityInfluence;
     float _ScatteringProbeUnitWidth;
@@ -174,7 +175,6 @@ CBUFFER_START(VolumeCBuffer)
     float _WindPropagationExtinction;
     float _WindPropagationOccluderDensity;
     float _WindPropagationOccluderMargin;
-    float _vcbpad1;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBuffer

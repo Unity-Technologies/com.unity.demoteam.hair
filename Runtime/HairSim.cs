@@ -1756,7 +1756,7 @@ namespace Unity.DemoTeam.Hair
 			volumeData.buffersReadback._VolumeLODStage.ScheduleCopy(cmd, volumeData.buffers._VolumeLODStage);
 		}
 
-		public static void PushVolumeStepBegin(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume)
+		public static void PushVolumeStepBegin(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume, float deltaTime)
 		{
 			ref var volumeConstants = ref volumeData.constants;
 			ref var volumeKeywords = ref volumeData.keywords;
@@ -1764,6 +1764,8 @@ namespace Unity.DemoTeam.Hair
 			// derive constants
 			var allGroupsAvgRestSpan = volumeConstants._AllGroupsAvgParticleDiameter + volumeConstants._AllGroupsAvgParticleMargin;
 			var allGroupsAvgRestDensity = (volumeConstants._AllGroupsAvgParticleDiameter * volumeConstants._AllGroupsAvgParticleDiameter) / (allGroupsAvgRestSpan * allGroupsAvgRestSpan);
+
+			volumeConstants._VolumeDT = deltaTime;
 
 			volumeConstants._TargetDensityScale = Mathf.Max(1e-7f, settingsVolume.restDensityScale * allGroupsAvgRestDensity);
 			volumeConstants._TargetDensityInfluence = settingsVolume.restDensityInfluence;
@@ -1811,9 +1813,10 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				// substep per-frame scene data
-				//TODO skip substepping if range stepFracLo, stepFracHi is [0, 1]
 				if (stepFracHi > 0.0f)
 				{
+					//TODO skip substepping if range stepFracLo, stepFracHi is [0, 1]
+
 					cmd.SetComputeFloatParam(s_volumeCS, UniformIDs._SubstepFractionLo, stepFracLo);
 					cmd.SetComputeFloatParam(s_volumeCS, UniformIDs._SubstepFractionHi, stepFracHi);
 
@@ -1871,9 +1874,12 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		public static void PushVolumeStepEnd(CommandBuffer cmd, in VolumeData volumeData)
+		public static void PushVolumeStepEnd(CommandBuffer cmd, in VolumeData volumeData, in SettingsVolume settingsVolume)
 		{
-			// defined for completeness
+			// build the per-frame volume data
+			{
+				PushVolumeScattering(cmd, volumeData, settingsVolume);
+			}
 		}
 
 		static void PushVolumeClear(CommandBuffer cmd, ref VolumeData volumeData, in SettingsVolume settingsVolume)
@@ -2048,45 +2054,6 @@ namespace Unity.DemoTeam.Hair
 				cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumePressureGradient, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 			}
 
-			// scattering probe
-			if (settingsVolume.scatteringProbe)
-			{
-				using (new ProfilingScope(cmd, MarkersGPU.Volume_7_Scattering))
-				{
-					switch (settingsVolume.probeOcclusionMode)
-					{
-						case SettingsVolume.OcclusionMode.Discrete:
-							{
-								if (volumeData.constants._ScatteringProbeOccluderDensity > 0.0f)
-								{
-									goto case SettingsVolume.OcclusionMode.Exact;
-								}
-
-								cmd.GetTemporaryRT(VolumeData.s_textureIDs._VolumeDensityComp, MakeVolumeDesc((int)settingsVolume.gridResolution, RenderTextureFormat.RHalf));
-
-								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScatteringPrep, volumeData);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScatteringPrep, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
-
-								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScattering, volumeData);
-								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensity, VolumeData.s_textureIDs._VolumeDensityComp);
-								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScattering, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
-
-								cmd.ReleaseTemporaryRT(VolumeData.s_textureIDs._VolumeDensityComp);
-							}
-							break;
-
-						case SettingsVolume.OcclusionMode.Exact:
-							{
-								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScattering, volumeData);
-								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
-								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScattering, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
-							}
-							break;
-					}
-				}
-			}
-
 			// wind propagation
 			if (settingsVolume.windPropagation)
 			{
@@ -2120,6 +2087,48 @@ namespace Unity.DemoTeam.Hair
 								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeWind, volumeData);
 								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeWind, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
 								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeWind, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
+							}
+							break;
+					}
+				}
+			}
+		}
+
+		public static void PushVolumeScattering(CommandBuffer cmd, in VolumeData volumeData, in SettingsVolume settingsVolume)
+		{
+			// scattering probe
+			if (settingsVolume.scatteringProbe)
+			{
+				using (new ProfilingScope(cmd, MarkersGPU.Volume_7_Scattering))
+				{
+					switch (settingsVolume.probeOcclusionMode)
+					{
+						case SettingsVolume.OcclusionMode.Discrete:
+							{
+								if (volumeData.constants._ScatteringProbeOccluderDensity > 0.0f)
+								{
+									goto case SettingsVolume.OcclusionMode.Exact;
+								}
+
+								cmd.GetTemporaryRT(VolumeData.s_textureIDs._VolumeDensityComp, MakeVolumeDesc((int)settingsVolume.gridResolution, RenderTextureFormat.RHalf));
+
+								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScatteringPrep, volumeData);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScatteringPrep, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
+
+								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScattering, volumeData);
+								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensity, VolumeData.s_textureIDs._VolumeDensityComp);
+								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScattering, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
+
+								cmd.ReleaseTemporaryRT(VolumeData.s_textureIDs._VolumeDensityComp);
+							}
+							break;
+
+						case SettingsVolume.OcclusionMode.Exact:
+							{
+								BindVolumeData(cmd, s_volumeCS, VolumeKernels.KVolumeScattering, volumeData);
+								cmd.SetComputeTextureParam(s_volumeCS, VolumeKernels.KVolumeScattering, VolumeData.s_textureIDs._VolumeDensityPreComp, volumeData.textures._VolumeDensity);
+								cmd.DispatchCompute(s_volumeCS, VolumeKernels.KVolumeScattering, volumeData.buffers._VolumeLODDispatch, GetVolumeLODDispatchOffset(VolumeLODDispatch.Resolve));
 							}
 							break;
 					}

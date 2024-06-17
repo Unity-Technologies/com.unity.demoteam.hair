@@ -478,14 +478,15 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			// 6
-			#region Volume Resolve (13 float, 52 bytes)
+			#region Volume Resolve (14 floats, 56 bytes)
 			public uint _VolumeFeatures;
+			public float _VolumeDT;
 
-			// +1
+			// +2
 			public float _TargetDensityScale;
 			public float _TargetDensityInfluence;
 
-			// +3
+			// +4
 			public float _ScatteringProbeUnitWidth;
 			public uint _ScatteringProbeSubsteps;
 			public uint _ScatteringProbeSamplesTheta;
@@ -493,17 +494,17 @@ namespace Unity.DemoTeam.Hair
 			public float _ScatteringProbeOccluderDensity;
 			public float _ScatteringProbeOccluderMargin;
 
-			// +9
+			// +10
 			public uint _WindPropagationSubsteps;
 			public float _WindPropagationExtinction;
 			public float _WindPropagationOccluderDensity;
 			public float _WindPropagationOccluderMargin;
 
-			// +13
+			// +14
 			#endregion
 
-			// 19 --> 20 (pad to 16 byte boundary)
-			public float _vcbpad1;
+			// 20 --> 20 (pad to 16 byte boundary)
+			//public float _vcbpad1;
 			//public float _vcbpad2;
 			//public float _vcbpad3;
 		}

@@ -8,11 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added support for non-uniform scaling of discrete SDF boundaries specified via texture. (Also handles scaling of sampled distances.)
+- Added support for non-uniform scaling of discrete SDF boundaries specified via texture. (Also attempts to handle scaling of sampled distances.)
+- Added support for volumetric drag as part of the volumetric wind feature. Volumetric drag is automatically enabled when wind propagation is enabled.
 
 ### Fixed
 
 - Fixed a regression that prevented passing discrete SDF via RenderTexture.
+- Fixed an issue with volumetric wind impulse relying on potentially undefined solver constant.
+
+### Changed
+
+- Removed redundant volume data updates for improved performance: Primary volume data (density, velocity, pressure, wind) is now updated only after stepping simulation, while auxiliary volume data (scattering) is updated only once per frame. (Previously, all volume data was updated both after stepping simulation, and at minimum once per frame.)
 
 
 ## [0.14.2-exp.1] - 2024-06-06
@@ -185,7 +191,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added base class HairAssetCustomPlacement to support user defined providers of custom root placement (replaces HairAssetProvider).
 - Added base class HairAssetCustomData to support user defined providers of fully custom curve data.
 - Added utility scope LongOperationOutput for controlling the output of the LongOperation utility.
-- Enabled support for HDRP High Quality Line Renderering when used in combination HDRP >= 15.0.2.
+- Enabled support for HDRP High Quality Line Rendering when used in combination HDRP >= 15.0.2.
 
 ### Changed
 
