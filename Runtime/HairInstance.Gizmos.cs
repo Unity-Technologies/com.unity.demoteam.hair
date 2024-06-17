@@ -197,7 +197,7 @@ namespace Unity.DemoTeam.Hair
 
 				for (int i = 0; i != Mathf.Min(volumeEmitters.Count, HairSim.Conf.MAX_EMITTERS); i++)
 				{
-					HairWind.DrawGizmosRuntimeData(volumeEmitters[i], Time.time, Time.deltaTime, active: true, selected: false);
+					HairWind.DrawGizmosRuntimeData(volumeEmitters[i], Time.time, Time.deltaTime, active: true, selected: true);
 				}
 			}
 		}

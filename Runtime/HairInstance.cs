@@ -767,23 +767,23 @@ namespace Unity.DemoTeam.Hair
 
 			HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
 			HairSim.PushVolumeEnvironment(cmd, ref volumeData, settingsEnvironment, stepDesc.count, 1.0f);//stepDesc.hi);
-			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
+			HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics, stepDesc.dt);
 			{
 				//var frameTimeLo = execState.elapsedTime - stepDesc.count * stepDesc.dt;
 				//var frameTimeHi = execState.elapsedTime;
 
-				var stepVolume = HairSim.PrepareVolumeData(ref volumeData, settingsVolumetrics, solverData.Length + 1);
-				if (stepVolume || stepDesc.count == 0)
-				{
-					var stepFracLo = 0.0f;
-					var stepFracHi = 1.0f / Mathf.Max(1, stepDesc.count);
-					var stepTimeHi = execState.elapsedTime - stepDesc.dt * (Mathf.Max(1, stepDesc.count) - 1);
-
-					HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo, stepFracHi, stepTimeHi);
-				}
-
 				if (stepDesc.count >= 1)
 				{
+					var stepVolumePre = HairSim.PrepareVolumeData(ref volumeData, settingsVolumetrics, solverData.Length + 1);
+					if (stepVolumePre)
+					{
+						var stepFracLo = 0.0f;
+						var stepFracHi = 1.0f / (float)stepDesc.count;
+						var stepTimeHi = execState.elapsedTime - stepDesc.dt * (stepDesc.count - 1);
+
+						HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo, stepFracHi, stepTimeHi);
+					}
+
 					for (int i = 0; i != solverData.Length; i++)
 					{
 						HairSim.PushSolverStepBegin(cmd, ref solverData[i], GetSettingsPhysics(strandGroupInstances[i]), stepDesc.dt);
@@ -812,7 +812,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 			}
-			HairSim.PushVolumeStepEnd(cmd, volumeData);
+			HairSim.PushVolumeStepEnd(cmd, volumeData, settingsVolumetrics);
 
 			for (int i = 0; i != solverData.Length; i++)
 			{
@@ -1302,9 +1302,9 @@ namespace Unity.DemoTeam.Hair
 				}
 
 				HairSim.PushVolumeLOD(cmd, ref volumeData, settingsVolumetrics);
-				HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics);
+				HairSim.PushVolumeStepBegin(cmd, ref volumeData, settingsVolumetrics, 0.0f);
 				HairSim.PushVolumeStep(cmd, cmdFlags, ref volumeData, settingsVolumetrics, solverData, stepFracLo: 0.0f, stepFracHi: 0.0f, stepTimeHi: 0.0);
-				HairSim.PushVolumeStepEnd(cmd, volumeData);
+				HairSim.PushVolumeStepEnd(cmd, volumeData, settingsVolumetrics);
 
 				for (int i = 0; i != solverData.Length; i++)
 				{

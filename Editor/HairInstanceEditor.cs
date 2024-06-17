@@ -21,8 +21,8 @@ namespace Unity.DemoTeam.Hair
 		SerializedProperty _strandGroupSettings;
 		SerializedProperty _strandGroupDefaults;
 
-		SerializedProperty _settingsEnvironment;
 		SerializedProperty _settingsVolumetrics;
+		SerializedProperty _settingsEnvironment;
 
 		void OnEnable()
 		{
@@ -33,8 +33,8 @@ namespace Unity.DemoTeam.Hair
 			_strandGroupSettings = serializedObject.FindProperty(nameof(HairInstance.strandGroupSettings));
 			_strandGroupDefaults = serializedObject.FindProperty(nameof(HairInstance.strandGroupDefaults));
 
-			_settingsEnvironment = serializedObject.FindProperty(nameof(HairInstance.settingsEnvironment));
 			_settingsVolumetrics = serializedObject.FindProperty(nameof(HairInstance.settingsVolumetrics));
+			_settingsEnvironment = serializedObject.FindProperty(nameof(HairInstance.settingsEnvironment));
 		}
 
 		void OnDisable()
@@ -563,6 +563,12 @@ namespace Unity.DemoTeam.Hair
 		{
 			EditorGUI.BeginChangeCheck();
 			{
+				if (StructPropertyFieldsWithHeader(_settingsVolumetrics, ValidationGUIVolumetrics, hairInstance))
+				{
+					// ...
+				}
+
+				EditorGUILayout.Space();
 				if (StructPropertyFieldsWithHeader(_settingsEnvironment, ValidationGUIEnvironment, hairInstance))
 				{
 					using (new EditorGUI.IndentLevelScope())
@@ -593,12 +599,6 @@ namespace Unity.DemoTeam.Hair
 							}
 						}
 					}
-				}
-
-				EditorGUILayout.Space();
-				if (StructPropertyFieldsWithHeader(_settingsVolumetrics, ValidationGUIVolumetrics, hairInstance))
-				{
-					// ...
 				}
 			}
 
