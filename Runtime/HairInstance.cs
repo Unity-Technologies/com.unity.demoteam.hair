@@ -695,7 +695,6 @@ namespace Unity.DemoTeam.Hair
 					execState.accumulatedTime += dt;
 
 					var accumulatedStepCount = Mathf.FloorToInt(execState.accumulatedTime / simulationTimeStep);
-					if (accumulatedStepCount > 0)
 					{
 						var minStepCount = settingsExecutive.updateStepsMin ? settingsExecutive.updateStepsMinValue : accumulatedStepCount;
 						var maxStepCount = settingsExecutive.updateStepsMax ? settingsExecutive.updateStepsMaxValue : accumulatedStepCount;
