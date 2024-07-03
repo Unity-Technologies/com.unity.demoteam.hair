@@ -272,13 +272,6 @@ namespace Unity.DemoTeam.Hair
 		[Serializable]
 		public struct SettingsRendering
 		{
-			//public enum PerVertexData
-			//{
-			//	Disregard		= 0,
-			//	Upload			= 1,
-			//	UploadAndApply	= 2,
-			//}
-
 			public enum Renderer
 			{
 				Disabled				= 0,
@@ -288,6 +281,31 @@ namespace Unity.DemoTeam.Hair
 				HDRPHighQualityLines	= 4,
 			}
 
+			public enum ShadowSubstitute
+			{
+				BuiltinLines			= 0,
+				BuiltinStrips			= 1,
+				BuiltinTubes			= 2,
+				//VolumeIsosurface		= 3,
+				//VolumeTransmittance	= 4,
+			}
+
+			//[Flags]
+			//public enum MaterialPermissions
+			//{
+			//	FreeLOD					= 1 << 1,
+			//	FreeDiameter			= 1 << 0,
+			//	UploadPerVertexUV		= 1 << 2,
+			//	UploadPerVertexDiameter	= 1 << 3,
+			//}
+
+			//public enum PerVertexData
+			//{
+			//	Disregard		= 0,
+			//	Upload			= 1,
+			//	UploadAndApply	= 2,
+			//}
+
 			[LineHeader("Material")]
 
 			[ToggleGroup]
@@ -295,8 +313,8 @@ namespace Unity.DemoTeam.Hair
 			[ToggleGroupItem]
 			public Material materialAsset;
 
-			//TODO allow user to declare that material increases LOD
-			//public float materialScaleCeiling;
+			//TODO maybe something like this, but an enum with just the optional streams + flags to specify if material intends to dilate?
+			//public MaterialPermissions materialPermissions;
 
 			//public PerVertexData perVertexUV;
 			//public PerVertexData perVertexDiameter;
@@ -311,6 +329,16 @@ namespace Unity.DemoTeam.Hair
 			[RenderingLayerMask]
 			public int rendererLayers;
 			public ShadowCastingMode rendererShadows;
+
+			[ToggleGroup]
+			public bool shadowLayers;
+			[ToggleGroupItem, RenderingLayerMask]
+			public int shadowLayersValue;
+			[ToggleGroup]
+			public bool shadowSubstitute;
+			[ToggleGroupItem]
+			public ShadowSubstitute shadowSubstituteValue;
+
 			public MotionVectorGenerationMode motionVectors;
 
 			[LineHeader("Renderer LOD")]
@@ -336,8 +364,12 @@ namespace Unity.DemoTeam.Hair
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
 				rendererGroup = LineRendering.RendererGroup.None,
 #endif
-				rendererShadows = ShadowCastingMode.On,
 				rendererLayers = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
+				rendererShadows = ShadowCastingMode.On,
+				shadowLayers = false,
+				shadowLayersValue = 0x0101,//TODO this is the HDRP default -- should decide based on active pipeline asset
+				shadowSubstitute = false,
+				shadowSubstituteValue = ShadowSubstitute.BuiltinLines,
 				motionVectors = MotionVectorGenerationMode.Object,
 
 				kLODSelection = RenderLODSelection.AutomaticPerSegment,

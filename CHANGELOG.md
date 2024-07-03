@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased]
+
+### Added
+
+- Added "step-then-pause" button to simulation controls section in HairInstance inspector. (Next to play, pause, etc.)
+- Added support for overriding shadow renderer and shadow layers via rendering settings.
+
+### Fixed
+
+- Fixed an issue with minimum (simulation) step count not being respected.
+
+
 ## [0.15.0-exp.1] - 2024-06-17
 
 ### Added

@@ -18,6 +18,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static readonly GUIContent miniButtonIconPlay;
 		public static readonly GUIContent miniButtonIconPause;
+		public static readonly GUIContent miniButtonIconStep;
 		public static readonly GUIContent miniButtonIconRewind;
 
 		static HairGUIStyles()
@@ -49,7 +50,8 @@ namespace Unity.DemoTeam.Hair
 
 			miniButtonIconPlay = EditorGUIUtility.IconContent("Animation.Play");
 			miniButtonIconPause = EditorGUIUtility.IconContent("PauseButton");
-			miniButtonIconRewind = EditorGUIUtility.IconContent("Animation.PrevKey");
+			miniButtonIconStep = EditorGUIUtility.IconContent("Animation.NextKey");
+			miniButtonIconRewind = EditorGUIUtility.IconContent("Animation.FirstKey");
 		}
 	}
 }
