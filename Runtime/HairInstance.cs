@@ -1462,7 +1462,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				for (int i = 0; i != strandGroupInstances.Length; i++)
 				{	
-					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
+					ref var strandGroupInstance = ref strandGroupInstances[i];
 
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstanceShadows);
