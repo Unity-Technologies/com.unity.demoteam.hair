@@ -83,10 +83,14 @@ namespace Unity.DemoTeam.Hair
 #endif
 
 				[NonSerialized] public Material materialInstance;
+				[NonSerialized] public Material materialInstanceShadows;
 
 #if !UNITY_2021_2_OR_NEWER
 				[NonSerialized] public Mesh meshInstance;
+				[NonSerialized] public Mesh meshInstanceShadows;
+
 				[NonSerialized] public ulong meshInstanceKey;
+				[NonSerialized] public ulong meshInstanceKeyShadows;
 #endif
 			}
 
@@ -159,16 +163,20 @@ namespace Unity.DemoTeam.Hair
 			public int lastStepCountRaw;
 			public float lastStepCountSmooth;
 
+			public bool pausePostStep;
+
 			public static readonly ExecutiveState defaults = new ExecutiveState()
 			{
 				accumulatedTime = 0.0f,
 
 				elapsedTime = 0.0f,
 				elapsedTimeRaw = 0.0f,
-				
+
 				lastStepCount = 0,
 				lastStepCountRaw = 0,
 				lastStepCountSmooth = 0,
+
+				pausePostStep = false,
 			};
 		}
 
@@ -728,6 +736,21 @@ namespace Unity.DemoTeam.Hair
 
 				execState.elapsedTimeRaw += dt;
 				execState.elapsedTime += stepDesc.dt * stepDesc.count;
+
+				if (execState.pausePostStep && stepDesc.count > 0)
+				{
+					execState.pausePostStep = false;
+
+					//TODO separate editor player state from settings?
+					settingsExecutive.updateSimulation = false;
+				}
+			}
+			else
+			{
+				if (execState.pausePostStep)
+				{
+					execState.pausePostStep = false;
+				}
 			}
 
 			//timeState.stepHistory.Enqueue(stepDesc);
@@ -822,78 +845,84 @@ namespace Unity.DemoTeam.Hair
 				onRenderingStateChanged(cmd);
 		}
 
-		void UpdateSceneState()
+		void UpdateSceneState(CommandBuffer cmd)
 		{
 			for (int i = 0; i != strandGroupInstances.Length; i++)
 			{
-				UpdateRendererState(ref strandGroupInstances[i], solverData[i]);
+				UpdateRendererState(cmd, ref strandGroupInstances[i], solverData[i]);
 			}
 		}
 
-		void UpdateRendererState(ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData)
+		void UpdateRendererState(CommandBuffer cmd, ref GroupInstance strandGroupInstance, in HairSim.SolverData solverData)
 		{
 			ref readonly var settingsRendering = ref GetSettingsRendering(strandGroupInstance);
 
-			// select mesh
-			var mesh = null as Mesh;
+			#region GetRenderTopologyType(..)
+			static HairTopologyType GetRenderTopologyType(HairSim.SettingsRendering.Renderer renderer)
 			{
-				if (settingsRendering.renderer != HairSim.SettingsRendering.Renderer.Disabled)
+				switch (renderer)
 				{
-					static HairTopologyType GetTopologyType(HairSim.SettingsRendering.Renderer renderer)
-					{
-						switch (renderer)
-						{
-							case HairSim.SettingsRendering.Renderer.BuiltinTubes:
-								return HairTopologyType.Tubes;
-
-							case HairSim.SettingsRendering.Renderer.BuiltinStrips:
-								return HairTopologyType.Strips;
-
-							default:
-								return HairTopologyType.Lines;
-						}
-					}
-
-					var meshDesc = new HairTopologyDesc
-					{
-						type = GetTopologyType(settingsRendering.renderer),
-						strandCount = (int)solverData.constants._StrandCount,
-						strandParticleCount = (int)solverData.constants._StagingStrandVertexCount,
-						memoryLayout = solverData.memoryLayout,
-					};
-
-#if !UNITY_2021_2_OR_NEWER
-					ref var meshInstance = ref strandGroupInstance.sceneObjects.meshInstance;
-					ref var meshInstanceKey = ref strandGroupInstance.sceneObjects.meshInstanceKey;
-
-					// if possible, keep current instance and do not touch topology cache (allow shared mesh to deallocate)
-					var meshKey = HairTopologyCache.GetSortKey(meshDesc);
-					if (meshKey != meshInstanceKey || meshInstance == null)
-					{
-						CoreUtils.Destroy(meshInstance);
-						
-						meshInstance = HairInstanceBuilder.CreateMeshInstance(HairTopologyCache.GetSharedMesh(meshDesc), HideFlags.HideAndDontSave);
-						meshInstanceKey = meshKey;
-					}
-
-					mesh = meshInstance;
-#else
-					mesh = HairTopologyCache.GetSharedMesh(meshDesc);
-#endif
+					default:
+						return HairTopologyType.Lines;
+					case HairSim.SettingsRendering.Renderer.BuiltinStrips:
+						return HairTopologyType.Strips;
+					case HairSim.SettingsRendering.Renderer.BuiltinTubes:
+						return HairTopologyType.Tubes;
 				}
 			}
+			#endregion
 
-			// update mesh filter
-			ref var meshFilter = ref strandGroupInstance.sceneObjects.strandMeshFilter;
+			#region GetShadowTopologyType(..)
+			static HairTopologyType GetShadowTopologyType(HairSim.SettingsRendering.ShadowSubstitute shadowSubstitute)
 			{
-				if (meshFilter.sharedMesh != mesh)
-					meshFilter.sharedMesh = mesh;
+				switch (shadowSubstitute)
+				{
+					default:
+						return HairTopologyType.Lines;
+					case HairSim.SettingsRendering.ShadowSubstitute.BuiltinStrips:
+						return HairTopologyType.Strips;
+					case HairSim.SettingsRendering.ShadowSubstitute.BuiltinTubes:
+						return HairTopologyType.Tubes;
+				}
 			}
+			#endregion
 
-			// update material instance
-			ref var materialInstance = ref strandGroupInstance.sceneObjects.materialInstance;
+			#region GetTopologyMesh(..)
+#if !UNITY_2021_2_OR_NEWER
+			static Mesh GetTopologyMesh(in HairSim.SolverData solverData, HairTopologyType meshType, ref Mesh meshInstance, ref ulong meshInstanceKey)
+#else
+			static Mesh GetTopologyMesh(in HairSim.SolverData solverData, HairTopologyType meshType)
+#endif
 			{
-				var materialAsset = GetMaterial(strandGroupInstance);
+				var meshDesc = new HairTopologyDesc
+				{
+					type = meshType,
+					strandCount = (int)solverData.constants._StrandCount,
+					strandParticleCount = (int)solverData.constants._StagingStrandVertexCount,
+					memoryLayout = solverData.memoryLayout,
+				};
+
+#if !UNITY_2021_2_OR_NEWER
+				// if possible, keep current instance and do not touch topology cache (allow shared mesh to deallocate)
+				var meshKey = HairTopologyCache.GetSortKey(meshDesc);
+				if (meshKey != meshInstanceKey || meshInstance == null)
+				{
+					CoreUtils.Destroy(meshInstance);
+						
+					meshInstance = HairInstanceBuilder.CreateMeshInstance(HairTopologyCache.GetSharedMesh(meshDesc), HideFlags.HideAndDontSave);
+					meshInstanceKey = meshKey;
+				}
+
+				return meshInstance;
+#else
+				return HairTopologyCache.GetSharedMesh(meshDesc);
+#endif
+			}
+			#endregion
+
+			#region GetTopologyMaterial(..)
+			static Material GetTopologyMaterial(in HairSim.SolverData solverData, in HairSim.VolumeData volumeData, Mesh mesh, HairTopologyType meshType, Material materialAsset, ref Material materialInstance)
+			{
 				if (materialAsset != null && materialAsset.shader != null)
 				{
 					if (materialInstance == null)
@@ -917,26 +946,108 @@ namespace Unity.DemoTeam.Hair
 
 				if (materialInstance != null)
 				{
-					UpdateMaterialState(materialInstance, settingsRendering, solverData, volumeData, mesh);
+					UpdateMaterialState(materialInstance, solverData, volumeData, mesh, meshType);
 
 #if UNITY_EDITOR
 					var materialInstancePendingPasses = HairMaterialUtility.TryCompileCountPassesPending(materialInstance);
 					if (materialInstancePendingPasses > 0)
 					{
 						materialInstance.shader = HairMaterialUtility.GetReplacementShader(HairMaterialUtility.ReplacementType.Async);
-						UpdateMaterialState(materialInstance, settingsRendering, solverData, volumeData, mesh);
+						UpdateMaterialState(materialInstance, solverData, volumeData, mesh, meshType);
 					}
 #endif
 				}
+
+				return materialInstance;
+			}
+			#endregion
+
+			// prepare settings
+			var layerMask = settingsRendering.rendererLayers;
+			var layerMaskShadows = settingsRendering.shadowLayers ? settingsRendering.shadowLayersValue : layerMask;
+
+			var meshType = GetRenderTopologyType(settingsRendering.renderer);
+			var meshTypeShadows = settingsRendering.shadowSubstitute ? GetShadowTopologyType(settingsRendering.shadowSubstituteValue) : meshType;
+
+			// prepare conditionals
+			var sameShadowLayer = (layerMask == layerMaskShadows);
+			var sameShadowMesh = (meshType == meshTypeShadows);
+			var sameShadow = sameShadowLayer && sameShadowMesh;
+
+			var needRenderer = false;
+			var needRendererShadows = false;
+
+			var needResources = false;
+			var needResourcesShadows = false;
+			{
+				if (settingsRendering.renderer != HairSim.SettingsRendering.Renderer.Disabled)
+				{
+					if (sameShadow == true || settingsRendering.rendererShadows != ShadowCastingMode.ShadowsOnly)
+					{
+						needRenderer = true;
+						needResources = true;
+					}
+
+					if (sameShadow == false && settingsRendering.rendererShadows != ShadowCastingMode.Off)
+					{
+						needRendererShadows = true;
+						needResourcesShadows = (sameShadowMesh == false) || (needResources == false);
+					}
+				}
+			}
+
+			// prepare resources
+			var mesh = null as Mesh;
+			var meshShadows = null as Mesh;
+
+			var materialAsset = GetMaterial(strandGroupInstance);
+			var materialInstance = null as Material;
+			var materialInstanceShadows = null as Material;
+			{
+				if (needResources)
+				{
+#if !UNITY_2021_2_OR_NEWER
+					mesh = GetTopologyMesh(solverData, meshType,
+						ref strandGroupInstance.sceneObjects.meshInstance,
+						ref strandGroupInstance.sceneObjects.meshInstanceKey);
+#else
+					mesh = GetTopologyMesh(solverData, meshType);
+#endif
+					materialInstance = GetTopologyMaterial(solverData, volumeData, mesh, meshType, materialAsset, ref strandGroupInstance.sceneObjects.materialInstance);
+				}
+
+				if (needResourcesShadows)
+				{
+#if !UNITY_2021_2_OR_NEWER
+					meshShadows = GetTopologyMesh(solverData, meshTypeShadows,
+						ref strandGroupInstance.sceneObjects.meshInstanceShadows,
+						ref strandGroupInstance.sceneObjects.meshInstanceKeyShadows);
+#else
+					meshShadows = GetTopologyMesh(solverData, meshTypeShadows);
+#endif
+					materialInstanceShadows = GetTopologyMaterial(solverData, volumeData, meshShadows, meshTypeShadows, materialAsset, ref strandGroupInstance.sceneObjects.materialInstanceShadows);
+				}
+				else
+				{
+					meshShadows = mesh;
+					materialInstanceShadows = materialInstance;
+				}
+			}
+
+			// update mesh filter
+			ref var meshFilter = ref strandGroupInstance.sceneObjects.strandMeshFilter;
+			{
+				if (meshFilter.sharedMesh != mesh)
+					meshFilter.sharedMesh = mesh;
 			}
 
 			// update mesh renderer
 			ref var meshRenderer = ref strandGroupInstance.sceneObjects.strandMeshRenderer;
 			{
-				meshRenderer.enabled = (settingsRendering.renderer != HairSim.SettingsRendering.Renderer.Disabled);
+				meshRenderer.enabled = needRenderer;
 				meshRenderer.sharedMaterial = materialInstance;
-				meshRenderer.shadowCastingMode = settingsRendering.rendererShadows;
-				meshRenderer.renderingLayerMask = (uint)settingsRendering.rendererLayers;
+				meshRenderer.shadowCastingMode = sameShadow ? settingsRendering.rendererShadows : ShadowCastingMode.Off;
+				meshRenderer.renderingLayerMask = (uint)layerMask;
 				meshRenderer.motionVectorGenerationMode = settingsRendering.motionVectors;
 
 				if (meshRenderer.rayTracingMode != UnityEngine.Experimental.Rendering.RayTracingMode.Off && SystemInfo.supportsRayTracing)
@@ -954,14 +1065,14 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					meshRendererHDRP.enabled = true;
+					meshRendererHDRP.enabled = needRenderer;
 					meshRendererHDRP.rendererGroup = settingsRendering.rendererGroup;
 					meshRendererHDRP.enableHighQualityLineRendering = (settingsRendering.renderer == HairSim.SettingsRendering.Renderer.HDRPHighQualityLines);
 				}
 #endif
 			}
 
-			// update renderer bounds
+			// update mesh bounds
 			{
 #if !UNITY_2021_2_OR_NEWER
 				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
@@ -975,28 +1086,61 @@ namespace Unity.DemoTeam.Hair
 				//meshRenderer.bounds = HairSim.GetSolverBounds(solverData, volumeData);
 #endif
 			}
+
+			// separate shadows (optional depending on configuration)
+			if (needRendererShadows)
+			{
+#if !UNITY_2021_2_OR_NEWER
+				Graphics.DrawMesh(meshShadows, Matrix4x4.identity, materialInstanceShadows, 0, null, 0, null, ShadowCastingMode.ShadowsOnly);
+#else
+				var rp = new RenderParams(materialInstanceShadows);
+				{
+					//layer = 0;
+					//renderingLayerMask = GraphicsSettings.defaultRenderingLayerMask;
+					//rendererPriority = 0;
+					//worldBounds = new Bounds(Vector3.zero, Vector3.zero);
+					//camera = null;
+					//motionVectorMode = MotionVectorGenerationMode.Camera;
+					//reflectionProbeUsage = ReflectionProbeUsage.Off;
+					//material = mat;
+					//matProps = null;
+					//shadowCastingMode = ShadowCastingMode.Off;
+					//receiveShadows = false;
+					//lightProbeUsage = LightProbeUsage.Off;
+					//lightProbeProxyVolume = null;
+					//overrideSceneCullingMask = false;
+					//sceneCullingMask = 0uL;
+					//instanceID = 0;
+					rp.renderingLayerMask = (uint)layerMaskShadows;
+					rp.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+					rp.worldBounds = HairSim.GetSolverBounds(solverData, volumeData);
+				}
+
+				Graphics.RenderMesh(rp, meshShadows, 0, Matrix4x4.identity);
+#endif
+			}
 		}
 
-		static void UpdateMaterialState(Material materialInstance, in HairSim.SettingsRendering settingsRendering, in HairSim.SolverData solverData, in HairSim.VolumeData volumeData, Mesh mesh)
+		static void UpdateMaterialState(Material materialInstance, in HairSim.SolverData solverData, in HairSim.VolumeData volumeData, Mesh mesh, HairTopologyType meshType)
 		{
 			HairSim.BindSolverData(materialInstance, solverData);
 			HairSim.BindVolumeData(materialInstance, volumeData);
 
-			switch (settingsRendering.renderer)
+			switch (meshType)
 			{
-				case HairSim.SettingsRendering.Renderer.BuiltinTubes:
-					materialInstance.SetInt("_DecodeVertexCount", 4);
-					materialInstance.SetInt("_DecodeVertexWidth", 2);
+				case HairTopologyType.Lines:
+					materialInstance.SetInt("_DecodeVertexCount", 1);
+					materialInstance.SetInt("_DecodeVertexWidth", 0);
 					break;
 
-				case HairSim.SettingsRendering.Renderer.BuiltinStrips:
+				case HairTopologyType.Strips:
 					materialInstance.SetInt("_DecodeVertexCount", 2);
 					materialInstance.SetInt("_DecodeVertexWidth", 1);
 					break;
 
-				default:
-					materialInstance.SetInt("_DecodeVertexCount", 1);
-					materialInstance.SetInt("_DecodeVertexWidth", 0);
+				case HairTopologyType.Tubes:
+					materialInstance.SetInt("_DecodeVertexCount", 4);
+					materialInstance.SetInt("_DecodeVertexWidth", 2);
 					break;
 			}
 
@@ -1128,7 +1272,7 @@ namespace Unity.DemoTeam.Hair
 				var stepDesc = UpdateExecutiveState(dt);
 				{
 					UpdateSystemState(cmd, cmdFlags, stepDesc);
-					UpdateSceneState();
+					UpdateSceneState(cmd);
 				}
 
 				return true;
@@ -1321,8 +1465,14 @@ namespace Unity.DemoTeam.Hair
 					ref readonly var strandGroupInstance = ref strandGroupInstances[i];
 
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstance);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.materialInstanceShadows);
+
 #if !UNITY_2021_2_OR_NEWER
 					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstance);
+					CoreUtils.Destroy(strandGroupInstance.sceneObjects.meshInstanceShadows);
+
+					strandGroupInstance.sceneObjects.meshInstanceKey = 0uL;
+					strandGroupInstance.sceneObjects.meshInstanceKeyShadows = 0uL;
 #endif
 				}
 			}
@@ -1342,6 +1492,11 @@ namespace Unity.DemoTeam.Hair
 			HairSim.ReleaseVolumeData(ref volumeData);
 
 			execState = ExecutiveState.defaults;
+		}
+
+		public void PauseSimulationPostStep()
+		{
+			execState.pausePostStep = true;
 		}
 
 		public void ResetSimulationState()

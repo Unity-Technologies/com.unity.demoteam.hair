@@ -275,6 +275,14 @@ namespace Unity.DemoTeam.Hair
 
 					simActive = (GUILayout.Toggle(simActive == false, HairGUIStyles.miniButtonIconPause, EditorStyles.miniButton) == false);
 
+					if (GUILayout.Button(HairGUIStyles.miniButtonIconStep, EditorStyles.miniButton))
+					{
+						simAllowed = true;
+						simActive = true;
+
+						hairInstance.PauseSimulationPostStep();
+					}
+
 					if (GUILayout.Button(HairGUIStyles.miniButtonIconRewind, EditorStyles.miniButton))
 					{
 						hairInstance.ResetSimulationState();
