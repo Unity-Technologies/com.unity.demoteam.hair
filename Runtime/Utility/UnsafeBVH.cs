@@ -172,15 +172,19 @@ namespace Unity.DemoTeam.Hair
 	{
 		public static float SqDistanceNodePoint(Node* nodePtr, in float3 p)
 		{
-			// see: "distance functions" by Inigo Quilez
-			// https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+			//                .p
+			//            .r´
+			// +-------+´
+			// |     e´|
+			// |   q´  |
+			// |       |
+			// +-------+
 
-			var b = 0.5f * (nodePtr->data.max - nodePtr->data.min);
-			var c = 0.5f * (nodePtr->data.max + nodePtr->data.min);
-			var q = abs(p - c) - b;
-			var d = length(max(q, 0.0f)) + min(max(q.x, max(q.y, q.z)), 0.0f);
+			var e = 0.5f * (nodePtr->data.max - nodePtr->data.min);
+			var q = 0.5f * (nodePtr->data.max + nodePtr->data.min);
+			var r = max(abs(p - q) - e, 0.0f);
 
-			return (d * d);
+			return dot(r, r);
 		}
 
 		public static uint FindClosestLeaf<T>(in T context, in UnsafeBVH bvh, in float3 p) where T : IUnsafeBVHContext
