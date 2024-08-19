@@ -55,9 +55,25 @@ float GetStrandParticleOffset(const uint strandParticleNumber)
 
 float GetStrandParticleTaperScale(const uint strandParticleNumber, const float2 strandTaperOffsetScale)
 {
+	float strandParticleInterval = GetStrandParticleOffset(1);
 	float strandParticleOffset = GetStrandParticleOffset(strandParticleNumber);
-	float strandParticleTaperT = saturate((strandParticleOffset - strandTaperOffsetScale.x) / (1.0 - strandTaperOffsetScale.x));
-	return lerp(1.0, strandTaperOffsetScale.y, strandParticleTaperT);
+	float strandTaperOffset = strandTaperOffsetScale.x * _GroupMaxTipScaleOffset;
+	float strandTaperT = saturate((strandParticleOffset - strandTaperOffset) / max(strandParticleInterval, 1.0 - strandTaperOffset));// lower bound on taper interval here ensures smooth transition as taper offset approaches 1
+	return lerp(1.0, _GroupMaxTipScale * strandTaperOffsetScale.y, strandTaperT);
+
+	//TODO ideally should taper to match desired fill area independent of strand resolution
+	//
+	//   o--------x-----------o
+	//   |        | `         |  
+	//   |        |    `      | 1-s
+	// 1 |        |       `   |
+	//   |        |- - - - - `x  
+	//   |        |           | s  
+	//   o--------x-----------o
+	//        a         b
+	//
+	// desired area:
+	//   a + s*b + (1-s)*b/2
 }
 
 float3 GetStrandDebugColor(const uint strandIndex)

@@ -1361,10 +1361,9 @@ namespace Unity.DemoTeam.Hair
 
 						solverData[i].memoryLayout = groupAsset.particleMemoryLayout;
 
-						solverData[i].initialSumStrandLength = groupAsset.sumStrandLength;
-						solverData[i].initialMaxStrandLength = groupAsset.maxStrandLength;
-						solverData[i].initialMaxStrandDiameter = groupAsset.maxStrandDiameter;
-						solverData[i].initialAvgStrandDiameter = groupAsset.avgStrandDiameter;
+						solverData[i].initialStrandLengthTotal = groupAsset.strandLengthTotal;
+						solverData[i].initialStrandParamsMax = groupAsset.strandParamsMax;
+						solverData[i].initialStrandParamsAvg = groupAsset.strandParamsAvg;
 
 						solverData[i].lodThreshold = new NativeArray<float>(groupAsset.lodThreshold, Allocator.Persistent);
 					}

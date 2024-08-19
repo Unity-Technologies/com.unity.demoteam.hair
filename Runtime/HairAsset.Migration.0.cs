@@ -25,12 +25,12 @@ namespace Unity.DemoTeam.Hair
 	//
 	// (old structures are unfortunately also re-serialized)
 
-	using __1__SettingsProcedural = HairAsset.SettingsProcedural;
-	using __1__SettingsAlembic = HairAsset.SettingsAlembic;
-	using __1__SettingsCustom = HairAsset.SettingsCustom;
-	using __1__SettingsResolve = HairAsset.SettingsResolve;
+	using __IMPL__SettingsProcedural = HairAsset.SettingsProcedural;
+	using __IMPL__SettingsAlembic = HairAsset.SettingsAlembic;
+	using __IMPL__SettingsCustom = HairAsset.SettingsCustom;
+	using __IMPL__SettingsResolve = HairAsset.SettingsResolve;
 
-	using __1__StrandGroup = HairAsset.StrandGroup;
+	using __IMPL__StrandGroup = HairAsset.StrandGroup;
 
 	public partial class HairAsset
 	{
@@ -48,69 +48,107 @@ namespace Unity.DemoTeam.Hair
 
 		void PerformMigration_0()
 		{
-			ref var data_1_settingsProcedural = ref this.settingsProcedural;
-			ref var data_1_settingsAlembic = ref this.settingsAlembic;
-			ref var data_1_settingsCustom = ref this.settingsCustom;
+			ref var data_IMPL_settingsProcedural = ref this.settingsProcedural;
+			ref var data_IMPL_settingsAlembic = ref this.settingsAlembic;
+			ref var data_IMPL_settingsCustom = ref this.settingsCustom;
 
-			ref var data_1_strandGroups = ref this.strandGroups;
+			ref var data_IMPL_strandGroups = ref this.strandGroups;
+
+			// prepare data_IMPL_settingsProcedural
+			{
+				static void PrepareSettingsProcedural(ref __IMPL__SettingsProcedural out_IMPL)
+				{
+					out_IMPL.strandDiameter = HairAsset.SharedDefaults.defaultStrandDiameter;
+					out_IMPL.strandDiameterVariation = false;
+					out_IMPL.strandDiameterVariationAmount = 0.2f;
+
+					out_IMPL.tipScale = 1.0f;
+					out_IMPL.tipScaleVariation = false;
+					out_IMPL.tipScaleVariationAmount = 0.2f;
+					out_IMPL.tipScaleOffset = HairAsset.SharedDefaults.defaultTipScaleOffset;
+					out_IMPL.tipScaleOffsetVariation = false;
+					out_IMPL.tipScaleOffsetVariationAmount = 0.2f;
+				}
+
+				PrepareSettingsProcedural(ref data_IMPL_settingsProcedural);
+			}
+
+			// prepare data_IMPL_settingsAlembic
+			{
+				static void PrepareSettingsAlembic(ref __IMPL__SettingsAlembic out_IMPL)
+				{
+					out_IMPL.alembicScalePositions = __IMPL__SettingsAlembic.SourceUnit.DataInMeters;
+					out_IMPL.alembicScaleDiameters = __IMPL__SettingsAlembic.SourceUnit.DataInCentimeters;
+				}
+
+				PrepareSettingsAlembic(ref data_IMPL_settingsAlembic);
+			}
+
+			// prepare data_IMPL_settings*.settingsResolve
+			{
+				static void PrepareSettingsResolve(ref __IMPL__SettingsResolve out_IMPL)
+				{
+					out_IMPL.strandDiameter = __IMPL__SettingsResolve.StrandDiameter.UseFallback;
+					out_IMPL.strandDiameterFallback = 1.0f;
+
+					out_IMPL.tipScale = __IMPL__SettingsResolve.TipScale.UseFallback;
+					out_IMPL.tipScaleFallback = 1.0f;
+					out_IMPL.tipScaleFallbackOffset = HairAsset.SharedDefaults.defaultTipScaleOffset;
+
+					out_IMPL.additionalData = false;
+					out_IMPL.additionalDataMask = __IMPL__SettingsResolve.AdditionalData.All;
+				}
+
+				PrepareSettingsResolve(ref data_IMPL_settingsAlembic.settingsResolve);
+				PrepareSettingsResolve(ref data_IMPL_settingsCustom.settingsResolve);
+			}
 
 			// migrate data_0_settingsProcedural
 			{
 				ref readonly var in_0 = ref data_0_settingsProcedural;
 
-				// => data_1_settingsProcedural
+				// => data_IMPL_settingsProcedural
 				{
-					static void TransferSettingsProcedural(in __0__SettingsProcedural in_0, ref __1__SettingsProcedural out_1)
+					static void TransferSettingsProcedural(in __0__SettingsProcedural in_0, ref __IMPL__SettingsProcedural out_IMPL)
 					{
-						static __1__SettingsProcedural.SubmeshMask TranslateSubmeshMask(__0__SettingsProcedural.SubmeshMask x) => (__1__SettingsProcedural.SubmeshMask)x;
+						static __IMPL__SettingsProcedural.SubmeshMask TranslateSubmeshMask(__0__SettingsProcedural.SubmeshMask x) => (__IMPL__SettingsProcedural.SubmeshMask)x;
 
-						out_1.placementProvider = in_0.placementProvider;
-						out_1.placementMeshGroups = TranslateSubmeshMask(in_0.placementMeshGroups);
-						out_1.mappedDensity = in_0.mappedDensity;
-						out_1.mappedDirection = in_0.mappedDirection;
-						out_1.mappedParameters = in_0.mappedParameters;
-
-						out_1.tipScale = HairAsset.SharedDefaults.defaultTipScale;
-						out_1.tipScaleOffset = HairAsset.SharedDefaults.defaultTipScaleOffset;
+						out_IMPL.placementProvider = in_0.placementProvider;
+						out_IMPL.placementMeshGroups = TranslateSubmeshMask(in_0.placementMeshGroups);
+						out_IMPL.mappedDensity = in_0.mappedDensity;
+						out_IMPL.mappedDirection = in_0.mappedDirection;
+						out_IMPL.mappedParameters = in_0.mappedParameters;
 					}
 
-					TransferSettingsProcedural(in_0, ref data_1_settingsProcedural);
+					TransferSettingsProcedural(in_0, ref data_IMPL_settingsProcedural);
 				}
 			}
 
 			// migrate data_0_settings*.settingsResolve
 			{
-				// => data_1_settings*.settingsResolve
+				// => data_IMPL_settings*.settingsResolve
 				{
-					static void TransferSettingsResolve(in __0__SettingsResolve in_0, ref __1__SettingsResolve out_1)
+					static void TransferSettingsResolve(in __0__SettingsResolve in_0, ref __IMPL__SettingsResolve out_IMPL)
 					{
-						static __1__SettingsResolve.RootUV TranslateRootUV(__0__SettingsResolve.RootUV x)
+						static __IMPL__SettingsResolve.RootUV TranslateRootUV(__0__SettingsResolve.RootUV x)
 						{
 							switch (x)
 							{
-								case __0__SettingsResolve.RootUV.ResolveFromMesh: return __1__SettingsResolve.RootUV.ResolveFromMesh;
-								case __0__SettingsResolve.RootUV.ResolveFromCurveUV: return __1__SettingsResolve.RootUV.ResolveFromCurves;
+								case __0__SettingsResolve.RootUV.ResolveFromMesh: return __IMPL__SettingsResolve.RootUV.ResolveFromMesh;
+								case __0__SettingsResolve.RootUV.ResolveFromCurveUV: return __IMPL__SettingsResolve.RootUV.ResolveFromCurves;
 								default:
-								case __0__SettingsResolve.RootUV.Uniform: return __1__SettingsResolve.RootUV.UseFallback;
+								case __0__SettingsResolve.RootUV.Uniform: return __IMPL__SettingsResolve.RootUV.UseFallback;
 							}
 						}
 
-						out_1.resampleResolution = in_0.resampleParticleCount;
+						out_IMPL.resampleResolution = in_0.resampleParticleCount;
 
-						out_1.rootUV = TranslateRootUV(in_0.rootUV);
-						out_1.rootUVFallback = in_0.rootUVConstant;
-
-						out_1.strandDiameter = __1__SettingsResolve.StrandDiameter.UseFallback;
-						out_1.strandDiameterScale = 0.01f;
-						out_1.strandDiameterFallback = HairAsset.SharedDefaults.defaultStrandDiameter;
-						out_1.tipScaleFallback = HairAsset.SharedDefaults.defaultTipScale;
-						out_1.tipScaleFallbackOffset = HairAsset.SharedDefaults.defaultTipScaleOffset;
-
-						out_1.exportAttributes = false;
+						out_IMPL.rootUV = TranslateRootUV(in_0.rootUV);
+						out_IMPL.rootUVFallback = in_0.rootUVConstant;
 					}
 
-					TransferSettingsResolve(data_0_settingsAlembic.settingsResolve, ref data_1_settingsAlembic.settingsResolve);
-					TransferSettingsResolve(data_0_settingsCustom.settingsResolve, ref data_1_settingsCustom.settingsResolve);
+					TransferSettingsResolve(data_0_settingsAlembic.settingsResolve, ref data_IMPL_settingsAlembic.settingsResolve);
+					TransferSettingsResolve(data_0_settingsCustom.settingsResolve, ref data_IMPL_settingsCustom.settingsResolve);
 				}
 			}
 
@@ -118,91 +156,99 @@ namespace Unity.DemoTeam.Hair
 			{
 				ref readonly var in_0 = ref data_0_settingsAlembic;
 
-				// => data_1_settingsAlembic.settingsResolve
+				// => data_IMPL_settingsAlembic.settingsResolve
 				{
-					static void TransferSettingsAlembic(in __0__SettingsAlembic in_0, ref __1__SettingsResolve out_1)
+					static void TransferSettingsAlembic(in __0__SettingsAlembic in_0, ref __IMPL__SettingsResolve out_IMPL)
 					{
-						static __1__SettingsResolve.RootUV TranslateRootUV(__0__SettingsResolve.RootUV x)
+						static __IMPL__SettingsResolve.RootUV TranslateRootUV(__0__SettingsResolve.RootUV x)
 						{
 							switch (x)
 							{
-								case __0__SettingsResolve.RootUV.ResolveFromMesh: return __1__SettingsResolve.RootUV.ResolveFromMesh;
-								case __0__SettingsResolve.RootUV.ResolveFromCurveUV: return __1__SettingsResolve.RootUV.ResolveFromCurves;
+								case __0__SettingsResolve.RootUV.ResolveFromMesh: return __IMPL__SettingsResolve.RootUV.ResolveFromMesh;
+								case __0__SettingsResolve.RootUV.ResolveFromCurveUV: return __IMPL__SettingsResolve.RootUV.ResolveFromCurves;
 								default:
-								case __0__SettingsResolve.RootUV.Uniform: return __1__SettingsResolve.RootUV.UseFallback;
+								case __0__SettingsResolve.RootUV.Uniform: return __IMPL__SettingsResolve.RootUV.UseFallback;
 							}
 						}
 
 						if (in_0.OLD__transferred == false)
 						{
-							out_1.rootUV = TranslateRootUV(in_0.OLD__rootUV);
-							out_1.rootUVFallback = in_0.OLD__rootUVConstant;
-							out_1.rootUVMesh = in_0.OLD__rootUVMesh;
+							out_IMPL.rootUV = TranslateRootUV(in_0.OLD__rootUV);
+							out_IMPL.rootUVFallback = in_0.OLD__rootUVConstant;
+							out_IMPL.rootUVMesh = in_0.OLD__rootUVMesh;
 
-							out_1.resampleCurves = in_0.OLD__resampleCurves;
-							out_1.resampleResolution = in_0.OLD__resampleParticleCount;
-							out_1.resampleQuality = in_0.OLD__resampleQuality;
+							out_IMPL.resampleCurves = in_0.OLD__resampleCurves;
+							out_IMPL.resampleResolution = in_0.OLD__resampleParticleCount;
+							out_IMPL.resampleQuality = in_0.OLD__resampleQuality;
 						}
 					}
 
-					TransferSettingsAlembic(in_0, ref data_1_settingsAlembic.settingsResolve);
+					TransferSettingsAlembic(in_0, ref data_IMPL_settingsAlembic.settingsResolve);
 				}
 			}
 
 			// migrate data_0_strandGroups[]
 			{
-				// => data_1_strandGroups[]
+				// => data_IMPL_strandGroups[]
 				{
-					static void TransferStrandGroup(in __0__StrandGroup in_0, ref __1__StrandGroup out_1, HairAsset hairAsset)
+					static void TransferStrandGroup(in __0__StrandGroup in_0, ref __IMPL__StrandGroup out_IMPL, HairAsset hairAsset)
 					{
-						out_1.sumStrandLength = in_0.totalLength;
-						out_1.avgStrandDiameter = HairAsset.SharedDefaults.defaultStrandDiameter * 0.001f;
-						out_1.maxStrandDiameter = HairAsset.SharedDefaults.defaultStrandDiameter * 0.001f;
+						out_IMPL.strandLengthTotal = in_0.totalLength;
+						out_IMPL.strandParamsMax = new Vector4(in_0.maxStrandLength, 1.0f * 0.001f, 1.0f, 1.0f);
+						out_IMPL.strandParamsAvg = new Vector4(in_0.maxStrandLength, 1.0f * 0.001f, 1.0f, 1.0f);
 
-						out_1.rootScale = new Vector4[in_0.rootScale.Length];
+						out_IMPL.rootScale = new Vector4[in_0.rootScale.Length];
 						{
-							for (int i = 0; i != out_1.rootScale.Length; i++)
+							var sumRootScale = 0.0f;
+
+							for (int i = 0; i != out_IMPL.rootScale.Length; i++)
 							{
-								out_1.rootScale[i].x = in_0.rootScale[i];
-								out_1.rootScale[i].y = 1.0f;
-								out_1.rootScale[i].z = HairAsset.SharedDefaults.defaultTipScaleOffset;
-								out_1.rootScale[i].w = 1.0f;
+								out_IMPL.rootScale[i].x = in_0.rootScale[i];
+								out_IMPL.rootScale[i].y = 1.0f;
+								out_IMPL.rootScale[i].z = HairAsset.SharedDefaults.defaultTipScaleOffset;
+								out_IMPL.rootScale[i].w = 1.0f;
+
+								sumRootScale += in_0.rootScale[i];
 							}
+
+							out_IMPL.strandParamsAvg.x = out_IMPL.strandParamsMax.x * (sumRootScale / out_IMPL.rootScale.Length);
 						}
 
-						out_1.particleTexCoord = null;
-						out_1.particleDiameter = null;
-						out_1.particleFeatures = __1__StrandGroup.ParticleFeatures.Position;
+						out_IMPL.particleTexCoord = null;
+						out_IMPL.particleDiameter = null;
+						out_IMPL.particleFeatures = __IMPL__StrandGroup.ParticleFeatures.Position;
 
 						// ensure valid lod data (note: only meant as placeholder until asset is rebuilt)
 						{
-							if (out_1.lodCount == 0)
+							if (out_IMPL.lodCount == 0)
 							{
-								out_1.lodCount = 1;
-								out_1.lodGuideCount = new int[1] { out_1.strandCount };
-								out_1.lodGuideIndex = new int[out_1.strandCount];
-								out_1.lodThreshold = new float[1] { 1.0f };
-								for (int i = 0; i != out_1.lodGuideIndex.Length; i++)
+								out_IMPL.lodCount = 1;
+								out_IMPL.lodGuideCount = new int[1] { out_IMPL.strandCount };
+								out_IMPL.lodGuideIndex = new int[out_IMPL.strandCount];
+								out_IMPL.lodThreshold = new float[1] { 1.0f };
+								for (int i = 0; i != out_IMPL.lodGuideIndex.Length; i++)
 								{
-									out_1.lodGuideIndex[i] = i;
+									out_IMPL.lodGuideIndex[i] = i;
 								}
 							}
 
-							if ((out_1.lodGuideCarry?.Length ?? 0) == 0)
+							//TODO impl
+							if ((out_IMPL.lodGuideCarry?.Length ?? 0) == 0)
 							{
-								out_1.lodGuideCarry = new float[out_1.lodGuideIndex.Length];
-								for (int i = 0; i != out_1.lodGuideCarry.Length; i++)
+								out_IMPL.lodGuideCarry = new float[out_IMPL.lodGuideIndex.Length];
+								for (int i = 0; i != out_IMPL.lodGuideCarry.Length; i++)
 								{
-									out_1.lodGuideCarry[i] = 1.0f;
+									out_IMPL.lodGuideCarry[i] = 1.0f;
 								}
 							}
 
-							if ((out_1.lodGuideReach?.Length ?? 0) == 0)
+							//TODO impl
+							if ((out_IMPL.lodGuideReach?.Length ?? 0) == 0)
 							{
-								out_1.lodGuideReach = new float[out_1.lodGuideCarry.Length];
-								for (int i = 0; i != out_1.lodGuideReach.Length; i++)
+								out_IMPL.lodGuideReach = new float[out_IMPL.lodGuideCarry.Length];
+								for (int i = 0; i != out_IMPL.lodGuideReach.Length; i++)
 								{
-									out_1.lodGuideReach[i] = 0.0f;
+									out_IMPL.lodGuideReach[i] = 0.0f;
 								}
 							}
 						}
@@ -210,7 +256,7 @@ namespace Unity.DemoTeam.Hair
 						// ensure valid mesh assets
 						/*REMOVED
 						{
-							static void ValidateRenderMesh(__1__StrandGroup out_1, HairAsset hairAsset, ref Mesh meshAsset, HairInstanceBuilder.FnCreateRenderMesh fnCreateRenderMesh)
+							static void ValidateRenderMesh(__IMPL__StrandGroup out_IMPL, HairAsset hairAsset, ref Mesh meshAsset, HairInstanceBuilder.FnCreateRenderMesh fnCreateRenderMesh)
 							{
 								var prevName = (meshAsset != null) ? meshAsset.name : null;
 								var prevHideFlags = (meshAsset != null ? meshAsset.hideFlags : HideFlags.HideInHierarchy);
@@ -227,7 +273,7 @@ namespace Unity.DemoTeam.Hair
 
 								if (meshAsset == null)
 								{
-									meshAsset = fnCreateRenderMesh(prevHideFlags, out_1.particleMemoryLayout, out_1.strandCount, out_1.strandParticleCount, out_1.bounds);
+									meshAsset = fnCreateRenderMesh(prevHideFlags, out_IMPL.particleMemoryLayout, out_IMPL.strandCount, out_IMPL.strandParticleCount, out_IMPL.bounds);
 									meshAsset.name = prevName ?? meshAsset.name;
 #if UNITY_EDITOR
 									UnityEditor.AssetDatabase.AddObjectToAsset(meshAsset, hairAsset);
@@ -235,24 +281,40 @@ namespace Unity.DemoTeam.Hair
 								}
 							}
 
-							ValidateRenderMesh(out_1, hairAsset, ref out_1.meshAssetLines, HairInstanceBuilder.CreateRenderMeshLines);
-							ValidateRenderMesh(out_1, hairAsset, ref out_1.meshAssetStrips, HairInstanceBuilder.CreateRenderMeshStrips);
-							ValidateRenderMesh(out_1, hairAsset, ref out_1.meshAssetTubes, HairInstanceBuilder.CreateRenderMeshTubes);
+							ValidateRenderMesh(out_IMPL, hairAsset, ref out_IMPL.meshAssetLines, HairInstanceBuilder.CreateRenderMeshLines);
+							ValidateRenderMesh(out_IMPL, hairAsset, ref out_IMPL.meshAssetStrips, HairInstanceBuilder.CreateRenderMeshStrips);
+							ValidateRenderMesh(out_IMPL, hairAsset, ref out_IMPL.meshAssetTubes, HairInstanceBuilder.CreateRenderMeshTubes);
 						}
 						*/
 					}
 
-					for (int i = 0; i != (data_1_strandGroups?.Length ?? 0); i++)
+					for (int i = 0; i != (data_IMPL_strandGroups?.Length ?? 0); i++)
 					{
-						TransferStrandGroup(data_0_strandGroups[i], ref data_1_strandGroups[i], this);
+						TransferStrandGroup(data_0_strandGroups[i], ref data_IMPL_strandGroups[i], this);
 					}
 				}
 			}
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__SettingsProcedural
 		{
+			//public enum PlacementType
+			//{
+			//	Primitive,
+			//	Custom,
+			//	Mesh,
+			//}
+
+			//public enum PrimitiveType
+			//{
+			//	Curtain,
+			//	Brush,
+			//	Cap,
+			//	StratifiedCurtain,
+			//}
+
 			[Flags]
 			public enum SubmeshMask
 			{
@@ -266,8 +328,17 @@ namespace Unity.DemoTeam.Hair
 				Submesh7 = 1 << 7,
 			}
 
+			//public enum CurlSamplingStrategy
+			//{
+			//	RelaxStrandLength,
+			//	RelaxCurlSlope,
+			//}
+
+			//public PlacementType placement;
+			//public PrimitiveType placementPrimitive;
 			[FormerlySerializedAs("placementGenerator")]
 			public HairAssetCustomPlacement placementProvider;
+			//public Mesh placementMesh;
 			[FormerlySerializedAs("placementMeshInclude")]
 			public SubmeshMask placementMeshGroups;
 			[FormerlySerializedAs("placementDensity")]
@@ -277,53 +348,102 @@ namespace Unity.DemoTeam.Hair
 			[FormerlySerializedAs("paintedParameters")]
 			public Texture2D mappedParameters;
 
+			//public int strandCount;
+			//public int strandParticleCount;
+			//public float strandLength;
+			//public bool strandLengthVariation;
+			//public float strandLengthVariationAmount;
+
+			//public bool curl;
+			//public float curlRadius;
+			//public float curlSlope;
+			//public bool curlVariation;
+			//public float curlVariationRadius;
+			//public float curlVariationSlope;
+			//public CurlSamplingStrategy curlSamplingStrategy;
+
 			public static readonly __0__SettingsProcedural defaults = new __0__SettingsProcedural()
 			{
+				//placement = PlacementType.Primitive,
+				//placementPrimitive = PrimitiveType.Curtain,
 				placementProvider = null,
+				//placementMesh = null,
 				placementMeshGroups = (SubmeshMask)(-1),
 				mappedDensity = null,
 				mappedDirection = null,
 				mappedParameters = null,
+
+				//strandCount = 64,
+				//strandParticleCount = 32,
+
+				//strandLength = 0.25f,
+				//strandLengthVariation = false,
+				//strandLengthVariationAmount = 0.2f,
+
+				//curl = false,
+				//curlRadius = 1.0f,
+				//curlSlope = 0.3f,
+				//curlVariation = false,
+				//curlVariationRadius = 0.1f,
+				//curlVariationSlope = 0.3f,
+				//curlSamplingStrategy = CurlSamplingStrategy.RelaxStrandLength,
 			};
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__SettingsAlembic
 		{
-			public __0__SettingsResolve settingsResolve;
+			//public enum Groups
+			//{
+			//	Combine,
+			//	Preserve,
+			//}
 
-			public bool OLD__transferred;
-			[FormerlySerializedAs("rootUV")]
-			public __0__SettingsResolve.RootUV OLD__rootUV;
-			[FormerlySerializedAs("rootUVConstant")]
-			public Vector2 OLD__rootUVConstant;
-			[FormerlySerializedAs("rootUVMesh")]
-			public Mesh OLD__rootUVMesh;
-			[FormerlySerializedAs("resampleCurves")]
-			public bool OLD__resampleCurves;
-			[FormerlySerializedAs("resampleParticleCount")]
-			public int OLD__resampleParticleCount;
-			[FormerlySerializedAs("resampleQuality")]
-			public int OLD__resampleQuality;
+#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
+			//public AlembicStreamPlayer alembicAsset;
+#endif
+			//public Groups alembicAssetGroups;
+
+			public __0__SettingsResolve settingsResolve;
 
 			public static readonly __0__SettingsAlembic defaults = new __0__SettingsAlembic()
 			{
+#if HAS_PACKAGE_UNITY_ALEMBIC && UNITY_EDITOR
+				//alembicAsset = null,
+#endif
+				//alembicAssetGroups = Groups.Combine,
+
 				settingsResolve = __0__SettingsResolve.defaults,
 			};
+
+			[FormerlySerializedAs("rootUV")] public __0__SettingsResolve.RootUV OLD__rootUV;
+			[FormerlySerializedAs("rootUVConstant")] public Vector2 OLD__rootUVConstant;
+			[FormerlySerializedAs("rootUVMesh")] public Mesh OLD__rootUVMesh;
+			[FormerlySerializedAs("resampleCurves")] public bool OLD__resampleCurves;
+			[FormerlySerializedAs("resampleParticleCount")] public int OLD__resampleParticleCount;
+			[FormerlySerializedAs("resampleQuality")] public int OLD__resampleQuality;
+			public bool OLD__transferred;
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__SettingsCustom
 		{
+			//public HairAssetCustomData dataProvider;
+
 			public __0__SettingsResolve settingsResolve;
 
 			public static readonly __0__SettingsCustom defaults = new __0__SettingsCustom()
 			{
+				//dataProvider = null,
+
 				settingsResolve = __0__SettingsResolve.defaults,
 			};
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__SettingsResolve
 		{
 			public enum RootUV
@@ -335,25 +455,32 @@ namespace Unity.DemoTeam.Hair
 
 			public RootUV rootUV;
 			public Vector2 rootUVConstant;
+			//public Mesh rootUVMesh;
 
+			//public bool resampleCurves;
 			public int resampleParticleCount;
+			//public int resampleQuality;
 
 			public static readonly __0__SettingsResolve defaults = new __0__SettingsResolve()
 			{
 				rootUV = RootUV.Uniform,
 				rootUVConstant = Vector2.zero,
+				//rootUVMesh = null,
 
+				//resampleCurves = true,
 				resampleParticleCount = 16,
+				//resampleQuality = 1,
 			};
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__StrandGroup
 		{
 			//public int strandCount;
 			//public int strandParticleCount;
 
-			//public float maxStrandLength;
+			public float maxStrandLength;
 			//public float maxParticleInterval;
 
 			public float totalLength;

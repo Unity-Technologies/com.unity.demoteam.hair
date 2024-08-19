@@ -43,6 +43,17 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 100.0f), Tooltip("Strand separation margin (in millimeters)")]
 			public float strandSeparation;
 
+			[LineHeader("Tapering")]
+
+			[ToggleGroup]
+			public bool tipScale;
+			[ToggleGroupItem, Range(0.0f, 1.0f)]
+			public float tipScaleValue;
+			[ToggleGroup]
+			public bool tipScaleOffset;
+			[ToggleGroupItem, Range(0.0f, 1.0f)]
+			public float tipScaleOffsetValue;
+
 			[LineHeader("Bounds")]
 
 			public BoundsMode boundsMode;
@@ -67,10 +78,15 @@ namespace Unity.DemoTeam.Hair
 			{
 				strandScale = StrandScale.Fixed,
 				strandDiameter = false,
-				strandDiameterValue = 1.0f,
+				strandDiameterValue = HairAsset.SharedDefaults.defaultStrandDiameter,
 				strandLength = false,
-				strandLengthValue = 1.0f,
+				strandLengthValue = HairAsset.SharedDefaults.defaultStrandLength,
 				strandSeparation = 0.0f,
+
+				tipScale = false,
+				tipScaleValue = HairAsset.SharedDefaults.defaultTipScale,
+				tipScaleOffset = false,
+				tipScaleOffsetValue = HairAsset.SharedDefaults.defaultTipScaleOffset,
 
 				boundsMode = BoundsMode.Automatic,
 				boundsCenter = Vector3.zero,
@@ -329,7 +345,6 @@ namespace Unity.DemoTeam.Hair
 			[RenderingLayerMask]
 			public int rendererLayers;
 			public ShadowCastingMode rendererShadows;
-
 			[ToggleGroup]
 			public bool shadowLayers;
 			[ToggleGroupItem, RenderingLayerMask]
@@ -338,7 +353,6 @@ namespace Unity.DemoTeam.Hair
 			public bool shadowSubstitute;
 			[ToggleGroupItem]
 			public ShadowSubstitute shadowSubstituteValue;
-
 			public MotionVectorGenerationMode motionVectors;
 
 			[LineHeader("Renderer LOD")]

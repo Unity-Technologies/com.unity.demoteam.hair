@@ -93,10 +93,9 @@ namespace Unity.DemoTeam.Hair
 			// data accessible by CPU
 			public HairAsset.MemoryLayout memoryLayout;
 
-			public float initialSumStrandLength;
-			public float initialMaxStrandLength;
-			public float initialMaxStrandDiameter;
-			public float initialAvgStrandDiameter;
+			public float initialStrandLengthTotal;
+			public Vector4 initialStrandParamsMax;
+			public Vector4 initialStrandParamsAvg;
 
 			public bool manualBounds;
 			public Vector3 manualBoundsMin;
@@ -142,7 +141,7 @@ namespace Unity.DemoTeam.Hair
 			// NOTE: explicit end padding to 16 byte boundary required on some platforms, please update counts if modifying
 
 			// 0
-			#region Strand Geometry (12 floats, 48 bytes)
+			#region Strand Geometry (15 floats, 60 bytes)
 			public uint _StrandCount;					// number of strands
 			public uint _StrandParticleCount;			// number of particles in strand
 			public uint _StrandParticleOffset;			// stride in particles between strands
@@ -156,15 +155,17 @@ namespace Unity.DemoTeam.Hair
 			public float _GroupMaxParticleDiameter;		// (already scaled) max particle diameter
 			public float _GroupAvgParticleDiameter;		// (already scaled) avg particle diameter
 			public float _GroupAvgParticleMargin;		// (already scaled) avg particle margin
+			public float _GroupMaxTipScale;				// max tip scale
+			public float _GroupMaxTipScaleOffset;		// max tip scale offset
 
-			// +10
+			// +13
 			public uint _GroupBoundsIndex;				// group bounds index
 			public float _GroupBoundsPadding;			// group bounds padding
 
-			// +12
+			// +15
 			#endregion
 
-			// 12
+			// 15
 			#region Strand Solver (28 floats, 112 bytes)
 			public uint _SolverLODMethod;				// solver lod method (for lod selection)
 			public float _SolverLODCeiling;				// solver lod ceiling
@@ -208,7 +209,7 @@ namespace Unity.DemoTeam.Hair
 			// +28
 			#endregion
 
-			// 40
+			// 43
 			#region Strand Staging (10 floats, 40 bytes)
 			public uint _StagingSubdivision;			// staging subdivision count
 			public uint _StagingVertexFormat;			// staging buffer vertex format
@@ -227,10 +228,10 @@ namespace Unity.DemoTeam.Hair
 			// +10
 			#endregion
 
-			// 50 --> 52 (pad to 16 byte boundary)
+			// 53 --> 56 (pad to 16 byte boundary)
 			public float _scbpad1;
 			public float _scbpad2;
-			//public float _scbpad3;
+			public float _scbpad3;
 		}
 
 		[GenerateHLSL, Flags]

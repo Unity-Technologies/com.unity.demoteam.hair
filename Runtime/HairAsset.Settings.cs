@@ -136,10 +136,21 @@ namespace Unity.DemoTeam.Hair
 			public bool strandDiameterVariation;
 			[ToggleGroupItem, Range(0.0f, 1.0f), Tooltip("Amount of variation as fraction of strand diameter")]
 			public float strandDiameterVariationAmount;
+
+			[LineHeader("Tapering")]
+
 			[Range(0.0f, 1.0f)]
 			public float tipScale;
+			[ToggleGroup]
+			public bool tipScaleVariation;
+			[ToggleGroupItem, Range(0.0f, 1.0f)]
+			public float tipScaleVariationAmount;
 			[Range(0.0f, 1.0f)]
 			public float tipScaleOffset;
+			[ToggleGroup]
+			public bool tipScaleOffsetVariation;
+			[ToggleGroupItem, Range(0.0f, 1.0f)]
+			public float tipScaleOffsetVariationAmount;
 
 			[LineHeader("Curls")]
 
@@ -174,14 +185,19 @@ namespace Unity.DemoTeam.Hair
 				strandCount = 64,
 				strandParticleCount = 32,
 
-				strandLength = 0.25f,
+				strandLength = SharedDefaults.defaultStrandLength,
 				strandLengthVariation = false,
 				strandLengthVariationAmount = 0.2f,
 				strandDiameter = SharedDefaults.defaultStrandDiameter,
 				strandDiameterVariation = false,
 				strandDiameterVariationAmount = 0.2f,
+
 				tipScale = SharedDefaults.defaultTipScale,
+				tipScaleVariation = false,
+				tipScaleVariationAmount = 0.2f,
 				tipScaleOffset = SharedDefaults.defaultTipScaleOffset,
+				tipScaleOffsetVariation = false,
+				tipScaleOffsetVariationAmount = 0.2f,
 
 				curl = false,
 				curlRadius = 1.0f,
@@ -202,22 +218,12 @@ namespace Unity.DemoTeam.Hair
 				Preserve	= 1,
 			}
 
-			//static float SourceUnitToUnitScale(HairAsset.SettingsAlembic.SourceUnit sourceUnit, float sourceUnitFallback = 1.0f)
-			//{
-			//	switch (sourceUnit)
-			//	{
-			//		case HairAsset.SettingsAlembic.SourceUnit.DataInMeters: return 1.0f;
-			//		case HairAsset.SettingsAlembic.SourceUnit.DataInCentimeters: return 0.01f;
-			//		case HairAsset.SettingsAlembic.SourceUnit.DataInMillimeters: return 0.001f;
-			//		default: return sourceUnitFallback;
-			//	}
-			//}
-			//public enum SourceUnit
-			//{
-			//	DataInMeters,
-			//	DataInCentimeters,
-			//	DataInMillimeters,
-			//}
+			public enum SourceUnit
+			{
+				DataInMeters		= 0,
+				DataInCentimeters	= 1,
+				DataInMillimeters	= 2,
+			}
 
 			[LineHeader("Curves")]
 
@@ -235,6 +241,13 @@ namespace Unity.DemoTeam.Hair
 			[Tooltip("Whether to combine or preserve subsequent sets of curves with same vertex count")]
 			public Groups alembicAssetGroups;
 
+			[LineHeader("Conversion")]
+
+			[Tooltip("Declare unit scale of position data in assigned alembic asset")]
+			public SourceUnit alembicScalePositions;
+			[Tooltip("Declare unit scale of diameter data in assigned alembic asset")]
+			public SourceUnit alembicScaleDiameters;
+
 			[VisibleIf(false)] public SettingsResolve settingsResolve;
 
 			public static readonly SettingsAlembic defaults = new SettingsAlembic()
@@ -243,6 +256,9 @@ namespace Unity.DemoTeam.Hair
 				alembicAsset = null,
 #endif
 				alembicAssetGroups = Groups.Combine,
+
+				alembicScalePositions = SourceUnit.DataInMeters,
+				alembicScaleDiameters = SourceUnit.DataInCentimeters,
 
 				settingsResolve = SettingsResolve.defaults,
 			};
@@ -273,12 +289,6 @@ namespace Unity.DemoTeam.Hair
 			public const int MIN_RESAMPLE_QUALITY = 1;
 			public const int MAX_RESAMPLE_QUALITY = 5;
 
-			public enum StrandDiameter
-			{
-				ResolveFromCurves	= 0,
-				UseFallback			= 1,
-			}
-
 			public enum RootUV
 			{
 				ResolveFromMesh		= 0,
@@ -286,8 +296,20 @@ namespace Unity.DemoTeam.Hair
 				UseFallback			= 2,
 			}
 
+			public enum StrandDiameter
+			{
+				ResolveFromCurves	= 0,
+				UseFallback			= 1,
+			}
+
+			public enum TipScale
+			{
+				ResolveFromCurves	= 0,
+				UseFallback			= 1,
+			}
+
 			[Flags]
-			public enum TransferAttributes
+			public enum AdditionalData
 			{
 				None			= 0,
 				PerVertexUV		= 1 << 1,
@@ -314,10 +336,12 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Proportions")]
 
 			public StrandDiameter strandDiameter;
-			[VisibleIf(nameof(strandDiameter), StrandDiameter.ResolveFromCurves), Min(0.0f)]
-			public float strandDiameterScale;
 			[Range(0.01f, 100.0f), Tooltip("Strand diameter (in millimeters)")]
 			public float strandDiameterFallback;
+
+			[LineHeader("Tapering")]
+
+			public TipScale tipScale;
 			[Range(0.0f, 1.0f)]
 			public float tipScaleFallback;
 			[Range(0.0f, 1.0f)]
@@ -326,9 +350,9 @@ namespace Unity.DemoTeam.Hair
 			[LineHeader("Material")]
 
 			[ToggleGroup]
-			public bool exportAttributes;
+			public bool additionalData;
 			[ToggleGroupItem]
-			public TransferAttributes exportAttributesMask;
+			public AdditionalData additionalDataMask;
 
 			public static readonly SettingsResolve defaults = new SettingsResolve()
 			{
@@ -341,13 +365,14 @@ namespace Unity.DemoTeam.Hair
 				rootUVFallback = Vector2.zero,
 
 				strandDiameter = StrandDiameter.ResolveFromCurves,
-				strandDiameterScale = 0.01f,
 				strandDiameterFallback = SharedDefaults.defaultStrandDiameter,
+
+				tipScale = TipScale.ResolveFromCurves,
 				tipScaleFallback = SharedDefaults.defaultTipScale,
 				tipScaleFallbackOffset = SharedDefaults.defaultTipScaleOffset,
 
-				exportAttributes = false,
-				exportAttributesMask = TransferAttributes.All,
+				additionalData = false,
+				additionalDataMask = AdditionalData.All,
 			};
 		}
 
@@ -493,9 +518,10 @@ namespace Unity.DemoTeam.Hair
 
 		public static class SharedDefaults
 		{
+			public static readonly float defaultStrandLength = 0.25f;
 			public static readonly float defaultStrandDiameter = 1.0f;
-			public static readonly float defaultTipScaleOffset = 0.8f;
-			public static readonly float defaultTipScale = 0.1f;
+			public static readonly float defaultTipScale = 0.15f;
+			public static readonly float defaultTipScaleOffset = 0.75f;
 		}
 	}
 }

@@ -4,7 +4,7 @@ namespace Unity.DemoTeam.Hair
 {
 	public partial class HairInstance : IVersionedDataContext
 	{
-		const int VERSION_IMPL = 1;
+		const int VERSION_IMPL = 2;
 
 		[field: SerializeField]
 		public int version { get; private set; } = -1;
@@ -14,11 +14,18 @@ namespace Unity.DemoTeam.Hair
 		{
 			switch (version)
 			{
-				case 0: PerformMigration_0();
-					version = 1;
+				case 0:
+					PerformMigration_0();
+					version = VERSION_IMPL;
 					break;
 
-				case 1: // at latest version
+				case 1:
+					PerformMigration_1();
+					version = VERSION_IMPL;
+					break;
+
+				case VERSION_IMPL:
+					// at latest version
 					break;
 			}
 		}

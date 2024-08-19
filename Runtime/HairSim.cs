@@ -787,7 +787,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (settingsGeometry.strandLength)
 				{
-					localToWorldScaleLength *= settingsGeometry.strandLengthValue / solverData.initialMaxStrandLength;
+					localToWorldScaleLength *= settingsGeometry.strandLengthValue / solverData.initialStrandParamsMax.x;
 				}
 			}
 
@@ -795,13 +795,13 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (settingsGeometry.strandDiameter)
 				{
-					localToWorldScaleDiameter *= (settingsGeometry.strandDiameterValue * 0.001f) / solverData.initialMaxStrandDiameter;
+					localToWorldScaleDiameter *= (settingsGeometry.strandDiameterValue * 0.001f) / solverData.initialStrandParamsMax.y;
 				}
 			}
 
-			var worldMaxParticleInterval = localToWorldScaleLength * (solverData.initialMaxStrandLength / (solverConstants._StrandParticleCount - 1));
-			var worldMaxParticleDiameter = localToWorldScaleDiameter * solverData.initialMaxStrandDiameter;
-			var worldAvgParticleDiameter = localToWorldScaleDiameter * solverData.initialAvgStrandDiameter;
+			var worldMaxParticleInterval = localToWorldScaleLength * (solverData.initialStrandParamsMax.x / (solverConstants._StrandParticleCount - 1));
+			var worldMaxParticleDiameter = localToWorldScaleDiameter * solverData.initialStrandParamsMax.y;
+			var worldAvgParticleDiameter = localToWorldScaleDiameter * solverData.initialStrandParamsAvg.y;
 
 			solverConstants._GroupScale = localToWorldScaleLength;
 			solverConstants._GroupMaxParticleVolume = worldMaxParticleInterval * (0.25f * Mathf.PI * worldMaxParticleDiameter * worldMaxParticleDiameter);
@@ -809,6 +809,9 @@ namespace Unity.DemoTeam.Hair
 			solverConstants._GroupMaxParticleDiameter = worldMaxParticleDiameter;
 			solverConstants._GroupAvgParticleDiameter = worldAvgParticleDiameter;
 			solverConstants._GroupAvgParticleMargin = localToWorldScale * settingsGeometry.strandSeparation * 0.001f;
+
+			solverConstants._GroupMaxTipScale = settingsGeometry.tipScale ? settingsGeometry.tipScaleValue : solverData.initialStrandParamsMax.w;
+			solverConstants._GroupMaxTipScaleOffset = settingsGeometry.tipScaleOffset ? settingsGeometry.tipScaleOffsetValue : solverData.initialStrandParamsMax.z;
 
 			solverConstants._GroupBoundsPadding = settingsGeometry.boundsScale ? settingsGeometry.boundsScaleValue : 1.25f;
 
@@ -1203,7 +1206,7 @@ namespace Unity.DemoTeam.Hair
 			for (int i = 0; i != solverData.Length; i++)
 			{
 				ref readonly var solverConstants = ref solverData[i].constants;
-				ref readonly var solverWeight = ref solverData[i].initialSumStrandLength;
+				ref readonly var solverWeight = ref solverData[i].initialStrandLengthTotal;
 
 				allGroupsMaxParticleVolume = Mathf.Max(allGroupsMaxParticleVolume, solverConstants._GroupMaxParticleVolume);
 				allGroupsMaxParticleInterval = Mathf.Max(allGroupsMaxParticleInterval, solverConstants._GroupMaxParticleInterval);
