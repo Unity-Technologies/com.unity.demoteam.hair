@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased] - 
+
+### Added
+
+- Added new options in HairInstance to allow runtime adjustments to tapering per group instance. (Same pattern as runtime adjustments to strand length, diameter.)
+- Added new fields in HairAsset to declare expected unit scale of ingested alembic curve positions and diameters. (Only relevant for hair assets set up to ingest curves from an alembic container.)
+
+### Changed
+
+- Bumped internal data version to support a few internal data layout changes. Existing data will be migrated.
+
+### Fixed
+
+- Fixed an issue with mesh based root UV resolve not always producing correct texture coordinates. (Caused by incorrect measure in closest triangle BVH lookup - thanks @Kleptine for investigating this in #98.)
+- Fixed an issue with inconsistent shading when using strips for rendering in combination with builtin RP.
+- Fixed a regression in HairVolumeUVW.
+- Fixed a padding issue.
+
+
 ## [0.16.0-exp.1] - 2024-07-04
 
 ### Added
