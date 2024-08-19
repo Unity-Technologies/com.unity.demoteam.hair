@@ -24,18 +24,15 @@ namespace Unity.DemoTeam.Hair
 				Diameter = 1 << 2,
 			}
 
-			public int strandCount;
-			public int strandParticleCount;
+			public int strandCount;							// strand count
+			public int strandParticleCount;					// strand particle count (uniform resolution within group)
 
-			public float sumStrandLength;
-			public float maxStrandLength;
-			public float maxStrandDiameter;
-			public float avgStrandDiameter;
-
-			[HideInInspector] public Bounds bounds;
+			public float strandLengthTotal;					// strand length group total
+			public Vector4 strandParamsMax;					// strand params group maximum (x: strand length, y: strand diameter, z: tip scale offset, w: tip scale)
+			public Vector4 strandParamsAvg;					// strand params group average (x: strand length, y: strand diameter, z: tip scale offset, w: tip scale)
 
 			[HideInInspector] public Vector2[] rootUV;		// root uv
-			[HideInInspector] public Vector4[] rootScale;	// root scale (length, diameter normalized to maximum within group), z: tip scale offset, w: tip scale
+			[HideInInspector] public Vector4[] rootScale;	// root scale wrt. group maximum (x: strand length, y: strand diameter, z: tip scale offset, w: tip scale)
 
 			[HideInInspector] public ParticleFeatures particleFeatures;
 			[HideInInspector] public MemoryLayout particleMemoryLayout;
@@ -43,6 +40,8 @@ namespace Unity.DemoTeam.Hair
 			[HideInInspector] public Vector3[] particlePosition;
 			[HideInInspector] public Vector2[] particleTexCoord;
 			[HideInInspector] public float[] particleDiameter;
+
+			[HideInInspector] public Bounds bounds;
 
 			public int lodCount;
 
@@ -185,8 +184,8 @@ namespace Unity.DemoTeam.Hair
 
 			public struct Tip
 			{
-				public float tipScaleOffset;	// tip offset (where along curve to begin tapering)
-				public float tipScale;			// tip scale (tip diameter relative to root)
+				public float tipScale;			// tip scale
+				public float tipScaleOffset;	// tip scale offset (offset along curve where tapering begins)
 			}
 
 			public int curveCount;							// number of curves in set

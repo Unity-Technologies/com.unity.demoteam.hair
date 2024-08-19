@@ -461,23 +461,23 @@ namespace Unity.DemoTeam.Hair
 			strandGroup.particleMemoryLayout = hairAsset.settingsBasic.memoryLayout;
 
 			// set strand features
-			static HairAsset.StrandGroup.ParticleFeatures GetParticleFeature(HairAsset.SettingsResolve.TransferAttributes flag)
+			static HairAsset.StrandGroup.ParticleFeatures GetParticleFeature(HairAsset.SettingsResolve.AdditionalData flag)
 			{
 				switch (flag)
 				{
-					case HairAsset.SettingsResolve.TransferAttributes.PerVertexUV: return HairAsset.StrandGroup.ParticleFeatures.TexCoord;
-					case HairAsset.SettingsResolve.TransferAttributes.PerVertexWidth: return HairAsset.StrandGroup.ParticleFeatures.Diameter;
+					case HairAsset.SettingsResolve.AdditionalData.PerVertexUV: return HairAsset.StrandGroup.ParticleFeatures.TexCoord;
+					case HairAsset.SettingsResolve.AdditionalData.PerVertexWidth: return HairAsset.StrandGroup.ParticleFeatures.Diameter;
 					default: return 0;
 				}
 			}
 
 			strandGroup.particleFeatures = HairAsset.StrandGroup.ParticleFeatures.Position;
-			if (settings.exportAttributes)
+			if (settings.additionalData)
 			{
 				if (uniformCurveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.TexCoord))
-					strandGroup.particleFeatures |= GetParticleFeature(settings.exportAttributesMask & HairAsset.SettingsResolve.TransferAttributes.PerVertexUV);
+					strandGroup.particleFeatures |= GetParticleFeature(settings.additionalDataMask & HairAsset.SettingsResolve.AdditionalData.PerVertexUV);
 				if (uniformCurveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter))
-					strandGroup.particleFeatures |= GetParticleFeature(settings.exportAttributesMask & HairAsset.SettingsResolve.TransferAttributes.PerVertexWidth);
+					strandGroup.particleFeatures |= GetParticleFeature(settings.additionalDataMask & HairAsset.SettingsResolve.AdditionalData.PerVertexWidth);
 			}
 
 			// prep strand buffers
@@ -539,7 +539,7 @@ namespace Unity.DemoTeam.Hair
 							}
 							else
 							{
-								Debug.LogWarning("Unable to resolve root UVs from mesh, since no mesh was assigned. Using uniform fallback.");
+								Debug.LogWarning("Unable to resolve root UVs from mesh, since no mesh was assigned. Using provided uniform fallback.");
 								goto case HairAsset.SettingsResolve.RootUV.UseFallback;
 							}
 						}
@@ -566,7 +566,7 @@ namespace Unity.DemoTeam.Hair
 							// else use fallback
 							else
 							{
-								Debug.LogWarning("Unable to resolve root UVs from curves, since no curve UVs were provided in curve set. Using uniform fallback.");
+								Debug.LogWarning("Unable to resolve root UVs from curves, since no curve UVs were provided in curve set. Using provided uniform fallback.");
 								goto case HairAsset.SettingsResolve.RootUV.UseFallback;
 							}
 						}
@@ -582,82 +582,122 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 
-				// resolve root diameter and tapering
-				switch (settings.strandDiameter)
+				// resolve diameter and tapering
 				{
-					case HairAsset.SettingsResolve.StrandDiameter.ResolveFromCurves:
+					var tryResolveDiameter = (settings.strandDiameter == HairAsset.SettingsResolve.StrandDiameter.ResolveFromCurves);
+					var tryResolveTapering = (settings.tipScale == HairAsset.SettingsResolve.TipScale.ResolveFromCurves);
+
+					// write result per vertex
+					var perVertexResult = (tryResolveDiameter || tryResolveTapering) && uniformCurveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter);
+					if (perVertexResult)
+					{
+						for (int i = 0; i != uniformCurveSet.curveCount; i++)
 						{
-							// first try per-vertex diameter
-							if (uniformCurveSet.vertexFeatures.HasFlag(HairAssetProvisional.CurveSet.VertexFeatures.Diameter))
+							var maxDiameter = uniformVertexDataDiameterPtr[i * uniformVertexCount];
+							var maxDiameterVertexIndex = 0;
+							var maxDiameterVertexIndexTaper = 0;
+
+							for (int j = 1; j != uniformVertexCount; j++)
+							{
+								var vertexDiameter = uniformVertexDataDiameterPtr[i * uniformVertexCount + j];
+								if (vertexDiameter >= maxDiameter)
+								{
+									maxDiameter = vertexDiameter;
+									maxDiameterVertexIndex = j;
+								}
+								else
+								{
+									if (maxDiameterVertexIndex == j - 1)
+									{
+										maxDiameterVertexIndexTaper = j - 1;
+									}
+								}
+							}
+
+							var tipDiameter = uniformVertexDataDiameterPtr[(i + 1) * uniformVertexCount - 1];
+							var tipScale = Mathf.Min(tipDiameter, maxDiameter) / maxDiameter;
+							var tipScaleOffset = maxDiameterVertexIndexTaper / (float)(uniformVertexCount - 1);
+
+							strandGroup.rootScale[i].y = maxDiameter * uniformCurveSet.unitScaleDiameter;
+							strandGroup.rootScale[i].z = tipScaleOffset;
+							strandGroup.rootScale[i].w = tipScale;
+						}
+					}
+
+					// resolve strand diameter
+					switch (settings.strandDiameter)
+					{
+						case HairAsset.SettingsResolve.StrandDiameter.ResolveFromCurves:
+							{
+								// first try per-vertex diameter (result written already)
+								if (perVertexResult)
+								{
+								}
+								// else try per-curve diameter
+								else if (uniformCurveSet.curveFeatures.HasFlag(HairAssetProvisional.CurveSet.CurveFeatures.Diameter))
+								{
+									for (int i = 0; i != uniformCurveSet.curveCount; i++)
+									{
+										strandGroup.rootScale[i].y = uniformCurveDataDiameterPtr[i] * uniformCurveSet.unitScaleDiameter;
+									}
+								}
+								// else use fallback
+								else
+								{
+									Debug.LogWarning("Unable to resolve strand diameters from curves, since no curve diameters were provided in curve set. Using provided uniform fallback.");
+									goto case HairAsset.SettingsResolve.StrandDiameter.UseFallback;
+								}
+							}
+							break;
+
+						case HairAsset.SettingsResolve.StrandDiameter.UseFallback:
 							{
 								for (int i = 0; i != uniformCurveSet.curveCount; i++)
 								{
-									// find maximum
-									var maxDiameter = 0.0f;
-									var maxDiameterVertexIndex = 0;
-
-									for (int j = 0; j != uniformVertexCount; j++)
-									{
-										ref readonly var vertexDiameter = ref uniformVertexDataDiameterPtr[i * uniformVertexCount + j];
-										if (maxDiameter <= vertexDiameter)
-										{
-											maxDiameter = vertexDiameter;
-											maxDiameterVertexIndex = j;
-										}
-									}
-
-									// find tip
-									var tipDiameter = uniformVertexDataDiameterPtr[(i + 1) * uniformVertexCount - 1];
-									var tipScaleOffset = maxDiameterVertexIndex / (float)(uniformVertexCount - 1);
-									var tipScale = Mathf.Min(tipDiameter, maxDiameter) / maxDiameter;
-
-									strandGroup.rootScale[i].y = maxDiameter * uniformCurveSet.unitScaleDiameter * settings.strandDiameterScale;
-									strandGroup.rootScale[i].z = tipScaleOffset;
-									strandGroup.rootScale[i].w = tipScale;
+									strandGroup.rootScale[i].y = settings.strandDiameterFallback * 0.001f;
 								}
 							}
-							// else try per-curve diameter
-							else if (uniformCurveSet.curveFeatures.HasFlag(HairAssetProvisional.CurveSet.CurveFeatures.Diameter))
+							break;
+					}
+
+					// resolve tapering
+					switch (settings.tipScale)
+					{
+						case HairAsset.SettingsResolve.TipScale.ResolveFromCurves:
 							{
-								if (uniformCurveSet.curveFeatures.HasFlag(HairAssetProvisional.CurveSet.CurveFeatures.Tapering))
+								// first try per-vertex tapering (result written already)
+								if (perVertexResult)
+								{
+								}
+								// else try per-curve tapering
+								else if (uniformCurveSet.curveFeatures.HasFlag(HairAssetProvisional.CurveSet.CurveFeatures.Tapering))
 								{
 									for (int i = 0; i != uniformCurveSet.curveCount; i++)
 									{
 										ref readonly var curveTapering = ref uniformCurveDataTaperingPtr[i];
-										strandGroup.rootScale[i].y = uniformCurveDataDiameterPtr[i] * uniformCurveSet.unitScaleDiameter * settings.strandDiameterScale;
 										strandGroup.rootScale[i].z = curveTapering.tipScaleOffset;
 										strandGroup.rootScale[i].w = curveTapering.tipScale;
 									}
 								}
+								// else use fallback
 								else
 								{
-									for (int i = 0; i != uniformCurveSet.curveCount; i++)
-									{
-										strandGroup.rootScale[i].y = uniformCurveDataDiameterPtr[i] * uniformCurveSet.unitScaleDiameter * settings.strandDiameterScale;
-										strandGroup.rootScale[i].z = settings.tipScaleFallbackOffset;
-										strandGroup.rootScale[i].w = settings.tipScaleFallback;
-									}
+									Debug.LogWarning("Unable to resolve tapering from curves, since no curve diameters were provided in curve set. Using provided uniform fallback.");
+									goto case HairAsset.SettingsResolve.TipScale.UseFallback;
 								}
 							}
-							// else use fallback
-							else
-							{
-								Debug.LogWarning("Unable to resolve strand diameters from curves, since no curve diameters were provided in curve set. Using uniform fallback.");
-								goto case HairAsset.SettingsResolve.StrandDiameter.UseFallback;
-							}
-						}
-						break;
+							break;
 
-					case HairAsset.SettingsResolve.StrandDiameter.UseFallback:
-						{
-							for (int i = 0; i != uniformCurveSet.curveCount; i++)
+						case HairAsset.SettingsResolve.TipScale.UseFallback:
 							{
-								strandGroup.rootScale[i].y = settings.strandDiameterFallback * 0.001f;
-								strandGroup.rootScale[i].z = settings.tipScaleFallbackOffset;
-								strandGroup.rootScale[i].w = settings.tipScaleFallback;
+								for (int i = 0; i != uniformCurveSet.curveCount; i++)
+								{
+									strandGroup.rootScale[i].z = settings.tipScaleFallbackOffset;
+									strandGroup.rootScale[i].w = settings.tipScaleFallback;
+								}
 							}
-						}
-						break;
+							break;
+					}
 				}
 
 				// write particle data
@@ -890,9 +930,20 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
+				static float SourceUnitToUnitScale(HairAsset.SettingsAlembic.SourceUnit sourceUnit)
+				{
+					switch (sourceUnit)
+					{
+						default:
+						case HairAsset.SettingsAlembic.SourceUnit.DataInMeters: return 1.0f;
+						case HairAsset.SettingsAlembic.SourceUnit.DataInCentimeters: return 0.01f;
+						case HairAsset.SettingsAlembic.SourceUnit.DataInMillimeters: return 0.001f;
+					}
+				}
+
 				combinedCurveSet.vertexFeatures = combinedCurveVertexFeatures;
-				combinedCurveSet.unitScalePosition = 1.0f;
-				combinedCurveSet.unitScaleDiameter = 1.0f;
+				combinedCurveSet.unitScalePosition = SourceUnitToUnitScale(settings.alembicScalePositions);
+				combinedCurveSet.unitScaleDiameter = SourceUnitToUnitScale(settings.alembicScaleDiameters);
 			}
 
 			using (combinedCurveSet)
@@ -914,92 +965,81 @@ namespace Unity.DemoTeam.Hair
 
 			// finalize strand properties
 			using (var longOperation = new LongOperationScope("Finalizing strands"))
-			using (var strandLength = new NativeArray<float>(strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
-			using (var strandDiameter = new NativeArray<float>(strandCount, Allocator.Temp, NativeArrayOptions.ClearMemory))
 			{
-				unsafe
+				// calc strand lengths
+				for (int i = 0; i != strandCount; i++)
 				{
-					var strandLengthPtr = (float*)strandLength.GetUnsafePtr();
-					var strandDiameterPtr = (float*)strandDiameter.GetUnsafePtr();
+					longOperation.UpdateStatus("Measuring", i, strandCount);
 
-					// calc individual strand lengths
-					for (int i = 0; i != strandCount; i++)
+					HairAssetUtility.DeclareStrandIterator(strandGroup, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
+
+					ref var strandParams = ref strandGroup.rootScale[i];
 					{
-						longOperation.UpdateStatus("Measuring", i, strandCount);
-
-						HairAssetUtility.DeclareStrandIterator(strandGroup, i, out int strandParticleBegin, out int strandParticleStride, out int strandParticleEnd);
-
 						for (int j = strandParticleBegin + strandParticleStride; j != strandParticleEnd; j += strandParticleStride)
 						{
 							ref var p0 = ref strandGroup.particlePosition[j - strandParticleStride];
 							ref var p1 = ref strandGroup.particlePosition[j];
 
-							strandLengthPtr[i] += Vector3.Distance(p0, p1);
+							strandParams.x += Vector3.Distance(p0, p1);
 						}
 					}
+				}
 
-					// find total and maximum strand length within group
-					var sumStrandLength = 0.0f;
-					var maxStrandLength = 0.0f;
+				// ensure non-zero strand parameters
+				{
+					var strandParamsEps = 1e-10f * Vector4.one;
 					{
 						for (int i = 0; i != strandCount; i++)
 						{
-							sumStrandLength += strandLengthPtr[i];
-							maxStrandLength = Mathf.Max(maxStrandLength, strandLengthPtr[i]);
+							strandGroup.rootScale[i] = Vector4.Max(strandGroup.rootScale[i], strandParamsEps);
 						}
-
-						strandGroup.sumStrandLength = sumStrandLength;
-						strandGroup.maxStrandLength = maxStrandLength;
 					}
+				}
 
-					// load individual strand diameters
+				// calc maximum/average strand parameters within group (x: strand length, y: strand diameter, z: tip scale offset, w: tip scale)
+				strandGroup.strandLengthTotal = 0.0f;
+				strandGroup.strandParamsMax = Vector4.zero;
+				strandGroup.strandParamsAvg = Vector4.zero;
+				{
 					for (int i = 0; i != strandCount; i++)
 					{
-						strandDiameterPtr[i] = strandGroup.rootScale[i].y;
-					}
-
-					// find maximum and average strand diameter within group
-					var sumStrandDiameterL = 0.0f;
-					var maxStrandDiameter = 0.0f;
-					{
-						for (int i = 0; i != strandCount; i++)
+						ref readonly var strandParams = ref strandGroup.rootScale[i];
 						{
-							sumStrandDiameterL += strandDiameterPtr[i] * strandLengthPtr[i];
-							maxStrandDiameter = Mathf.Max(maxStrandDiameter, strandDiameterPtr[i]);
+							strandGroup.strandLengthTotal += strandParams.x;
+							strandGroup.strandParamsMax = Vector4.Max(strandGroup.strandParamsMax, strandParams);
+							strandGroup.strandParamsAvg += strandParams.x * strandParams;
 						}
-
-						strandGroup.maxStrandDiameter = maxStrandDiameter;
-						strandGroup.avgStrandDiameter = sumStrandDiameterL / sumStrandLength;
 					}
 
-					// calc strand scale factors (length, diameter normalized to maximum within group)
-					for (int i = 0; i != strandCount; i++)
+					strandGroup.strandParamsAvg /= strandGroup.strandLengthTotal;
+				}
+
+				// calc normalized strand parameters wrt. group maximum (x: strand length, y: strand diameter, z: tip scale offset, w: tip scale)
+				for (int i = 0; i != strandCount; i++)
+				{
+					strandGroup.rootScale[i].Scale(strandGroup.strandParamsMax.Rcp());
+				}
+
+				// calc bounds
+				if (strandGroup.particlePosition.Length > 0)
+				{
+					var boundsMin = strandGroup.particlePosition[0];
+					var boundsMax = boundsMin;
+					var boundsPad = strandGroup.strandParamsMax.y * Vector3.one;
+
+					for (int i = 1, n = strandGroup.particlePosition.Length; i != n; i++)
 					{
-						strandGroup.rootScale[i].x = strandLengthPtr[i] / maxStrandLength;
-						strandGroup.rootScale[i].y = strandDiameterPtr[i] / maxStrandDiameter;
+						longOperation.UpdateStatus("Computing bounds", i, n);
+
+						boundsMin = Vector3.Min(boundsMin, strandGroup.particlePosition[i]);
+						boundsMax = Vector3.Max(boundsMax, strandGroup.particlePosition[i]);
 					}
 
-					// calc bounds
-					if (strandGroup.particlePosition.Length > 0)
-					{
-						var boundsMin = strandGroup.particlePosition[0];
-						var boundsMax = boundsMin;
-						var boundsPad = maxStrandDiameter * Vector3.one;
-
-						for (int i = 1, n = strandGroup.particlePosition.Length; i != n; i++)
-						{
-							longOperation.UpdateStatus("Computing bounds", i, n);
-
-							boundsMin = Vector3.Min(boundsMin, strandGroup.particlePosition[i]);
-							boundsMax = Vector3.Max(boundsMax, strandGroup.particlePosition[i]);
-						}
-
-						strandGroup.bounds = new Bounds(0.5f * (boundsMin + boundsMax), boundsMax - boundsMin + boundsPad);
-					}
-					else
-					{
-						strandGroup.bounds = new Bounds(Vector3.zero, Vector3.zero);
-					}
+					strandGroup.bounds = new Bounds(0.5f * (boundsMin + boundsMax), boundsMax - boundsMin + boundsPad);
+				}
+				else
+				{
+					strandGroup.bounds = new Bounds(Vector3.zero, Vector3.zero);
 				}
 			}
 
@@ -1726,18 +1766,39 @@ namespace Unity.DemoTeam.Hair
 		{
 			var particleInterval = settings.strandLength / (settings.strandParticleCount - 1);
 			var particleIntervalVariation = settings.strandLengthVariation ? settings.strandLengthVariationAmount : 0.0f;
-
+			var particleIntervalRandSeq = new Unity.Mathematics.Random(257);
 			var particleDiameter = settings.strandDiameter * 0.001f;
 			var particleDiameterVariation = settings.strandDiameterVariation ? settings.strandDiameterVariationAmount : 0.0f;
+			var particleDiameterRandSeq = new Unity.Mathematics.Random(3432);
+
+			var tipScaleVariation = settings.tipScaleVariation ? settings.tipScaleVariationAmount : 0.0f;
+			var tipScaleRandSeq = new Unity.Mathematics.Random(7546);
+			var tipScaleOffsetVariation = settings.tipScaleOffsetVariation ? settings.tipScaleOffsetVariationAmount : 0.0f;
+			var tipScaleOffsetRandSeq = new Unity.Mathematics.Random(9277);
 
 			var curlRadiusVariation = settings.curlVariation ? settings.curlVariationRadius : 0.0f;
+			var curlRadiusRandSeq = new Unity.Mathematics.Random(709);
 			var curlSlopeVariation = settings.curlVariation ? settings.curlVariationSlope : 0.0f;
+			var curlSlopeRandSeq = new Unity.Mathematics.Random(1171);
+			var curlPlaneRandSeq = new Unity.Mathematics.Random(457);
 
-			var randSeqParticleInterval = new Unity.Mathematics.Random(257);
-			var randSeqParticleDiameter = new Unity.Mathematics.Random(3432);
-			var randSeqCurlPlaneUV = new Unity.Mathematics.Random(457);
-			var randSeqCurlRadius = new Unity.Mathematics.Random(709);
-			var randSeqCurlSlope = new Unity.Mathematics.Random(1171);
+			static float NextScale(ref Unity.Mathematics.Random randSeq, float variation)
+			{
+				if (variation > 0.0f)
+					return Mathf.Lerp(1.0f, randSeq.NextFloat(), variation);
+				else
+					return 1.0f;
+			}
+
+			static Vector3 NextVectorInPlane(ref Mathematics.Random randSeq, in Vector3 n)
+			{
+				Vector3 r;
+				{
+					do r = Vector3.ProjectOnPlane(randSeq.NextFloat3Direction(), n);
+					while (Vector3.SqrMagnitude(r) < 1e-5f);
+				}
+				return r;
+			};
 
 			using (var longOperation = new LongOperationScope("Generating strands"))
 			{
@@ -1750,12 +1811,12 @@ namespace Unity.DemoTeam.Hair
 
 					// resolve root diameter and tapering
 					rootScalePtr[i].x = 0.0f;// completed in FinalizeStrandGroup(..)
-					rootScalePtr[i].y = rootVar[i].normalizedStrandDiameter * particleDiameter * Mathf.Lerp(1.0f, randSeqParticleDiameter.NextFloat(), particleDiameterVariation);
-					rootScalePtr[i].z = settings.tipScaleOffset;
-					rootScalePtr[i].w = settings.tipScale;
+					rootScalePtr[i].y = rootVar[i].normalizedStrandDiameter * particleDiameter * NextScale(ref particleDiameterRandSeq, particleDiameterVariation);
+					rootScalePtr[i].z = settings.tipScaleOffset * NextScale(ref tipScaleOffsetRandSeq, tipScaleOffsetVariation);
+					rootScalePtr[i].w = settings.tipScale * NextScale(ref tipScaleRandSeq, tipScaleVariation);
 
 					// resolve particle positions
-					var step = rootVar[i].normalizedStrandLength * particleInterval * Mathf.Lerp(1.0f, randSeqParticleInterval.NextFloat(), particleIntervalVariation);
+					var step = rootVar[i].normalizedStrandLength * particleInterval * NextScale(ref particleIntervalRandSeq, particleIntervalVariation);
 					var curPos = rootPos[i];
 					var curDir = rootDir[i];
 
@@ -1763,21 +1824,11 @@ namespace Unity.DemoTeam.Hair
 
 					if (settings.curl)
 					{
-						static Vector3 NextVectorInPlane(ref Mathematics.Random randSeq, in Vector3 n)
-						{
-							Vector3 r;
-							{
-								do r = Vector3.ProjectOnPlane(randSeq.NextFloat3Direction(), n);
-								while (Vector3.SqrMagnitude(r) < 1e-5f);
-							}
-							return r;
-						};
-
-						var curPlaneU = Vector3.Normalize(NextVectorInPlane(ref randSeqCurlPlaneUV, curDir));
+						var curPlaneU = Vector3.Normalize(NextVectorInPlane(ref curlPlaneRandSeq, curDir));
 						var curPlaneV = Vector3.Cross(curPlaneU, curDir);
 
-						var targetRadius = rootVar[i].normalizedCurlRadius * settings.curlRadius * 0.01f * Mathf.Lerp(1.0f, randSeqCurlRadius.NextFloat(), curlRadiusVariation);
-						var targetSlope = rootVar[i].normalizedCurlSlope * settings.curlSlope * Mathf.Lerp(1.0f, randSeqCurlSlope.NextFloat(), curlSlopeVariation);
+						var targetRadius = rootVar[i].normalizedCurlRadius * settings.curlRadius * 0.01f * NextScale(ref curlRadiusRandSeq, curlRadiusVariation);
+						var targetSlope = rootVar[i].normalizedCurlSlope * settings.curlSlope * NextScale(ref curlSlopeRandSeq, curlSlopeVariation);
 
 						var stepPlane = step * Mathf.Cos(0.5f * Mathf.PI * targetSlope);
 						if (stepPlane > 1.0f * targetRadius)

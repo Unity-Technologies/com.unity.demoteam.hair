@@ -672,8 +672,8 @@ namespace Unity.DemoTeam.Hair
 						previewConstants._LODCount = (uint)strandGroup.lodCount;
 
 						previewConstants._GroupScale = 1.0f;
-						previewConstants._GroupMaxParticleInterval = strandGroup.maxStrandLength / (previewConstants._StrandParticleCount - 1);
-						previewConstants._GroupMaxParticleDiameter = strandGroup.maxStrandDiameter;
+						previewConstants._GroupMaxParticleInterval = strandGroup.strandParamsMax.x / (previewConstants._StrandParticleCount - 1);
+						previewConstants._GroupMaxParticleDiameter = strandGroup.strandParamsMax.y;
 						previewConstants._GroupBoundsIndex = 0;
 
 						previewConstants._StagingSubdivision = 0;

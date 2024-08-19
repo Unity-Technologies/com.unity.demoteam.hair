@@ -23,15 +23,15 @@ namespace Unity.DemoTeam.Hair
 	//
 	// (old structures are unfortunately also re-serialized)
 
-	using __1__SettingsExecutive = HairInstance.SettingsExecutive;
-	using __1__SettingsEnvironment = HairSim.SettingsEnvironment;
-	using __1__SettingsVolumetrics = HairSim.SettingsVolume;
+	using __IMPL__SettingsExecutive = HairInstance.SettingsExecutive;
+	using __IMPL__SettingsEnvironment = HairSim.SettingsEnvironment;
+	using __IMPL__SettingsVolumetrics = HairSim.SettingsVolume;
 
-	using __1__SettingsGeometry = HairSim.SettingsGeometry;
-	using __1__SettingsRendering = HairSim.SettingsRendering;
-	using __1__SettingsPhysics = HairSim.SettingsPhysics;
+	using __IMPL__SettingsGeometry = HairSim.SettingsGeometry;
+	using __IMPL__SettingsRendering = HairSim.SettingsRendering;
+	using __IMPL__SettingsPhysics = HairSim.SettingsPhysics;
 
-	using __1__SolverLODSelection = HairSim.SolverLODSelection;
+	using __IMPL__SolverLODSelection = HairSim.SolverLODSelection;
 
 	public partial class HairInstance
 	{
@@ -49,129 +49,129 @@ namespace Unity.DemoTeam.Hair
 
 		void PerformMigration_0()
 		{
-			ref var data_1_settingsExecutive = ref this.settingsExecutive;
-			ref var data_1_settingsEnvironment = ref this.settingsEnvironment;
-			ref var data_1_settingsVolumetrics = ref this.settingsVolumetrics;
+			ref var data_IMPL_settingsExecutive = ref this.settingsExecutive;
+			ref var data_IMPL_settingsEnvironment = ref this.settingsEnvironment;
+			ref var data_IMPL_settingsVolumetrics = ref this.settingsVolumetrics;
 
-			ref var data_1_strandGroupDefaults = ref this.strandGroupDefaults;
-			ref var data_1_strandGroupSettings = ref this.strandGroupSettings;
+			ref var data_IMPL_strandGroupDefaults = ref this.strandGroupDefaults;
+			ref var data_IMPL_strandGroupSettings = ref this.strandGroupSettings;
 
 			// migrate data_0_settingsSystem
 			{
 				ref readonly var in_0 = ref data_0_settingsSystem;
 
-				// => data_1_settingsExecutive
+				// => data_IMPL_settingsExecutive
 				{
-					static void TransferSettingsSystem(in __0__SettingsSystem in_0, ref __1__SettingsExecutive out_1)
+					static void TransferSettingsSystem(in __0__SettingsSystem in_0, ref __IMPL__SettingsExecutive out_IMPL)
 					{
-						static __1__SettingsExecutive.UpdateMode TranslateUpdateMode(__0__SettingsSystem.UpdateMode x) => (__1__SettingsExecutive.UpdateMode)x;
-						static __1__SettingsExecutive.UpdateRate TranslateSimulationRate(__0__SettingsSystem.SimulationRate x)
+						static __IMPL__SettingsExecutive.UpdateMode TranslateUpdateMode(__0__SettingsSystem.UpdateMode x) => (__IMPL__SettingsExecutive.UpdateMode)x;
+						static __IMPL__SettingsExecutive.UpdateRate TranslateSimulationRate(__0__SettingsSystem.SimulationRate x)
 						{
 							switch (x)
 							{
 								default:
-								case __0__SettingsSystem.SimulationRate.Fixed30Hz: return __1__SettingsExecutive.UpdateRate.Fixed30Hz;
-								case __0__SettingsSystem.SimulationRate.Fixed60Hz: return __1__SettingsExecutive.UpdateRate.Fixed60Hz;
-								case __0__SettingsSystem.SimulationRate.Fixed120Hz: return __1__SettingsExecutive.UpdateRate.Fixed120Hz;
-								case __0__SettingsSystem.SimulationRate.CustomTimeStep: return __1__SettingsExecutive.UpdateRate.CustomTimeStep;
+								case __0__SettingsSystem.SimulationRate.Fixed30Hz: return __IMPL__SettingsExecutive.UpdateRate.Fixed30Hz;
+								case __0__SettingsSystem.SimulationRate.Fixed60Hz: return __IMPL__SettingsExecutive.UpdateRate.Fixed60Hz;
+								case __0__SettingsSystem.SimulationRate.Fixed120Hz: return __IMPL__SettingsExecutive.UpdateRate.Fixed120Hz;
+								case __0__SettingsSystem.SimulationRate.CustomTimeStep: return __IMPL__SettingsExecutive.UpdateRate.CustomTimeStep;
 							}
 						}
 
-						out_1.updateMode = TranslateUpdateMode(in_0.updateMode);
-						out_1.updateSimulation = in_0.simulation;
-						out_1.updateSimulationRate = TranslateSimulationRate(in_0.simulationRate);
-						out_1.updateSimulationInEditor = in_0.simulationInEditor;
-						out_1.updateTimeStep = in_0.simulationTimeStep;
-						out_1.updateStepsMin = in_0.stepsMin;
-						out_1.updateStepsMinValue = in_0.stepsMinValue;
-						out_1.updateStepsMax = in_0.stepsMax;
-						out_1.updateStepsMaxValue = in_0.stepsMaxValue;
+						out_IMPL.updateMode = TranslateUpdateMode(in_0.updateMode);
+						out_IMPL.updateSimulation = in_0.simulation;
+						out_IMPL.updateSimulationRate = TranslateSimulationRate(in_0.simulationRate);
+						out_IMPL.updateSimulationInEditor = in_0.simulationInEditor;
+						out_IMPL.updateTimeStep = in_0.simulationTimeStep;
+						out_IMPL.updateStepsMin = in_0.stepsMin;
+						out_IMPL.updateStepsMinValue = in_0.stepsMinValue;
+						out_IMPL.updateStepsMax = in_0.stepsMax;
+						out_IMPL.updateStepsMaxValue = in_0.stepsMaxValue;
 					}
 
-					TransferSettingsSystem(in_0, ref data_1_settingsExecutive);
+					TransferSettingsSystem(in_0, ref data_IMPL_settingsExecutive);
 				}
 
-				// => data_1_strandGroupDefaults.settingsGeometry
-				// => data_1_strandGroupSettings[].settingsGeometry
+				// => data_IMPL_strandGroupDefaults.settingsGeometry
+				// => data_IMPL_strandGroupSettings[].settingsGeometry
 				{
-					static void TransferSettingsSystem(in __0__SettingsSystem in_0, ref __1__SettingsGeometry out_1)
+					static void TransferSettingsSystem(in __0__SettingsSystem in_0, ref __IMPL__SettingsGeometry out_IMPL)
 					{
-						static __1__SettingsGeometry.BoundsMode TranslateBoundsMode(__0__SettingsSystem.BoundsMode x) => (__1__SettingsGeometry.BoundsMode)x;
+						static __IMPL__SettingsGeometry.BoundsMode TranslateBoundsMode(__0__SettingsSystem.BoundsMode x) => (__IMPL__SettingsGeometry.BoundsMode)x;
 
-						out_1.boundsMode = TranslateBoundsMode(in_0.boundsMode);
-						out_1.boundsCenter = in_0.boundsCenter;
-						out_1.boundsExtent = in_0.boundsExtent;
-						out_1.boundsScale = in_0.boundsScale;
-						out_1.boundsScaleValue = in_0.boundsScaleValue;
+						out_IMPL.boundsMode = TranslateBoundsMode(in_0.boundsMode);
+						out_IMPL.boundsCenter = in_0.boundsCenter;
+						out_IMPL.boundsExtent = in_0.boundsExtent;
+						out_IMPL.boundsScale = in_0.boundsScale;
+						out_IMPL.boundsScaleValue = in_0.boundsScaleValue;
 					}
 
-					TransferSettingsSystem(in_0, ref data_1_strandGroupDefaults.settingsGeometry);
+					TransferSettingsSystem(in_0, ref data_IMPL_strandGroupDefaults.settingsGeometry);
 					
-					for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
+					for (int i = 0; i != (data_IMPL_strandGroupSettings?.Length ?? 0); i++)
 					{
-						TransferSettingsSystem(in_0, ref data_1_strandGroupSettings[i].settingsGeometry);
+						TransferSettingsSystem(in_0, ref data_IMPL_strandGroupSettings[i].settingsGeometry);
 					}
 				}
 
-				// => data_1_strandGroupDefaults.settingsPhysics
-				// => data_1_strandGroupSettings[].settingsPhysics
+				// => data_IMPL_strandGroupDefaults.settingsPhysics
+				// => data_IMPL_strandGroupSettings[].settingsPhysics
 				{
-					static void TransferSettingsSystem(in __0__SettingsSystem in_0, ref __1__SettingsPhysics out_1)
+					static void TransferSettingsSystem(in __0__SettingsSystem in_0, ref __IMPL__SettingsPhysics out_IMPL)
 					{
-						static __1__SolverLODSelection TranslateLODSelection(__0__SettingsSystem.LODSelection x)
+						static __IMPL__SolverLODSelection TranslateLODSelection(__0__SettingsSystem.LODSelection x)
 						{
 							switch (x)
 							{
 								default:
-								case __0__SettingsSystem.LODSelection.Automatic: return __1__SolverLODSelection.AutomaticPerGroup;
-								case __0__SettingsSystem.LODSelection.Fixed: return __1__SolverLODSelection.Manual;
+								case __0__SettingsSystem.LODSelection.Automatic: return __IMPL__SolverLODSelection.AutomaticPerGroup;
+								case __0__SettingsSystem.LODSelection.Fixed: return __IMPL__SolverLODSelection.Manual;
 							}
 						};
 
-						out_1.kLODSelection = TranslateLODSelection(in_0.kLODSearch);
-						out_1.kLODSelectionValue = in_0.kLODSearchValue;
+						out_IMPL.kLODSelection = TranslateLODSelection(in_0.kLODSearch);
+						out_IMPL.kLODSelectionValue = in_0.kLODSearchValue;
 					}
 
-					TransferSettingsSystem(in_0, ref data_1_strandGroupDefaults.settingsPhysics);
+					TransferSettingsSystem(in_0, ref data_IMPL_strandGroupDefaults.settingsPhysics);
 					
-					for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
+					for (int i = 0; i != (data_IMPL_strandGroupSettings?.Length ?? 0); i++)
 					{
-						TransferSettingsSystem(in_0, ref data_1_strandGroupSettings[i].settingsPhysics);
+						TransferSettingsSystem(in_0, ref data_IMPL_strandGroupSettings[i].settingsPhysics);
 					}
 				}
 
-				// => data_1_strandGroupDefaults.settingsRendering
-				// => data_1_strandGroupSettings[].settingsRendering
+				// => data_IMPL_strandGroupDefaults.settingsRendering
+				// => data_IMPL_strandGroupSettings[].settingsRendering
 				{
-					static void TransferSettingsSystem(in __0__SettingsSystem in_0, ref __1__SettingsRendering out_1)
+					static void TransferSettingsSystem(in __0__SettingsSystem in_0, ref __IMPL__SettingsRendering out_IMPL)
 					{
-						static __1__SettingsRendering.Renderer TranslateStrandRenderer(__0__SettingsSystem.StrandRenderer x)
+						static __IMPL__SettingsRendering.Renderer TranslateStrandRenderer(__0__SettingsSystem.StrandRenderer x)
 						{
 							switch (x)
 							{
-								case __0__SettingsSystem.StrandRenderer.Disabled: return __1__SettingsRendering.Renderer.Disabled;
+								case __0__SettingsSystem.StrandRenderer.Disabled: return __IMPL__SettingsRendering.Renderer.Disabled;
 								default:
-								case __0__SettingsSystem.StrandRenderer.BuiltinLines: return __1__SettingsRendering.Renderer.BuiltinLines;
-								case __0__SettingsSystem.StrandRenderer.BuiltinStrips: return __1__SettingsRendering.Renderer.BuiltinStrips;
-								case __0__SettingsSystem.StrandRenderer.BuiltinTubes: return __1__SettingsRendering.Renderer.BuiltinTubes;
-								case __0__SettingsSystem.StrandRenderer.HDRPHighQualityLines: return __1__SettingsRendering.Renderer.HDRPHighQualityLines;
+								case __0__SettingsSystem.StrandRenderer.BuiltinLines: return __IMPL__SettingsRendering.Renderer.BuiltinLines;
+								case __0__SettingsSystem.StrandRenderer.BuiltinStrips: return __IMPL__SettingsRendering.Renderer.BuiltinStrips;
+								case __0__SettingsSystem.StrandRenderer.BuiltinTubes: return __IMPL__SettingsRendering.Renderer.BuiltinTubes;
+								case __0__SettingsSystem.StrandRenderer.HDRPHighQualityLines: return __IMPL__SettingsRendering.Renderer.HDRPHighQualityLines;
 							}
 						};
 
-						out_1.renderer = TranslateStrandRenderer(in_0.strandRenderer);
+						out_IMPL.renderer = TranslateStrandRenderer(in_0.strandRenderer);
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
-						out_1.rendererGroup = in_0.strandRendererGroup;
+						out_IMPL.rendererGroup = in_0.strandRendererGroup;
 #endif
-						out_1.rendererLayers = in_0.strandLayers;
-						out_1.rendererShadows = in_0.strandShadows;
-						out_1.motionVectors = in_0.motionVectors;
+						out_IMPL.rendererLayers = in_0.strandLayers;
+						out_IMPL.rendererShadows = in_0.strandShadows;
+						out_IMPL.motionVectors = in_0.motionVectors;
 					}
 
-					TransferSettingsSystem(in_0, ref data_1_strandGroupDefaults.settingsRendering);
+					TransferSettingsSystem(in_0, ref data_IMPL_strandGroupDefaults.settingsRendering);
 
-					for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
+					for (int i = 0; i != (data_IMPL_strandGroupSettings?.Length ?? 0); i++)
 					{
-						TransferSettingsSystem(in_0, ref data_1_strandGroupSettings[i].settingsRendering);
+						TransferSettingsSystem(in_0, ref data_IMPL_strandGroupSettings[i].settingsRendering);
 					}
 				}
 			}
@@ -180,61 +180,61 @@ namespace Unity.DemoTeam.Hair
 			{
 				ref readonly var in_0 = ref data_0_settingsVolume;
 
-				// => data_1_settingsEnvironment
+				// => data_IMPL_settingsEnvironment
 				{
-					static void TransferSettingsVolume(in __0__VolumeSettings in_0, ref __1__SettingsEnvironment out_1)
+					static void TransferSettingsVolume(in __0__VolumeSettings in_0, ref __IMPL__SettingsEnvironment out_IMPL)
 					{
-						static __1__SettingsEnvironment.BoundaryCaptureMode TranslateCollectMode(__0__VolumeSettings.CollectMode x) => (__1__SettingsEnvironment.BoundaryCaptureMode)x;
+						static __IMPL__SettingsEnvironment.BoundaryCaptureMode TranslateCollectMode(__0__VolumeSettings.CollectMode x) => (__IMPL__SettingsEnvironment.BoundaryCaptureMode)x;
 
-						out_1.boundaryCapture = in_0.boundariesCollect;
-						out_1.boundaryCaptureMode = TranslateCollectMode(in_0.boundariesCollectMode);
-						out_1.boundaryCaptureLayer = in_0.boundariesCollectLayer;
-						out_1.boundaryResident = in_0.boundariesPriority;
-						out_1.defaultSolidMargin = in_0.collisionMargin;
-						out_1.defaultSolidDensity = in_0.probeOcclusionSolidDensity;
+						out_IMPL.boundaryCapture = in_0.boundariesCollect;
+						out_IMPL.boundaryCaptureMode = TranslateCollectMode(in_0.boundariesCollectMode);
+						out_IMPL.boundaryCaptureLayer = in_0.boundariesCollectLayer;
+						out_IMPL.boundaryResident = in_0.boundariesPriority;
+						out_IMPL.defaultSolidMargin = in_0.collisionMargin;
+						out_IMPL.defaultSolidDensity = in_0.probeOcclusionSolidDensity;
 					}
 
-					TransferSettingsVolume(in_0, ref data_1_settingsEnvironment);
+					TransferSettingsVolume(in_0, ref data_IMPL_settingsEnvironment);
 				}
 
-				// => data_1_settingsVolumetrics
+				// => data_IMPL_settingsVolumetrics
 				{
-					static void TransferSettingsVolume(in __0__VolumeSettings in_0, ref __1__SettingsVolumetrics out_1)
+					static void TransferSettingsVolume(in __0__VolumeSettings in_0, ref __IMPL__SettingsVolumetrics out_IMPL)
 					{
-						static __1__SettingsVolumetrics.GridPrecision TranslateGridPrecision(__0__VolumeSettings.GridPrecision x) => (__1__SettingsVolumetrics.GridPrecision)x;
-						static __1__SettingsVolumetrics.SplatMethod TranslateSplatMethod(__0__VolumeSettings.SplatMethod x) => (__1__SettingsVolumetrics.SplatMethod)x;
-						static __1__SettingsVolumetrics.PressureSolution TranslatePressureSolution(__0__VolumeSettings.PressureSolution x) => (__1__SettingsVolumetrics.PressureSolution)x;
-						static __1__SettingsVolumetrics.RestDensity TranslateTargetDensity(__0__VolumeSettings.TargetDensity x) => (__1__SettingsVolumetrics.RestDensity)x;
-						static __1__SettingsVolumetrics.OcclusionMode TranslateOcclusionMode(__0__VolumeSettings.OcclusionMode x) => (__1__SettingsVolumetrics.OcclusionMode)x;
+						static __IMPL__SettingsVolumetrics.GridPrecision TranslateGridPrecision(__0__VolumeSettings.GridPrecision x) => (__IMPL__SettingsVolumetrics.GridPrecision)x;
+						static __IMPL__SettingsVolumetrics.SplatMethod TranslateSplatMethod(__0__VolumeSettings.SplatMethod x) => (__IMPL__SettingsVolumetrics.SplatMethod)x;
+						static __IMPL__SettingsVolumetrics.PressureSolution TranslatePressureSolution(__0__VolumeSettings.PressureSolution x) => (__IMPL__SettingsVolumetrics.PressureSolution)x;
+						static __IMPL__SettingsVolumetrics.RestDensity TranslateTargetDensity(__0__VolumeSettings.TargetDensity x) => (__IMPL__SettingsVolumetrics.RestDensity)x;
+						static __IMPL__SettingsVolumetrics.OcclusionMode TranslateOcclusionMode(__0__VolumeSettings.OcclusionMode x) => (__IMPL__SettingsVolumetrics.OcclusionMode)x;
 
-						out_1.gridPrecision = TranslateGridPrecision(in_0.gridPrecision);
-						out_1.gridResolution = (uint)in_0.gridResolution;
+						out_IMPL.gridPrecision = TranslateGridPrecision(in_0.gridPrecision);
+						out_IMPL.gridResolution = (uint)in_0.gridResolution;
 
-						out_1.splatMethod = TranslateSplatMethod(in_0.splatMethod);
-						out_1.splatClusters = in_0.splatClusters;
+						out_IMPL.splatMethod = TranslateSplatMethod(in_0.splatMethod);
+						out_IMPL.splatClusters = in_0.splatClusters;
 
-						out_1.pressureIterations = (uint)in_0.pressureIterations;
-						out_1.pressureSolution = TranslatePressureSolution(in_0.pressureSolution);
-						out_1.restDensity = TranslateTargetDensity(in_0.targetDensity);
-						out_1.restDensityInfluence = in_0.targetDensityInfluence;
+						out_IMPL.pressureIterations = (uint)in_0.pressureIterations;
+						out_IMPL.pressureSolution = TranslatePressureSolution(in_0.pressureSolution);
+						out_IMPL.restDensity = TranslateTargetDensity(in_0.targetDensity);
+						out_IMPL.restDensityInfluence = in_0.targetDensityInfluence;
 
-						out_1.scatteringProbe = in_0.scatteringProbe;
-						out_1.scatteringProbeCellSubsteps = in_0.scatteringProbeCellSubsteps;
-						out_1.scatteringProbeBias = in_0.scatteringProbeBias;
-						out_1.probeSamplesTheta = in_0.probeSamplesTheta;
-						out_1.probeSamplesPhi = in_0.probeSamplesPhi;
-						out_1.probeOcclusion = in_0.probeOcclusion;
-						out_1.probeOcclusionMode = TranslateOcclusionMode(in_0.probeOcclusionMode);
-						out_1.probeOcclusionSolidDensity = in_0.probeOcclusionSolidDensity;
+						out_IMPL.scatteringProbe = in_0.scatteringProbe;
+						out_IMPL.scatteringProbeCellSubsteps = in_0.scatteringProbeCellSubsteps;
+						out_IMPL.scatteringProbeBias = in_0.scatteringProbeBias;
+						out_IMPL.probeSamplesTheta = in_0.probeSamplesTheta;
+						out_IMPL.probeSamplesPhi = in_0.probeSamplesPhi;
+						out_IMPL.probeOcclusion = in_0.probeOcclusion;
+						out_IMPL.probeOcclusionMode = TranslateOcclusionMode(in_0.probeOcclusionMode);
+						out_IMPL.probeOcclusionSolidDensity = in_0.probeOcclusionSolidDensity;
 
-						out_1.windPropagation = in_0.windPropagation;
-						out_1.windPropagationCellSubsteps = in_0.windPropagationCellSubsteps;
-						out_1.windOcclusion = in_0.windOcclusion;
-						out_1.windOcclusionMode = TranslateOcclusionMode(in_0.windOcclusionMode);
-						out_1.windDepth = in_0.windExtinction;
+						out_IMPL.windPropagation = in_0.windPropagation;
+						out_IMPL.windPropagationCellSubsteps = in_0.windPropagationCellSubsteps;
+						out_IMPL.windOcclusion = in_0.windOcclusion;
+						out_IMPL.windOcclusionMode = TranslateOcclusionMode(in_0.windOcclusionMode);
+						out_IMPL.windDepth = in_0.windExtinction;
 					}
 
-					TransferSettingsVolume(in_0, ref data_1_settingsVolumetrics);
+					TransferSettingsVolume(in_0, ref data_IMPL_settingsVolumetrics);
 				}
 			}
 
@@ -243,130 +243,131 @@ namespace Unity.DemoTeam.Hair
 			{
 				// *.settingsStrands
 				{
-					// => data_1_strandGroupDefaults.settingsRendering
-					// => data_1_strandGroupSettings[].settingsRendering
+					// => data_IMPL_strandGroupDefaults.settingsRendering
+					// => data_IMPL_strandGroupSettings[].settingsRendering
 					{
-						static void TransferSettingsStrands(in __0__SettingsStrands in_0, ref __1__SettingsRendering out_1)
+						static void TransferSettingsStrands(in __0__SettingsStrands in_0, ref __IMPL__SettingsRendering out_IMPL)
 						{
-							out_1.material = in_0.material;
-							out_1.materialAsset = in_0.materialValue;
+							out_IMPL.material = in_0.material;
+							out_IMPL.materialAsset = in_0.materialValue;
 						}
 
-						TransferSettingsStrands(data_0_strandGroupDefaults.settingsStrands, ref data_1_strandGroupDefaults.settingsRendering);
+						TransferSettingsStrands(data_0_strandGroupDefaults.settingsStrands, ref data_IMPL_strandGroupDefaults.settingsRendering);
 
-						for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
+						for (int i = 0; i != (data_IMPL_strandGroupSettings?.Length ?? 0); i++)
 						{
-							TransferSettingsStrands(data_0_strandGroupSettings[i].settingsStrands, ref data_1_strandGroupSettings[i].settingsRendering);
-							data_1_strandGroupSettings[i].settingsRenderingToggle = data_0_strandGroupSettings[i].settingsStrandsToggle;
+							TransferSettingsStrands(data_0_strandGroupSettings[i].settingsStrands, ref data_IMPL_strandGroupSettings[i].settingsRendering);
+							data_IMPL_strandGroupSettings[i].settingsRenderingToggle = data_0_strandGroupSettings[i].settingsStrandsToggle;
 						}
 					}
 
-					// => data_1_strandGroupDefaults.settingsGeometry
-					// => data_1_strandGroupSettings[].settingsGeometry
+					// => data_IMPL_strandGroupDefaults.settingsGeometry
+					// => data_IMPL_strandGroupSettings[].settingsGeometry
 					{
-						static void TransferSettingsStrands(in __0__SettingsStrands in_0, ref __1__SettingsGeometry out_1)
+						static void TransferSettingsStrands(in __0__SettingsStrands in_0, ref __IMPL__SettingsGeometry out_IMPL)
 						{
-							static __1__SettingsGeometry.StrandScale TranslateStrandScale(__0__SettingsStrands.StrandScale x) => (__1__SettingsGeometry.StrandScale)x;
-							static __1__SettingsGeometry.StagingPrecision TranslateStagingPrecision(__0__SettingsStrands.StagingPrecision x) => (__1__SettingsGeometry.StagingPrecision)x;
+							static __IMPL__SettingsGeometry.StrandScale TranslateStrandScale(__0__SettingsStrands.StrandScale x) => (__IMPL__SettingsGeometry.StrandScale)x;
+							static __IMPL__SettingsGeometry.StagingPrecision TranslateStagingPrecision(__0__SettingsStrands.StagingPrecision x) => (__IMPL__SettingsGeometry.StagingPrecision)x;
 
-							out_1.strandScale = TranslateStrandScale(in_0.strandScale);
-							out_1.strandDiameter = true;
-							out_1.strandDiameterValue = in_0.strandDiameter;
-							out_1.strandSeparation = in_0.strandMargin;
+							out_IMPL.strandScale = TranslateStrandScale(in_0.strandScale);
+							out_IMPL.strandDiameter = true;
+							out_IMPL.strandDiameterValue = in_0.strandDiameter;
+							out_IMPL.strandSeparation = in_0.strandMargin;
 
-							out_1.stagingPrecision = TranslateStagingPrecision(in_0.stagingPrecision);
-							out_1.stagingSubdivision = (in_0.stagingSubdivision > 0);
-							out_1.stagingSubdivisionCount = (in_0.stagingSubdivision > 0) ? in_0.stagingSubdivision : 1;
+							out_IMPL.stagingPrecision = TranslateStagingPrecision(in_0.stagingPrecision);
+							out_IMPL.stagingSubdivision = (in_0.stagingSubdivision > 0);
+							out_IMPL.stagingSubdivisionCount = (in_0.stagingSubdivision > 0) ? in_0.stagingSubdivision : 1;
 						}
 
-						TransferSettingsStrands(data_0_strandGroupDefaults.settingsStrands, ref data_1_strandGroupDefaults.settingsGeometry);
+						TransferSettingsStrands(data_0_strandGroupDefaults.settingsStrands, ref data_IMPL_strandGroupDefaults.settingsGeometry);
 
-						for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
+						for (int i = 0; i != (data_IMPL_strandGroupSettings?.Length ?? 0); i++)
 						{
-							TransferSettingsStrands(data_0_strandGroupSettings[i].settingsStrands, ref data_1_strandGroupSettings[i].settingsGeometry);
-							data_1_strandGroupSettings[i].settingsGeometryToggle = data_0_strandGroupSettings[i].settingsStrandsToggle;
+							TransferSettingsStrands(data_0_strandGroupSettings[i].settingsStrands, ref data_IMPL_strandGroupSettings[i].settingsGeometry);
+							data_IMPL_strandGroupSettings[i].settingsGeometryToggle = data_0_strandGroupSettings[i].settingsStrandsToggle;
 						}
 					}
 				}
 
 				// *.settingsSolver
 				{
-					// => data_1_strandGroupDefaults.settingsPhysics
-					// => data_1_strandGroupSettings[].settingsPhysics
+					// => data_IMPL_strandGroupDefaults.settingsPhysics
+					// => data_IMPL_strandGroupSettings[].settingsPhysics
 					{
-						static void TransferSettingsSolver(in __0__SolverSettings in_0, ref __1__SettingsPhysics out_1)
+						static void TransferSettingsSolver(in __0__SolverSettings in_0, ref __IMPL__SettingsPhysics out_IMPL)
 						{
-							static __1__SettingsPhysics.Solver TranslateMethod(__0__SolverSettings.Method x) => (__1__SettingsPhysics.Solver)x;
-							static __1__SettingsPhysics.TimeInterval TranslateTimeInterval(__0__SolverSettings.TimeInterval x) => (__1__SettingsPhysics.TimeInterval)x;
-							static __1__SettingsPhysics.LocalCurvatureMode TranslateLocalCurvatureMode(__0__SolverSettings.LocalCurvatureMode x) => (__1__SettingsPhysics.LocalCurvatureMode)x;
-							static __1__SettingsPhysics.LocalShapeMode TranslateLocalShapeMode(__0__SolverSettings.LocalShapeMode x) => (__1__SettingsPhysics.LocalShapeMode)x;
+							static __IMPL__SettingsPhysics.Solver TranslateMethod(__0__SolverSettings.Method x) => (__IMPL__SettingsPhysics.Solver)x;
+							static __IMPL__SettingsPhysics.TimeInterval TranslateTimeInterval(__0__SolverSettings.TimeInterval x) => (__IMPL__SettingsPhysics.TimeInterval)x;
+							static __IMPL__SettingsPhysics.LocalCurvatureMode TranslateLocalCurvatureMode(__0__SolverSettings.LocalCurvatureMode x) => (__IMPL__SettingsPhysics.LocalCurvatureMode)x;
+							static __IMPL__SettingsPhysics.LocalShapeMode TranslateLocalShapeMode(__0__SolverSettings.LocalShapeMode x) => (__IMPL__SettingsPhysics.LocalShapeMode)x;
 
-							out_1.solver = TranslateMethod(in_0.method);
-							out_1.solverSubsteps = (uint)in_0.substeps;
-							out_1.constraintIterations = (uint)in_0.iterations;
-							out_1.constraintStiffness = in_0.stiffness;
-							out_1.constraintSOR = in_0.kSOR;
+							out_IMPL.solver = TranslateMethod(in_0.method);
+							out_IMPL.solverSubsteps = (uint)in_0.substeps;
+							out_IMPL.constraintIterations = (uint)in_0.iterations;
+							out_IMPL.constraintStiffness = in_0.stiffness;
+							out_IMPL.constraintSOR = in_0.kSOR;
 
-							out_1.dampingLinear = in_0.damping;
-							out_1.dampingLinearFactor = in_0.dampingFactor;
-							out_1.dampingLinearInterval = TranslateTimeInterval(in_0.dampingInterval);
-							out_1.dampingAngular = in_0.angularDamping;
-							out_1.dampingAngularFactor = in_0.angularDampingFactor;
-							out_1.dampingAngularInterval = TranslateTimeInterval(in_0.angularDampingInterval);
-							out_1.cellPressure = in_0.cellPressure;
-							out_1.cellVelocity = in_0.cellVelocity;
-							out_1.cellExternal = in_0.cellForces;
-							out_1.gravity = 1.0f;// global scale and rotation moves to data_1_settingsEnvironment
+							out_IMPL.dampingLinear = in_0.damping;
+							out_IMPL.dampingLinearFactor = in_0.dampingFactor;
+							out_IMPL.dampingLinearInterval = TranslateTimeInterval(in_0.dampingInterval);
+							out_IMPL.dampingAngular = in_0.angularDamping;
+							out_IMPL.dampingAngularFactor = in_0.angularDampingFactor;
+							out_IMPL.dampingAngularInterval = TranslateTimeInterval(in_0.angularDampingInterval);
+							out_IMPL.cellPressure = in_0.cellPressure;
+							out_IMPL.cellVelocity = in_0.cellVelocity;
+							out_IMPL.cellExternal = in_0.cellForces;
+							out_IMPL.gravity = 1.0f;// global scale and rotation moves to data_IMPL_settingsEnvironment
 
-							out_1.boundaryCollision = in_0.boundaryCollision;
-							out_1.boundaryCollisionFriction = in_0.boundaryCollisionFriction;
-							out_1.distance = in_0.distance;
-							out_1.distanceLRA = in_0.distanceLRA;
-							out_1.distanceFTL = in_0.distanceFTL;
-							out_1.distanceFTLCorrection = in_0.distanceFTLCorrection;
-							out_1.localCurvature = in_0.localCurvature;
-							out_1.localCurvatureMode = TranslateLocalCurvatureMode(in_0.localCurvatureMode);
-							out_1.localCurvatureValue = in_0.localCurvatureValue;
-							out_1.localShape = in_0.localShape;
-							out_1.localShapeMode = TranslateLocalShapeMode(in_0.localShapeMode);
-							out_1.localShapeInfluence = in_0.localShapeInfluence;
-							out_1.localShapeBias = in_0.localShapeBias;
-							out_1.localShapeBiasValue = in_0.localShapeBiasValue;
+							out_IMPL.boundaryCollision = in_0.boundaryCollision;
+							out_IMPL.boundaryCollisionFriction = in_0.boundaryCollisionFriction;
+							out_IMPL.distance = in_0.distance;
+							out_IMPL.distanceLRA = in_0.distanceLRA;
+							out_IMPL.distanceFTL = in_0.distanceFTL;
+							out_IMPL.distanceFTLCorrection = in_0.distanceFTLCorrection;
+							out_IMPL.localCurvature = in_0.localCurvature;
+							out_IMPL.localCurvatureMode = TranslateLocalCurvatureMode(in_0.localCurvatureMode);
+							out_IMPL.localCurvatureValue = in_0.localCurvatureValue;
+							out_IMPL.localShape = in_0.localShape;
+							out_IMPL.localShapeMode = TranslateLocalShapeMode(in_0.localShapeMode);
+							out_IMPL.localShapeInfluence = in_0.localShapeInfluence;
+							out_IMPL.localShapeBias = in_0.localShapeBias;
+							out_IMPL.localShapeBiasValue = in_0.localShapeBiasValue;
 
-							out_1.globalPosition = in_0.globalPosition;
-							out_1.globalPositionInfluence = in_0.globalPositionInfluence;
-							out_1.globalPositionInterval = TranslateTimeInterval(in_0.globalPositionInterval);
-							out_1.globalRotation = in_0.globalRotation;
-							out_1.globalRotationInfluence = in_0.globalRotationInfluence;
-							out_1.globalFade = in_0.globalFade;
-							out_1.globalFadeOffset = in_0.globalFadeOffset;
-							out_1.globalFadeExtent = in_0.globalFadeExtent;
+							out_IMPL.globalPosition = in_0.globalPosition;
+							out_IMPL.globalPositionInfluence = in_0.globalPositionInfluence;
+							out_IMPL.globalPositionInterval = TranslateTimeInterval(in_0.globalPositionInterval);
+							out_IMPL.globalRotation = in_0.globalRotation;
+							out_IMPL.globalRotationInfluence = in_0.globalRotationInfluence;
+							out_IMPL.globalFade = in_0.globalFade;
+							out_IMPL.globalFadeOffset = in_0.globalFadeOffset;
+							out_IMPL.globalFadeExtent = in_0.globalFadeExtent;
 						}
 
-						TransferSettingsSolver(data_0_strandGroupDefaults.settingsSolver, ref data_1_strandGroupDefaults.settingsPhysics);
+						TransferSettingsSolver(data_0_strandGroupDefaults.settingsSolver, ref data_IMPL_strandGroupDefaults.settingsPhysics);
 
-						for (int i = 0; i != (data_1_strandGroupSettings?.Length ?? 0); i++)
+						for (int i = 0; i != (data_IMPL_strandGroupSettings?.Length ?? 0); i++)
 						{
-							TransferSettingsSolver(data_0_strandGroupSettings[i].settingsSolver, ref data_1_strandGroupSettings[i].settingsPhysics);
-							data_1_strandGroupSettings[i].settingsPhysicsToggle = data_0_strandGroupSettings[i].settingsSolverToggle;
+							TransferSettingsSolver(data_0_strandGroupSettings[i].settingsSolver, ref data_IMPL_strandGroupSettings[i].settingsPhysics);
+							data_IMPL_strandGroupSettings[i].settingsPhysicsToggle = data_0_strandGroupSettings[i].settingsSolverToggle;
 						}
 					}
 
-					// => data_1_settingsEnvironment
+					// => data_IMPL_settingsEnvironment
 					{
-						static void TransferSettingsSolver(in __0__SolverSettings in_0, ref __1__SettingsEnvironment out_1)
+						static void TransferSettingsSolver(in __0__SolverSettings in_0, ref __IMPL__SettingsEnvironment out_IMPL)
 						{
-							out_1.gravityScale = in_0.gravity;
-							out_1.gravityRotation = Quaternion.Euler(in_0.gravityRotation);
+							out_IMPL.gravityScale = in_0.gravity;
+							out_IMPL.gravityRotation = Quaternion.Euler(in_0.gravityRotation);
 						}
 
-						TransferSettingsSolver(data_0_strandGroupDefaults.settingsSolver, ref data_1_settingsEnvironment);
+						TransferSettingsSolver(data_0_strandGroupDefaults.settingsSolver, ref data_IMPL_settingsEnvironment);
 					}
 				}
 			}
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__SettingsSystem
 		{
 			public enum BoundsMode
@@ -472,6 +473,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__VolumeSettings
 		{
 			public enum GridPrecision
@@ -590,8 +592,14 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__GroupSettings
 		{
+			//public List<GroupAssetReference> groupAssetReferences;
+
+			//public __0__SettingsSkinning settingsSkinning;
+			//public bool settingsSkinningToggle;
+
 			public __0__SettingsStrands settingsStrands;
 			public bool settingsStrandsToggle;
 
@@ -600,6 +608,11 @@ namespace Unity.DemoTeam.Hair
 
 			public static __0__GroupSettings defaults => new __0__GroupSettings()
 			{
+				//groupAssetReferences = new List<GroupAssetReference>(1),
+
+				//settingsSkinning = SettingsSkinning.defaults,
+				//settingsSkinningToggle = false,
+
 				settingsStrands = __0__SettingsStrands.defaults,
 				settingsStrandsToggle = false,
 
@@ -609,6 +622,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__SettingsStrands
 		{
 			public enum StrandScale
@@ -651,6 +665,7 @@ namespace Unity.DemoTeam.Hair
 		}
 
 		[Serializable]
+		// captured @ 46a8b132
 		struct __0__SolverSettings
 		{
 			public enum Method
