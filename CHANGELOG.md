@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [unreleased] - 
+## [0.17.0-exp.1] - 2024-08-19
 
 ### Added
 
@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue with mesh based root UV resolve not always producing correct texture coordinates. (Caused by incorrect measure in closest triangle BVH lookup - thanks @Kleptine for investigating this in #98.)
 - Fixed an issue with inconsistent shading when using strips for rendering in combination with builtin RP.
 - Fixed a regression in HairVolumeUVW.
-- Fixed a padding issue.
+- Fixed a constant buffer padding issue.
 
 
 ## [0.16.0-exp.1] - 2024-07-04
@@ -247,7 +247,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
-[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.16.0-exp.1...HEAD
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.17.0-exp.1...HEAD
+[0.17.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.16.0-exp.1...0.17.0-exp.1
 [0.16.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.15.0-exp.1...0.16.0-exp.1
 [0.15.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.14.2-exp.1...0.15.0-exp.1
 [0.14.2-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.14.1-exp.1...0.14.2-exp.1
