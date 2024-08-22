@@ -40,7 +40,7 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
-				if (skinningBoneIndex != -1)
+				if (skinningBoneIndex != -1 && skinningBoneIndex < smr.bones.Length)
 				{
 					this.skinningBone = smr.bones[skinningBoneIndex];
 					this.skinningBoneBindPose = smr.sharedMesh.bindposes[skinningBoneIndex];
