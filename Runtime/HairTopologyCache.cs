@@ -85,7 +85,7 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 
-				mesh.UploadMeshData(markNoLongerReadable: true);
+				mesh.UploadMeshData(false);
 
 				s_keyToMesh[key] = mesh;
 				s_keyToUsage[key] = 1;
