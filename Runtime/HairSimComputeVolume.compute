@@ -90,7 +90,8 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl"
 
-#define HAIRSIM_WRITEABLE_VOLUMEBOUNDS (F_BOUNDS || F_LOD)
+#define HAIRSIM_WRITEABLE_VOLUMEBOUNDS (F_BOUNDS)
+#define HAIRSIM_WRITEABLE_VOLUMELOD (F_LOD)
 #define HAIRSIM_WRITEABLE_VOLUMEACCU (F_CLEAR || F_SPLAT)
 #define HAIRSIM_WRITEABLE_VOLUMEDATA (F_RESOLVE || F_DIVERGENCE || F_PRESSURE)
 #define HAIRSIM_WRITEABLE_VOLUMEOPTS (F_CLEAR || F_SCATTERING || F_WIND)
@@ -115,7 +116,7 @@
 
 #if VOLUME_SPLAT_CLUSTERS
   #define CHECK_SPLAT(x)	\
-	if (x >= _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE * 4 + 3] * _StrandParticleCount) return;
+	if (x >= _SolverLODRange[SOLVERLODRANGE_SOLVE].y * _StrandParticleCount) return;
 #else
   #define CHECK_SPLAT(x)	\
 	if (x >= _StrandCount * _StrandParticleCount) return;
@@ -123,7 +124,7 @@
 
 #if VOLUME_SPLAT_CLUSTERS && LAYOUT_INTERLEAVED
   #define DECLARE_SPLAT_PARTICLE_UNCHECKED(x)	\
-	const uint particleIndex = _StrandCount * (x / _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE * 4 + 3]) + (x % _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE * 4 + 3]);
+	const uint particleIndex = _StrandCount * (x / _SolverLODRange[SOLVERLODRANGE_SOLVE].y) + (x % _SolverLODRange[SOLVERLODRANGE_SOLVE].y);
 #else
   #define DECLARE_SPLAT_PARTICLE_UNCHECKED(x)	\
 	const uint particleIndex = x;
@@ -134,7 +135,7 @@
 	DECLARE_SPLAT_PARTICLE_UNCHECKED(x);
 
 #define CHECK_STRAND(x)			(x < _StrandCount)
-#define CHECK_STRAND_SOLVER(x)	(x < _SolverLODDispatch[SOLVERLODDISPATCH_SOLVE * 4 + 3])
+#define CHECK_STRAND_SOLVER(x)	(x < _SolverLODRange[SOLVERLODRANGE_SOLVE].y)
 
 #define DECLARE_STRAND_UNCHECKED(x)											\
 	const uint strandIndex = x;												\

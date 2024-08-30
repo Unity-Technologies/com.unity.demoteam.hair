@@ -25,10 +25,12 @@
 #define HAIRSIM_SOLVERDATA StructuredBuffer
 #endif
 
-#if HAIRSIM_WRITEABLE_SOLVERDATA
-#define HAIRSIM_SOLVERDISPATCH RWBuffer
+#if HAIRSIM_WRITEABLE_SOLVERLOD
+#define HAIRSIM_SOLVERLOD RWStructuredBuffer
+#define HAIRSIM_SOLVERLODX RWBuffer
 #else
-#define HAIRSIM_SOLVERDISPATCH Buffer
+#define HAIRSIM_SOLVERLOD StructuredBuffer
+#define HAIRSIM_SOLVERLODX Buffer
 #endif
 
 #if HAIRSIM_WRITEABLE_SOLVERDATA
@@ -47,9 +49,10 @@ HAIRSIM_SOLVERINPUT<float4> _RootFrameNext;				// quat(xyz,w): strand root mater
 HAIRSIM_SOLVERINPUT<float4> _RootFramePrev;				// quat(xyz,w): ...
 HAIRSIM_SOLVERINPUT<float4> _RootFrame;					// quat(xyz,w): ...
 
-HAIRSIM_SOLVERDATA<LODIndices> _SolverLODStage;			// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
-HAIRSIM_SOLVERDATA<uint2> _SolverLODRange;				// xy: dispatch strand range [begin, end)
-HAIRSIM_SOLVERDISPATCH<uint> _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
+HAIRSIM_SOLVERLOD<LODIndices> _SolverLODStage;			// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
+HAIRSIM_SOLVERLOD<uint2> _SolverLODRange;				// xy: dispatch strand range [begin, end)
+HAIRSIM_SOLVERLODX<uint> _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
+HAIRSIM_SOLVERLODX<uint> _SolverLODTopology;			// x[5]: dispatch args draw indexed
 
 HAIRSIM_SOLVERINIT<float4> _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: initial local accumulated weight (gather)
 HAIRSIM_SOLVERINIT<float4> _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
@@ -88,10 +91,12 @@ HAIRSIM_RENDERDATA _StagingVertexPrev;					// xyz: ...
 #define HAIRSIM_VOLUMEBOUNDS StructuredBuffer
 #endif
 
-#if HAIRSIM_WRITEABLE_VOLUMEBOUNDS
-#define HAIRSIM_VOLUMEDISPATCH RWBuffer
+#if HAIRSIM_WRITEABLE_VOLUMELOD
+#define HAIRSIM_VOLUMELOD RWStructuredBuffer
+#define HAIRSIM_VOLUMELODX RWBuffer
 #else
-#define HAIRSIM_VOLUMEDISPATCH Buffer
+#define HAIRSIM_VOLUMELOD StructuredBuffer
+#define HAIRSIM_VOLUMELODX Buffer
 #endif
 
 #if SHADER_API_METAL
@@ -134,8 +139,8 @@ HAIRSIM_VOLUMEBOUNDS<LODBounds> _BoundsPrev;		// array(LODBounds): bounds (cente
 HAIRSIM_VOLUMEBOUNDS<LODGeometry> _BoundsGeometry;	// array(LODGeometry): bounds geometry description (dimensions for coverage)
 HAIRSIM_VOLUMEBOUNDS<float2> _BoundsCoverage;		// xy: bounds coverage (unbiased ceiling)
 
-HAIRSIM_VOLUMEBOUNDS<VolumeLODGrid> _VolumeLODStage;// array(VolumeLODGrid): grid properties
-HAIRSIM_VOLUMEDISPATCH<uint> _VolumeLODDispatch;	// xyz: num groups, w: num grid cells in one dimension
+HAIRSIM_VOLUMELOD<VolumeLODGrid> _VolumeLODStage;// array(VolumeLODGrid): grid properties
+HAIRSIM_VOLUMELODX<uint> _VolumeLODDispatch;		// xyz: num groups, w: num grid cells in one dimension
 
 HAIRSIM_VOLUMEACCU<int> _AccuWeight;				// x: fp accumulated weight
 HAIRSIM_VOLUMEACCU<int> _AccuWeight0;				// x: fp accumulated target weight

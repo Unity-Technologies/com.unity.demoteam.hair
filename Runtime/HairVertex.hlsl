@@ -102,7 +102,7 @@ struct HairVertexID
 	float2 tubularUV;
 };
 
-static const HairVertexID defaultHairVertexID =
+static const HairVertexID s_defaultHairVertexID =
 {
 	/* uint strandIndex; */ 0,
 	/* uint vertexIndex; */ 0,
@@ -118,7 +118,7 @@ struct HairVertexModifiers
 	bool widthSet;
 };
 
-static const HairVertexModifiers defaultHairVertexModifiers =
+static const HairVertexModifiers s_defaultHairVertexModifiers =
 {
 	/* float lodScale; */ 1.0,
 	/* float lodBias;  */ 0.0,
@@ -143,7 +143,7 @@ struct HairVertexData
 	float3 strandIndexColor;
 };
 
-static const HairVertexData defaultHairVertexData =
+static const HairVertexData s_defaultHairVertexData =
 {
 	/* float3 surfacePosition;  */ float3(0.0, 0.0, 0.0),
 	/* float3 surfaceNormal;    */ float3(0.0, 0.0, 0.0),
@@ -227,6 +227,7 @@ float2 GetSurfaceUV(const float2 tubularUV)
 HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers m)
 {
 	DECLARE_STRAND(id.strandIndex);
+
 	const uint i = strandParticleBegin + id.vertexIndex * strandParticleStride;
 	const uint i_next = i + strandParticleStride;
 	const uint i_prev = i - strandParticleStride;
@@ -261,7 +262,15 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 				switch (_RenderLODMethod)
 				{
 					case RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT:
+#define ANISOTROPIC_LOD_DENSITY 0
+#if ANISOTROPIC_LOD_DENSITY
+						float3 curveViewWS = HAIR_VERTEX_IMPL_WS_POS_VIEW_DIR(curvePositionRWS);
+						float curveParallel = saturate(abs(dot(normalize_safe(curveTangentWS), curveViewWS)));
+						float curveCoverageA = lerp(curveCoverage, sqrt(curveCoverage), curveParallel);
+						lodDesc = ResolveLODIndices(ResolveLODQuantity(curveCoverageA, _RenderLODCeiling, _RenderLODScale * m.lodScale, _RenderLODBias + m.lodBias));
+#else
 						lodDesc = ResolveLODIndices(ResolveLODQuantity(curveCoverage, _RenderLODCeiling, _RenderLODScale * m.lodScale, _RenderLODBias + m.lodBias));
+#endif
 						break;
 
 					default:
@@ -291,7 +300,7 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 				float guideProjectedCoverageHi = 1.0 - exp(-radius * guideCarryHi / guideReachHi);
 				float guideProjectedCoverage = 1.0 - exp(-radius * guideCarry / guideReach);
 
-#define USE_PASSING_FRACTION 1
+#define USE_PASSING_FRACTION 0
 #if USE_PASSING_FRACTION
 				if (_RenderLODMethod == RENDERLODSELECTION_AUTOMATIC_PER_SEGMENT)
 				{
@@ -430,24 +439,35 @@ HairVertexData GetHairVertex(
 	const float3 staticPositionOS,
 	const float3 staticNormalOS,
 	const float3 staticTangentOS,
-	const HairVertexModifiers m = defaultHairVertexModifiers)
+	const HairVertexModifiers m = s_defaultHairVertexModifiers)
 {
+	HairVertexData v;
+	{
 #if HAIR_VERTEX_LIVE || !SHADER_STAGE_VERTEX
-	if (_DecodeVertexCount > 0)
-	{
-		return GetHairVertexOS(DecodeHairVertexID(packedID), m);
-	}
-	else
-#endif
-	{
-		HairVertexData v = defaultHairVertexData;
+		if (_DecodeVertexCount > 0)
 		{
+			HairVertexID id = DecodeHairVertexID(packedID);
+
+			if (id.strandIndex < _SolverLODRange[SOLVERLODRANGE_RENDER].y)
+			{
+				v = GetHairVertexOS(id, m);
+			}
+			else
+			{
+				v = s_defaultHairVertexData;
+				v.surfacePosition = asfloat(0x7FC00000u); // => NaN
+			}
+		}
+		else
+#endif
+		{
+			v = s_defaultHairVertexData;
 			v.surfacePosition = staticPositionOS;
 			v.surfaceNormal = staticNormalOS;
 			v.surfaceTangent = staticTangentOS;
 		}
-		return v;
 	}
+	return v;
 }
 
 //-------------

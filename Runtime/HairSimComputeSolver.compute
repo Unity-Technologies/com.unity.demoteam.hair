@@ -7,6 +7,7 @@
 
 #pragma kernel KLODSelectionInit						THREAD_GROUP_SIZE=1		F_LOD
 #pragma kernel KLODSelection							THREAD_GROUP_SIZE=1		F_LOD
+#pragma kernel KLODSelectionPost						THREAD_GROUP_SIZE=1		F_LOD
 
 #pragma kernel KInitialize								THREAD_GROUP_SIZE=64	F_INIT
 #pragma kernel KInitializePostVolume					THREAD_GROUP_SIZE=64	F_INIT
@@ -22,6 +23,7 @@
 #pragma kernel KStaging									THREAD_GROUP_SIZE=64	F_STAGING
 #pragma kernel KStagingSubdivision						THREAD_GROUP_SIZE=64	F_STAGING
 #pragma kernel KStagingHistory							THREAD_GROUP_SIZE=64	F_STAGING
+#pragma kernel KStagingHistoryAdd						THREAD_GROUP_SIZE=64	F_STAGING
 
 //----------
 // includes
@@ -29,8 +31,9 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 #define HAIRSIM_WRITEABLE_SOLVERINPUT (F_INPUT)
+#define HAIRSIM_WRITEABLE_SOLVERLOD (F_LOD)
 #define HAIRSIM_WRITEABLE_SOLVERINIT (F_INIT)
-#define HAIRSIM_WRITEABLE_SOLVERDATA (F_INIT || F_LOD || F_SOLVE || F_INTERPOLATE || F_STAGING)
+#define HAIRSIM_WRITEABLE_SOLVERDATA (F_INIT || F_SOLVE || F_INTERPOLATE || F_STAGING)
 
 #include "HairSimData.hlsl"
 #include "HairSimComputeConfig.hlsl"
@@ -716,7 +719,7 @@ uint4 ResolveDrawParallelParticles(uint strandCount, uint particleVertexCount)
 	return uint4((strandCount * _StrandParticleCount) * particleVertexCount, 1, 0, 0);
 }
 
-uint2 ResolveRange(uint i, uint j)
+uint2 CheckedRange(uint i, uint j)
 {
 	if (i <= j)
 		return uint2(i, j);
@@ -724,7 +727,7 @@ uint2 ResolveRange(uint i, uint j)
 		return uint2(j, j);
 }
 
-uint ResolveCount(uint2 range)
+uint CheckedCount(uint2 range)
 {
 	if (range.x < range.y)
 		return (range.y - range.x);
@@ -751,9 +754,9 @@ void KLODSelectionInit(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	uint2 rangeSolve		= ResolveRange(0, _StrandCount);
-	uint2 rangeInterpolate	= ResolveRange(_StrandCount, _StrandCount);
-	uint2 rangeRender		= ResolveRange(0, _StrandCount);
+	uint2 rangeSolve		= CheckedRange(0, _StrandCount);
+	uint2 rangeInterpolate	= CheckedRange(_StrandCount, _StrandCount);
+	uint2 rangeRender		= CheckedRange(0, _StrandCount);
 
 	_SolverLODRange[SOLVERLODRANGE_SOLVE]				= rangeSolve;
 	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE]			= rangeInterpolate;
@@ -828,12 +831,14 @@ void KLODSelection(
 	
 	// update delimiters / ranges
 	uint solverStrandCount = _LODGuideCount[solverLODDesc.lodIndexHi];
-	uint renderStrandCount = _StrandCount;//_LODGuideCount[renderLODDesc.lodIndexHi];//TODO apply rendering upper bound
+	uint renderStrandCount = _LODGuideCount[renderLODDesc.lodIndexHi];
 
 	uint i0 = _SolverLODRange[SOLVERLODRANGE_SOLVE].y;
 	uint j0 = _SolverLODRange[SOLVERLODRANGE_INTERPOLATE].y;
+	uint k0 = _SolverLODRange[SOLVERLODRANGE_RENDER].y;
 	uint i1;
 	uint j1;
+	uint k1;
 	{
 		/* delimiters
 
@@ -860,19 +865,22 @@ void KLODSelection(
 		{
 			i1 = solverStrandCount;				// promote	[i0, i1]	(pos -> sim)
 			j1 = renderStrandCount;				// append	[j0, j1]	(off -> pos)
+			k1 = renderStrandCount;
 		}
 		else
 		{
 			i1 = i0;							// promote	deferred
 			j1 = max(j0, renderStrandCount);	// append	[j0, j1]	(off -> pos)
+			k1 = renderStrandCount;
 		}
 	}
 
-	uint2 rangeSolve				= ResolveRange(0, i1);
-	uint2 rangeInterpolate			= ResolveRange(i1, j1);
-	uint2 rangeInterpolateAdd		= ResolveRange(j0, j1);
-	uint2 rangeInterpolatePromote	= ResolveRange(i0, i1);
-	uint2 rangeRender				= ResolveRange(0, renderStrandCount);
+	uint2 rangeSolve				= CheckedRange(0, i1);
+	uint2 rangeInterpolate			= CheckedRange(i1, j1);
+	uint2 rangeInterpolateAdd		= CheckedRange(j0, j1);
+	uint2 rangeInterpolatePromote	= CheckedRange(i0, i1);
+	uint2 rangeRender				= CheckedRange(0, k1);
+	uint2 rangeRenderAdd			= CheckedRange(k0, k1);
 
 	_SolverLODRange[SOLVERLODRANGE_SOLVE]				= rangeSolve;
 	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE]			= rangeInterpolate;
@@ -881,11 +889,12 @@ void KLODSelection(
 	_SolverLODRange[SOLVERLODRANGE_RENDER]				= rangeRender;
 
 	// update dispatch
-	uint countSolve					= ResolveCount(rangeSolve);
-	uint countInterpolate			= ResolveCount(rangeInterpolate);
-	uint countInterpolateAdd		= ResolveCount(rangeInterpolateAdd);
-	uint countInterpolatePromote	= ResolveCount(rangeInterpolatePromote);
-	uint countRender				= ResolveCount(rangeRender);
+	uint countSolve					= CheckedCount(rangeSolve);
+	uint countInterpolate			= CheckedCount(rangeInterpolate);
+	uint countInterpolateAdd		= CheckedCount(rangeInterpolateAdd);
+	uint countInterpolatePromote	= CheckedCount(rangeInterpolatePromote);
+	uint countRender				= CheckedCount(rangeRender);
+	uint countRenderAdd				= CheckedCount(rangeRenderAdd);
 
 	WriteIndirectDispatch(SOLVERLODDISPATCH_SOLVE,					ResolveDispatchParallelStrands(countSolve));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_SOLVE_GROUP_PARTICLES,	ResolveDispatchParallelParticlesEachStrand(countSolve));
@@ -893,13 +902,65 @@ void KLODSelection(
 	WriteIndirectDispatch(SOLVERLODDISPATCH_INTERPOLATE_ADD,		ResolveDispatchParallelStrands(countInterpolateAdd));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_INTERPOLATE_PROMOTE,	ResolveDispatchParallelStrands(countInterpolatePromote));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_STAGING,				ResolveDispatchParallelStrands(countRender));
-	WriteIndirectDispatch(SOLVERLODDISPATCH_STAGING_REENTRANT,		ResolveDispatchParallelStrands(0));//TODO
+	WriteIndirectDispatch(SOLVERLODDISPATCH_STAGING_ADD,			ResolveDispatchParallelStrands(countRenderAdd));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_TRANSFER,				ResolveDispatchParallelParticles(countSolve));
-	WriteIndirectDispatch(SOLVERLODDISPATCH_TRANSFER_ALL,			ResolveDispatchParallelParticles(countRender));
+	WriteIndirectDispatch(SOLVERLODDISPATCH_TRANSFER_ALL,			ResolveDispatchParallelParticles(countSolve + countInterpolate));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_POINTS,			ResolveDrawParallelParticles(countSolve, 1));
-	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_POINTS_ALL,		ResolveDrawParallelParticles(countRender, 1));
+	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_POINTS_ALL,		ResolveDrawParallelParticles(countSolve + countInterpolate, 1));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_QUADS,			ResolveDrawParallelParticles(countSolve, 8));
-	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_QUADS_ALL,		ResolveDrawParallelParticles(countRender, 8));
+	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_QUADS_ALL,		ResolveDrawParallelParticles(countSolve + countInterpolate, 8));
+}
+
+uint ResolveIndexCountLines(uint strandCount)
+{
+	uint perLineSegments = _StagingStrandVertexCount - 1;
+	uint perLineIndices = perLineSegments * 2;
+	return strandCount * perLineIndices;
+}
+
+uint ResolveIndexCountStrips(uint strandCount)
+{
+	uint perStripSegments = _StagingStrandVertexCount - 1;
+	uint perStripTriangles = perStripSegments * 2;
+	uint perStripIndices = perStripTriangles * 3;
+	return strandCount * perStripIndices;
+}
+
+uint ResolveIndexCountTubes(uint strandCount)
+{
+	const uint numSides = 4;
+
+	uint perTubeSegments = _StagingStrandVertexCount - 1;
+	uint perTubeTriangles = (perTubeSegments * numSides * 2) + 4;
+	uint perTubeIndices = perTubeTriangles * 3;
+	return strandCount * perTubeIndices;
+}
+
+void WriteIndirectTopology(uint index, uint indexCount)
+{
+	_SolverLODTopology[index * 5 + 0] = indexCount;	// == indexCountPerInstance
+	_SolverLODTopology[index * 5 + 1] = 1;			// == instanceCount
+	_SolverLODTopology[index * 5 + 2] = 0;			// == startIndex
+	_SolverLODTopology[index * 5 + 3] = 0;			// == baseVertexIndex
+	_SolverLODTopology[index * 5 + 4] = 0;			// == startInstance
+}
+
+[numthreads(1, 1, 1)]
+void KLODSelectionPost(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	uint countRender = _SolverLODRange[SOLVERLODRANGE_RENDER].y;
+
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_LINES,	ResolveIndexCountLines(countRender));
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_STRIPS,	ResolveIndexCountStrips(countRender));
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_TUBES,	ResolveIndexCountTubes(countRender));
 }
 
 #endif//F_LOD
@@ -2110,7 +2171,7 @@ void KStaging(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x);
+	DECLARE_STRAND_WITHIN(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_RENDER]);
 
 	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
 
@@ -2173,7 +2234,7 @@ void KStagingSubdivision(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x);
+	DECLARE_STRAND_WITHIN(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_RENDER]);
 
 	const LODBounds lodBounds = _Bounds[_GroupBoundsIndex];
 
@@ -2234,7 +2295,26 @@ void KStagingHistory(
 	// SV_DispatchThreadID  thread coords (global)
 	// SV_GroupIndex        thread offset within execution group
 {
-	DECLARE_STRAND(worldIdx.x);
+	DECLARE_STRAND_WITHIN(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_RENDER]);
+
+	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
+	{
+		ResetStagingPositionPrev(i);
+	}
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void KStagingHistoryAdd(
+	uint3 groupIdx : SV_GroupID,
+	uint3 localIdx : SV_GroupThreadID,
+	uint3 worldIdx : SV_DispatchThreadID,
+	uint threadIdx : SV_GroupIndex)
+	// SV_GroupID           execution group coords
+	// SV_GroupThreadID     thread coords within execution group
+	// SV_DispatchThreadID  thread coords (global)
+	// SV_GroupIndex        thread offset within execution group
+{
+	DECLARE_STRAND_WITHIN(worldIdx.x, _SolverLODRange[SOLVERLODRANGE_RENDER_ADD]);
 
 	for (uint i = strandParticleBegin; i != strandParticleEnd; i += strandParticleStride)
 	{

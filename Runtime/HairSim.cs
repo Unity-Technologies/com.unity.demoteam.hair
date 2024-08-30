@@ -1,6 +1,8 @@
 ﻿#pragma warning disable 0162 // some parts will be unreachable due to branching on configuration constants
 #pragma warning disable 0649 // some fields are assigned via reflection
 
+//#define DEBUG_LOD_SELECTION
+
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -98,6 +100,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KInitializePostVolume;
 			public static int KLODSelectionInit;
 			public static int KLODSelection;
+			public static int KLODSelectionPost;
 			public static int KSolveConstraints_GaussSeidelReference;
 			public static int KSolveConstraints_GaussSeidel;
 			public static int KSolveConstraints_Jacobi_16;
@@ -110,6 +113,7 @@ namespace Unity.DemoTeam.Hair
 			public static int KStaging;
 			public static int KStagingSubdivision;
 			public static int KStagingHistory;
+			public static int KStagingHistoryAdd;
 		}
 
 		static class VolumeKernels
@@ -254,6 +258,7 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._SolverLODStage, "SolverLODStage", (int)SolverLODStage.__COUNT, sizeof(LODIndices));
 				changed |= CreateBuffer(ref solverBuffers._SolverLODRange, "SolverLODRange", (int)SolverLODRange.__COUNT, particleStrideVector2);
 				changed |= CreateBuffer(ref solverBuffers._SolverLODDispatch, "SolverLODDispatch", (int)SolverLODDispatch.__COUNT * 4, sizeof(uint), ComputeBufferType.IndirectArguments);
+				changed |= CreateBuffer(ref solverBuffers._SolverLODTopology, "SolverLODTopology", (int)SolverLODTopology.__COUNT * 5, sizeof(uint), ComputeBufferType.IndirectArguments);
 
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleOffset, "InitialParticleOffset", particleCount, particleStrideVector4);
 				changed |= CreateBuffer(ref solverBuffers._InitialParticleFrameDelta, "InitialParticleFrameDelta", particleCount, particleStrideVector4);
@@ -271,6 +276,10 @@ namespace Unity.DemoTeam.Hair
 				changed |= CreateBuffer(ref solverBuffers._LODGuideReach, "LODGuideReach", Mathf.Max(1, lodCount) * strandCount, particleStrideScalar);
 
 				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODStage, solverBuffers._SolverLODStage);
+#if DEBUG_LOD_SELECTION
+				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODRange, solverBuffers._SolverLODRange);
+				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODTopology, solverBuffers._SolverLODTopology);
+#endif
 
 				return changed;
 			}
@@ -388,6 +397,7 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverBuffers._SolverLODStage);
 			ReleaseBuffer(ref solverBuffers._SolverLODRange);
 			ReleaseBuffer(ref solverBuffers._SolverLODDispatch);
+			ReleaseBuffer(ref solverBuffers._SolverLODTopology);
 
 			ReleaseBuffer(ref solverBuffers._InitialParticleOffset);
 			ReleaseBuffer(ref solverBuffers._InitialParticleFrameDelta);
@@ -412,6 +422,10 @@ namespace Unity.DemoTeam.Hair
 			ReleaseBuffer(ref solverBuffers._StagingVertexPrev);
 
 			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODStage);
+#if DEBUG_LOD_SELECTION
+			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODRange);
+			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODTopology);
+#endif
 
 			if (solverData.lodThreshold.IsCreated)
 				solverData.lodThreshold.Dispose();
@@ -520,6 +534,7 @@ namespace Unity.DemoTeam.Hair
 			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODStage, solverBuffers._SolverLODStage);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODRange, solverBuffers._SolverLODRange);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODDispatch, solverBuffers._SolverLODDispatch);
+			target.BindComputeBuffer(SolverData.s_bufferIDs._SolverLODTopology, solverBuffers._SolverLODTopology);
 
 			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticlePosition, solverBuffers._ParticlePosition);
 			target.BindComputeBuffer(SolverData.s_bufferIDs._ParticlePositionPrev, solverBuffers._ParticlePositionPrev);
@@ -856,7 +871,7 @@ namespace Unity.DemoTeam.Hair
 
 			// schedule readback
 			solverData.buffersReadback._SolverLODStage.ScheduleCopy(cmd, solverData.buffers._SolverLODStage);
-			/*
+#if DEBUG_LOD_SELECTION
 			solverData.buffersReadback._SolverLODRange.ScheduleCopy(cmd, solverData.buffers._SolverLODRange);
 			{
 				var data = solverData.buffersReadback._SolverLODRange.GetData<uint2>(true);
@@ -875,8 +890,13 @@ namespace Unity.DemoTeam.Hair
 						Debug.LogFormat("range {0} = {1}", (HairSim.SolverLODRange)i, data[i]);
 					}
 				}
+
+				var rangeRender = data[(int)HairSim.SolverLODRange.Render];
+				var rangeRenderAdd = data[(int)HairSim.SolverLODRange.RenderAdd];
+
+				Debug.LogFormat("render range [{0}, {1})", rangeRender.x, rangeRender.y);
 			}
-			*/
+#endif
 
 			// add reentrant -> interpolated
 			BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolateAdd, solverData);
@@ -1189,7 +1209,35 @@ namespace Unity.DemoTeam.Hair
 					BindSolverData(cmd, s_solverCS, SolverKernels.KStagingHistory, solverData);
 					cmd.DispatchCompute(s_solverCS, SolverKernels.KStagingHistory, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.Staging));
 				}
+				else
+				{
+					BindSolverData(cmd, s_solverCS, SolverKernels.KStagingHistoryAdd, solverData);
+					cmd.DispatchCompute(s_solverCS, SolverKernels.KStagingHistoryAdd, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.StagingAdd));
+				}
 			}
+
+			// post-staging lod selection (topology)
+			//TODO push staging params earlier to fold this under earlier lod selection
+			BindSolverData(cmd, s_solverCS, SolverKernels.KLODSelectionPost, solverData);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KLODSelectionPost, 1, 1, 1);
+
+			// schedule readback
+#if DEBUG_LOD_SELECTION
+			solverData.buffersReadback._SolverLODTopology.ScheduleCopy(cmd, solverData.buffers._SolverLODTopology);
+			{
+				var data = solverData.buffersReadback._SolverLODTopology.GetData<uint>(true);
+				Debug.Log("---indirect draw args---");
+				for (int i = 0; i != 3; i++)
+				{
+					Debug.LogFormat((SolverLODTopology)i + ": args = {0}, {1}, {2}, {3}, {4}",
+						data[i * 5 + 0],
+						data[i * 5 + 1],
+						data[i * 5 + 2],
+						data[i * 5 + 3],
+						data[i * 5 + 4]);
+				}
+			}
+#endif
 		}
 
 		public static void PushVolumeGeometry(CommandBuffer cmd, ref VolumeData volumeData, SolverData[] solverData)
@@ -2329,14 +2377,19 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
-		static uint GetSolverLODDispatchOffset(SolverLODDispatch index)
+		public static uint GetSolverLODDispatchOffset(SolverLODDispatch index)
 		{
 			return (uint)index * 4 * sizeof(uint);
 		}
 
-		static uint GetVolumeLODDispatchOffset(VolumeLODDispatch index)
+		public static uint GetVolumeLODDispatchOffset(VolumeLODDispatch index)
 		{
 			return (uint)index * 4 * sizeof(uint);
+		}
+
+		public static uint GetSolverLODTopologyOffset(SolverLODTopology index)
+		{
+			return (uint)index * 5 + sizeof(uint);
 		}
 	}
 }
