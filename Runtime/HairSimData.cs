@@ -39,6 +39,7 @@ namespace Unity.DemoTeam.Hair
 				public T _SolverLODStage;				// x: lod index lo, y: lod index hi, z: lod blend fraction, w: lod value/quantity
 				public T _SolverLODRange;				// xy: dispatch strand range [begin, end)
 				public T _SolverLODDispatch;			// xyz: dispatch args compute, w: dispatch strand count || xyzw: dispatch args draw
+				public T _SolverLODTopology;			// x[5]: dispatch args draw indexed
 
 				public T _InitialParticleOffset;		// xyz: initial particle offset from strand root, w: initial local accumulated weight (gather)
 				public T _InitialParticleFrameDelta;	// quat(xyz,w): initial particle material frame delta
@@ -267,6 +268,7 @@ namespace Unity.DemoTeam.Hair
 			InterpolateAdd			= 2,
 			InterpolatePromote		= 3,
 			Render					= 4,
+			RenderAdd				= 5,
 			__COUNT
 		}
 
@@ -279,13 +281,22 @@ namespace Unity.DemoTeam.Hair
 			InterpolateAdd			= 3,	// thread group is 64 strands
 			InterpolatePromote		= 4,	// thread group is 64 strands
 			Staging					= 5,	// thread group is 64 strands
-			StagingReentrant		= 6,	// thread group is 64 strands
+			StagingAdd				= 6,	// thread group is 64 strands
 			Transfer				= 7,	// thread group is 64 particles
 			TransferAll				= 8,	// thread group is 64 particles
 			RasterPoints			= 9,	// -
 			RasterPointsAll			= 10,	// -
 			RasterQuads				= 11,	// -
 			RasterQuadsAll			= 12,	// -
+			__COUNT
+		}
+
+		[GenerateHLSL]
+		public enum SolverLODTopology
+		{
+			IndexedLines			= 0,	// -
+			IndexedStrips			= 1,	// -
+			IndexedTubes			= 2,	// -
 			__COUNT
 		}
 
