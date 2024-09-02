@@ -6,6 +6,9 @@ Shader "Hair/Hidden/HairMaterialReplaceAsync"
 	#pragma editor_sync_compilation
 
 	#pragma multi_compile_local_vertex HAIR_VERTEX_STATIC HAIR_VERTEX_LIVE
+	#pragma multi_compile_local_vertex PROCEDURAL_INSTANCING_ON
+
+	#pragma instancing_options assumeuniformscaling nomatrices nolodfade nolightprobe nolightmap norendererbounds procedural:HairVertexInstancingSetup
 
 	#include "HairMaterialCommonUnlit.hlsl"
 

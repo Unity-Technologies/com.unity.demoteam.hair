@@ -11,6 +11,7 @@
 #endif
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
 #ifndef UNITY_MATRIX_M
 #define UNITY_MATRIX_M unity_ObjectToWorld
@@ -37,6 +38,7 @@ struct UnlitAttribs
 	float3 staticPositionOS : POSITION;
 	float3 staticTangentOS : TANGENT;
 	float3 staticNormalOS : NORMAL;
+	UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct UnlitVaryings
@@ -51,6 +53,7 @@ struct UnlitVaryings
 
 UnlitVaryings UnlitVert(UnlitAttribs IN)
 {
+	UNITY_SETUP_INSTANCE_ID(IN);
 	HairVertexData v = GetHairVertex(IN.packedID, IN.staticPositionOS, IN.staticNormalOS, IN.staticTangentOS);
 	{
 		UnlitVaryings OUT;

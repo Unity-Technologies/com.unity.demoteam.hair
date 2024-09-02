@@ -30,12 +30,15 @@
 #define SOLVERLODTOPOLOGY_INDEXED_LINES (0)
 #define SOLVERLODTOPOLOGY_INDEXED_STRIPS (1)
 #define SOLVERLODTOPOLOGY_INDEXED_TUBES (2)
+#define SOLVERLODTOPOLOGY_INDEXED_INSTANCED_LINES (3)
+#define SOLVERLODTOPOLOGY_INDEXED_INSTANCED_STRIPS (4)
+#define SOLVERLODTOPOLOGY_INDEXED_INSTANCED_TUBES (5)
 #define SOLVERLODTOPOLOGY___COUNT (3)
 
 //
 // Unity.DemoTeam.Hair.HairSim+RenderFeatures:  static fields
 //
-#define RENDERFEATURES_TAPERING (1)
+#define RENDERFEATURES_INSTANCING (1)
 #define RENDERFEATURES_PER_VERTEX_TEX_COORD (2)
 #define RENDERFEATURES_PER_VERTEX_DIAMETER (4)
 
@@ -215,9 +218,9 @@ CBUFFER_START(SolverCBuffer)
     float _RenderLODScale;
     float _RenderLODBias;
     float _RenderLODClipThreshold;
+    uint _RenderFeatures;
     float _scbpad1;
     float _scbpad2;
-    float _scbpad3;
 CBUFFER_END
 
 // Generated from Unity.DemoTeam.Hair.HairSim+SolverCBufferRoots

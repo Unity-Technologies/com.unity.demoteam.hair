@@ -369,6 +369,11 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 1.0f)]
 			public float clipThreshold;
 
+			[LineHeader("Experimental")]
+
+			public bool allowIndirect;
+			public bool allowInstancing;
+
 			public static readonly SettingsRendering defaults = new SettingsRendering()
 			{
 				material = false,
