@@ -32,7 +32,42 @@ namespace Unity.DemoTeam.Hair
 		//---------------
 		// gpu resources
 
+		static GraphicsBuffer.Target TranslateComputeBufferType(ComputeBufferType type)
+		{
+			if (type == ComputeBufferType.Default)
+			{
+				return GraphicsBuffer.Target.Structured;
+			}
+			else
+			{
+				var mask = (GraphicsBuffer.Target)0;
+				{
+					if (type.HasFlag(ComputeBufferType.Raw))
+						mask |= GraphicsBuffer.Target.Raw;
+					if (type.HasFlag(ComputeBufferType.Append))
+						mask |= GraphicsBuffer.Target.Append;
+					if (type.HasFlag(ComputeBufferType.Counter))
+						mask |= GraphicsBuffer.Target.Counter;
+					if (type.HasFlag(ComputeBufferType.Constant))
+						mask |= GraphicsBuffer.Target.Constant;
+					if (type.HasFlag(ComputeBufferType.Structured))
+						mask |= GraphicsBuffer.Target.Structured;
+					if (type.HasFlag(ComputeBufferType.IndirectArguments))
+						mask |= GraphicsBuffer.Target.IndirectArguments;
+				}
+				return mask;
+			}
+		}
+
 		public static bool CreateBuffer<T>(ref ComputeBuffer buffer, string name, int count, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged
+		{
+			unsafe
+			{
+				return CreateBuffer(ref buffer, name, count, sizeof(T), type);
+			}
+		}
+
+		public static bool CreateBuffer<T>(ref GraphicsBuffer buffer, string name, int count, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged
 		{
 			unsafe
 			{
@@ -53,6 +88,21 @@ namespace Unity.DemoTeam.Hair
 			return true;
 		}
 
+		public static bool CreateBuffer(ref GraphicsBuffer buffer, string name, int count, int stride, ComputeBufferType type = ComputeBufferType.Default)
+		{
+			if (buffer != null && buffer.count == count && buffer.stride == stride && buffer.IsValid())
+				return false;
+
+			if (buffer != null)
+				buffer.Release();
+
+			buffer = new GraphicsBuffer(TranslateComputeBufferType(type), count > 0 ? count : 1, stride);
+#if UNITY_2021_2_OR_NEWER
+			buffer.name = name;
+#endif
+			return true;
+		}
+
 		public static void ReleaseBuffer(ref ComputeBuffer buffer)
 		{
 			if (buffer != null)
@@ -62,7 +112,26 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		public static void ReleaseBuffer(ref GraphicsBuffer buffer)
+		{
+			if (buffer != null)
+			{
+				buffer.Release();
+				buffer = null;
+			}
+		}
+
 		public static bool CreateReadbackBuffer(ref AsyncReadbackBuffer bufferReadback, in ComputeBuffer buffer)
+		{
+			var ret = CreateCPUBuffer(ref bufferReadback.buffer, buffer.count * buffer.stride, Allocator.Persistent);
+			if (ret)
+			{
+				//Debug.Log("created readback buffer w/ length " + (buffer.count * buffer.stride) + " for buffer " + buffer.ToString());
+			}
+			return ret;
+		}
+
+		public static bool CreateReadbackBuffer(ref AsyncReadbackBuffer bufferReadback, in GraphicsBuffer buffer)
 		{
 			var ret = CreateCPUBuffer(ref bufferReadback.buffer, buffer.count * buffer.stride, Allocator.Persistent);
 			if (ret)
@@ -165,6 +234,15 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
+		public static void PushComputeBufferData(CommandBuffer cmd, in GraphicsBuffer buffer, in Array bufferData)
+		{
+#if UNITY_2021_1_OR_NEWER
+			cmd.SetBufferData(buffer, bufferData);
+#else
+			cmd.SetComputeBufferData(buffer, bufferData);
+#endif
+		}
+
 		public static void PushComputeBufferData<T>(CommandBuffer cmd, in ComputeBuffer buffer, in NativeArray<T> bufferData) where T : struct
 		{
 #if UNITY_2021_1_OR_NEWER
@@ -174,7 +252,30 @@ namespace Unity.DemoTeam.Hair
 #endif
 		}
 
+		public static void PushComputeBufferData<T>(CommandBuffer cmd, in GraphicsBuffer buffer, in NativeArray<T> bufferData) where T : struct
+		{
+#if UNITY_2021_1_OR_NEWER
+			cmd.SetBufferData(buffer, bufferData);
+#else
+			cmd.SetComputeBufferData(buffer, bufferData);
+#endif
+		}
+
 		public static void PushConstantBufferData<T>(CommandBuffer cmd, in ComputeBuffer cbuffer, in T cbufferData) where T : struct
+		{
+			var cbufferStaging = new NativeArray<T>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+			{
+				cbufferStaging[0] = cbufferData;
+#if UNITY_2021_1_OR_NEWER
+				cmd.SetBufferData(cbuffer, cbufferStaging);
+#else
+				cmd.SetComputeBufferData(cbuffer, cbufferStaging);
+#endif
+				cbufferStaging.Dispose();
+			}
+		}
+
+		public static void PushConstantBufferData<T>(CommandBuffer cmd, in GraphicsBuffer cbuffer, in T cbufferData) where T : struct
 		{
 			var cbufferStaging = new NativeArray<T>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 			{
@@ -227,6 +328,22 @@ namespace Unity.DemoTeam.Hair
 					buffer.SetData(data);
 			}
 
+			public void SetData(GraphicsBuffer buffer, Array data)
+			{
+				if (asyncUpload)
+					PushComputeBufferData(cmd, buffer, data);
+				else
+					buffer.SetData(data);
+			}
+
+			public void SetData<T>(GraphicsBuffer buffer, in NativeArray<T> data) where T : struct
+			{
+				if (asyncUpload)
+					PushComputeBufferData(cmd, buffer, data);
+				else
+					buffer.SetData(data);
+			}
+
 			public void Dispose()
 			{
 				if (asyncWait)
@@ -240,7 +357,9 @@ namespace Unity.DemoTeam.Hair
 		public interface IBindTarget
 		{
 			void BindConstantBuffer(int nameID, ComputeBuffer cbuffer);
+			void BindConstantBuffer(int nameID, GraphicsBuffer cbuffer);
 			void BindComputeBuffer(int nameID, ComputeBuffer buffer);
+			void BindComputeBuffer(int nameID, GraphicsBuffer buffer);
 			void BindComputeTexture(int nameID, Texture texture);
 			void BindKeyword(string name, bool value);
 		}
@@ -257,7 +376,9 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cs.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
+			public void BindConstantBuffer(int nameID, GraphicsBuffer cbuffer) => cs.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cs.SetBuffer(kernel, nameID, buffer);
+			public void BindComputeBuffer(int nameID, GraphicsBuffer buffer) => cs.SetBuffer(kernel, nameID, buffer);
 			public void BindComputeTexture(int nameID, Texture texture) => cs.SetTexture(kernel, nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cs, name, value);
 		}
@@ -276,7 +397,9 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cmd.SetComputeConstantBufferParam(cs, nameID, cbuffer, 0, cbuffer.stride);
+			public void BindConstantBuffer(int nameID, GraphicsBuffer cbuffer) => cmd.SetComputeConstantBufferParam(cs, nameID, cbuffer, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cmd.SetComputeBufferParam(cs, kernel, nameID, buffer);
+			public void BindComputeBuffer(int nameID, GraphicsBuffer buffer) => cmd.SetComputeBufferParam(cs, kernel, nameID, buffer);
 			public void BindComputeTexture(int nameID, Texture texture) => cmd.SetComputeTextureParam(cs, kernel, nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
 		}
@@ -284,7 +407,9 @@ namespace Unity.DemoTeam.Hair
 		public struct BindTargetGlobal : IBindTarget
 		{
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => Shader.SetGlobalConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
+			public void BindConstantBuffer(int nameID, GraphicsBuffer cbuffer) => Shader.SetGlobalConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => Shader.SetGlobalBuffer(nameID, buffer);
+			public void BindComputeBuffer(int nameID, GraphicsBuffer buffer) => Shader.SetGlobalBuffer(nameID, buffer);
 			public void BindComputeTexture(int nameID, Texture texture) => Shader.SetGlobalTexture(nameID, texture);
 			public void BindKeyword(string name, bool value)
 			{
@@ -305,7 +430,9 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => cmd.SetGlobalConstantBuffer(cbuffer, nameID, 0, cbuffer.stride);
+			public void BindConstantBuffer(int nameID, GraphicsBuffer cbuffer) => cmd.SetGlobalConstantBuffer(cbuffer, nameID, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => cmd.SetGlobalBuffer(nameID, buffer);
+			public void BindComputeBuffer(int nameID, GraphicsBuffer buffer) => cmd.SetGlobalBuffer(nameID, buffer);
 			public void BindComputeTexture(int nameID, Texture texture) => cmd.SetGlobalTexture(nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(cmd, name, value);
 		}
@@ -320,7 +447,9 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public void BindConstantBuffer(int nameID, ComputeBuffer cbuffer) => mat.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
+			public void BindConstantBuffer(int nameID, GraphicsBuffer cbuffer) => mat.SetConstantBuffer(nameID, cbuffer, 0, cbuffer.stride);
 			public void BindComputeBuffer(int nameID, ComputeBuffer buffer) => mat.SetBuffer(nameID, buffer);
+			public void BindComputeBuffer(int nameID, GraphicsBuffer buffer) => mat.SetBuffer(nameID, buffer);
 			public void BindComputeTexture(int nameID, Texture texture) => mat.SetTexture(nameID, texture);
 			public void BindKeyword(string name, bool value) => CoreUtils.SetKeyword(mat, name, value);
 		}
@@ -346,6 +475,11 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			public void ScheduleCopy(CommandBuffer cmd, ComputeBuffer buffer)
+			{
+				cmd.RequestAsyncReadback(buffer, Callback);
+			}
+
+			public void ScheduleCopy(CommandBuffer cmd, GraphicsBuffer buffer)
 			{
 				cmd.RequestAsyncReadback(buffer, Callback);
 			}

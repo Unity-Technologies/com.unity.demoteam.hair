@@ -1089,7 +1089,17 @@ namespace Unity.DemoTeam.Hair
 						meshRendererHDRP.enabled = false;
 #endif
 
-#if UNITY_2021_2_OR_NEWER && false//TODO ComputeBuffer -> GraphicsBuffer
+#if !UNITY_2021_2_OR_NEWER
+					Graphics.DrawMeshInstancedIndirect(
+						mesh,
+						submeshIndex: 0,
+						materialInstance,
+						HairSim.GetSolverBounds(solverData, volumeData),
+						solverData.buffers._SolverLODTopology,
+						argsOffset: (int)HairSim.GetSolverLODTopologyOffset((HairSim.SolverLODTopology)topologyIndex),
+						properties: null,
+						meshRenderer.shadowCastingMode);
+#else
 					var rparams = new RenderParams(materialInstance);
 					{
 						/* defaults since 2023.2:
@@ -1124,16 +1134,6 @@ namespace Unity.DemoTeam.Hair
 					}
 
 					Graphics.RenderMeshIndirect(rparams, mesh, solverData.buffers._SolverLODTopology, 1, topologyIndex);
-#else
-					Graphics.DrawMeshInstancedIndirect(
-						mesh,
-						submeshIndex: 0,
-						materialInstance,
-						HairSim.GetSolverBounds(solverData, volumeData),
-						solverData.buffers._SolverLODTopology,
-						argsOffset: (int)HairSim.GetSolverLODTopologyOffset((HairSim.SolverLODTopology)topologyIndex),
-						properties: null,
-						meshRenderer.shadowCastingMode);
 #endif
 				}
 			}
@@ -1157,7 +1157,7 @@ namespace Unity.DemoTeam.Hair
 			// separate shadows (optional depending on configuration)
 			if (needRendererShadows)
 			{
-#if !UNITY_2021_2_OR_NEWER || true
+#if !UNITY_2021_2_OR_NEWER
 				if (allowIndirectShadows)
 				{
 					Graphics.DrawMeshInstancedIndirect(
@@ -1175,36 +1175,36 @@ namespace Unity.DemoTeam.Hair
 					Graphics.DrawMesh(meshShadows, Matrix4x4.identity, materialInstanceShadows, 0, null, 0, null, ShadowCastingMode.ShadowsOnly);
 				}
 #else
+				var rparams = new RenderParams(materialInstanceShadows);
+				{
+					/* defaults since 2023.2:
+
+					rparams.layer = 0;
+					rparams.renderingLayerMask = GraphicsSettings.defaultRenderingLayerMask;
+					rparams.rendererPriority = 0;
+					rparams.worldBounds = new Bounds(Vector3.zero, Vector3.zero);
+					rparams.camera = null;
+					rparams.motionVectorMode = MotionVectorGenerationMode.Camera;
+					rparams.reflectionProbeUsage = ReflectionProbeUsage.Off;
+					rparams.material = mat;
+					rparams.matProps = null;
+					rparams.shadowCastingMode = ShadowCastingMode.Off;
+					rparams.receiveShadows = false;
+					rparams.lightProbeUsage = LightProbeUsage.Off;
+					rparams.lightProbeProxyVolume = null;
+					rparams.overrideSceneCullingMask = false;
+					rparams.sceneCullingMask = 0uL;
+					rparams.instanceID = 0;
+
+					*/
+
+					rparams.renderingLayerMask = (uint)layerMaskShadows;
+					rparams.worldBounds = HairSim.GetSolverBounds(solverData, volumeData);
+					rparams.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+				}
+
 				if (allowIndirectShadows)
 				{
-					var rparams = new RenderParams(materialInstanceShadows);
-					{
-						/* defaults since 2023.2:
-
-						rparams.layer = 0;
-						rparams.renderingLayerMask = GraphicsSettings.defaultRenderingLayerMask;
-						rparams.rendererPriority = 0;
-						rparams.worldBounds = new Bounds(Vector3.zero, Vector3.zero);
-						rparams.camera = null;
-						rparams.motionVectorMode = MotionVectorGenerationMode.Camera;
-						rparams.reflectionProbeUsage = ReflectionProbeUsage.Off;
-						rparams.material = mat;
-						rparams.matProps = null;
-						rparams.shadowCastingMode = ShadowCastingMode.Off;
-						rparams.receiveShadows = false;
-						rparams.lightProbeUsage = LightProbeUsage.Off;
-						rparams.lightProbeProxyVolume = null;
-						rparams.overrideSceneCullingMask = false;
-						rparams.sceneCullingMask = 0uL;
-						rparams.instanceID = 0;
-
-						*/
-
-						rparams.renderingLayerMask = (uint)layerMaskShadows;
-						rparams.worldBounds = HairSim.GetSolverBounds(solverData, volumeData);
-						rparams.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
-					}
-
 					Graphics.RenderMeshIndirect(rparams, meshShadows, solverData.buffers._SolverLODTopology, 1, topologyIndexShadows);
 				}
 				else
