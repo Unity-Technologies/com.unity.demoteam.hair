@@ -371,8 +371,8 @@ namespace Unity.DemoTeam.Hair
 
 			//[LineHeader("Experimental")]
 
-			public const bool allowIndirect = true;
-			public const bool allowInstancing = true;
+			public bool allowIndirect => true;
+			public bool allowInstancing => true;
 
 			public static readonly SettingsRendering defaults = new SettingsRendering()
 			{
