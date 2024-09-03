@@ -369,10 +369,10 @@ namespace Unity.DemoTeam.Hair
 			[Range(0.0f, 1.0f)]
 			public float clipThreshold;
 
-			[LineHeader("Experimental")]
+			//[LineHeader("Experimental")]
 
-			public bool allowIndirect;
-			public bool allowInstancing;
+			public const bool allowIndirect = true;
+			public const bool allowInstancing = true;
 
 			public static readonly SettingsRendering defaults = new SettingsRendering()
 			{
@@ -397,9 +397,6 @@ namespace Unity.DemoTeam.Hair
 				kLODScale = 1.0f,
 				kLODBias = 0.0f,
 				clipThreshold = 0.05f,
-
-				allowIndirect = true,
-				allowInstancing = true,
 			};
 		}
 
