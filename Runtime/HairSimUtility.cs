@@ -239,7 +239,7 @@ namespace Unity.DemoTeam.Hair
 #if UNITY_2021_1_OR_NEWER
 			cmd.SetBufferData(buffer, bufferData);
 #else
-			cmd.SetComputeBufferData(buffer, bufferData);
+			Debug.LogError("PushComputeBufferData(cmd, GraphicsBuffer) requres 2021.1+");
 #endif
 		}
 
@@ -257,7 +257,7 @@ namespace Unity.DemoTeam.Hair
 #if UNITY_2021_1_OR_NEWER
 			cmd.SetBufferData(buffer, bufferData);
 #else
-			cmd.SetComputeBufferData(buffer, bufferData);
+			Debug.LogError("PushComputeBufferData(cmd, GraphicsBuffer) requres 2021.1+");
 #endif
 		}
 
@@ -283,7 +283,7 @@ namespace Unity.DemoTeam.Hair
 #if UNITY_2021_1_OR_NEWER
 				cmd.SetBufferData(cbuffer, cbufferStaging);
 #else
-				cmd.SetComputeBufferData(cbuffer, cbufferStaging);
+				Debug.LogError("PushComputeBufferData(cmd, GraphicsBuffer) requres 2021.1+");
 #endif
 				cbufferStaging.Dispose();
 			}
@@ -320,7 +320,7 @@ namespace Unity.DemoTeam.Hair
 					buffer.SetData(data);
 			}
 
-			public void SetData<T>(ComputeBuffer buffer, in NativeArray<T> data) where T : struct
+			public void SetData(GraphicsBuffer buffer, Array data)
 			{
 				if (asyncUpload)
 					PushComputeBufferData(cmd, buffer, data);
@@ -328,7 +328,7 @@ namespace Unity.DemoTeam.Hair
 					buffer.SetData(data);
 			}
 
-			public void SetData(GraphicsBuffer buffer, Array data)
+			public void SetData<T>(ComputeBuffer buffer, in NativeArray<T> data) where T : struct
 			{
 				if (asyncUpload)
 					PushComputeBufferData(cmd, buffer, data);

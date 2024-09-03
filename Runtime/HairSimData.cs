@@ -80,7 +80,11 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// data accessible by GPU
+#if UNITY_2021_1_OR_NEWER
 			public SolverBuffers<GraphicsBuffer> buffers;
+#else
+			public SolverBuffers<ComputeBuffer> buffers;
+#endif
 			public SolverTextures<Texture> textures;
 
 			// data accessible by GPU + CPU
