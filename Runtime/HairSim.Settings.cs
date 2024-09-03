@@ -397,6 +397,9 @@ namespace Unity.DemoTeam.Hair
 				kLODScale = 1.0f,
 				kLODBias = 0.0f,
 				clipThreshold = 0.05f,
+
+				allowIndirect = true,
+				allowInstancing = true,
 			};
 		}
 
