@@ -763,6 +763,7 @@ void KLODSelectionInit(
 	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE_ADD]		= rangeInterpolate;
 	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE_PROMOTE]	= rangeInterpolate;
 	_SolverLODRange[SOLVERLODRANGE_RENDER]				= rangeRender;
+	_SolverLODRange[SOLVERLODRANGE_RENDER_ADD]			= rangeRender;
 }
 
 [numthreads(1, 1, 1)]
@@ -887,6 +888,7 @@ void KLODSelection(
 	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE_ADD]		= rangeInterpolateAdd;
 	_SolverLODRange[SOLVERLODRANGE_INTERPOLATE_PROMOTE]	= rangeInterpolatePromote;
 	_SolverLODRange[SOLVERLODRANGE_RENDER]				= rangeRender;
+	_SolverLODRange[SOLVERLODRANGE_RENDER_ADD]			= rangeRenderAdd;
 
 	// update dispatch
 	uint countSolve					= CheckedCount(rangeSolve);
@@ -911,38 +913,38 @@ void KLODSelection(
 	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_QUADS_ALL,		ResolveDrawParallelParticles(countSolve + countInterpolate, 8));
 }
 
-uint ResolveIndexCountLines(uint strandCount)
+uint2 ResolveDrawIndexedLine()
 {
 	uint perLineSegments = _StagingStrandVertexCount - 1;
 	uint perLineIndices = perLineSegments * 2;
-	return strandCount * perLineIndices;
+	return uint2(perLineIndices, 1);
 }
 
-uint ResolveIndexCountStrips(uint strandCount)
+uint2 ResolveDrawIndexedStrip()
 {
 	uint perStripSegments = _StagingStrandVertexCount - 1;
 	uint perStripTriangles = perStripSegments * 2;
 	uint perStripIndices = perStripTriangles * 3;
-	return strandCount * perStripIndices;
+	return uint2(perStripIndices, 1);
 }
 
-uint ResolveIndexCountTubes(uint strandCount)
+uint2 ResolveDrawIndexedTube()
 {
 	const uint numSides = 4;
 
 	uint perTubeSegments = _StagingStrandVertexCount - 1;
 	uint perTubeTriangles = (perTubeSegments * numSides * 2) + 4;
 	uint perTubeIndices = perTubeTriangles * 3;
-	return strandCount * perTubeIndices;
+	return uint2(perTubeIndices, 1);
 }
 
-void WriteIndirectTopology(uint index, uint indexCount)
+void WriteIndirectTopology(uint index, uint2 args)
 {
-	_SolverLODTopology[index * 5 + 0] = indexCount;	// == indexCountPerInstance
-	_SolverLODTopology[index * 5 + 1] = 1;			// == instanceCount
-	_SolverLODTopology[index * 5 + 2] = 0;			// == startIndex
-	_SolverLODTopology[index * 5 + 3] = 0;			// == baseVertexIndex
-	_SolverLODTopology[index * 5 + 4] = 0;			// == startInstance
+	_SolverLODTopology[index * 5 + 0] = args.x;	// == indexCountPerInstance
+	_SolverLODTopology[index * 5 + 1] = args.y;	// == instanceCount
+	_SolverLODTopology[index * 5 + 2] = 0;		// == startIndex
+	_SolverLODTopology[index * 5 + 3] = 0;		// == baseVertexIndex
+	_SolverLODTopology[index * 5 + 4] = 0;		// == startInstance
 }
 
 [numthreads(1, 1, 1)]
@@ -958,9 +960,12 @@ void KLODSelectionPost(
 {
 	uint countRender = _SolverLODRange[SOLVERLODRANGE_RENDER].y;
 
-	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_LINES,	ResolveIndexCountLines(countRender));
-	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_STRIPS,	ResolveIndexCountStrips(countRender));
-	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_TUBES,	ResolveIndexCountTubes(countRender));
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_LINES,				uint2(countRender, 1) * ResolveDrawIndexedLine());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_STRIPS,				uint2(countRender, 1) * ResolveDrawIndexedStrip());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_TUBES,				uint2(countRender, 1) * ResolveDrawIndexedTube());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_LINES,	uint2(1, countRender) * ResolveDrawIndexedLine());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_STRIPS,	uint2(1, countRender) * ResolveDrawIndexedStrip());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_TUBES,	uint2(1, countRender) * ResolveDrawIndexedTube());
 }
 
 #endif//F_LOD

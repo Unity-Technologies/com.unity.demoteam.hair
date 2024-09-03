@@ -767,7 +767,33 @@ namespace Unity.DemoTeam.Hair
 			}
 		}
 
+		static void CreateBufferWithData<T>(ref GraphicsBuffer buffer, T[] data, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged
+		{
+			unsafe
+			{
+				var elementCount = data.Length;
+				var elementStride = UnsafeUtility.SizeOf<T>();
+
+				HairSimUtility.CreateBuffer(ref buffer, string.Empty, elementCount, elementStride, type);
+
+				buffer.SetData(data);
+			}
+		}
+
 		static void CreateBufferWithNativeData<T>(ref ComputeBuffer buffer, NativeArray<T> data, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged
+		{
+			unsafe
+			{
+				var elementCount = data.Length;
+				var elementStride = sizeof(T);
+
+				HairSimUtility.CreateBuffer(ref buffer, string.Empty, elementCount, elementStride, type);
+
+				buffer.SetData(data);
+			}
+		}
+
+		static void CreateBufferWithNativeData<T>(ref GraphicsBuffer buffer, NativeArray<T> data, ComputeBufferType type = ComputeBufferType.Default) where T : unmanaged
 		{
 			unsafe
 			{

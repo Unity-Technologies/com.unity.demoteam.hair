@@ -26,6 +26,7 @@
 #endif
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Packages/com.unity.shadergraph/ShaderGraphLibrary/ShaderVariables.hlsl"
 #ifndef UNITY_MATRIX_M
 #define UNITY_MATRIX_M unity_ObjectToWorld
@@ -58,6 +59,7 @@ struct appdata_hair
 #endif
 	float3 normal : NORMAL;
 	float4 tangent : TANGENT;
+	UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct Input
@@ -71,6 +73,7 @@ struct Input
 
 void BuiltinVert(inout appdata_hair a, out Input o)
 {
+	UNITY_SETUP_INSTANCE_ID(a);
 #if !SHADER_TARGET_SURFACE_ANALYSIS
 	HairVertexData v = GetHairVertex(a.packedID, a.vertex.xyz, a.normal.xyz, (a.tangent.xyz * a.tangent.w));
 	{

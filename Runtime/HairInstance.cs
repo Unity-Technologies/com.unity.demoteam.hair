@@ -1050,15 +1050,15 @@ namespace Unity.DemoTeam.Hair
 
 			#region GetTopologyMesh(..)
 #if !UNITY_2021_2_OR_NEWER
-			static Mesh GetTopologyMesh(in HairSim.SolverData solverData, HairTopologyType meshType, ref Mesh meshInstance, ref ulong meshInstanceKey)
+			static Mesh GetTopologyMesh(in HairSim.SolverData solverData, HairTopologyType meshType, bool gpuInstancing, ref Mesh meshInstance, ref ulong meshInstanceKey)
 #else
-			static Mesh GetTopologyMesh(in HairSim.SolverData solverData, HairTopologyType meshType)
+			static Mesh GetTopologyMesh(in HairSim.SolverData solverData, HairTopologyType meshType, bool gpuInstancing)
 #endif
 			{
 				var meshDesc = new HairTopologyDesc
 				{
 					type = meshType,
-					strandCount = (int)solverData.constants._StrandCount,
+					strandCount = gpuInstancing ? 1 : (int)solverData.constants._StrandCount,
 					strandParticleCount = (int)solverData.constants._StagingStrandVertexCount,
 					memoryLayout = solverData.memoryLayout,
 				};
@@ -1082,7 +1082,7 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			#region GetTopologyMaterial(..)
-			static Material GetTopologyMaterial(in HairSim.SolverData solverData, in HairSim.VolumeData volumeData, Mesh mesh, HairTopologyType meshType, Material materialAsset, ref Material materialInstance)
+			static Material GetTopologyMaterial(in HairSim.SolverData solverData, in HairSim.VolumeData volumeData, Mesh mesh, HairTopologyType meshType, bool gpuInstancing, Material materialAsset, ref Material materialInstance)
 			{
 				if (materialAsset != null && materialAsset.shader != null)
 				{
@@ -1157,6 +1157,15 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
+			// prepare instancing
+			var allowIndirect = settingsRendering.allowIndirect && (settingsRendering.renderer != HairSim.SettingsRendering.Renderer.HDRPHighQualityLines);
+			var allowIndirectShadows = settingsRendering.allowIndirect;
+			var allowInstancing = settingsRendering.allowInstancing && allowIndirect;
+			var allowInstancingShadows = settingsRendering.allowInstancing && allowIndirectShadows;
+
+			var topologyIndex = (int)meshType + (allowInstancing ? 3 : 0);
+			var topologyIndexShadows = (int)meshTypeShadows + (allowInstancingShadows ? 3 : 0);
+
 			// prepare resources
 			var mesh = null as Mesh;
 			var meshShadows = null as Mesh;
@@ -1168,25 +1177,25 @@ namespace Unity.DemoTeam.Hair
 				if (needResources)
 				{
 #if !UNITY_2021_2_OR_NEWER
-					mesh = GetTopologyMesh(solverData, meshType,
+					mesh = GetTopologyMesh(solverData, meshType, allowInstancing,
 						ref strandGroupInstance.sceneObjects.meshInstance,
 						ref strandGroupInstance.sceneObjects.meshInstanceKey);
 #else
-					mesh = GetTopologyMesh(solverData, meshType);
+					mesh = GetTopologyMesh(solverData, meshType, allowInstancing);
 #endif
-					materialInstance = GetTopologyMaterial(solverData, volumeData, mesh, meshType, materialAsset, ref strandGroupInstance.sceneObjects.materialInstance);
+					materialInstance = GetTopologyMaterial(solverData, volumeData, mesh, meshType, allowInstancing, materialAsset, ref strandGroupInstance.sceneObjects.materialInstance);
 				}
 
 				if (needResourcesShadows)
 				{
 #if !UNITY_2021_2_OR_NEWER
-					meshShadows = GetTopologyMesh(solverData, meshTypeShadows,
+					meshShadows = GetTopologyMesh(solverData, meshTypeShadows, allowInstancingShadows,
 						ref strandGroupInstance.sceneObjects.meshInstanceShadows,
 						ref strandGroupInstance.sceneObjects.meshInstanceKeyShadows);
 #else
-					meshShadows = GetTopologyMesh(solverData, meshTypeShadows);
+					meshShadows = GetTopologyMesh(solverData, meshTypeShadows, allowInstancingShadows);
 #endif
-					materialInstanceShadows = GetTopologyMaterial(solverData, volumeData, meshShadows, meshTypeShadows, materialAsset, ref strandGroupInstance.sceneObjects.materialInstanceShadows);
+					materialInstanceShadows = GetTopologyMaterial(solverData, volumeData, meshShadows, meshTypeShadows, allowInstancingShadows, materialAsset, ref strandGroupInstance.sceneObjects.materialInstanceShadows);
 				}
 				else
 				{
@@ -1226,11 +1235,68 @@ namespace Unity.DemoTeam.Hair
 						}
 					}
 
-					meshRendererHDRP.enabled = needRenderer;
+					meshRendererHDRP.enabled = needRenderer && (settingsRendering.rendererShadows != ShadowCastingMode.ShadowsOnly);
 					meshRendererHDRP.rendererGroup = settingsRendering.rendererGroup;
 					meshRendererHDRP.enableHighQualityLineRendering = (settingsRendering.renderer == HairSim.SettingsRendering.Renderer.HDRPHighQualityLines);
 				}
 #endif
+
+				if (allowIndirect)
+				{
+					meshRenderer.enabled = false;
+
+#if HAS_PACKAGE_UNITY_HDRP_15_0_2
+					if (meshRendererHDRP != null)
+						meshRendererHDRP.enabled = false;
+#endif
+
+#if !UNITY_2021_2_OR_NEWER
+					Graphics.DrawMeshInstancedIndirect(
+						mesh,
+						submeshIndex: 0,
+						materialInstance,
+						HairSim.GetSolverBounds(solverData, volumeData),
+						solverData.buffers._SolverLODTopology,
+						argsOffset: (int)HairSim.GetSolverLODTopologyOffset((HairSim.SolverLODTopology)topologyIndex),
+						properties: null,
+						meshRenderer.shadowCastingMode);
+#else
+					var rparams = new RenderParams(materialInstance);
+					{
+						/* defaults since 2023.2:
+
+						rparams.layer = 0;
+						rparams.renderingLayerMask = GraphicsSettings.defaultRenderingLayerMask;
+						rparams.rendererPriority = 0;
+						rparams.worldBounds = new Bounds(Vector3.zero, Vector3.zero);
+						rparams.camera = null;
+						rparams.motionVectorMode = MotionVectorGenerationMode.Camera;
+						rparams.reflectionProbeUsage = ReflectionProbeUsage.Off;
+						rparams.material = mat;
+						rparams.matProps = null;
+						rparams.shadowCastingMode = ShadowCastingMode.Off;
+						rparams.receiveShadows = false;
+						rparams.lightProbeUsage = LightProbeUsage.Off;
+						rparams.lightProbeProxyVolume = null;
+						rparams.overrideSceneCullingMask = false;
+						rparams.sceneCullingMask = 0uL;
+						rparams.instanceID = 0;
+
+						*/
+
+						rparams.renderingLayerMask = (uint)meshRenderer.renderingLayerMask;
+						rparams.worldBounds = HairSim.GetSolverBounds(solverData, volumeData);
+						rparams.motionVectorMode = meshRenderer.motionVectorGenerationMode;
+						rparams.shadowCastingMode = meshRenderer.shadowCastingMode;
+						rparams.receiveShadows = true;
+#if UNITY_2023_2_OR_NEWER
+						rparams.instanceID = this.GetInstanceID();
+#endif
+					}
+
+					Graphics.RenderMeshIndirect(rparams, mesh, solverData.buffers._SolverLODTopology, 1, topologyIndex);
+#endif
+				}
 			}
 
 			// update mesh bounds
@@ -1240,6 +1306,7 @@ namespace Unity.DemoTeam.Hair
 				if (mesh != null)
 					mesh.bounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
 #else
+
 				// starting with 2021.2 we can override renderer bounds directly
 				meshRenderer.localBounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
 
@@ -1252,32 +1319,59 @@ namespace Unity.DemoTeam.Hair
 			if (needRendererShadows)
 			{
 #if !UNITY_2021_2_OR_NEWER
-				Graphics.DrawMesh(meshShadows, Matrix4x4.identity, materialInstanceShadows, 0, null, 0, null, ShadowCastingMode.ShadowsOnly);
-#else
-				var rp = new RenderParams(materialInstanceShadows);
+				if (allowIndirectShadows)
 				{
-					//layer = 0;
-					//renderingLayerMask = GraphicsSettings.defaultRenderingLayerMask;
-					//rendererPriority = 0;
-					//worldBounds = new Bounds(Vector3.zero, Vector3.zero);
-					//camera = null;
-					//motionVectorMode = MotionVectorGenerationMode.Camera;
-					//reflectionProbeUsage = ReflectionProbeUsage.Off;
-					//material = mat;
-					//matProps = null;
-					//shadowCastingMode = ShadowCastingMode.Off;
-					//receiveShadows = false;
-					//lightProbeUsage = LightProbeUsage.Off;
-					//lightProbeProxyVolume = null;
-					//overrideSceneCullingMask = false;
-					//sceneCullingMask = 0uL;
-					//instanceID = 0;
-					rp.renderingLayerMask = (uint)layerMaskShadows;
-					rp.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
-					rp.worldBounds = HairSim.GetSolverBounds(solverData, volumeData);
+					Graphics.DrawMeshInstancedIndirect(
+						meshShadows,
+						submeshIndex: 0,
+						materialInstanceShadows,
+						HairSim.GetSolverBounds(solverData, volumeData),
+						solverData.buffers._SolverLODTopology,
+						argsOffset: (int)HairSim.GetSolverLODTopologyOffset((HairSim.SolverLODTopology)topologyIndexShadows),
+						properties: null,
+						ShadowCastingMode.ShadowsOnly);
+				}
+				else
+				{
+					Graphics.DrawMesh(meshShadows, Matrix4x4.identity, materialInstanceShadows, 0, null, 0, null, ShadowCastingMode.ShadowsOnly);
+				}
+#else
+				var rparams = new RenderParams(materialInstanceShadows);
+				{
+					/* defaults since 2023.2:
+
+					rparams.layer = 0;
+					rparams.renderingLayerMask = GraphicsSettings.defaultRenderingLayerMask;
+					rparams.rendererPriority = 0;
+					rparams.worldBounds = new Bounds(Vector3.zero, Vector3.zero);
+					rparams.camera = null;
+					rparams.motionVectorMode = MotionVectorGenerationMode.Camera;
+					rparams.reflectionProbeUsage = ReflectionProbeUsage.Off;
+					rparams.material = mat;
+					rparams.matProps = null;
+					rparams.shadowCastingMode = ShadowCastingMode.Off;
+					rparams.receiveShadows = false;
+					rparams.lightProbeUsage = LightProbeUsage.Off;
+					rparams.lightProbeProxyVolume = null;
+					rparams.overrideSceneCullingMask = false;
+					rparams.sceneCullingMask = 0uL;
+					rparams.instanceID = 0;
+
+					*/
+
+					rparams.renderingLayerMask = (uint)layerMaskShadows;
+					rparams.worldBounds = HairSim.GetSolverBounds(solverData, volumeData);
+					rparams.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
 				}
 
-				Graphics.RenderMesh(rp, meshShadows, 0, Matrix4x4.identity);
+				if (allowIndirectShadows)
+				{
+					Graphics.RenderMeshIndirect(rparams, meshShadows, solverData.buffers._SolverLODTopology, 1, topologyIndexShadows);
+				}
+				else
+				{
+					Graphics.RenderMesh(rparams, meshShadows, 0, Matrix4x4.identity);
+				}
 #endif
 			}
 		}

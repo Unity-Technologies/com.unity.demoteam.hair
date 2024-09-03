@@ -80,7 +80,11 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// data accessible by GPU
+#if UNITY_2021_1_OR_NEWER
+			public SolverBuffers<GraphicsBuffer> buffers;
+#else
 			public SolverBuffers<ComputeBuffer> buffers;
+#endif
 			public SolverTextures<Texture> textures;
 
 			// data accessible by GPU + CPU
@@ -211,7 +215,7 @@ namespace Unity.DemoTeam.Hair
 			#endregion
 
 			// 43
-			#region Strand Staging (10 floats, 40 bytes)
+			#region Strand Staging (11 floats, 44 bytes)
 			public uint _StagingSubdivision;			// staging subdivision count
 			public uint _StagingVertexFormat;			// staging buffer vertex format
 			public uint _StagingVertexStride;			// staging buffer vertex stride
@@ -224,15 +228,17 @@ namespace Unity.DemoTeam.Hair
 			public float _RenderLODCeiling;				// render lod ceiling
 			public float _RenderLODScale;				// render lod scale
 			public float _RenderLODBias;				// render lod bias
-			public float _RenderLODClipThreshold;       // reclip threshold (min pixel coverage)
+			public float _RenderLODClipThreshold;		// reclip threshold (min pixel coverage)
 
-			// +10
+			public uint _RenderFeatures;				// render feature falgs
+
+			// +11
 			#endregion
 
-			// 53 --> 56 (pad to 16 byte boundary)
+			// 54 --> 56 (pad to 16 byte boundary)
 			public float _scbpad1;
 			public float _scbpad2;
-			public float _scbpad3;
+			//public float _scbpad3;
 		}
 
 		[GenerateHLSL, Flags]
@@ -297,6 +303,9 @@ namespace Unity.DemoTeam.Hair
 			IndexedLines			= 0,	// -
 			IndexedStrips			= 1,	// -
 			IndexedTubes			= 2,	// -
+			IndexedInstancedLines	= 3,	// -
+			IndexedInstancedStrips	= 4,	// -
+			IndexedInstancedTubes	= 5,	// -
 			__COUNT
 		}
 
@@ -311,7 +320,7 @@ namespace Unity.DemoTeam.Hair
 		[GenerateHLSL, Flags]
 		public enum RenderFeatures
 		{
-			Tapering			= 1 << 0,
+			Instancing			= 1 << 0,
 			PerVertexTexCoord	= 1 << 1,
 			PerVertexDiameter	= 1 << 2,
 		}

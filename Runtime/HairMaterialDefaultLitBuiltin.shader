@@ -4,7 +4,10 @@ Shader "Hair/Default/HairMaterialDefaultLitBuiltin"
 
 	#pragma target 5.0
 
+	#pragma multi_compile_local_vertex PROCEDURAL_INSTANCING_ON
 	#pragma multi_compile_local_vertex HAIR_VERTEX_STATIC HAIR_VERTEX_LIVE
+
+	#pragma instancing_options assumeuniformscaling nomatrices nolodfade nolightprobe nolightmap norendererbounds procedural:HairVertexInstancingSetup
 
 	#include "HairMaterialCommonBuiltin.hlsl"
 

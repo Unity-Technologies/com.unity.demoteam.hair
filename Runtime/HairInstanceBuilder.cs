@@ -320,10 +320,10 @@ namespace Unity.DemoTeam.Hair
 
 						case VertexAttributeFormat.UNorm16:
 							//	 48-n bit strand index (i)
-							//	   16 bit vertex index (k)
-							//	0..16 bit vertex facet (j)
+							//	0..16 bit vertex facet (k)
+							//	   16 bit vertex index (j)
 							//
-							//	[ iiii iiii iiii iiii | iiii iiii iiii iiii | iiii iiii ffff ffff | jjjj jjjj jjjj jjjj ]
+							//	[ iiii iiii iiii iiii | iiii iiii iiii iiii | iiii iiii kkkk kkkk | jjjj jjjj jjjj jjjj ]
 							//	  ---------w---------   ---------z---------   ---------y---------   ---------x---------
 							{
 								var lshStrandIndex = 16 + reqBitsVertexFacet;

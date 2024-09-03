@@ -1188,6 +1188,15 @@ namespace Unity.DemoTeam.Hair
 				stagingBufferHistoryReset |= CreateBuffer(ref solverBuffers._StagingVertexPrev, "StagingVertex_1", stagingBufferVertexCount, stagingVertexStride, ComputeBufferType.Raw);
 			}
 
+			// derive features
+			RenderFeatures features = 0;
+			{
+				features |= (settingsRendering.allowIndirect && settingsRendering.allowInstancing) ? RenderFeatures.Instancing : 0;
+				//features |= RenderFeatures.PerVertexTexCoord;
+				//features |= RenderFeatures.PerVertexDiameter;
+			}
+			solverConstants._RenderFeatures = (uint)features;
+
 			// update cbuffer
 			PushConstantBufferData(cmd, solverData.buffers.SolverCBuffer, solverConstants);
 
@@ -2389,7 +2398,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static uint GetSolverLODTopologyOffset(SolverLODTopology index)
 		{
-			return (uint)index * 5 + sizeof(uint);
+			return (uint)index * 5 * sizeof(uint);
 		}
 	}
 }

@@ -35,6 +35,34 @@
 	const uint strandParticleStride = _StrandParticleStride;				\
 	const uint strandParticleEnd = strandParticleBegin + strandParticleStride * STRAND_PARTICLE_COUNT;
 
+//------------
+// instancing
+
+//#pragma instancing_options assumeuniformscaling nomatrices nolodfade nolightprobe nolightmap norendererbounds procedural:HairVertexInstancingSetup
+
+#ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
+void HairVertexInstancingMatrices(float4x4 objectToWorld, float4x4 worldToObject)
+{
+	//TODO add meaningful pivot here
+
+	//const float4x4 I = float4x4(
+	//	1.0, 0.0, 0.0, 0.0,
+	//	0.0, 1.0, 0.0, 0.0,
+	//	0.0, 0.0, 1.0, 0.0,
+	//	0.0, 0.0, 0.0, 1.0);
+
+	//objectToWorld = I;
+	//worldToObject = I;
+}
+
+void HairVertexInstancingSetup()
+{
+	#define unity_ObjectToWorld unity_ObjectToWorld
+	#define unity_WorldToObject unity_WorldToObject
+	//HairVertexInstancingMatrices(unity_ObjectToWorld, unity_WorldToObject);
+}
+#endif
+
 //---------
 // utility
 
@@ -166,15 +194,24 @@ HairVertexID DecodeHairVertexID(float4 packedID)
 	{
 		uint4 unpack = round(packedID * _DecodeVertexComponentValue);
 
-		id.strandIndex = (
-			(unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
-			(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
-			(unpack.y >> _DecodeVertexWidth)
-		);
-		
+#ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
+		if ((_RenderFeatures & RENDERFEATURES_INSTANCING) != 0)
+		{
+			id.strandIndex = unity_InstanceID;
+		}
+		else
+#endif
+		{
+			id.strandIndex = (
+				(unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
+				(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
+				(unpack.y >> _DecodeVertexWidth)
+			);
+		}
+
 		id.vertexIndex = unpack.x;
 		id.vertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);
-		
+
 		//TODO evaluate this in comparison
 		//	id.strandIndex = floor(dot(packedID.yzw, _DecodeStrandIndex.xyz))
 		//	id.vertexFacet = frac(packedID.y * _DecodeStrandFacet.x) * _DecodeStrandFacet.y
@@ -350,7 +387,7 @@ HairVertexData GetHairVertexWS(const HairVertexID id, const HairVertexModifiers 
 		{
 			radius *= GetStrandParticleTaperScale(id.vertexIndex, _RootScale[strandIndex].zw);
 		}
-		
+
 		// apply scaling
 		{
 			radius = m.widthMod * (m.widthSet ? 0.5 : radius);
