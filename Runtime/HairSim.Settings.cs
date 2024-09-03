@@ -229,7 +229,7 @@ namespace Unity.DemoTeam.Hair
 			public float kLODSelectionValue;
 			[Range(0.0f, 1.0f)]
 			public float kLODCeiling;
-			[Range(0.0f, 2.0f)]
+			[Range(0.0f, 4.0f)]
 			public float kLODScale;
 			[Range(-1.0f, 1.0f)]
 			public float kLODBias;
@@ -362,7 +362,7 @@ namespace Unity.DemoTeam.Hair
 			public float kLODSelectionValue;
 			[Range(0.0f, 1.0f)]
 			public float kLODCeiling;
-			[Range(0.0f, 2.0f)]
+			[Range(0.0f, 4.0f)]
 			public float kLODScale;
 			[Range(-1.0f, 1.0f)]
 			public float kLODBias;
