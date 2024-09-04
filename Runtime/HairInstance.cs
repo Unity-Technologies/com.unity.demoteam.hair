@@ -1145,7 +1145,6 @@ namespace Unity.DemoTeam.Hair
 				if (mesh != null)
 					mesh.bounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
 #else
-
 				// starting with 2021.2 we can override renderer bounds directly
 				meshRenderer.localBounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
 
@@ -1172,6 +1171,9 @@ namespace Unity.DemoTeam.Hair
 				}
 				else
 				{
+					if (meshShadows != null)
+						meshShadows.bounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
+
 					Graphics.DrawMesh(meshShadows, Matrix4x4.identity, materialInstanceShadows, 0, null, 0, null, ShadowCastingMode.ShadowsOnly);
 				}
 #else
