@@ -766,7 +766,7 @@ namespace Unity.DemoTeam.Hair
 
 					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODStage, lodDescs);
 					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODRange, lodRange);
-					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODTopology, lodTopology);
+					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODTopology, lodTopology, ComputeBufferType.IndirectArguments);
 				}
 			}
 
