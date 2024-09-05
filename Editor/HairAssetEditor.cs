@@ -71,7 +71,7 @@ namespace Unity.DemoTeam.Hair
 
 			previewRenderer = new PreviewRenderUtility();
 			previewRenderer.camera.clearFlags = CameraClearFlags.SolidColor;
-			previewRenderer.camera.backgroundColor = Color.black;// Color.Lerp(Color.black, Color.grey, 0.5f);
+			previewRenderer.camera.backgroundColor = Color.black;
 			previewRenderer.camera.nearClipPlane = 0.001f;
 			previewRenderer.camera.farClipPlane = 50.0f;
 			previewRenderer.camera.fieldOfView = 50.0f;
@@ -477,10 +477,11 @@ namespace Unity.DemoTeam.Hair
 
 									GUI.Box(rect, Texture2D.blackTexture, EditorStyles.textField);
 									{
-										rect.xMin += 1;
-										rect.yMin += 1;
-										rect.xMax -= 1;
-										rect.yMax -= 1;
+										var h = 0.5f * EditorGUIUtility.singleLineHeight;
+										rect.xMin += h;
+										rect.yMin += h;
+										rect.xMax -= h;
+										rect.yMax -= h;
 									}
 
 									// apply zoom
@@ -568,7 +569,21 @@ namespace Unity.DemoTeam.Hair
 									}
 
 									previewRenderer.BeginPreview(rect, GUIStyle.none);
-									previewRenderer.DrawMesh(mesh, Matrix4x4.identity, previewMaterial, subMeshIndex: 0);
+									{
+										Graphics.DrawMeshInstancedIndirect(
+											mesh,
+											submeshIndex: 0,
+											previewMaterial,
+											hairAsset.strandGroups[i].bounds,
+											previewBuffers._SolverLODTopology,
+											argsOffset: (int)HairSim.GetSolverLODTopologyOffset(HairSim.SolverLODTopology.IndexedInstancedLines),
+											properties: null,
+											ShadowCastingMode.Off,
+											receiveShadows: false,
+											layer: 0,
+											previewRenderer.camera,
+											LightProbeUsage.Off);
+									}
 									previewRenderer.Render(true, true);
 									previewRenderer.EndAndDrawPreview(rect);
 								}
@@ -580,7 +595,7 @@ namespace Unity.DemoTeam.Hair
 								var selectedLOD = EditorGUILayout.IntSlider("Preview LOD", previewLOD[i], 0, hairAsset.strandGroups[i].lodCount - 1);
 								if (selectedLOD != previewLOD[i])
 								{
-									InitializePreviewLOD(i, selectedLOD);
+									InitializePreviewLOD(i, selectedLOD, hairAsset.strandGroups[i].lodGuideCount);
 								}
 							}
 
@@ -654,7 +669,7 @@ namespace Unity.DemoTeam.Hair
 						previewMesh = new HairTopologyDesc
 						{
 							type = HairTopologyType.Lines,
-							strandCount = hairAsset.strandGroups[i].strandCount,
+							strandCount = 1,// using instanced topology
 							strandParticleCount = hairAsset.strandGroups[i].strandParticleCount,
 							memoryLayout = hairAsset.strandGroups[i].particleMemoryLayout,
 						};
@@ -686,7 +701,9 @@ namespace Unity.DemoTeam.Hair
 						previewConstants._RenderLODMethod = (uint)HairSim.RenderLODSelection.Manual;
 						previewConstants._RenderLODScale = 1.0f;
 						previewConstants._RenderLODBias = 0.0f;
-						previewConstants._RenderLODClipThreshold = 0.05f;//TODO remove this once HairVertex implements hard upper bound
+						previewConstants._RenderLODClipThreshold = 0.0f;
+
+						previewConstants._RenderFeatures = (uint)HairSim.RenderFeatures.Instancing;
 					}
 
 					unsafe
@@ -703,7 +720,7 @@ namespace Unity.DemoTeam.Hair
 					CreateBufferWithData(ref previewBuffers._LODGuideReach, strandGroup.lodGuideReach);
 					CreateBufferWithData(ref previewBuffers._StagingVertex, strandGroup.particlePosition, ComputeBufferType.Raw);
 
-					InitializePreviewLOD(i, strandGroup.lodCount - 1);
+					InitializePreviewLOD(i, strandGroup.lodCount - 1, strandGroup.lodGuideCount);
 				}
 
 				Graphics.ExecuteCommandBuffer(cmd);
@@ -714,10 +731,11 @@ namespace Unity.DemoTeam.Hair
 			EditorApplication.update += PingPreviewMeshes;
 		}
 
-		void InitializePreviewLOD(int i, int lodIndex)
+		void InitializePreviewLOD(int i, int lodIndex, int[] lodGuideCount)
 		{
 			using (var lodDescs = new NativeArray<HairSim.LODIndices>((int)HairSim.SolverLODStage.__COUNT, Allocator.Temp))
 			using (var lodRange = new NativeArray<Vector2Int>((int)HairSim.SolverLODRange.__COUNT, Allocator.Temp))
+			using (var lodTopology = new NativeArray<uint>((int)HairSim.SolverLODTopology.__COUNT * 5, Allocator.Temp))
 			{
 				unsafe
 				{
@@ -730,16 +748,25 @@ namespace Unity.DemoTeam.Hair
 
 					var lodDescsPtr = (HairSim.LODIndices*)lodDescs.GetUnsafePtr();
 					var lodRangePtr = (Vector2Int*)lodRange.GetUnsafePtr();
+					var lodTopologyPtr = (uint*)lodTopology.GetUnsafePtr();
 
 					var lodIndexCeil = Mathf.Max(0, (int)previewData[i].constants._LODCount - 1);
 					var lodIndexDesc = MakeLODDesc(Mathf.Clamp(lodIndex, 0, lodIndexCeil));
+					var lodTopologyIndex = (int)HairSim.SolverLODTopology.IndexedInstancedLines;
 
 					lodDescsPtr[(int)HairSim.SolverLODStage.Physics] = lodIndexDesc;
 					lodDescsPtr[(int)HairSim.SolverLODStage.Rendering] = lodIndexDesc;
-					lodRangePtr[(int)HairSim.SolverLODRange.Render] = new Vector2Int(0, (int)previewData[i].constants._StrandCount);
+					lodRangePtr[(int)HairSim.SolverLODRange.Render] = new Vector2Int(0, lodGuideCount[lodIndex]);
+
+					lodTopologyPtr[lodTopologyIndex * 5 + 0] = HairTopologyCache.GetSharedMesh(previewMeshes[i]).GetIndexCount(0);
+					lodTopologyPtr[lodTopologyIndex * 5 + 1] = (uint)lodGuideCount[lodIndex];
+					lodTopologyPtr[lodTopologyIndex * 5 + 2] = 0;
+					lodTopologyPtr[lodTopologyIndex * 5 + 3] = 0;
+					lodTopologyPtr[lodTopologyIndex * 5 + 4] = 0;
 
 					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODStage, lodDescs);
 					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODRange, lodRange);
+					CreateBufferWithNativeData(ref previewData[i].buffers._SolverLODTopology, lodTopology, ComputeBufferType.IndirectArguments);
 				}
 			}
 
