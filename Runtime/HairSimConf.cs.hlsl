@@ -15,6 +15,7 @@
 #define SPLAT_TRILINEAR (1)
 #define VOLUME_SQUARE_CELLS (1)
 #define VOLUME_STAGGERED_GRID (0)
+#define INSTANCING_BATCH_SIZE (64)
 
 
 #endif

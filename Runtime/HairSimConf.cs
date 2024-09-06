@@ -34,6 +34,9 @@ namespace Unity.DemoTeam.Hair
 			public const int VOLUME_STAGGERED_GRID = 0;
 			// 0 == store everything at cell centers
 			// 1 == store velocity and pressure gradient at cell faces
+
+			public const int INSTANCING_BATCH_SIZE = 64;
+			// N == number of strands per render instance
 		}
 	}
 }

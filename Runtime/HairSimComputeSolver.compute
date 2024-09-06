@@ -959,13 +959,16 @@ void KLODSelectionPost(
 	// SV_GroupIndex        thread offset within execution group
 {
 	uint countRender = _SolverLODRange[SOLVERLODRANGE_RENDER].y;
+	uint countRenderBatchSize = min(countRender, INSTANCING_BATCH_SIZE);
+	uint countRenderBatchCount = (countRender + INSTANCING_BATCH_SIZE - 1) / INSTANCING_BATCH_SIZE;
 
 	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_LINES,				uint2(countRender, 1) * ResolveDrawIndexedLine());
 	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_STRIPS,				uint2(countRender, 1) * ResolveDrawIndexedStrip());
 	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_TUBES,				uint2(countRender, 1) * ResolveDrawIndexedTube());
-	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_LINES,	uint2(1, countRender) * ResolveDrawIndexedLine());
-	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_STRIPS,	uint2(1, countRender) * ResolveDrawIndexedStrip());
-	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_TUBES,	uint2(1, countRender) * ResolveDrawIndexedTube());
+
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_LINES,	uint2(countRenderBatchSize, countRenderBatchCount) * ResolveDrawIndexedLine());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_STRIPS,	uint2(countRenderBatchSize, countRenderBatchCount) * ResolveDrawIndexedStrip());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_TUBES,	uint2(countRenderBatchSize, countRenderBatchCount) * ResolveDrawIndexedTube());
 }
 
 #endif//F_LOD
