@@ -19,6 +19,7 @@
 #endif
 
 #include "HairSimData.hlsl"
+#include "HairSimComputeConfig.hlsl"
 #include "HairSimComputeLOD.hlsl"
 #include "HairSimDebugDrawColors.hlsl"
 
@@ -194,20 +195,18 @@ HairVertexID DecodeHairVertexID(float4 packedID)
 	{
 		uint4 unpack = round(packedID * _DecodeVertexComponentValue);
 
+		id.strandIndex = (
+			(unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
+			(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
+			(unpack.y >> _DecodeVertexWidth)
+		);
+
 #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
 		if ((_RenderFeatures & RENDERFEATURES_INSTANCING) != 0)
 		{
-			id.strandIndex = unity_InstanceID;
+			id.strandIndex += (unity_InstanceID * INSTANCING_BATCH_SIZE);
 		}
-		else
 #endif
-		{
-			id.strandIndex = (
-				(unpack.w << ((_DecodeVertexComponentWidth << 1) - _DecodeVertexWidth)) |
-				(unpack.z << ((_DecodeVertexComponentWidth << 0) - _DecodeVertexWidth)) |
-				(unpack.y >> _DecodeVertexWidth)
-			);
-		}
 
 		id.vertexIndex = unpack.x;
 		id.vertexFacet = unpack.y & ((1 << _DecodeVertexWidth) - 1);

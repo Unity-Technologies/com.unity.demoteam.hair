@@ -669,7 +669,7 @@ namespace Unity.DemoTeam.Hair
 						previewMesh = new HairTopologyDesc
 						{
 							type = HairTopologyType.Lines,
-							strandCount = 1,// using instanced topology
+							strandCount = Mathf.Min(hairAsset.strandGroups[i].strandCount, HairSim.Conf.INSTANCING_BATCH_SIZE),
 							strandParticleCount = hairAsset.strandGroups[i].strandParticleCount,
 							memoryLayout = hairAsset.strandGroups[i].particleMemoryLayout,
 						};
@@ -759,7 +759,7 @@ namespace Unity.DemoTeam.Hair
 					lodRangePtr[(int)HairSim.SolverLODRange.Render] = new Vector2Int(0, lodGuideCount[lodIndex]);
 
 					lodTopologyPtr[lodTopologyIndex * 5 + 0] = HairTopologyCache.GetSharedMesh(previewMeshes[i]).GetIndexCount(0);
-					lodTopologyPtr[lodTopologyIndex * 5 + 1] = (uint)lodGuideCount[lodIndex];
+					lodTopologyPtr[lodTopologyIndex * 5 + 1] = ((uint)lodGuideCount[lodIndex] + HairSim.Conf.INSTANCING_BATCH_SIZE - 1) / HairSim.Conf.INSTANCING_BATCH_SIZE;
 					lodTopologyPtr[lodTopologyIndex * 5 + 2] = 0;
 					lodTopologyPtr[lodTopologyIndex * 5 + 3] = 0;
 					lodTopologyPtr[lodTopologyIndex * 5 + 4] = 0;

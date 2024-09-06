@@ -897,7 +897,7 @@ namespace Unity.DemoTeam.Hair
 				var meshDesc = new HairTopologyDesc
 				{
 					type = meshType,
-					strandCount = gpuInstancing ? 1 : (int)solverData.constants._StrandCount,
+					strandCount = Mathf.Min((int)solverData.constants._StrandCount, gpuInstancing ? HairSim.Conf.INSTANCING_BATCH_SIZE : (int)solverData.constants._StrandCount),
 					strandParticleCount = (int)solverData.constants._StagingStrandVertexCount,
 					memoryLayout = solverData.memoryLayout,
 				};
