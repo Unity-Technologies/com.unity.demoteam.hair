@@ -1061,25 +1061,44 @@ namespace Unity.DemoTeam.Hair
 
 				if (meshRenderer.rayTracingMode != UnityEngine.Experimental.Rendering.RayTracingMode.Off && SystemInfo.supportsRayTracing)
 					meshRenderer.rayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode.Off;
+			}
 
 #if HAS_PACKAGE_UNITY_HDRP_15_0_2
-				ref var meshRendererHDRP = ref strandGroupInstance.sceneObjects.strandMeshRendererHDRP;
+			ref var meshRendererHDRP = ref strandGroupInstance.sceneObjects.strandMeshRendererHDRP;
+			{
+				if (meshRendererHDRP == null)
 				{
-					if (meshRendererHDRP == null)
+					var container = strandGroupInstance.sceneObjects.strandMeshContainer;
+					if (container != null && container.TryGetComponent(out meshRendererHDRP) == false)
 					{
-						var container = strandGroupInstance.sceneObjects.strandMeshContainer;
-						if (container != null && container.TryGetComponent(out meshRendererHDRP) == false)
-						{
-							meshRendererHDRP = strandGroupInstance.sceneObjects.strandMeshRendererHDRP = HairInstanceBuilder.CreateComponent<HDAdditionalMeshRendererSettings>(container, container.hideFlags);
-						}
+						meshRendererHDRP = strandGroupInstance.sceneObjects.strandMeshRendererHDRP = HairInstanceBuilder.CreateComponent<HDAdditionalMeshRendererSettings>(container, container.hideFlags);
 					}
-
-					meshRendererHDRP.enabled = needRenderer && (settingsRendering.rendererShadows != ShadowCastingMode.ShadowsOnly);
-					meshRendererHDRP.rendererGroup = settingsRendering.rendererGroup;
-					meshRendererHDRP.enableHighQualityLineRendering = (settingsRendering.renderer == HairSim.SettingsRendering.Renderer.HDRPHighQualityLines);
 				}
+
+				meshRendererHDRP.enabled = needRenderer && (settingsRendering.rendererShadows != ShadowCastingMode.ShadowsOnly);
+				meshRendererHDRP.rendererGroup = settingsRendering.rendererGroup;
+				meshRendererHDRP.enableHighQualityLineRendering = (settingsRendering.renderer == HairSim.SettingsRendering.Renderer.HDRPHighQualityLines);
+			}
 #endif
 
+			// update mesh bounds
+			{
+#if !UNITY_2021_2_OR_NEWER
+				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
+				if (mesh != null)
+					mesh.bounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
+#else
+				// starting with 2021.2 we can override renderer bounds directly
+				meshRenderer.localBounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
+
+				//TODO the world space bounds override is failing in some cases -- figure out why?
+				//meshRenderer.bounds = HairSim.GetSolverBounds(solverData, volumeData);
+#endif
+			}
+
+			// render (optional depending on configuration)
+			if (needRenderer)
+			{
 				if (allowIndirect)
 				{
 					meshRenderer.enabled = false;
@@ -1138,22 +1157,7 @@ namespace Unity.DemoTeam.Hair
 				}
 			}
 
-			// update mesh bounds
-			{
-#if !UNITY_2021_2_OR_NEWER
-				// prior to 2021.2 it was only possible to set renderer bounds indirectly via mesh bounds
-				if (mesh != null)
-					mesh.bounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
-#else
-				// starting with 2021.2 we can override renderer bounds directly
-				meshRenderer.localBounds = HairSim.GetSolverBounds(solverData, volumeData).WithTransform(meshFilter.transform.worldToLocalMatrix);
-
-				//TODO the world space bounds override is failing in some cases -- figure out why?
-				//meshRenderer.bounds = HairSim.GetSolverBounds(solverData, volumeData);
-#endif
-			}
-
-			// separate shadows (optional depending on configuration)
+			// render separate shadows (optional depending on configuration)
 			if (needRendererShadows)
 			{
 #if !UNITY_2021_2_OR_NEWER
