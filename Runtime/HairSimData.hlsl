@@ -222,6 +222,67 @@ HAIRSIM_VOLUMESUBSTEP<WindEmitter> _WindEmitter;
 //---------
 // utility
 
+#define UNORM_ENCODING 0
+#define UNORM_10_10_10 0
+
+#if UNORM_ENCODING
+uint2 EncodePosition(float3 p, float4 pivot)
+{
+	float3 p_snorm = (p - pivot.xyz) / pivot.w;
+	float3 p_unorm = saturate(0.5 * p_snorm + 0.5);
+	
+	uint3 p_u10 = (p_unorm * 0x003ff);	//             11 1111 1111 = 0x003ff
+	uint3 p_u20 = (p_unorm * 0xfffff);	// 1111 1111 1111 1111 1111 = 0xfffff
+	uint2 p_enc;
+	{
+#if UNORM_10_10_10
+		// ----------------- u32 -----------------
+		// 1111 1111 1111 1111 1111 1111 1111 1111
+		//   '---0x3ff--' '---0x3ff--''---0x3ff--'
+		
+		p_enc.x = (p_u10.x & 0x003ff) | ((p_u10.y & 0x003ff) << 10) | ((p_u10.z & 0x003ff) << 20);
+		p_enc.y = 0;
+#else
+		// ----------------- u32 ----------------- ----------------- u32 -----------------
+		// 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111
+		//      '--0xff-' '-------0xfffff--------' '----0xfff---' '-------0xfffff--------'
+
+		p_enc.x = (p_u20.x & 0xfffff) | ((p_u20.z & 0x00fff) << 20);
+		p_enc.y = (p_u20.y & 0xfffff) | ((p_u20.z & 0xff000) << 8);
+#endif
+	}
+	
+	return p_enc;
+}
+
+float3 DecodePosition(uint2 p_enc, float4 pivot)
+{
+#if UNORM_10_10_10
+	uint3 p_u10;
+	{
+		p_u10.x = (p_enc.x & 0x000003ff);
+		p_u10.y = (p_enc.x & 0x000ffc00) >> 10;
+		p_u10.z = (p_enc.x & 0x3ff00000) >> 20;
+	}
+#else
+	uint3 p_u20;
+	{
+		p_u20.x = (p_enc.x & 0x000fffff);
+		p_u20.y = (p_enc.y & 0x000fffff);
+		p_u20.z = ((p_enc.x & 0xfff00000) >> 20) | ((p_enc.y & 0x0ff00000) >> 8);
+	}
+#endif
+
+	
+#if UNORM_10_10_10
+	float3 p_unorm = p_u10 / (float)0x003ff;
+#else
+	float3 p_unorm = p_u20 / (float)0xfffff;
+#endif
+	float3 p_snorm = p_unorm * 2.0 - 1.0;
+	return p_snorm * pivot.w + pivot.xyz;
+}
+#else
 uint2 EncodePosition(float3 p, float4 pivot)
 {
 	uint3 p_f16 = f32tof16((p - pivot.xyz) / pivot.w);
@@ -235,6 +296,7 @@ float3 DecodePosition(uint2 p_enc, float4 pivot)
 	float3 p = f16tof32(p_f16) * pivot.w + pivot.xyz;
 	return p;
 }
+#endif
 
 float3 LoadStagingPosition(const uint i, const LODBounds lodBounds)
 {
