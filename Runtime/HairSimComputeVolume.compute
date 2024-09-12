@@ -1440,7 +1440,7 @@ void KBoundsResolve(
 		lodBounds.center = 0.5 * (boundsMax + boundsMin);
 		lodBounds.extent = 0.5 * (boundsMax - boundsMin);
 		lodBounds.radius = length(lodBounds.extent);
-		lodBounds.reach = min(lodBounds.extent.x, min(lodBounds.extent.y, lodBounds.extent.z));
+		lodBounds.reach = max(lodBounds.extent.x, max(lodBounds.extent.y, lodBounds.extent.z));
 	}
 
 	_Bounds[boundsIndex] = lodBounds;
@@ -1470,7 +1470,7 @@ void KBoundsResolveCombined(
 		lodBounds.center = 0.5 * (combinedBoundsMax + combinedBoundsMin);
 		lodBounds.extent = 0.5 * (combinedBoundsMax - combinedBoundsMin);
 		lodBounds.radius = length(lodBounds.extent);
-		lodBounds.reach = min(lodBounds.extent.x, min(lodBounds.extent.y, lodBounds.extent.z));
+		lodBounds.reach = max(lodBounds.extent.x, max(lodBounds.extent.y, lodBounds.extent.z));
 	}
 
 	_Bounds[boundsIndex] = lodBounds;
