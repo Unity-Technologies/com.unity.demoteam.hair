@@ -222,7 +222,7 @@ HAIRSIM_VOLUMESUBSTEP<WindEmitter> _WindEmitter;
 //---------
 // utility
 
-#define UNORM_ENCODING 1
+#define UNORM_ENCODING 0
 #define UNORM_10_10_10 0
 
 #if UNORM_ENCODING
