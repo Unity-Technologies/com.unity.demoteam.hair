@@ -12,7 +12,7 @@
 #endif
 
 #ifndef rsqrt_safe// used where NaN would otherwise damage the data
-#define rsqrt_safe(x) max(0.0, rsqrt(x))
+#define rsqrt_safe(x) rsqrt(max(1e-37, x))
 #endif
 
 #ifndef rsqrt_unsafe// used where NaN is already handled by later operation
