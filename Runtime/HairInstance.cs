@@ -29,6 +29,31 @@ namespace Unity.DemoTeam.Hair
 	{
 		public static HashSet<HairInstance> s_instances = new HashSet<HairInstance>();
 
+		// Hook into RenderPipelineManager.beginContextRendering so we can have the option of handling prereqs late in the frame. 
+#if UNITY_EDITOR
+		[InitializeOnLoadMethod]
+		static void InitializeOnLoad() => HookCallback();
+#else
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+		static void InitializeOnLoad() => HookCallback();
+#endif
+		static void HookCallback()
+		{
+			RenderPipelineManager.beginContextRendering -= RenderPipelineManagerOnBeginContextRendering;
+			RenderPipelineManager.beginContextRendering += RenderPipelineManagerOnBeginContextRendering;
+		}
+
+		static void RenderPipelineManagerOnBeginContextRendering(ScriptableRenderContext context, List<Camera> cameras)
+		{
+			foreach (var instance in s_instances)
+			{
+				if (instance != null && instance.settingsExecutive.updateMode == SettingsExecutive.UpdateMode.BuiltinLateEvent)
+				{
+					instance.HandlePrerequisite();
+				}
+			}
+		}
+
 		[Serializable]
 		public struct GroupProvider
 		{

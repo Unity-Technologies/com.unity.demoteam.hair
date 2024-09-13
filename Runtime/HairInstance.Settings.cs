@@ -15,6 +15,7 @@ namespace Unity.DemoTeam.Hair
 			public enum UpdateMode
 			{
 				BuiltinEvent	= 0,
+				BuiltinLateEvent= 2,
 				ExternalCall	= 1,
 			}
 
