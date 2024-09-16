@@ -905,6 +905,7 @@ void KLODSelection(
 	WriteIndirectDispatch(SOLVERLODDISPATCH_INTERPOLATE_PROMOTE,	ResolveDispatchParallelStrands(countInterpolatePromote));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_STAGING,				ResolveDispatchParallelStrands(countRender));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_STAGING_ADD,			ResolveDispatchParallelStrands(countRenderAdd));
+	WriteIndirectDispatch(SOLVERLODDISPATCH_ROOTS,					ResolveDispatchParallelStrands(max(countSolve, countRender)));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_TRANSFER,				ResolveDispatchParallelParticles(countSolve));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_TRANSFER_ALL,			ResolveDispatchParallelParticles(countSolve + countInterpolate));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_POINTS,			ResolveDrawParallelParticles(countSolve, 1));
