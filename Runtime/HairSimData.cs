@@ -288,12 +288,13 @@ namespace Unity.DemoTeam.Hair
 			InterpolatePromote		= 4,	// thread group is 64 strands
 			Staging					= 5,	// thread group is 64 strands
 			StagingAdd				= 6,	// thread group is 64 strands
-			Transfer				= 7,	// thread group is 64 particles
-			TransferAll				= 8,	// thread group is 64 particles
-			RasterPoints			= 9,	// -
-			RasterPointsAll			= 10,	// -
-			RasterQuads				= 11,	// -
-			RasterQuadsAll			= 12,	// -
+			Roots					= 7,	// thread group is 64 strands
+			Transfer				= 8,	// thread group is 64 particles
+			TransferAll				= 9,	// thread group is 64 particles
+			RasterPoints			= 10,	// -
+			RasterPointsAll			= 11,	// -
+			RasterQuads				= 12,	// -
+			RasterQuadsAll			= 13,	// -
 			__COUNT
 		}
 

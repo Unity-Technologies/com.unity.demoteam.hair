@@ -891,10 +891,11 @@ namespace Unity.DemoTeam.Hair
 					}
 				}
 
+				var rangeSolve = data[(int)HairSim.SolverLODRange.Solve];
+				var rangeInterpolate = data[(int)HairSim.SolverLODRange.Interpolate];
 				var rangeRender = data[(int)HairSim.SolverLODRange.Render];
-				var rangeRenderAdd = data[(int)HairSim.SolverLODRange.RenderAdd];
 
-				Debug.LogFormat("render range [{0}, {1})", rangeRender.x, rangeRender.y);
+				Debug.LogFormat("ranges: solve [{0}, {1}) -- interp [{2},{3}) -- render [{4},{5})", rangeSolve.x, rangeSolve.y, rangeInterpolate.x, rangeInterpolate.y, rangeRender.x, rangeRender.y);
 			}
 #endif
 
@@ -1063,7 +1064,7 @@ namespace Unity.DemoTeam.Hair
 
 							var resolveRootsInterpolated = stepFinal || (volumeData.keywords.VOLUME_SPLAT_CLUSTERS == false && i == substepCount - 1);
 							var resolveRootsDispatch = resolveRootsInterpolated ?
-								SolverLODDispatch.Staging :
+								SolverLODDispatch.Roots :
 								SolverLODDispatch.Solve;
 
 							BindSolverData(cmd, s_solverCS, SolverKernels.KRootsSubstep, solverData);

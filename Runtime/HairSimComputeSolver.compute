@@ -843,7 +843,7 @@ void KLODSelection(
 	{
 		/* delimiters
 
-		|------sim------|------pos------|-------------off---------|
+		|------sim------|------pos------|-------------OFF---------|
 		                i0              j0
 
 		                |------pos---------------|
@@ -852,7 +852,7 @@ void KLODSelection(
 		                                  append
 
 
-		|------sim------|------pos------:--------|----off---------|
+		|------sim------|------pos------:--------|----OFF---------|
 		                i0             (j0)      j1 
 
 		|------sim--------------------------|
@@ -864,14 +864,14 @@ void KLODSelection(
 
 		if (_SolverLODMethod & 0x10000)
 		{
-			i1 = solverStrandCount;				// promote	[i0, i1]	(pos -> sim)
-			j1 = renderStrandCount;				// append	[j0, j1]	(off -> pos)
+			i1 = solverStrandCount;							// promote	[i0, i1]	(pos -> sim)
+			j1 = max(solverStrandCount, renderStrandCount);	// append	[j0, j1]	(OFF -> pos)
 			k1 = renderStrandCount;
 		}
 		else
 		{
-			i1 = i0;							// promote	deferred
-			j1 = max(j0, renderStrandCount);	// append	[j0, j1]	(off -> pos)
+			i1 = i0;										// promote	deferred
+			j1 = max(j0, renderStrandCount);				// append	[j0, j1]	(OFF -> pos)
 			k1 = renderStrandCount;
 		}
 	}
@@ -905,6 +905,7 @@ void KLODSelection(
 	WriteIndirectDispatch(SOLVERLODDISPATCH_INTERPOLATE_PROMOTE,	ResolveDispatchParallelStrands(countInterpolatePromote));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_STAGING,				ResolveDispatchParallelStrands(countRender));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_STAGING_ADD,			ResolveDispatchParallelStrands(countRenderAdd));
+	WriteIndirectDispatch(SOLVERLODDISPATCH_ROOTS,					ResolveDispatchParallelStrands(max(countSolve, countRender)));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_TRANSFER,				ResolveDispatchParallelParticles(countSolve));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_TRANSFER_ALL,			ResolveDispatchParallelParticles(countSolve + countInterpolate));
 	WriteIndirectDispatch(SOLVERLODDISPATCH_RASTER_POINTS,			ResolveDrawParallelParticles(countSolve, 1));
