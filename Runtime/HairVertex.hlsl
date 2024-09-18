@@ -15,7 +15,7 @@
 #endif
 
 #ifndef normalize_safe
-#define normalize_safe(x) (x * rsqrt(max(1e-7, dot(x, x))))
+#define normalize_safe(x) ((x) * rsqrt(max(1e-37, dot(x, x))))
 #endif
 
 #include "HairSimData.hlsl"

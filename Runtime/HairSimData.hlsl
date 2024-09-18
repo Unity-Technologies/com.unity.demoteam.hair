@@ -273,7 +273,6 @@ float3 DecodePosition(uint2 p_enc, float4 pivot)
 	}
 #endif
 
-	
 #if UNORM_10_10_10
 	float3 p_unorm = p_u10 / (float)0x003ff;
 #else
@@ -300,7 +299,11 @@ float3 DecodePosition(uint2 p_enc, float4 pivot)
 
 float3 LoadStagingPosition(const uint i, const LODBounds lodBounds)
 {
+#if UNORM_ENCODING
+	const float4 stagingPivot = float4(lodBounds.center, lodBounds.radius);
+#else
 	const float4 stagingPivot = float4(lodBounds.center, lodBounds.reach);
+#endif
 
 	switch (_StagingVertexFormat)
 	{
@@ -317,7 +320,11 @@ float3 LoadStagingPosition(const uint i, const LODBounds lodBounds)
 
 float3 LoadStagingPositionPrev(const uint i, const LODBounds lodBoundsPrev)
 {
+#if UNORM_ENCODING
+	const float4 stagingPivotPrev = float4(lodBoundsPrev.center, lodBoundsPrev.radius);
+#else
 	const float4 stagingPivotPrev = float4(lodBoundsPrev.center, lodBoundsPrev.reach);
+#endif
 
 	switch (_StagingVertexFormat)
 	{
@@ -335,7 +342,11 @@ float3 LoadStagingPositionPrev(const uint i, const LODBounds lodBoundsPrev)
 void StoreStagingPosition(const uint i, float3 p, const LODBounds lodBounds)
 {
 #if HAIRSIM_WRITEABLE_SOLVERDATA
+#if UNORM_ENCODING
+	const float4 stagingPivot = float4(lodBounds.center, lodBounds.radius);
+#else
 	const float4 stagingPivot = float4(lodBounds.center, lodBounds.reach);
+#endif
 
 	switch (_StagingVertexFormat)
 	{
