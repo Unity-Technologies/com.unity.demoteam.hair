@@ -1192,7 +1192,7 @@ namespace Unity.DemoTeam.Hair
 			// derive features
 			RenderFeatures features = 0;
 			{
-				features |= (settingsRendering.allowIndirect && settingsRendering.allowInstancing) ? RenderFeatures.Instancing : 0;
+				//features |= (settingsRendering.allowIndirect && settingsRendering.allowInstancing) ? RenderFeatures.Instancing : 0;
 				//features |= RenderFeatures.PerVertexTexCoord;
 				//features |= RenderFeatures.PerVertexDiameter;
 			}

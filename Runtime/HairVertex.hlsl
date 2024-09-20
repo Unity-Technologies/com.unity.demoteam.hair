@@ -202,10 +202,7 @@ HairVertexID DecodeHairVertexID(float4 packedID)
 		);
 
 #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
-		if ((_RenderFeatures & RENDERFEATURES_INSTANCING) != 0)
-		{
-			id.strandIndex += (unity_InstanceID * INSTANCING_BATCH_SIZE);
-		}
+		id.strandIndex += (unity_InstanceID * INSTANCING_BATCH_SIZE);
 #endif
 
 		id.vertexIndex = unpack.x;
