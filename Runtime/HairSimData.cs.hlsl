@@ -64,8 +64,9 @@
 // Unity.DemoTeam.Hair.HairSim+SolverLODStage:  static fields
 //
 #define SOLVERLODSTAGE_PHYSICS (0)
-#define SOLVERLODSTAGE_RENDERING (1)
-#define SOLVERLODSTAGE___COUNT (2)
+#define SOLVERLODSTAGE_PHYSICS_PREV (1)
+#define SOLVERLODSTAGE_RENDERING (2)
+#define SOLVERLODSTAGE___COUNT (3)
 
 //
 // Unity.DemoTeam.Hair.HairSim+SolverLODDispatch:  static fields

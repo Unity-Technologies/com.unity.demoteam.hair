@@ -262,7 +262,8 @@ namespace Unity.DemoTeam.Hair
 		public enum SolverLODStage
 		{
 			Physics		= 0,
-			Rendering	= 1,
+			PhysicsPrev	= 1,
+			Rendering	= 2,
 			__COUNT
 		}
 
