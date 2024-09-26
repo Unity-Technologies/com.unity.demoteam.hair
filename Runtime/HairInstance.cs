@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Rendering;
+using UnityEngine.XR;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -1033,8 +1034,9 @@ namespace Unity.DemoTeam.Hair
 			var enableIndirectShadows = settingsRendering.allowIndirect && supportIndirect;
 			var enableInstancing = settingsRendering.allowInstancing && enableIndirect;
 			var enableInstancingShadows = settingsRendering.allowInstancing && enableIndirectShadows;
+			var enableStereoInstancing = (XRSettings.stereoRenderingMode == XRSettings.StereoRenderingMode.SinglePassInstanced);
 
-			var topologyIndex = (int)meshType + (enableInstancing ? 3 : 0);
+			var topologyIndex = (int)meshType + (enableInstancing ? 3 : 0) + (enableStereoInstancing ? 6 : 0);
 			var topologyIndexShadows = (int)meshTypeShadows + (enableInstancingShadows ? 3 : 0);
 
 			// prepare resources

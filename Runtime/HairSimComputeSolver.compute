@@ -995,6 +995,14 @@ void KLODSelectionPost(
 	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_LINES,	uint2(countRenderBatchSize, countRenderBatchCount) * ResolveDrawIndexedLine());
 	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_STRIPS,	uint2(countRenderBatchSize, countRenderBatchCount) * ResolveDrawIndexedStrip());
 	WriteIndirectTopology(SOLVERLODTOPOLOGY_INDEXED_INSTANCED_TUBES,	uint2(countRenderBatchSize, countRenderBatchCount) * ResolveDrawIndexedTube());
+
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_XR_INDEXED_LINES,			uint2(countRender, 2) * ResolveDrawIndexedLine());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_XR_INDEXED_STRIPS,			uint2(countRender, 2) * ResolveDrawIndexedStrip());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_XR_INDEXED_TUBES,			uint2(countRender, 2) * ResolveDrawIndexedTube());
+
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_XR_INDEXED_INSTANCED_LINES,	uint2(countRenderBatchSize, 2 * countRenderBatchCount) * ResolveDrawIndexedLine());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_XR_INDEXED_INSTANCED_STRIPS,uint2(countRenderBatchSize, 2 * countRenderBatchCount) * ResolveDrawIndexedStrip());
+	WriteIndirectTopology(SOLVERLODTOPOLOGY_XR_INDEXED_INSTANCED_TUBES,	uint2(countRenderBatchSize, 2 * countRenderBatchCount) * ResolveDrawIndexedTube());
 }
 
 #endif//F_LOD
