@@ -1,6 +1,10 @@
 #ifndef __HAIRSIMCOMPUTEQUATERNION_HLSL__
 #define __HAIRSIMCOMPUTEQUATERNION_HLSL__
 
+#ifndef normalize_safe
+#define normalize_safe(x) ((x) * rsqrt(max(1e-37, dot(x, x))))
+#endif
+
 //----------------------
 // quaternion functions
 
@@ -166,13 +170,32 @@ float4 MakeQuaternionLookAt(float3 forward, float3 up)
 
 float4 MakeQuaternionFromBend(float3 p0, float3 p1, float3 p2)
 {
+#if 1
+	// gracefully handle zero segment length
+	float3 u = normalize_safe(p1 - p0);
+	float3 v = normalize_safe(p2 - p1);
+	return MakeQuaternionFromTo(u, v);
+#else
+	// assume non-zero segment length
 	float3 u = normalize(p1 - p0);
 	float3 v = normalize(p2 - p1);
 	return MakeQuaternionFromTo(u, v);
+#endif
 }
 
 float4 NextQuaternionFromBend(float3 p0, float3 p1, float3 p2, float4 q1)
 {
+#if 1
+	// gracefully handle zero segment length
+	float3 u = QMul(q1, float3(0, 1, 0));
+	float3 v = normalize_safe(p2 - p1);
+
+	float4 rotTangent = MakeQuaternionFromToWithFallback(u, v, QMul(q1, float3(1, 0, 0)));
+	float4 rotTwist = MakeQuaternionTwistIdentity();
+
+	return QMul(rotTangent, QMul(q1, rotTwist));
+#else
+	// assume non-zero segment length
 	float3 u = QMul(q1, float3(0, 1, 0));
 	float3 v = normalize(p2 - p1);
 
@@ -180,6 +203,7 @@ float4 NextQuaternionFromBend(float3 p0, float3 p1, float3 p2, float4 q1)
 	float4 rotTwist = MakeQuaternionTwistIdentity();
 
 	return QMul(rotTangent, QMul(q1, rotTwist));
+#endif
 }
 
 float4 NextQuaternionFromBendRMF(float3 p0, float3 p1, float3 p2, float4 q1)

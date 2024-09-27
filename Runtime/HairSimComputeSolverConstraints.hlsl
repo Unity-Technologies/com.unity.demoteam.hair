@@ -4,6 +4,8 @@
 #include "HairSimComputeSolverBoundaries.hlsl"
 #include "HairSimComputeSolverQuaternion.hlsl"
 
+#define MIN_MAX_HANDLES_NAN 0
+
 //--------
 // macros
 
@@ -12,11 +14,19 @@
 #endif
 
 #ifndef rsqrt_safe// used where NaN would otherwise damage the data
+#if MIN_MAX_HANDLES_NAN
+#define rsqrt_safe(x) max(0.0, rsqrt(x))
+#else
 #define rsqrt_safe(x) rsqrt(max(1e-37, x))
+#endif
 #endif
 
 #ifndef rsqrt_unsafe// used where NaN is already handled by later operation
+#if MIN_MAX_HANDLES_NAN
 #define rsqrt_unsafe(x) rsqrt(x)
+#else
+#define rsqrt_unsafe(x) rsqrt_safe(x)
+#endif
 #endif
 
 //----------------------
@@ -364,6 +374,18 @@ void SolveMaterialFrameStretchShearConstraint(
 
 	const float3 e3 = float3(0, 1, 0);
 
+#if 0
+	// apply eq. 31 to obtain change vector
+	float3 r = (p1 - p0) - distance0 * QMul(q, e3);
+
+	// apply eq. 37 to calc corrections
+	float W_inv = stiffness / (w0 + w1 + 4.0 * wq * distance0 * distance0 + w_EPSILON);
+
+	 //TODO
+	d0 += (w0 * W_inv) * r;
+	d1 -= (w1 * W_inv) * r;
+	dq += (wq * W_inv * distance0) * QMul(float4(r, 0), QMul(q, QConjugate(float4(e3, 0))));
+#else
 	// apply eq. 31 to obtain change vector
 	float3 r = (p1 - p0) / distance0 - QMul(q, e3);
 
@@ -373,6 +395,7 @@ void SolveMaterialFrameStretchShearConstraint(
 	d0 += (w0 * W_inv * distance0) * r;
 	d1 -= (w1 * W_inv * distance0) * r;
 	dq += (wq * W_inv * distance0 * distance0) * QMul(float4(r, 0), QMul(q, QConjugate(float4(e3, 0))));
+#endif
 }
 
 //--------------------------------------------------

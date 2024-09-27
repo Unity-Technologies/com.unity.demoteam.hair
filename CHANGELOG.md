@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0-exp.1] - 2024-09-27
+
+### Added
+
+- Implemented dynamic LOD-based upper bound on render geometry. (Reduces the amount of work submitted to the interpolation and staging stages post-physics, and also allows for early out in the vertex stage for reduced overhead.)
+- Added support for indirect instanced rendering via two new options in rendering settings: 'Allow indirect' and 'Allow instanced'. These are both enabled by default. (When effective, they reduce the amount of work submitted to the vertex stage, and reduce the memory footprint of topology meshes via instancing, respectively.)
+- Added support for single-pass instanced stereo (automatically enabled when needed.)
+
+### Changed
+
+- Tweaked the LOD scale sliders in settings for physics and rendering to range between 0 and 4 (previously the upper bound was 2). In general, LOD transitions occur when coverage drops below 1/(lod scale).
+
+### Fixed
+
+- Fixed an issue with the underlying type of buffer used for indirect dispatch.
+- Fixed an issue with incorrect/missing substitute shadow bounds on versions prior to 2021.1.
+- Fixed an issue with the preview in the HairAsset inspector not showing any strands (due to incorrect bounds.)
+- Fixed a few NaN issues that would sometimes consume very short strands at far away distances.
+- Fixed a few issues with strands not getting correctly added or promoted to interpolation stage or simulation stage when transitioning directly from non-visible state.
+
+
 ## [0.17.0-exp.1] - 2024-08-19
 
 ### Added
@@ -247,7 +268,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
-[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.17.0-exp.1...HEAD
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.0-exp.1...HEAD
+[0.18.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.17.0-exp.1...0.18.0-exp.1
 [0.17.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.16.0-exp.1...0.17.0-exp.1
 [0.16.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.15.0-exp.1...0.16.0-exp.1
 [0.15.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.14.2-exp.1...0.15.0-exp.1

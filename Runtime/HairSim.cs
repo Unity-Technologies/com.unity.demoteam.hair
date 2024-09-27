@@ -2,6 +2,7 @@
 #pragma warning disable 0649 // some fields are assigned via reflection
 
 //#define DEBUG_LOD_SELECTION
+//#define DEBUG_LOD_SELECTION_POST
 
 using System;
 using UnityEngine;
@@ -95,6 +96,7 @@ namespace Unity.DemoTeam.Hair
 		{
 			public static int KRoots;
 			public static int KRootsHistory;
+			public static int KRootsHistoryAdd;
 			public static int KRootsSubstep;
 			public static int KInitialize;
 			public static int KInitializePostVolume;
@@ -278,6 +280,7 @@ namespace Unity.DemoTeam.Hair
 				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODStage, solverBuffers._SolverLODStage);
 #if DEBUG_LOD_SELECTION
 				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODRange, solverBuffers._SolverLODRange);
+				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODDispatch, solverBuffers._SolverLODDispatch);
 				CreateReadbackBuffer(ref solverData.buffersReadback._SolverLODTopology, solverBuffers._SolverLODTopology);
 #endif
 
@@ -424,6 +427,7 @@ namespace Unity.DemoTeam.Hair
 			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODStage);
 #if DEBUG_LOD_SELECTION
 			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODRange);
+			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODDispatch);
 			ReleaseReadbackBuffer(ref solverData.buffersReadback._SolverLODTopology);
 #endif
 
@@ -873,11 +877,14 @@ namespace Unity.DemoTeam.Hair
 			solverData.buffersReadback._SolverLODStage.ScheduleCopy(cmd, solverData.buffers._SolverLODStage);
 #if DEBUG_LOD_SELECTION
 			solverData.buffersReadback._SolverLODRange.ScheduleCopy(cmd, solverData.buffers._SolverLODRange);
+			solverData.buffersReadback._SolverLODDispatch.ScheduleCopy(cmd, solverData.buffers._SolverLODDispatch);
 			{
-				var data = solverData.buffersReadback._SolverLODRange.GetData<uint2>(true);
-				
-				var rangeAdd = data[(int)HairSim.SolverLODRange.InterpolateAdd];
-				var rangePromote = data[(int)HairSim.SolverLODRange.InterpolatePromote];
+				var dataRange = solverData.buffersReadback._SolverLODRange.GetData<uint2>(true);
+				var dataStage = solverData.buffersReadback._SolverLODStage.GetData<LODIndices>(true);
+				var dataDispatch = solverData.buffersReadback._SolverLODDispatch.GetData<uint4>(true);
+
+				var rangeAdd = dataRange[(int)HairSim.SolverLODRange.InterpolateAdd];
+				var rangePromote = dataRange[(int)HairSim.SolverLODRange.InterpolatePromote];
 
 				var countAdd = rangeAdd.y - rangeAdd.x;
 				var countPromote = rangePromote.y - rangePromote.x;
@@ -887,20 +894,36 @@ namespace Unity.DemoTeam.Hair
 					Debug.Log("---- ADD OR PROMOTE -----");
 					for (int i = 0; i != (int)HairSim.SolverLODRange.__COUNT; i++)
 					{
-						Debug.LogFormat("range {0} = {1}", (HairSim.SolverLODRange)i, data[i]);
+						Debug.LogFormat("range {0} = {1}", (HairSim.SolverLODRange)i, dataRange[i]);
+					}
+
+					Debug.Log(" ... ");
+					for (int i = 0; i != (int)HairSim.SolverLODStage.__COUNT; i++)
+					{
+						Debug.LogFormat("stage {0} = {1}", (HairSim.SolverLODStage)i, dataStage[i].lodIndexHi);
+					}
+
+					Debug.Log(" ... ");
+					for (int i = 0; i != (int)HairSim.SolverLODDispatch.__COUNT; i++)
+					{
+						Debug.LogFormat("dispatch {0} = [{1}, {2}, {3}] {4}", (HairSim.SolverLODDispatch)i, dataDispatch[i].x, dataDispatch[i].y, dataDispatch[i].z, dataDispatch[i].w);
 					}
 				}
-
-				var rangeSolve = data[(int)HairSim.SolverLODRange.Solve];
-				var rangeInterpolate = data[(int)HairSim.SolverLODRange.Interpolate];
-				var rangeRender = data[(int)HairSim.SolverLODRange.Render];
-
-				Debug.LogFormat("ranges: solve [{0}, {1}) -- interp [{2},{3}) -- render [{4},{5})", rangeSolve.x, rangeSolve.y, rangeInterpolate.x, rangeInterpolate.y, rangeRender.x, rangeRender.y);
 			}
 #endif
 
 			// add reentrant -> interpolated
-			BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolateAdd, solverData);
+			static SolverData WithCurrentRoots(in SolverData solverData)
+			{
+				var ret = solverData;
+				{
+					CoreUtils.Swap(ref ret.buffers._RootFrame, ref ret.buffers._RootFrameNext);
+					CoreUtils.Swap(ref ret.buffers._RootPosition, ref ret.buffers._RootPositionNext);
+				}
+				return ret;
+			}
+
+			BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolateAdd, WithCurrentRoots(solverData));
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolateAdd, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.InterpolateAdd));
 		}
 
@@ -999,6 +1022,9 @@ namespace Unity.DemoTeam.Hair
 			PushConstantBufferData(cmd, solverData.buffers.SolverCBuffer, solverConstants);
 
 			// promote interpolated -> simulated
+			BindSolverData(cmd, s_solverCS, SolverKernels.KRootsHistoryAdd, solverData);
+			cmd.DispatchCompute(s_solverCS, SolverKernels.KRootsHistoryAdd, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.InterpolatePromote));
+
 			BindSolverData(cmd, s_solverCS, SolverKernels.KInterpolatePromote, solverData);
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KInterpolatePromote, solverData.buffers._SolverLODDispatch, GetSolverLODDispatchOffset(SolverLODDispatch.InterpolatePromote));
 		}
@@ -1192,7 +1218,7 @@ namespace Unity.DemoTeam.Hair
 			// derive features
 			RenderFeatures features = 0;
 			{
-				features |= (settingsRendering.allowIndirect && settingsRendering.allowInstancing) ? RenderFeatures.Instancing : 0;
+				//features |= (settingsRendering.allowIndirect && settingsRendering.allowInstancing) ? RenderFeatures.Instancing : 0;
 				//features |= RenderFeatures.PerVertexTexCoord;
 				//features |= RenderFeatures.PerVertexDiameter;
 			}
@@ -1232,7 +1258,7 @@ namespace Unity.DemoTeam.Hair
 			cmd.DispatchCompute(s_solverCS, SolverKernels.KLODSelectionPost, 1, 1, 1);
 
 			// schedule readback
-#if DEBUG_LOD_SELECTION
+#if DEBUG_LOD_SELECTION && DEBUG_LOD_SELECTION_POST
 			solverData.buffersReadback._SolverLODTopology.ScheduleCopy(cmd, solverData.buffers._SolverLODTopology);
 			{
 				var data = solverData.buffersReadback._SolverLODTopology.GetData<uint>(true);

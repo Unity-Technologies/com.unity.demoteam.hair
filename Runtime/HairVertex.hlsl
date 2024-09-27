@@ -15,7 +15,7 @@
 #endif
 
 #ifndef normalize_safe
-#define normalize_safe(x) (x * rsqrt(max(1e-7, dot(x, x))))
+#define normalize_safe(x) ((x) * rsqrt(max(1e-37, dot(x, x))))
 #endif
 
 #include "HairSimData.hlsl"
@@ -202,10 +202,7 @@ HairVertexID DecodeHairVertexID(float4 packedID)
 		);
 
 #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
-		if ((_RenderFeatures & RENDERFEATURES_INSTANCING) != 0)
-		{
-			id.strandIndex += (unity_InstanceID * INSTANCING_BATCH_SIZE);
-		}
+		id.strandIndex += (unity_InstanceID * INSTANCING_BATCH_SIZE);
 #endif
 
 		id.vertexIndex = unpack.x;

@@ -6,6 +6,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Rendering;
+using UnityEngine.XR;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -1156,10 +1157,6 @@ namespace Unity.DemoTeam.Hair
 			var meshTypeShadows = settingsRendering.shadowSubstitute ? GetShadowTopologyType(settingsRendering.shadowSubstituteValue) : meshType;
 
 			// prepare conditionals
-			var sameShadowLayer = (layerMask == layerMaskShadows);
-			var sameShadowMesh = (meshType == meshTypeShadows);
-			var sameShadow = sameShadowLayer && sameShadowMesh;
-
 			var needRenderer = false;
 			var needRendererShadows = false;
 
@@ -1168,6 +1165,10 @@ namespace Unity.DemoTeam.Hair
 			{
 				if (settingsRendering.renderer != HairSim.SettingsRendering.Renderer.Disabled)
 				{
+					var sameShadowLayer = (layerMask == layerMaskShadows);
+					var sameShadowMesh = (meshType == meshTypeShadows);
+					var sameShadow = sameShadowLayer && sameShadowMesh;
+
 					if (sameShadow == true || settingsRendering.rendererShadows != ShadowCastingMode.ShadowsOnly)
 					{
 						needRenderer = true;
@@ -1183,13 +1184,46 @@ namespace Unity.DemoTeam.Hair
 			}
 
 			// prepare instancing
-			var allowIndirect = settingsRendering.allowIndirect && (settingsRendering.renderer != HairSim.SettingsRendering.Renderer.HDRPHighQualityLines);
-			var allowIndirectShadows = settingsRendering.allowIndirect;
-			var allowInstancing = settingsRendering.allowInstancing && allowIndirect;
-			var allowInstancingShadows = settingsRendering.allowInstancing && allowIndirectShadows;
+			var supportIndirect = false;
+			{
+#pragma warning disable CS0219
+#if UNITY_EDITOR
+				const bool false_if_UNITY_EDITOR = false;
+#else
+				const bool false_if_UNITY_EDITOR = true;
+#endif
+#pragma warning restore CS0219
 
-			var topologyIndex = (int)meshType + (allowInstancing ? 3 : 0);
-			var topologyIndexShadows = (int)meshTypeShadows + (allowInstancingShadows ? 3 : 0);
+				// indirect feature table
+				//
+				//	N = NO
+				//	y = yes, partially (no picking)
+				//	Y = YES
+				//
+				//			BRP/20	BRP/22	BRP/23	SRP/20	SRP/22	SRP/23
+				//	-1		y		y		Y		y		y		Y
+				//	mask	y		y		Y		N		y		Y
+
+#if UNITY_2023_2_OR_NEWER
+				// supports indirect w/ layer mask + picking
+				supportIndirect = true;
+#elif UNITY_2021_2_OR_NEWER
+				// supports indirect w/ layer mask
+				supportIndirect = false_if_UNITY_EDITOR;
+#else
+				// supports indirect
+				supportIndirect = false_if_UNITY_EDITOR && ((RenderPipelineManager.currentPipeline == null) || (layerMask == GraphicsSettings.defaultRenderingLayerMask));
+#endif
+			}
+
+			var enableIndirect = settingsRendering.allowIndirect && supportIndirect && (settingsRendering.renderer != HairSim.SettingsRendering.Renderer.HDRPHighQualityLines);
+			var enableIndirectShadows = settingsRendering.allowIndirect && supportIndirect;
+			var enableInstancing = settingsRendering.allowInstancing && enableIndirect;
+			var enableInstancingShadows = settingsRendering.allowInstancing && enableIndirectShadows;
+			var enableStereoInstancing = (XRSettings.stereoRenderingMode == XRSettings.StereoRenderingMode.SinglePassInstanced);
+
+			var topologyIndex = (int)meshType + (enableInstancing ? 3 : 0) + (enableStereoInstancing ? 6 : 0);
+			var topologyIndexShadows = (int)meshTypeShadows + (enableInstancingShadows ? 3 : 0);
 
 			// prepare resources
 			var mesh = null as Mesh;
@@ -1202,25 +1236,25 @@ namespace Unity.DemoTeam.Hair
 				if (needResources)
 				{
 #if !UNITY_2021_2_OR_NEWER
-					mesh = GetTopologyMesh(solverData, meshType, allowInstancing,
+					mesh = GetTopologyMesh(solverData, meshType, enableInstancing,
 						ref strandGroupInstance.sceneObjects.meshInstance,
 						ref strandGroupInstance.sceneObjects.meshInstanceKey);
 #else
-					mesh = GetTopologyMesh(solverData, meshType, allowInstancing);
+					mesh = GetTopologyMesh(solverData, meshType, enableInstancing);
 #endif
-					materialInstance = GetTopologyMaterial(solverData, volumeData, mesh, meshType, allowInstancing, materialAsset, ref strandGroupInstance.sceneObjects.materialInstance);
+					materialInstance = GetTopologyMaterial(solverData, volumeData, mesh, meshType, enableInstancing, materialAsset, ref strandGroupInstance.sceneObjects.materialInstance);
 				}
 
 				if (needResourcesShadows)
 				{
 #if !UNITY_2021_2_OR_NEWER
-					meshShadows = GetTopologyMesh(solverData, meshTypeShadows, allowInstancingShadows,
+					meshShadows = GetTopologyMesh(solverData, meshTypeShadows, enableInstancingShadows,
 						ref strandGroupInstance.sceneObjects.meshInstanceShadows,
 						ref strandGroupInstance.sceneObjects.meshInstanceKeyShadows);
 #else
-					meshShadows = GetTopologyMesh(solverData, meshTypeShadows, allowInstancingShadows);
+					meshShadows = GetTopologyMesh(solverData, meshTypeShadows, enableInstancingShadows);
 #endif
-					materialInstanceShadows = GetTopologyMaterial(solverData, volumeData, meshShadows, meshTypeShadows, allowInstancingShadows, materialAsset, ref strandGroupInstance.sceneObjects.materialInstanceShadows);
+					materialInstanceShadows = GetTopologyMaterial(solverData, volumeData, meshShadows, meshTypeShadows, enableInstancingShadows, materialAsset, ref strandGroupInstance.sceneObjects.materialInstanceShadows);
 				}
 				else
 				{
@@ -1241,7 +1275,7 @@ namespace Unity.DemoTeam.Hair
 			{
 				meshRenderer.enabled = needRenderer;
 				meshRenderer.sharedMaterial = materialInstance;
-				meshRenderer.shadowCastingMode = sameShadow ? settingsRendering.rendererShadows : ShadowCastingMode.Off;
+				meshRenderer.shadowCastingMode = needRendererShadows ? ShadowCastingMode.Off : settingsRendering.rendererShadows;
 				meshRenderer.renderingLayerMask = (uint)layerMask;
 				meshRenderer.motionVectorGenerationMode = settingsRendering.motionVectors;
 
@@ -1285,7 +1319,7 @@ namespace Unity.DemoTeam.Hair
 			// render (optional depending on configuration)
 			if (needRenderer)
 			{
-				if (allowIndirect)
+				if (enableIndirect)
 				{
 					meshRenderer.enabled = false;
 
@@ -1347,7 +1381,7 @@ namespace Unity.DemoTeam.Hair
 			if (needRendererShadows)
 			{
 #if !UNITY_2021_2_OR_NEWER
-				if (allowIndirectShadows)
+				if (enableIndirectShadows)
 				{
 					Graphics.DrawMeshInstancedIndirect(
 						meshShadows,
@@ -1395,7 +1429,7 @@ namespace Unity.DemoTeam.Hair
 					rparams.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
 				}
 
-				if (allowIndirectShadows)
+				if (enableIndirectShadows)
 				{
 					Graphics.RenderMeshIndirect(rparams, meshShadows, solverData.buffers._SolverLODTopology, 1, topologyIndexShadows);
 				}

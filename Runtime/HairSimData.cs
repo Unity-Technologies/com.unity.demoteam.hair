@@ -262,7 +262,8 @@ namespace Unity.DemoTeam.Hair
 		public enum SolverLODStage
 		{
 			Physics		= 0,
-			Rendering	= 1,
+			PhysicsPrev	= 1,
+			Rendering	= 2,
 			__COUNT
 		}
 
@@ -301,12 +302,18 @@ namespace Unity.DemoTeam.Hair
 		[GenerateHLSL]
 		public enum SolverLODTopology
 		{
-			IndexedLines			= 0,	// -
-			IndexedStrips			= 1,	// -
-			IndexedTubes			= 2,	// -
-			IndexedInstancedLines	= 3,	// -
-			IndexedInstancedStrips	= 4,	// -
-			IndexedInstancedTubes	= 5,	// -
+			IndexedLines				= 0,
+			IndexedStrips				= 1,
+			IndexedTubes				= 2,
+			IndexedInstancedLines		= 3,
+			IndexedInstancedStrips		= 4,
+			IndexedInstancedTubes		= 5,
+			XrIndexedLines				= 6,
+			XrIndexedStrips				= 7,
+			XrIndexedTubes				= 8,
+			XrIndexedInstancedLines		= 9,
+			XrIndexedInstancedStrips	= 10,
+			XrIndexedInstancedTubes		= 11,
 			__COUNT
 		}
 
