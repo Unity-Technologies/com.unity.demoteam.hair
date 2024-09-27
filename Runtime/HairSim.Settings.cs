@@ -355,12 +355,16 @@ namespace Unity.DemoTeam.Hair
 			public ShadowSubstitute shadowSubstituteValue;
 			public MotionVectorGenerationMode motionVectors;
 
+			/*
 			[LineHeader("Renderer Flags")]
 
 			[Tooltip("Allow rendering via indirect draw (improves performance by shrinking work submitted to vertex stage according to LOD based upper bound)")]
 			public bool allowIndirect;
 			[EditableIf(nameof(allowIndirect), true), Tooltip("Allow rendering via indirect instanced draw (reduces memory footprint of topology data by instancing single warp-aware batch of strands)")]
 			public bool allowInstancing;
+			*/
+			public bool allowIndirect => true;
+			public bool allowInstancing => true;
 
 			[LineHeader("Renderer LOD")]
 
@@ -393,8 +397,10 @@ namespace Unity.DemoTeam.Hair
 				shadowSubstituteValue = ShadowSubstitute.BuiltinLines,
 				motionVectors = MotionVectorGenerationMode.Object,
 
+				/*
 				allowIndirect = true,
 				allowInstancing = true,
+				*/
 
 				kLODSelection = RenderLODSelection.AutomaticPerSegment,
 				kLODSelectionValue = 1.0f,
