@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.1-exp.1] - 2024-09-27
+
+### Fixed
+
+- Fixed missing default initialization of new flags.
+
+
 ## [0.18.0-exp.1] - 2024-09-27
 
 ### Added
@@ -268,7 +275,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
-[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.0-exp.1...HEAD
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.1-exp.1...HEAD
+[0.18.1-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.0-exp.1...0.18.1-exp.1
 [0.18.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.17.0-exp.1...0.18.0-exp.1
 [0.17.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.16.0-exp.1...0.17.0-exp.1
 [0.16.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.15.0-exp.1...0.16.0-exp.1
