@@ -393,6 +393,9 @@ namespace Unity.DemoTeam.Hair
 				shadowSubstituteValue = ShadowSubstitute.BuiltinLines,
 				motionVectors = MotionVectorGenerationMode.Object,
 
+				allowIndirect = true,
+				allowInstancing = true,
+
 				kLODSelection = RenderLODSelection.AutomaticPerSegment,
 				kLODSelectionValue = 1.0f,
 				kLODCeiling = 1.0f,
