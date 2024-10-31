@@ -39,7 +39,7 @@
 //------------
 // instancing
 
-//#pragma instancing_options assumeuniformscaling nomatrices nolodfade nolightprobe nolightmap norendererbounds procedural:HairVertexInstancingSetup
+//#pragma instancing_options assumeuniformscaling nomatrices nolodfade nolightprobe nolightmap procedural:HairVertexInstancingSetup
 
 #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
 void HairVertexInstancingMatrices(float4x4 objectToWorld, float4x4 worldToObject)
@@ -58,8 +58,8 @@ void HairVertexInstancingMatrices(float4x4 objectToWorld, float4x4 worldToObject
 
 void HairVertexInstancingSetup()
 {
-	#define unity_ObjectToWorld unity_ObjectToWorld
-	#define unity_WorldToObject unity_WorldToObject
+	//#define unity_ObjectToWorld unity_ObjectToWorld
+	//#define unity_WorldToObject unity_WorldToObject
 	//HairVertexInstancingMatrices(unity_ObjectToWorld, unity_WorldToObject);
 }
 #endif
