@@ -1220,7 +1220,11 @@ namespace Unity.DemoTeam.Hair
 			var enableIndirectShadows = settingsRendering.allowIndirect && supportIndirect;
 			var enableInstancing = settingsRendering.allowInstancing && enableIndirect;
 			var enableInstancingShadows = settingsRendering.allowInstancing && enableIndirectShadows;
+#if ENABLE_VR && ENABLE_VR_MODULE
 			var enableStereoInstancing = (XRSettings.stereoRenderingMode == XRSettings.StereoRenderingMode.SinglePassInstanced);
+#else
+			var enableStereoInstancing = false;
+#endif
 
 			var topologyIndex = (int)meshType + (enableInstancing ? 3 : 0) + (enableStereoInstancing ? 6 : 0);
 			var topologyIndexShadows = (int)meshTypeShadows + (enableInstancingShadows ? 3 : 0);

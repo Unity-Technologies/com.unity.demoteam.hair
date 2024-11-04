@@ -85,7 +85,11 @@ namespace Unity.DemoTeam.Hair
 						break;
 				}
 
-				mesh.UploadMeshData(false);
+#if UNITY_EDITOR
+				mesh.UploadMeshData(markNoLongerReadable: true);
+#else
+				mesh.UploadMeshData(markNoLongerReadable: false);//TODO builds should use markNoLongerReadable again when crash has been fixed
+#endif
 
 				s_keyToMesh[key] = mesh;
 				s_keyToUsage[key] = 1;

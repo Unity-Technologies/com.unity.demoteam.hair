@@ -1795,8 +1795,8 @@
     "m_DismissedVersion": 0,
     "m_KeywordType": 0,
     "m_KeywordDefinition": 1,
-    "m_KeywordScope": 0,
-    "m_KeywordStages": 63,
+    "m_KeywordScope": 1,
+    "m_KeywordStages": 1,
     "m_Entries": [],
     "m_Value": 0,
     "m_IsEditable": true
@@ -1969,7 +1969,7 @@
     "m_SourceType": 1,
     "m_FunctionName": "Instancing",
     "m_FunctionSource": "",
-    "m_FunctionBody": "#pragma instancing_options assumeuniformscaling nomatrices nolodfade nolightprobe nolightmap norendererbounds procedural:HairVertexInstancingSetup\r\nOut = In;"
+    "m_FunctionBody": "#pragma instancing_options assumeuniformscaling nomatrices nolodfade nolightprobe nolightmap procedural:HairVertexInstancingSetup\r\nOut = In;"
 }
 
 {

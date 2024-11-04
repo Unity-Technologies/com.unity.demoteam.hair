@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased]
+
+### Fixed
+
+- Added workaround for crash in builds (disable use of `markNoLongerReadable:true` in non-editor calls to `Mesh.UploadMeshData`).
+
+
+## [0.18.2-exp.1] - 2024-10-21
+
+### Fixed
+
+- Removed potentially missing script from sample prefab.
+
+
 ## [0.18.1-exp.1] - 2024-09-27
 
 ### Fixed
@@ -275,7 +289,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
-[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.1-exp.1...HEAD
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.2-exp.1...HEAD
+[0.18.2-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.1-exp.1...0.18.2-exp.1
 [0.18.1-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.0-exp.1...0.18.1-exp.1
 [0.18.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.17.0-exp.1...0.18.0-exp.1
 [0.17.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.16.0-exp.1...0.17.0-exp.1
