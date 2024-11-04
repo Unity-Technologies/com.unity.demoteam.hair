@@ -300,7 +300,7 @@ bool VolumeTraceEnded(in VolumeTraceState trace)
 #if 0
 	if (any(and(trace.uvw < 0, trace.uvwStep <= 0)) || any(and(trace.uvw > 1, trace.uvwStep >= 0)))
 #else
-	if (any(trace.uvw < 0 && trace.uvwStep <= 0) || any(trace.uvw > 1 && trace.uvwStep >= 0))
+	if (any((trace.uvw < 0) & (trace.uvwStep <= 0)) || any((trace.uvw > 1) & (trace.uvwStep >= 0)))
 #endif
 		return true;
 	else

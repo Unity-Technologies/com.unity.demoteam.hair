@@ -47,6 +47,8 @@ float GetParticleVolumeWeight(uint particleIndex)
 #define WORLDIDX_TO_ACCUIDX(idx) VolumeIndexToFlatIndex(idx)
 #endif
 
+#if HAIRSIM_WRITEABLE_VOLUMEACCU
+
 void InterlockedAddTrilinear(HAIRSIM_VOLUMEACCU<int> volume, float value, uint3 idx0, float3 w0, float3 w1)
 {
 	const uint2 h = uint2(1, 0);
@@ -116,5 +118,13 @@ void InterlockedMaxParticleContribution(const VolumeLODGrid lodGrid, float3 worl
 	InterlockedMax(volume[WORLDIDX_TO_ACCUIDX(VolumeWorldToIndex(lodGrid, worldPos))], (int) round(value * (1 << SPLAT_FRACTIONAL_BITS)));
 #endif
 }
+
+#else// !HAIRSIM_WRITEABLE_VOLUMEACCU
+
+//void InterlockedAddParticleContribution(const VolumeLODGrid lodGrid, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5) { }
+//void InterlockedAddParticleContributionPackW(const VolumeLODGrid lodGrid, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5) { }
+//void InterlockedMaxParticleContribution(const VolumeLODGrid lodGrid, float3 worldPos, float value, HAIRSIM_VOLUMEACCU<int> volume, float3 offset = 0.5) { }
+
+#endif
 
 #endif//__HAIRSIMCOMPUTEVOLUMETRANSFER_HLSL__
