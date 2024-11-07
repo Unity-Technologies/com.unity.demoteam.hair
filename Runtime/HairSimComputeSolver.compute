@@ -312,7 +312,7 @@ DEFINE_DECAY_FUNCTIONS(float4);
 
 float3 LinearToAngular(float3 r, float3 v)
 {
-	float3 w = cross(r, v) / dot(r, r);
+	float3 w = cross(r, v) / max(1e-37, dot(r, r));
 	return w;
 }
 
