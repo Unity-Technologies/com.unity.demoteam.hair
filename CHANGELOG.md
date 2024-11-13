@@ -4,11 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [unreleased]
+## [0.18.3-exp.1] - 2024-11-13
+
+### Changed
+
+- Reduced number of shader variants produced by HairVertex. (Reduces shader compilation time for all hair materials.)
 
 ### Fixed
 
 - Added workaround for crash in builds (disable use of `markNoLongerReadable:true` in non-editor calls to `Mesh.UploadMeshData`).
+- Fixed a keyword issue causing indirect instanced rendering to not work correctly on versions prior to 2021.1.
+- Fixed warnings when building shaders for XR targets.
+- Fixed a number of issues affecting certain build targets (avoid use of logical vector ops in volume trace, guard against volume transfer functions being declared for non-writable targets, guard against XR module missing when querying state of single pass instanced stereo).
+- Fixed a division by zero that would sometimes cause angular damping to consume small strands.
 
 
 ## [0.18.2-exp.1] - 2024-10-21
@@ -289,7 +297,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!--- LINKS --->
-[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.2-exp.1...HEAD
+[unreleased]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.3-exp.1...HEAD
+[0.18.3-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.2-exp.1...0.18.3-exp.1
 [0.18.2-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.1-exp.1...0.18.2-exp.1
 [0.18.1-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.18.0-exp.1...0.18.1-exp.1
 [0.18.0-exp.1]: https://github.com/Unity-Technologies/com.unity.demoteam.hair/compare/0.17.0-exp.1...0.18.0-exp.1
