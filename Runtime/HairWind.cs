@@ -248,10 +248,10 @@ namespace Unity.DemoTeam.Hair
 				default:
 					component = null; break;
 			}
-			return (component != null);
 #else
-			return false;
+			component = null;
 #endif
+			return (component != null);
 		}
 
 		public static bool TryGetMatchingComponent(HairWind wind, out Component component)
