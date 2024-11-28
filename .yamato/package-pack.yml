@@ -8,7 +8,7 @@ pack:
     flavor: b1.large
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package pack --package-path package
+    - upm-ci package pack
   artifacts:
     packages:
       paths:

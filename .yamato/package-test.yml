@@ -13,7 +13,7 @@ test_{{ platform.name }}_{{ editor.version }}:
     UPMCI_PKG: "upm-ci-utils@stable"
   commands:
     - npm install {% if platform.name == "win" %}"%UPMCI_PKG%"{% else %}"$UPMCI_PKG"{% endif %} -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --package-path package --type package-tests --extra-create-project-arg=-upmNoDefaultPackages
+    - upm-ci package test -u {{ editor.version }} --type package-tests --extra-create-project-arg=-upmNoDefaultPackages
   artifacts:
     logs:
       paths:
@@ -38,7 +38,7 @@ validate_{{ platform.name }}_{{ editor.version }}:
     UPMCI_PKG: "upm-ci-utils@stable"
   commands:
     - npm install {% if platform.name == "win" %}"%UPMCI_PKG%"{% else %}"$UPMCI_PKG"{% endif %} -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --package-path package --type vetting-tests --platform editmode --extra-create-project-arg=-upmNoDefaultPackages
+    - upm-ci package test -u {{ editor.version }} --type vetting-tests --platform editmode --extra-create-project-arg=-upmNoDefaultPackages
   artifacts:
     logs:
       paths:

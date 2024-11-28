@@ -11,7 +11,7 @@ test_coverage_{{ platform.name }}_{{ editor.version }}:
     flavor: {{ platform.flavor}}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --package-path package --type package-tests --extra-create-project-arg=-upmNoDefaultPackages --enable-code-coverage --code-coverage-options 'generateAdditionalMetrics;generateHtmlReport;assemblyFilters:+{{ package-assembly }}*'
+    - upm-ci package test -u {{ editor.version }} --type package-tests --extra-create-project-arg=-upmNoDefaultPackages --enable-code-coverage --code-coverage-options 'generateAdditionalMetrics;generateHtmlReport;assemblyFilters:+{{ package-assembly }}*'
   artifacts:
     logs:
       paths:

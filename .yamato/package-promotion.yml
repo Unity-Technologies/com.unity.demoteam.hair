@@ -13,7 +13,7 @@ promotion_test_{{ platform.name }}_{{ editor.version }}:
     UPMCI_PROMOTION: 1
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test --unity-version {{ editor.version }} --package-path package --extra-create-project-arg=-upmNoDefaultPackages
+    - upm-ci package test --unity-version {{ editor.version }} --extra-create-project-arg=-upmNoDefaultPackages
   artifacts:
     logs:
       paths:
@@ -43,7 +43,7 @@ promote:
     UPMCI_PROMOTION: 1
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package promote --package-path package --dry-run
+    - upm-ci package promote --dry-run
   triggers:
     tags:
       only:

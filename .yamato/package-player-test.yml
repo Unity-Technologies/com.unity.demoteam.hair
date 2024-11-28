@@ -15,7 +15,7 @@ build_{{ platform.name }}_{{ editor.version }}:
     {{ switch_sdk_2 }}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --package-path package --extra-create-project-arg=-upmNoDefaultPackages --player-build-path upm-ci~/player/{{ platform.id }} --build-only {{platform.extra_test_args}}
+    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages --player-build-path upm-ci~/player/{{ platform.id }} --build-only {{platform.extra_test_args}}
   artifacts:
     logs:
       paths:
@@ -42,7 +42,7 @@ run_{{ platform.name }}_{{ editor.version }}:
     {{ switch_sdk_2 }}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --player-build-path upm-ci~/player/{{ platform.id }} --package-path package --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
+    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --player-build-path upm-ci~/player/{{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
   artifacts:
     logs:
       paths:
@@ -67,7 +67,7 @@ build_and_run_{{ platform.name }}_{{ editor.version }}:
     {{ switch_sdk_2 }}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --package-path package --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
+    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
   artifacts:
     logs:
       paths:

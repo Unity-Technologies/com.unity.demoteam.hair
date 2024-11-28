@@ -10,7 +10,7 @@ publish:
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
 # Please remove the dry-run option once your CI pipeline is in place ant that you're ready to publish for real
-    - upm-ci package publish --package-path package --dry-run
+    - upm-ci package publish --dry-run
   triggers:
     tags:
       only:
