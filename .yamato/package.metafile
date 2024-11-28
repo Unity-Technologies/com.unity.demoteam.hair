@@ -1,7 +1,6 @@
 test_editors:
   - version: 2020.2.0f1
   - version: 2021.3
-  - version: trunk
 
 test_platforms:
   - name: win
@@ -18,9 +17,7 @@ test_platforms:
     flavor: b1.large
 
 player_test_editors:
-  - version: 2020.2.0f1
   - version: 2021.3
-  - version: trunk
 
 player_test_platforms:
   - name: win
