@@ -79,6 +79,16 @@
             "name": "com.unity.collections",
             "expression": "[2.0.0,2.1.0-exp.4)",
             "define": "HAS_PACKAGE_UNITY_COLLECTIONS_2_0_0_UNTIL_2_1_0_EXP_4"
+        },
+        {
+            "name": "com.unity.modules.physics",
+            "expression": "1.0.0",
+            "define": "HAS_MODULE_PHYSICS"
+        },
+        {
+            "name": "com.unity.modules.wind",
+            "expression": "1.0.0",
+            "define": "HAS_MODULE_WIND"
         }
     ],
     "noEngineReferences": false
