@@ -1,0 +1,64 @@
+{% metadata_file .yamato/package.metafile -%}
+---
+
+{% for editor in test_editors -%}
+{% for platform in test_platforms -%}
+promotion_test_{{ platform.name }}_{{ editor.version }}:
+  name : Promotion Test {{ editor.version }} on {{ platform.name }}
+  agent:
+    type: {{ platform.type }}
+    image: {{ platform.image }}
+    flavor: {{ platform.flavor}}
+  variables:
+    UPMCI_PROMOTION: 1
+  commands:
+    - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
+    - upm-ci package test --unity-version {{ editor.version }} --package-path package --extra-create-project-arg=-upmNoDefaultPackages
+  artifacts:
+    logs:
+      paths:
+        - "upm-ci~/test-results/**/*"
+        - "upm-ci~/upm-ci.log"
+  dependencies:
+    - .yamato/package-pack.yml#pack
+{% endfor -%}
+{% endfor -%}
+
+promotion_test_trigger:
+  name: Promotion Tests Trigger
+  dependencies:
+{% for editor in test_editors -%}
+{% for platform in test_platforms -%}
+    - .yamato/package-promotion.yml#promotion_test_{{platform.name}}_{{editor.version}}
+{% endfor -%}
+{% endfor -%}
+
+promote:
+  name: Promote to Production
+  agent:
+    type: Unity::VM
+    image: package-ci/ubuntu-22.04:v4
+    flavor: b1.small
+  variables:
+    UPMCI_PROMOTION: 1
+  commands:
+    - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
+    - upm-ci package promote --package-path package --dry-run
+  triggers:
+    tags:
+      only:
+        - /^[Rr]elease-(0\.\d+\.\d+|[1-9]\d*\.\d+\.\d+(-preview(\.\d+)?|-exp(\.\d+|-\w+\.\d+)|-pre\.\d+))$/
+  artifacts:
+    artifacts:
+      paths:
+        - "upm-ci~/packages/*.tgz"
+    logs:
+      paths:
+        - "upm-ci~/upm-ci.log"
+  dependencies:
+    - .yamato/package-pack.yml#pack
+{% for editor in test_editors -%}
+{% for platform in test_platforms -%}
+    - .yamato/package-promotion.yml#promotion_test_{{ platform.name }}_{{ editor.version }}
+{% endfor -%}
+{% endfor -%}

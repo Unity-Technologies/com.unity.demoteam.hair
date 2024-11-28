@@ -1,0 +1,103 @@
+test_editors:
+  - version: 2020.2.0f1
+  - version: 2021.3
+  - version: trunk
+
+test_platforms:
+  - name: win
+    type: Unity::VM
+    image: package-ci/win10:v4
+    flavor: b1.large
+  - name: mac
+    type: Unity::VM::osx
+    image: package-ci/macos-13:v4
+    flavor: m1.mac
+  - name: ubuntu
+    type: Unity::VM
+    image: package-ci/ubuntu-22.04:v4
+    flavor: b1.large
+
+player_test_editors:
+  - version: 2020.2.0f1
+  - version: 2021.3
+  - version: trunk
+
+player_test_platforms:
+  - name: win
+    id: standalone
+    build_and_run:
+      type: Unity::VM
+      image: package-ci/win10:v4
+      flavor: b1.large
+  - name: mac
+    id: standalone
+    build_and_run:
+      type: Unity::VM::osx
+      image: package-ci/macos-13:v4
+      flavor: m1.mac
+  - name: android
+    id: android
+    build:
+      type: Unity::VM
+      image: package-ci/win10:v4
+      flavor: b1.large
+    run:
+      type: Unity::mobile::shield
+      image: package-ci/win10:v4
+      flavor: b1.large
+    extra_test_args: --extra-utr-arg="--scripting-backend=Il2Cpp"
+  - name: ios
+    id: ios
+    build:
+      type: Unity::VM::osx
+      image: package-ci/macos-13:v4
+      flavor: b1.large
+    run:
+      type: Unity::mobile::iPhone
+      image: package-ci/macos-13:v4
+      flavor: b1.large
+  - name: ps4
+    id: ps4
+    build_and_run:
+      type: Unity::console::ps4
+      image: package-ci/win10-ps4:v4
+      flavor: b1.large
+  - name: ps5
+    id: ps5
+    build:
+      type: Unity::VM
+      image: package-ci/win10-ps5:v4
+      flavor: b1.large
+    run:
+      type: Unity::console::ps5
+      image: package-ci/win10-ps5:v4
+      flavor: b1.large
+  - name: switch
+    id: switch
+    build_and_run:
+      type: Unity::console::switch
+      image: package-ci/win10-switch:v4
+      flavor: b1.large
+  - name: gamecorexboxone
+    id: GameCoreXboxOne
+    build:
+      type: Unity::VM
+      image: package-ci/win10-xbox:v4
+      flavor: b1.large
+    run:
+      type: Unity::console::xbox
+      image: package-ci/win10-xbox:v4
+      flavor: b1.large
+  - name: gamecorexboxseries
+    id: GameCoreScarlett
+    build:
+      type: Unity::VM
+      image: package-ci/win10-xbox:v4
+      flavor: b1.large
+    run:
+      type: Unity::console::scarlett
+      image: package-ci/win10-xbox:v4
+      flavor: b1.large
+
+registry:
+  npm: https://artifactory.prd.it.unity3d.com/artifactory/api/npm/upm-npm

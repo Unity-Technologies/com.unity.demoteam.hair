@@ -1,0 +1,18 @@
+{% metadata_file .yamato/package.metafile -%}
+---
+pack:
+  name: Pack
+  agent:
+    type: Unity::VM
+    image: package-ci/ubuntu-22.04:v4
+    flavor: b1.large
+  commands:
+    - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
+    - upm-ci package pack --package-path package
+  artifacts:
+    packages:
+      paths:
+        - "upm-ci~/packages/**/*"
+    logs:
+      paths:
+        - "upm-ci~/upm-ci.log"

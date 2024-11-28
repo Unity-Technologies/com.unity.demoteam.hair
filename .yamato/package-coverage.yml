@@ -1,0 +1,34 @@
+{% metadata_file .yamato/package.metafile -%}
+package-assembly: unity.a-package
+---
+{% for editor in test_editors -%}
+{% for platform in test_platforms -%}
+test_coverage_{{ platform.name }}_{{ editor.version }}:
+  name : Test Coverage on {{ platform.name }} ({{ editor.version }})
+  agent:
+    type: {{ platform.type }}
+    image: {{ platform.image }}
+    flavor: {{ platform.flavor}}
+  commands:
+    - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
+    - upm-ci package test -u {{ editor.version }} --package-path package --type package-tests --extra-create-project-arg=-upmNoDefaultPackages --enable-code-coverage --code-coverage-options 'generateAdditionalMetrics;generateHtmlReport;assemblyFilters:+{{ package-assembly }}*'
+  artifacts:
+    logs:
+      paths:
+        - "upm-ci~/test-results/**/*"
+        - "upm-ci~/upm-ci.log"
+  dependencies:
+    - .yamato/package-pack.yml#pack
+{% endfor -%}
+{% endfor -%}
+
+
+{% for platform in test_platforms -%}
+tests_coverage_all_{{ platform.name }}:
+  name: _Run All Coverage Tests ({{ platform.name }})
+  dependencies:
+    - .yamato/package-pack.yml#pack
+{% for editor in test_editors -%}
+    - .yamato/package-coverage.yml#test_coverage_{{ platform.name }}_{{ editor.version }}
+{% endfor -%}
+{% endfor -%}
