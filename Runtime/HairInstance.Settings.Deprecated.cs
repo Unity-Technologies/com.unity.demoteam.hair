@@ -13,7 +13,7 @@ namespace Unity.DemoTeam.Hair
 
 		[StructLayout(LayoutKind.Explicit)]
 		[EditorBrowsable(EditorBrowsableState.Never)]
-		[Obsolete("Renamed HairInstance.SettingsSystem (UnityUpgradable) -> HairInstance.SettingsExecutive", true)]
+		[Obsolete("Renamed HairInstance/SettingsSystem (UnityUpgradable) -> HairInstance/SettingsExecutive", true)]
 		public struct SettingsSystem
 		{
 			[FieldOffset(0)]
