@@ -18,7 +18,7 @@ namespace Unity.DemoTeam.Hair
 		public struct GeneratedRoots
 		{
 			[EditorBrowsable(EditorBrowsableState.Never)]
-			[Obsolete("Renamed GeneratedRoots/StrandParameters (UnityUpgradable) -> GeneratedRoots/RootParameters", true)]
+			[Obsolete("Renamed HairAssetProvider/GeneratedRoots/StrandParameters (UnityUpgradable) -> GeneratedRoots.RootParameters", true)]
 			public struct StrandParameters { };
 		};
 	}

@@ -13,15 +13,15 @@ namespace Unity.DemoTeam.Hair
 		public partial struct StrandGroup
 		{
 			[EditorBrowsable(EditorBrowsableState.Never), HideInInspector]
-			[Obsolete("Removed (all topologies built at runtime)", false)]
+			[Obsolete("Removed serialized topology (all topologies are now built at runtime)", false)]
 			public Mesh meshAssetLines { get => meshAssetRoots; }
 
 			[EditorBrowsable(EditorBrowsableState.Never), HideInInspector]
-			[Obsolete("Removed (all topologies built at runtime)", false)]
+			[Obsolete("Removed serialized topology (all topologies are now built at runtime)", false)]
 			public Mesh meshAssetStrips { get => meshAssetRoots; }
 
 			[EditorBrowsable(EditorBrowsableState.Never), HideInInspector]
-			[Obsolete("Removed (all topologies built at runtime)", false)]
+			[Obsolete("Removed serialized topology (all topologies are now built at runtime)", false)]
 			public Mesh meshAssetTubes { get => meshAssetRoots; }
 		}
 	}
