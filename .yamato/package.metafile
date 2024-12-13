@@ -21,10 +21,6 @@ test_platforms:
 
 player_test_versions:
   - 2020.3
-  - 2021
-  - 2022
-  - 2023
-  - 6000
 
 player_test_platforms:
   - name: win
