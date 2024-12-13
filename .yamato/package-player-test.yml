@@ -16,6 +16,7 @@ build_{{ platform.name }}_{{ version }}:
       set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
+      echo <PROJECT_FOLDER>
       upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages --player-build-path upm-ci~/player/{{ platform.id }} --build-only {{ platform.extra_test_args }}
   artifacts:
     logs:
@@ -44,6 +45,7 @@ run_{{ platform.name }}_{{ version }}:
       set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
+      echo <PROJECT_FOLDER>
       upm-ci package test -u {{ version }} --platform {{ platform.id }} --player-build-path upm-ci~/player/{{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{ platform.extra_test_args }}
   artifacts:
     logs:
@@ -70,6 +72,7 @@ build_and_run_{{ platform.name }}_{{ version }}:
       set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
+      echo <PROJECT_FOLDER>
       upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{ platform.extra_test_args }}
   artifacts:
     logs:
