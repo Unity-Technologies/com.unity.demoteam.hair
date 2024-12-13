@@ -12,8 +12,6 @@ build_{{ platform.name }}_{{ version }}:
   commands:
     - set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
     - set %PS4_SDK_PATH_1%
-    - set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
-    - set %PS5_SDK_PATH_1%
     - set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
     - set %SWITCH_SDK_PATH_1%
     - set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
@@ -43,8 +41,6 @@ run_{{ platform.name }}_{{ version }}:
   commands:
     - set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
     - set %PS4_SDK_PATH_1%
-    - set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
-    - set %PS5_SDK_PATH_1%
     - set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
     - set %SWITCH_SDK_PATH_1%
     - set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
@@ -72,8 +68,6 @@ build_and_run_{{ platform.name }}_{{ version }}:
   commands:
     - set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
     - set %PS4_SDK_PATH_1%
-    - set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
-    - set %PS5_SDK_PATH_1%
     - set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
     - set %SWITCH_SDK_PATH_1%
     - set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
