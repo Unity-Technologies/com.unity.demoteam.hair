@@ -1,19 +1,19 @@
 {% metadata_file .yamato/package.metafile -%}
 ---
 
-{% for editor in test_editors -%}
+{% for version in test_versions -%}
 {% for platform in test_platforms -%}
-promotion_test_{{ platform.name }}_{{ editor.version }}:
-  name : Promotion Test {{ editor.version }} on {{ platform.name }}
+promotion_test_{{ platform.name }}_{{ version }}:
+  name : Promotion Test {{ version }} on {{ platform.name }}
   agent:
     type: {{ platform.type }}
     image: {{ platform.image }}
-    flavor: {{ platform.flavor}}
+    flavor: {{ platform.flavor }}
   variables:
     UPMCI_PROMOTION: 1
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test --unity-version {{ editor.version }} --extra-create-project-arg=-upmNoDefaultPackages
+    - upm-ci package test --unity-version {{ version }} --extra-create-project-arg=-upmNoDefaultPackages
   artifacts:
     logs:
       paths:
@@ -29,7 +29,7 @@ promotion_test_trigger:
   dependencies:
 {% for editor in test_editors -%}
 {% for platform in test_platforms -%}
-    - .yamato/package-promotion.yml#promotion_test_{{platform.name}}_{{editor.version}}
+    - .yamato/package-promotion.yml#promotion_test_{{ platform.name }}_{{ version }}
 {% endfor -%}
 {% endfor -%}
 
@@ -59,6 +59,6 @@ promote:
     - .yamato/package-pack.yml#pack
 {% for editor in test_editors -%}
 {% for platform in test_platforms -%}
-    - .yamato/package-promotion.yml#promotion_test_{{ platform.name }}_{{ editor.version }}
+    - .yamato/package-promotion.yml#promotion_test_{{ platform.name }}_{{ version }}
 {% endfor -%}
 {% endfor -%}

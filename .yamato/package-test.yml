@@ -1,19 +1,19 @@
 {% metadata_file .yamato/package.metafile -%}
 ---
 
-{% for editor in test_editors -%}
+{% for version in test_versions -%}
 {% for platform in test_platforms -%}
-test_{{ platform.name }}_{{ editor.version }}:
-  name : Test {{ editor.version }} on {{ platform.name }}
+test_{{ platform.name }}_{{ version }}:
+  name : Test {{ version }} on {{ platform.name }}
   agent:
     type: {{ platform.type }}
     image: {{ platform.image }}
-    flavor: {{ platform.flavor}}
+    flavor: {{ platform.flavor }}
   variables:
     UPMCI_PKG: "upm-ci-utils@stable"
   commands:
     - npm install {% if platform.name == "win" %}"%UPMCI_PKG%"{% else %}"$UPMCI_PKG"{% endif %} -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --type package-tests --extra-create-project-arg=-upmNoDefaultPackages
+    - upm-ci package test -u {{ version }} --type package-tests --extra-create-project-arg=-upmNoDefaultPackages
   artifacts:
     logs:
       paths:
@@ -26,19 +26,19 @@ test_{{ platform.name }}_{{ editor.version }}:
 
 # Validate the package on each editor version and each platform
 # Validation only occurs in editmode.
-{% for editor in test_editors -%}
+{% for version in test_versions -%}
 {% for platform in test_platforms -%}
-validate_{{ platform.name }}_{{ editor.version }}:
-  name : Validate {{ editor.version }} on {{ platform.name }}
+validate_{{ platform.name }}_{{ version }}:
+  name : Validate {{ version }} on {{ platform.name }}
   agent:
     type: {{ platform.type }}
     image: {{ platform.image }}
-    flavor: {{ platform.flavor}}
+    flavor: {{ platform.flavor }}
   variables:
     UPMCI_PKG: "upm-ci-utils@stable"
   commands:
     - npm install {% if platform.name == "win" %}"%UPMCI_PKG%"{% else %}"$UPMCI_PKG"{% endif %} -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --type vetting-tests --platform editmode --extra-create-project-arg=-upmNoDefaultPackages
+    - upm-ci package test -u {{ version }} --type vetting-tests --platform editmode --extra-create-project-arg=-upmNoDefaultPackages
   artifacts:
     logs:
       paths:
@@ -63,7 +63,7 @@ test_trigger:
     - .yamato/package-pack.yml#pack
 {% for editor in test_editors -%}
 {% for platform in test_platforms -%}
-    - .yamato/package-test.yml#test_{{platform.name}}_{{editor.version}}
-    - .yamato/package-test.yml#validate_{{platform.name}}_{{editor.version}}
+    - .yamato/package-test.yml#test_{{ platform.name }}_{{ version }}
+    - .yamato/package-test.yml#validate_{{ platform.name }}_{{ version }}
 {% endfor -%}
 {% endfor -%}

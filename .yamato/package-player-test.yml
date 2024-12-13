@@ -1,21 +1,21 @@
 {% metadata_file .yamato/package.metafile -%}
 ---
-{% for editor in player_test_editors -%}
+{% for version in player_test_versions -%}
 {% for platform in player_test_platforms -%}
 {% if platform.build -%}
-build_{{ platform.name }}_{{ editor.version }}:
-  name : Build {{ editor.version }} {{ platform.name }} Player
+build_{{ platform.name }}_{{ version }}:
+  name : Build {{ version }} {{ platform.name }} Player
   agent:
     type: {{ platform.build.type }}
     image: {{ platform.build.image }}
-    flavor: {{ platform.build.flavor}}
+    flavor: {{ platform.build.flavor }}
   variables:
     {{ ps4_sdk }}
     {{ switch_sdk_1 }}
     {{ switch_sdk_2 }}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages --player-build-path upm-ci~/player/{{ platform.id }} --build-only {{platform.extra_test_args}}
+    - upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages --player-build-path upm-ci~/player/{{ platform.id }} --build-only {{platform.extra_test_args}}
   artifacts:
     logs:
       paths:
@@ -30,19 +30,19 @@ build_{{ platform.name }}_{{ editor.version }}:
     - .yamato/package-pack.yml#pack
 {% endif -%}
 {% if platform.run -%}
-run_{{ platform.name }}_{{ editor.version }}:
-  name : Run {{ editor.version }} {{ platform.name }} Player Tests
+run_{{ platform.name }}_{{ version }}:
+  name : Run {{ version }} {{ platform.name }} Player Tests
   agent:
     type: {{ platform.run.type }}
     image: {{ platform.run.image }}
-    flavor: {{ platform.run.flavor}}
+    flavor: {{ platform.run.flavor }}
   variables:
     {{ ps4_sdk }}
     {{ switch_sdk_1 }}
     {{ switch_sdk_2 }}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --player-build-path upm-ci~/player/{{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
+    - upm-ci package test -u {{ version }} --platform {{ platform.id }} --player-build-path upm-ci~/player/{{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
   artifacts:
     logs:
       paths:
@@ -52,22 +52,22 @@ run_{{ platform.name }}_{{ editor.version }}:
         - "**/test-results/**"
   dependencies:
     - .yamato/package-pack.yml#pack
-    - .yamato/package-player-test.yml#build_{{platform.name}}_{{editor.version}}
+    - .yamato/package-player-test.yml#build_{{ platform.name }}_{{ version }}
 {% endif -%}
 {% if platform.build_and_run -%}
-build_and_run_{{ platform.name }}_{{ editor.version }}:
-  name : Build and run {{ editor.version }} {{ platform.name }} Player Tests
+build_and_run_{{ platform.name }}_{{ version }}:
+  name : Build and run {{ version }} {{ platform.name }} Player Tests
   agent:
     type: {{ platform.build_and_run.type }}
     image: {{ platform.build_and_run.image }}
-    flavor: {{ platform.build_and_run.flavor}}
+    flavor: {{ platform.build_and_run.flavor }}
   variables:
     {{ ps4_sdk }}
     {{ switch_sdk_1 }}
     {{ switch_sdk_2 }}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ editor.version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
+    - upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
   artifacts:
     logs:
       paths:
@@ -87,9 +87,9 @@ player_test_trigger:
 {% for editor in player_test_editors -%}
 {% for platform in player_test_platforms -%}
 {% if platform.run -%}
-    - .yamato/package-player-test.yml#run_{{platform.name}}_{{editor.version}}
+    - .yamato/package-player-test.yml#run_{{ platform.name }}_{{ version }}
 {% elsif platform.build_and_run -%}
-    - .yamato/package-player-test.yml#build_and_run_{{platform.name}}_{{editor.version}}
+    - .yamato/package-player-test.yml#build_and_run_{{ platform.name }}_{{ version }}
 {% endif -%}
 {% endfor -%}
 {% endfor -%}
