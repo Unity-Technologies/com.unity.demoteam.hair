@@ -1,9 +1,9 @@
-test_editors:
-  - version: 2020.3
-  - version: 2021
-  - version: 2022
-  - version: 2023
-  - version: 6000
+test_versions:
+  - 2020.3
+  - 2021
+  - 2022
+  - 2023
+  - 6000
 
 test_platforms:
   - name: win
@@ -19,12 +19,12 @@ test_platforms:
     image: package-ci/ubuntu-22.04:v4
     flavor: b1.large
 
-player_test_editors:
-  - version: 2020.3
-  - version: 2021
-  - version: 2022
-  - version: 2023
-  - version: 6000
+player_test_versions:
+  - 2020.3
+  - 2021
+  - 2022
+  - 2023
+  - 6000
 
 player_test_platforms:
   - name: win
