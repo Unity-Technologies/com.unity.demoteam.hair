@@ -13,6 +13,7 @@ build_{{ platform.name }}_{{ version }}:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
     - |
       echo %PROJECT_FOLDER%
+      dir %PROJECT_FOLDER%
       set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
       set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
@@ -42,6 +43,7 @@ run_{{ platform.name }}_{{ version }}:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
     - |
       echo %PROJECT_FOLDER%
+      dir %PROJECT_FOLDER%
       set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
       set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
@@ -69,6 +71,7 @@ build_and_run_{{ platform.name }}_{{ version }}:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
     - |
       echo %PROJECT_FOLDER%
+      dir %PROJECT_FOLDER%
       set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
       set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
       set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
