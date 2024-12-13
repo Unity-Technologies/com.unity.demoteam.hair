@@ -1,5 +1,5 @@
 test_versions:
-  - 2020.3
+  - 2020
   - 2021
   - 2022
   - 2023
@@ -20,7 +20,7 @@ test_platforms:
     flavor: b1.large
 
 player_test_versions:
-  - 2020.3
+  - 2020
 
 player_test_platforms:
   - name: win
