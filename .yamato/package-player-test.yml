@@ -10,12 +10,13 @@ build_{{ platform.name }}_{{ version }}:
     image: {{ platform.build.image }}
     flavor: {{ platform.build.flavor }}
   commands:
-    - setx %PS4_SDK_PATH_1% %PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
-    - setx %PS5_SDK_PATH_1% %PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
-    - setx %SWITCH_SDK_PATH_1% %SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
-    - setx %SWITCH_SDK_PATH_2% %SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages --player-build-path upm-ci~/player/{{ platform.id }} --build-only {{ platform.extra_test_args }}
+    - |
+      set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
+      set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
+      set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
+      set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
+      upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages --player-build-path upm-ci~/player/{{ platform.id }} --build-only {{ platform.extra_test_args }}
   artifacts:
     logs:
       paths:
@@ -37,12 +38,13 @@ run_{{ platform.name }}_{{ version }}:
     image: {{ platform.run.image }}
     flavor: {{ platform.run.flavor }}
   commands:
-    - setx %PS4_SDK_PATH_1% %PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
-    - setx %PS5_SDK_PATH_1% %PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
-    - setx %SWITCH_SDK_PATH_1% %SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
-    - setx %SWITCH_SDK_PATH_2% %SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ version }} --platform {{ platform.id }} --player-build-path upm-ci~/player/{{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{ platform.extra_test_args }}
+    - |
+      set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
+      set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
+      set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
+      set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
+      upm-ci package test -u {{ version }} --platform {{ platform.id }} --player-build-path upm-ci~/player/{{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{ platform.extra_test_args }}
   artifacts:
     logs:
       paths:
@@ -62,12 +64,13 @@ build_and_run_{{ platform.name }}_{{ version }}:
     image: {{ platform.build_and_run.image }}
     flavor: {{ platform.build_and_run.flavor }}
   commands:
-    - setx %PS4_SDK_PATH_1% %PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
-    - setx %PS5_SDK_PATH_1% %PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
-    - setx %SWITCH_SDK_PATH_1% %SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
-    - setx %SWITCH_SDK_PATH_2% %SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
-    - upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{ platform.extra_test_args }}
+    - |
+      set %PS4_SDK_PATH_1%=%PS4_SDK_PATH_1_BEGIN%%PS4_SDK_{{ version }}%%PS4_SDK_PATH_1_END%
+      set %PS5_SDK_PATH_1%=%PS5_SDK_PATH_1_BEGIN%%PS5_SDK_{{ version }}%%PS5_SDK_PATH_1_END%
+      set %SWITCH_SDK_PATH_1%=%SWITCH_SDK_PATH_1_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_1_END%
+      set %SWITCH_SDK_PATH_2%=%SWITCH_SDK_PATH_2_BEGIN%%SWITCH_SDK_{{ version }}%%SWITCH_SDK_PATH_2_END%
+      upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{ platform.extra_test_args }}
   artifacts:
     logs:
       paths:
