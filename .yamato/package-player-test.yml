@@ -10,9 +10,10 @@ build_{{ platform.name }}_{{ version }}:
     image: {{ platform.build.image }}
     flavor: {{ platform.build.flavor }}
   variables:
-    {{ ps4_sdk }}
-    {{ switch_sdk_1 }}
-    {{ switch_sdk_2 }}
+    {{ PS4_SDK_PATH_1 | replace: "#", "PS4_SDK_{{ version }}" }}
+    {{ PS5_SDK_PATH_1 | replace: "#", "PS5_SDK_{{ version }}" }}
+    {{ SWITCH_SDK_PATH_1 | replace: "#", "SWITCH_SDK_{{ version }}" }}
+    {{ SWITCH_SDK_PATH_2 | replace: "#", "SWITCH_SDK_{{ version }}" }}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
     - upm-ci package test -u {{ version }} --platform {{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages --player-build-path upm-ci~/player/{{ platform.id }} --build-only {{platform.extra_test_args}}
@@ -37,9 +38,10 @@ run_{{ platform.name }}_{{ version }}:
     image: {{ platform.run.image }}
     flavor: {{ platform.run.flavor }}
   variables:
-    {{ ps4_sdk }}
-    {{ switch_sdk_1 }}
-    {{ switch_sdk_2 }}
+    {{ PS4_SDK_PATH_1 | replace: "#", "PS4_SDK_{{ version }}" }}
+    {{ PS5_SDK_PATH_1 | replace: "#", "PS5_SDK_{{ version }}" }}
+    {{ SWITCH_SDK_PATH_1 | replace: "#", "SWITCH_SDK_{{ version }}" }}
+    {{ SWITCH_SDK_PATH_2 | replace: "#", "SWITCH_SDK_{{ version }}" }}
   commands:
     - npm install upm-ci-utils@stable -g --registry {{ registry.npm }}
     - upm-ci package test -u {{ version }} --platform {{ platform.id }} --player-build-path upm-ci~/player/{{ platform.id }} --extra-create-project-arg=-upmNoDefaultPackages {{platform.extra_test_args}}
@@ -84,7 +86,7 @@ build_and_run_{{ platform.name }}_{{ version }}:
 player_test_trigger:
   name: Package Player Tests Trigger
   dependencies:
-{% for editor in player_test_editors -%}
+{% for version in player_test_versions -%}
 {% for platform in player_test_platforms -%}
 {% if platform.run -%}
     - .yamato/package-player-test.yml#run_{{ platform.name }}_{{ version }}
