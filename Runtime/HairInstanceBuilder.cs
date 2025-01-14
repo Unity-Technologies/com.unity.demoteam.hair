@@ -114,7 +114,6 @@ namespace Unity.DemoTeam.Hair
 						strandGroupInstance.sceneObjects.rootMeshAttachment.attachmentType = SkinAttachmentMesh.MeshAttachmentType.Mesh;
 						strandGroupInstance.sceneObjects.rootMeshAttachment.SchedulingMode =
 							SkinAttachmentComponentCommon.SchedulingMode.GPU;
-						strandGroupInstance.sceneObjects.rootMeshAttachment.common.bakedDataEntryName = hairInstance.name + "/" + strandGroupInstance.sceneObjects.rootMeshAttachment.name;
 #else
 						strandGroupInstance.sceneObjects.rootMeshAttachment =
  CreateComponent<SkinAttachment>(strandGroupInstance.sceneObjects.rootMeshContainer, hideFlags);
@@ -475,13 +474,13 @@ namespace Unity.DemoTeam.Hair
 							//  :  .   :
 							//  |,     |
 							//  4------5
-							//  |    ,´|
-							//  |  ,´  |      etc.
-							//  |,´    |
+							//  |    ,ï¿½|
+							//  |  ,ï¿½  |      etc.
+							//  |,ï¿½    |
 							//  2------3    12----13
-							//  |    ,´|    |    ,´|
-							//  |  ,´  |    |  ,´  |
-							//  |,´    |    |,´    |
+							//  |    ,ï¿½|    |    ,ï¿½|
+							//  |  ,ï¿½  |    |  ,ï¿½  |
+							//  |,ï¿½    |    |,ï¿½    |
 							//  0------1    10----11
 							//  .
 							//  |
@@ -539,11 +538,11 @@ namespace Unity.DemoTeam.Hair
 						{
 							//     :      :
 							//     7------6
-							//   ,´:    ,´|        4------5------6------7------4
-							//  4------5  |        |    ,´|    ,´|    ,´|    ,´|
-							//  |  :   |  |   =>   |  ,´  |  ,´  |  ,´  |  ,´  |
-							//  |  3 - |- 2        |,´    |,´    |,´    |,´    |
-							//  |,´    |,´         0------1------2------3------0
+							//   ,ï¿½:    ,ï¿½|        4------5------6------7------4
+							//  4------5  |        |    ,ï¿½|    ,ï¿½|    ,ï¿½|    ,ï¿½|
+							//  |  :   |  |   =>   |  ,ï¿½  |  ,ï¿½  |  ,ï¿½  |  ,ï¿½  |
+							//  |  3 - |- 2        |,ï¿½    |,ï¿½    |,ï¿½    |,ï¿½    |
+							//  |,ï¿½    |,ï¿½         0------1------2------3------0
 							//  0------1
 							//  .
 							//  |

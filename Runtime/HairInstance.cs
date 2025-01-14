@@ -592,7 +592,6 @@ namespace Unity.DemoTeam.Hair
 						{
 							attachment = strandGroupInstances[i].sceneObjects.rootMeshAttachment = HairInstanceBuilder.CreateComponent<SkinAttachmentMesh>(container, container.hideFlags);
 							attachment.attachmentType = SkinAttachmentMesh.MeshAttachmentType.Mesh;
-							attachment.common.bakedDataEntryName = this.name + "/" + attachment.name;
 						}
 					}
 
@@ -608,14 +607,9 @@ namespace Unity.DemoTeam.Hair
 
 						if (attachment != null && (attachment.Target != settingsSkinning.rootsAttachTarget || (attachment.IsAttached != settingsSkinning.rootsAttach && settingsSkinning.rootsAttachTarget != null)))
 						{
-							SkinAttachmentDataRegistry dataStorage = GetAttachmentDataStorage(settingsSkinning, ref strandGroupInstance);
-							attachment.DataStorage = dataStorage;
-							bool dataStorageNeedsRefresh = attachment.common.HasDataStorageChanged() ||
-							                               attachment.DataStorage == null ||
-							                               !attachment.ValidateBakedData();
 							bool attachmentStateChanged = attachment.IsAttached != settingsSkinning.rootsAttach;
 							
-							if (dataStorageNeedsRefresh || buildTargetChanged || attachmentStateChanged)
+							if (buildTargetChanged || attachmentStateChanged)
 							{
 								attachment.Target = settingsSkinning.rootsAttachTarget;
 
@@ -707,24 +701,7 @@ namespace Unity.DemoTeam.Hair
 #endif
 #endif
 		}
-
-#if HAS_PACKAGE_DEMOTEAM_DIGITALHUMAN_0_2_2_PREVIEW
-		SkinAttachmentDataRegistry GetAttachmentDataStorage(in SettingsSkinning settings, ref GroupInstance groupInstance)
-		{
-			if (settings.explicitDataRegistry)
-			{
-				return settings.explicitDataRegistry;
-			}
-
-
-			if (groupInstance.sceneObjects.rootMeshAttachment != null)
-			{	
-				var currentStorage = groupInstance.sceneObjects.rootMeshAttachment.DataStorage;
-				return currentStorage;
-			}
-			return null;
-		}
-#endif
+		
 		#endregion
 
 		#region Update Prerequisite

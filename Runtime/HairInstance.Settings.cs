@@ -80,8 +80,6 @@ namespace Unity.DemoTeam.Hair
 			public Renderer rootsAttachTarget;
 			[Tooltip("Optional mesh to use baking data (useful if the mesh in attach target has unwanted deformation)")]
 			public Mesh explicitRootsAttachMesh;
-			[Tooltip("Optional data storage used for baked attachment data. Default will create bake either next to 1) prefab this instance is part of, or if not prefab b) hair assets used in this hair instance ")]
-			public SkinAttachmentDataRegistry explicitDataRegistry;
 #else
 			[ToggleGroupItem]
 			public SkinAttachmentTarget rootsAttachTarget;
