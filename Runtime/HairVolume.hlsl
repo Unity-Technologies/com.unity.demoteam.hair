@@ -15,9 +15,15 @@ void HairVolume_float(
 	out float3 out_cellCount,
 	out float3 out_cellSizeWS,
 	out float3 out_cellSizeUVW,
+#if UNITY_VERSION >= 202023
+	out UnityTexture3D out_volumeDensity,
+	out UnityTexture3D out_volumeVelocity,
+	out UnityTexture3D out_volumeScattering,
+#else
 	out Texture3D out_volumeDensity,
 	out Texture3D out_volumeVelocity,
 	out Texture3D out_volumeScattering,
+#endif
 	out float3 out_volumeUVW)
 {
 	const VolumeLODGrid lodGrid = _VolumeLODStage[VOLUMELODSTAGE_RESOLVE];
@@ -27,9 +33,18 @@ void HairVolume_float(
 		out_cellCount = lodGrid.volumeCellCount;
 		out_cellSizeWS = VolumeWorldCellSize(lodGrid);
 		out_cellSizeUVW = 1.0f / lodGrid.volumeCellCount;
+#if UNITY_VERSION >= 202023
+		out_volumeDensity.tex = _UntypedVolumeDensity;
+		out_volumeDensity.samplerstate = _Volume_trilinear_clamp;
+		out_volumeVelocity.tex = _UntypedVolumeVelocity;
+		out_volumeVelocity.samplerstate = _Volume_trilinear_clamp;
+		out_volumeScattering.tex = _UntypedVolumeScattering;
+		out_volumeScattering.samplerstate = _Volume_trilinear_clamp;
+#else
 		out_volumeDensity = _UntypedVolumeDensity;
 		out_volumeVelocity = _UntypedVolumeVelocity;
 		out_volumeScattering = _UntypedVolumeScattering;
+#endif
 		out_volumeUVW = VolumeWorldToUVW(lodGrid, in_positionWS);
 	}
 }

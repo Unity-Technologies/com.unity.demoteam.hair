@@ -1,0 +1,314 @@
+{% metadata_file .yamato/package-ci.tests -%}
+
+small_agent: '{ type: Unity::VM, flavor: b1.small, image: package-ci/ubuntu-22.04:v4 }'
+
+install_upmci_unix: |
+  npm install -g "$UPMCI_PKG" --registry https://artifactory.prd.it.unity3d.com/artifactory/api/npm/upm-npm
+install_upmci_windows: |
+  npm install -g "%UPMCI_PKG%" --registry https://artifactory.prd.it.unity3d.com/artifactory/api/npm/upm-npm
+
+on_main_failure_unix: false || [ "$GIT_BRANCH" != master ] || [ "$YAMATO_COMMAND_BLOCK_SUCCESS" != 0 ] ||
+on_main_failure_windows: if "%GIT_BRANCH%"=="master" if "%YAMATO_COMMAND_BLOCK_SUCCESS%"=="0"
+
+badge_update: curl -fsGSX PUT https://badges-general.ds.unity3d.com/badge/repo/com.unity.demoteam.hair
+badge_tests_passing: -d badge=tests -d value=passing -d color=green
+badge_tests_failing: -d badge=tests -d value=failing -d color=red
+
+---
+
+# Pack (and x-ray)
+
+pack:
+  name: Pack (and x-ray)
+  agent: {{ small_agent }}
+  variables:
+    UPMCI_PKG: upm-ci-utils@stable
+    XRAY_PROFILE: experimental
+  commands:
+    # One could use 'upm-ci pack' here:
+    - {{ install_upmci_unix -}}
+    - upm-ci package pack
+
+    # We are, however, gonna use the new 'upm-pvp pack' instead
+    # (with --upm-ci-compat, because we're still testing with upm-ci below).
+    #- upm-pvp pack "*" --output upm-ci~/packages --upm-ci-compat
+
+    - upm-pvp xray --packages "upm-ci~/packages/*.tgz" --results pvp-results
+    - upm-pvp require "$XRAY_PROFILE" --results pvp-results --allow-missing
+  after:
+    - {{ on_main_failure_unix }} {{ badge_update }} {{ badge_tests_failing }}
+    - pets_ant
+  timeout: 0.5
+  artifacts:
+    logs:
+      paths:
+        - pvp-results/*
+        - upm-ci~/upm-ci.log"
+    packages:
+      paths:
+        - upm-ci~/packages/*
+
+
+# Host platform tests (editmode + playmode + verification)
+{% for combo in test_combos_editor -%}
+{% assign platform_id = combo | split: '_' | first -%}
+{% assign platform = test_platforms[platform_id] -%}
+{% assign unity_version = combo | split: '_' | last -%}
+{% assign unity_version_sdk = unity_version | split: "." | first -%}
+
+"test_{{ combo }}":
+  name: "Test ({{ platform.name }}, {{ unity_version }})"
+  agent: {{ platform.build_agent }}
+  variables:
+    PVP_PROFILE: experimental
+    UNITY_EXT_LOGGING: 1
+    UPMCI_PKG: upm-ci-utils@stable
+  dependencies:
+    - path: .yamato/package-ci.yml#pack
+      specific_options:
+        logs:
+          ignore_artifact: true
+  commands:
+{% if platform.windows -%}
+    - {{ install_upmci_windows -}}
+{% else -%}
+    - {{ install_upmci_unix -}}
+{% endif -%}
+    - unity-downloader-cli --fast --wait --unity-version "{{ unity_version }}" --components editor --arch {{ platform.arch | default: 'x64' }}
+    # Run upm-pvp to validate packages.
+    - upm-pvp test --unity .Editor --packages "upm-ci~/packages/*.tgz" --results pvp-results
+    - upm-pvp require {% if platform.windows %}"%PVP_PROFILE%"{% else %}"$PVP_PROFILE"{% endif %} --results pvp-results
+    # Run UTR to test packages.
+    - upm-pvp create-test-project test-project --packages "upm-ci~/packages/*.tgz" --unity .Editor
+    - UnifiedTestRunner --suite=editor --suite=playmode --editor-location=.Editor --testproject=test-project --artifacts-path=test-results "--ff={ops.upmpvpevidence.enable=true}"
+    # Run upm-ci to test the legacy pipeline.
+    #- upm-ci project test --unity-version .Editor --project-path test-project --type isolation-tests --enable-load-and-test-isolation
+    - upm-ci package test --unity-version .Editor --type package-tests --extra-create-project-arg=-upmNoDefaultPackages
+  after:
+{% if platform.windows -%}
+    - {{ on_main_failure_windows }} {{ badge_update }} {{ badge_tests_failing }}
+{% else -%}
+    - {{ on_main_failure_unix }} {{ badge_update }} {{ badge_tests_failing }}
+{% endif -%}
+    - pets_ant
+  timeout: {% if platform.windows %}1{% else %}0.5{% endif %}
+  artifacts:
+    logs:
+      paths:
+        - pvp-results/*
+        - test-results/**
+        - upm-ci~/test-results/**
+        - upm-ci~/upm-ci.log
+{% endfor -%}
+
+
+# Device tests (playmode tests only)
+{% for combo in test_combos_player -%}
+{% assign platform_id = combo | split: '_' | first -%}
+{% assign platform = test_platforms[platform_id] -%}
+{% assign unity_version = combo | split: '_' | last -%}
+{% assign unity_version_sdk = unity_version | split: "." | first -%}
+
+{% if platform.run_agent -%}
+"build_{{ combo }}":
+# note: split build-and-run platform
+  name: "Playmode build ({{ platform.name }}, {{ unity_version }})"
+{% else -%}
+"build_and_run_{{ combo }}":
+  name: "Playmode build and run ({{ platform.name }}, {{ unity_version }})"
+{% endif -%}
+  agent: {{ platform.build_agent }}
+  variables:
+    UNITY_EXT_LOGGING: 1
+  dependencies:
+    - path: .yamato/package-ci.yml#pack
+      specific_options:
+        logs:
+          ignore_artifact: true
+  commands:
+    # prepare editor
+    - unity-downloader-cli --fast --wait --unity-version "{{ unity_version }}" --components editor --components {{ platform.build_target }} --arch {{ platform.arch | default: 'x64' }}
+    # prepare test project
+    - upm-pvp create-test-project test-project --packages "upm-ci~/packages/*.tgz" --unity .Editor
+{% if platform.build_deps -%}
+    # prepare platform specific dependencies
+    - |
+      git clone --filter=blob:none --no-checkout --depth 1 --sparse {% if platform.windows -%}%CDS_PKG_ORIGIN%{% else %}$CDS_PKG_ORIGIN{% endif %}
+      cd unity
+{% for build_dep in platform.build_deps -%}
+      git sparse-checkout add {{ build_dep.pkg_path }}{{ build_dep.pkg_name }}
+{% endfor -%}
+      git sparse-checkout list
+      git checkout
+      cd ..
+{% for build_dep in platform.build_deps -%}
+    - xcopy "unity\{{ build_dep.pkg_path }}{{ build_dep.pkg_name }}" "test-project\Packages\{{ build_dep.pkg_name }}" /I /E /H /K
+{% endfor -%}
+{% endif -%}
+{% if platform.build_vars -%}
+    # debug platform specific paths
+    - echo ---path debug begin---
+{% for build_var in platform.build_vars -%}
+    - dir "{{ build_var.sdk_path_prefix }}*"
+{% endfor -%}
+    - echo ---path debug end---
+{% endif -%}
+    # dispatch
+    - |
+      echo ---dispatch---
+{% for build_var in platform.build_vars -%}
+      gsudo setx {{ build_var.sdk_path_id }} "{{ build_var.sdk_path_prefix }}%{{ build_var.sdk_ver_resolve }}{{ unity_version_sdk }}%{{ build_var.sdk_path_suffix }}" /m
+      gsudo setx {{ build_var.sdk_path_id }} "{{ build_var.sdk_path_prefix }}%{{ build_var.sdk_ver_resolve }}{{ unity_version_sdk }}%{{ build_var.sdk_path_suffix }}"
+      set {{ build_var.sdk_path_id }}={{ build_var.sdk_path_prefix }}%{{ build_var.sdk_ver_resolve }}{{ unity_version_sdk }}%{{ build_var.sdk_path_suffix }}
+{% endfor -%}
+{% if platform.run_agent -%}
+      {{ platform.build_utr_prefix | rstrip }} UnifiedTestRunner --platform={% if platform.run_target %}{{ platform.run_target }}{% else %}{{ platform.build_target }}{% endif %} --suite=playmode --editor-location=.Editor --testproject=test-project --artifacts-path=test-results --player-save-path=player --build-only {{ platform.build_utr_suffix | rstrip }}
+{% else -%}
+      {{ platform.build_utr_prefix | rstrip }} {{ platform.run_utr_prefix | rstrip }} UnifiedTestRunner --platform={% if platform.run_target %}{{ platform.run_target }}{% else %}{{ platform.build_target }}{% endif %} --suite=playmode --editor-location=.Editor --testproject=test-project --artifacts-path=test-results {{ platform.build_utr_suffix | rstrip }} {{ platform.run_utr_suffix | rstrip }}
+{% endif -%}
+  after:
+{% if platform.windows -%}
+    - {{ on_main_failure_windows }} {{ badge_update }} {{ badge_tests_failing }}
+{% else -%}
+    - {{ on_main_failure_unix }} {{ badge_update }} {{ badge_tests_failing }}
+{% endif -%}
+    - pets_ant
+  timeout: {% if platform.windows %}2{% else %}1{% endif %}
+  artifacts:
+    logs:
+      paths:
+        - test-results/**
+    player:
+      paths:
+        - player/**
+{% if platform.run_agent -%}
+"run_{{ combo }}":
+# note: split build-and-run platform
+  name: "Playmode run ({{ platform.name }}, {{ unity_version }})"
+  agent: {{ platform.run_agent }}
+  variables:
+    UNITY_EXT_LOGGING: 1
+  dependencies:
+    - path: .yamato/package-ci.yml#pack
+      specific_options:
+        logs:
+          ignore_artifact: true
+    - path: .yamato/package-ci.yml#build_{{ combo }}
+      specific_options:
+        logs:
+          ignore_artifact: true
+  commands:
+    # prepare editor
+    - unity-downloader-cli --fast --wait --unity-version "{{ unity_version }}" --components editor --components {{ platform.build_target }} --arch {{ platform.arch | default: 'x64' }}
+    # prepare test project
+    - upm-pvp create-test-project test-project --packages "upm-ci~/packages/*.tgz" --unity .Editor
+    # dispatch
+    - |
+      echo ---dispatch---
+{% if platform.build_vars -%}
+{% for build_var in platform.build_vars -%}
+      gsudo setx {{ build_var.sdk_path_id }} "{{ build_var.sdk_path_prefix }}%{{ build_var.sdk_ver_resolve }}{{ unity_version_sdk }}%{{ build_var.sdk_path_suffix }}" /m
+      gsudo setx {{ build_var.sdk_path_id }} "{{ build_var.sdk_path_prefix }}%{{ build_var.sdk_ver_resolve }}{{ unity_version_sdk }}%{{ build_var.sdk_path_suffix }}"
+      set {{ build_var.sdk_path_id }}={{ build_var.sdk_path_prefix }}%{{ build_var.sdk_ver_resolve }}{{ unity_version_sdk }}%{{ build_var.sdk_path_suffix }}
+{% endfor -%}
+{% endif -%}
+      {{ platform.build_utr_prefix | rstrip }} {{ platform.run_utr_prefix | rstrip }} UnifiedTestRunner --platform={% if platform.run_target %}{{ platform.run_target }}{% else %}{{ platform.build_target }}{% endif %} --suite=playmode --editor-location=.Editor --testproject=test-project --artifacts-path=test-results --player-load-path=player {{ platform.build_utr_suffix | rstrip }} {{ platform.run_utr_suffix | rstrip }}
+  after:
+{% if platform.windows -%}
+    - {{ on_main_failure_windows }} {{ badge_update }} {{ badge_tests_failing }}
+{% else -%}
+    - {{ on_main_failure_unix }} {{ badge_update }} {{ badge_tests_failing }}
+{% endif -%}
+    - pets_ant
+  timeout: {% if platform.windows %}2{% else %}1{% endif %}
+  artifacts:
+    logs:
+      paths:
+        - test-results/**
+{% endif -%}
+{% endfor -%}
+
+
+# Aggregate jobs
+
+test:
+  name: Test
+  agent: {{ small_agent }}
+  variables:
+    UPMPVP_ACK_UPMPVP_DOES_NO_API_VALIDATION: 1
+  dependencies:
+    # We need the package tarballs.
+    - .yamato/package-ci.yml#pack
+{% for combo in test_combos_editor -%}
+    # Host platform tests produce test evidence needed for publishing.
+    - path: ".yamato/package-ci.yml#test_{{ combo }}"
+      location: "results/test_{{ combo }}"
+{% endfor -%}
+{% for combo in test_combos_player -%}
+{% assign platform_id = combo | split: '_' | first -%}
+{% assign platform = test_platforms[platform_id] -%}
+    # Device tests just need to pass, we don't need any evidence from them.
+{% if platform.run_agent -%}
+    - path: ".yamato/package-ci.yml#run_{{ combo }}"
+{% else -%}
+    - path: ".yamato/package-ci.yml#build_and_run_{{ combo }}"
+{% endif -%}
+      ignore_artifact: true
+{% endfor -%}
+  commands:
+    # Test that we are able to publish without actually publishing.
+    - upm-pvp publish --packages "upm-ci~/packages/*.tgz" --evidence results --dry-run
+  after:
+    - |
+      if [ "$GIT_BRANCH" = master ]; then
+        if [ "$YAMATO_COMMAND_BLOCK_SUCCESS" = 1 ]; then
+          {{ badge_update }} {{ badge_tests_passing }}
+        else
+          {{ badge_update }} {{ badge_tests_failing }}
+        fi
+      fi
+    - pets_ant
+  timeout: 0.5
+  artifacts:
+    results:
+      paths:
+        - results/**
+  triggers:
+    branches:
+      only:
+        - master
+    pull_requests:
+      - targets:
+          only:
+            - master
+
+
+# Publish
+
+publish:
+  name: Publish
+  agent: {{ small_agent }}
+  variables:
+    UPMPVP_ACK_UPMPVP_DOES_NO_API_VALIDATION: 1
+  dependencies:
+    - .yamato/package-ci.yml#pack
+    - .yamato/package-ci.yml#test
+  commands:
+    - upm-pvp publish --packages "upm-ci~/packages/*.tgz" --evidence results --dry-run
+    - |
+      set -o pipefail
+      registry=https://artifactory.prd.it.unity3d.com/artifactory/api/npm/upm-candidates
+
+      for package_name in com.unity.demoteam.hair; do
+          latest_version=$(curl -fsSL "$registry/$package_name" | jq -r '.versions | keys[]' | xargs npx -y semver@7.3.8 -p | tail -n 1)
+          if [ "$latest_version" ]; then
+              curl -fsSX PUT "https://badges-general.ds.unity3d.com/badge/repo/$package_name?badge=candidates&color=lightgrey&value=$package_name@$latest_version"
+          fi
+      done
+  after:
+    - pets_ant
+  timeout: 0.5
+  artifacts:
+    logs:
+      paths:
+        - upm-ci~/upm-ci.log

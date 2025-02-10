@@ -181,6 +181,7 @@
     },
     "m_Path": "Hair",
     "m_ConcretePrecision": 0,
+    "m_PreviewMode": 2,
     "m_OutputNode": {
         "m_Id": "51009a9937724d72b9250896569a7909"
     },
@@ -243,22 +244,11 @@
     "m_Hidden": false,
     "m_ShaderOutputName": "volumeVelocity",
     "m_StageCapability": 3,
+    "m_BareResource": false,
     "m_Texture": {
         "m_SerializedTexture": "{\"texture\":{\"instanceID\":0}}",
         "m_Guid": ""
     }
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Texture3DMaterialSlot",
-    "m_ObjectId": "3a12afeae53c4e97bf58d7213b9f62f1",
-    "m_Id": 3,
-    "m_DisplayName": "volumeVelocity",
-    "m_SlotType": 1,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "volumeVelocity",
-    "m_StageCapability": 3
 }
 
 {
@@ -285,13 +275,13 @@
 }
 
 {
-    "m_SGVersion": 0,
+    "m_SGVersion": 1,
     "m_Type": "UnityEditor.ShaderGraph.CustomFunctionNode",
     "m_ObjectId": "44f5e51a52784b51a33d7135c556dd57",
     "m_Group": {
         "m_Id": ""
     },
-    "m_Name": "Custom Function",
+    "m_Name": "HairVolume (Custom Function)",
     "m_DrawState": {
         "m_Expanded": true,
         "m_Position": {
@@ -322,13 +312,13 @@
             "m_Id": "a7df3f87e1ea4d84952be8096e614534"
         },
         {
-            "m_Id": "b0cef74bafe941a2943f557138a16bc3"
+            "m_Id": "924495cad2934d0db8d0f0261c132a5b"
         },
         {
-            "m_Id": "3a12afeae53c4e97bf58d7213b9f62f1"
+            "m_Id": "5192fac8412240058b3299cd22003230"
         },
         {
-            "m_Id": "8ecfad928db843e98eb02330bceb45fe"
+            "m_Id": "8e9013651980415aa65f5e964c030481"
         },
         {
             "m_Id": "c126fe2487a34d7f8cfc58b828a8390d"
@@ -337,6 +327,7 @@
     "synonyms": [],
     "m_Precision": 0,
     "m_PreviewExpanded": false,
+    "m_PreviewMode": 0,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
@@ -442,10 +433,24 @@
     "synonyms": [],
     "m_Precision": 0,
     "m_PreviewExpanded": true,
+    "m_PreviewMode": 0,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
     "IsFirstSlotValid": true
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Texture3DMaterialSlot",
+    "m_ObjectId": "5192fac8412240058b3299cd22003230",
+    "m_Id": 3,
+    "m_DisplayName": "volumeVelocity",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "volumeVelocity",
+    "m_StageCapability": 3,
+    "m_BareResource": false
 }
 
 {
@@ -520,6 +525,7 @@
     "synonyms": [],
     "m_Precision": 1,
     "m_PreviewExpanded": false,
+    "m_PreviewMode": 2,
     "m_CustomColors": {
         "m_SerializableColors": []
     },
@@ -552,13 +558,27 @@
 {
     "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Texture3DMaterialSlot",
-    "m_ObjectId": "8ecfad928db843e98eb02330bceb45fe",
+    "m_ObjectId": "8e9013651980415aa65f5e964c030481",
     "m_Id": 9,
     "m_DisplayName": "volumeScattering",
     "m_SlotType": 1,
     "m_Hidden": false,
     "m_ShaderOutputName": "volumeScattering",
-    "m_StageCapability": 3
+    "m_StageCapability": 3,
+    "m_BareResource": false
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Texture3DMaterialSlot",
+    "m_ObjectId": "924495cad2934d0db8d0f0261c132a5b",
+    "m_Id": 2,
+    "m_DisplayName": "volumeDensity",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "volumeDensity",
+    "m_StageCapability": 3,
+    "m_BareResource": false
 }
 
 {
@@ -571,6 +591,7 @@
     "m_Hidden": false,
     "m_ShaderOutputName": "volumeDensity",
     "m_StageCapability": 3,
+    "m_BareResource": false,
     "m_Texture": {
         "m_SerializedTexture": "{\"texture\":{\"instanceID\":0}}",
         "m_Guid": ""
@@ -625,18 +646,6 @@
 
 {
     "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Texture3DMaterialSlot",
-    "m_ObjectId": "b0cef74bafe941a2943f557138a16bc3",
-    "m_Id": 2,
-    "m_DisplayName": "volumeDensity",
-    "m_SlotType": 1,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "volumeDensity",
-    "m_StageCapability": 3
-}
-
-{
-    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
     "m_ObjectId": "b7bc2982c849488391a1dc2b9c3a54fb",
     "m_Id": 7,
@@ -668,6 +677,7 @@
     "m_Hidden": false,
     "m_ShaderOutputName": "volumeScattering",
     "m_StageCapability": 3,
+    "m_BareResource": false,
     "m_Texture": {
         "m_SerializedTexture": "{\"texture\":{\"instanceID\":0}}",
         "m_Guid": ""

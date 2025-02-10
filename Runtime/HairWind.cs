@@ -65,6 +65,7 @@ namespace Unity.DemoTeam.Hair
 		//--------------------
 		// runtime conversion
 
+#if HAS_MODULE_WIND
 		public static SettingsFlow MakeSettingsFlow(WindZone windZone)
 		{
 			return new SettingsFlow
@@ -78,8 +79,11 @@ namespace Unity.DemoTeam.Hair
 				timingJitterResolution = 0.0f,
 			};
 		}
+#endif
 
+#if HAS_MODULE_WIND
 		public static RuntimeData GetRuntimeDirectional(WindZone windZone) => GetRuntimeDirectional(windZone.transform, MakeSettingsFlow(windZone), new SettingsDirectional { });
+#endif
 		public static RuntimeData GetRuntimeDirectional(Transform transform, in SettingsFlow flow, in SettingsDirectional directional)
 		{
 			return new RuntimeData
@@ -113,7 +117,9 @@ namespace Unity.DemoTeam.Hair
 			};
 		}
 
+#if HAS_MODULE_WIND
 		public static RuntimeData GetRuntimeSpherical(WindZone windZone) => GetRuntimeSpherical(windZone.transform, MakeSettingsFlow(windZone), new SettingsSpherical { });
+#endif
 		public static RuntimeData GetRuntimeSpherical(Transform transform, in SettingsFlow flow, in SettingsSpherical spherical)
 		{
 			return new RuntimeData
@@ -228,6 +234,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static bool TryGetMatchingComponent(HairWind wind, SettingsEmitter.Type type, out Component component)
 		{
+#if HAS_MODULE_WIND
 			var windZone = wind.GetComponent<WindZone>();
 			if (windZone == null)
 				windZone = null;
@@ -241,6 +248,9 @@ namespace Unity.DemoTeam.Hair
 				default:
 					component = null; break;
 			}
+#else
+			component = null;
+#endif
 			return (component != null);
 		}
 
@@ -260,6 +270,7 @@ namespace Unity.DemoTeam.Hair
 
 		public static bool TryGetComponentData(Component component, ref RuntimeData data)
 		{
+#if HAS_MODULE_WIND
 			var windZone = component as WindZone;
 			if (windZone == null)
 				windZone = component.GetComponent<WindZone>();
@@ -274,6 +285,7 @@ namespace Unity.DemoTeam.Hair
 						data = GetRuntimeSpherical(windZone); return true;
 				}
 			}
+#endif
 			return false;
 		}
 

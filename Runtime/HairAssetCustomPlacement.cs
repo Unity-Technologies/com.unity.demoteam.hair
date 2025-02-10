@@ -14,11 +14,11 @@ namespace Unity.DemoTeam.Hair
 	public abstract class HairAssetProvider
 	{
 		[EditorBrowsable(EditorBrowsableState.Never)]
-		[Obsolete("Renamed GeneratedRoots (UnityUpgradable) -> HairAssetProvisional.ProceduralRoots", true)]
+		[Obsolete("Renamed HairAssetProvider/GeneratedRoots (UnityUpgradable) -> HairAssetProvisional/ProceduralRoots", true)]
 		public struct GeneratedRoots
 		{
 			[EditorBrowsable(EditorBrowsableState.Never)]
-			[Obsolete("Renamed StrandParameters (UnityUpgradable) -> GeneratedRoots.RootParameters", true)]
+			[Obsolete("Renamed HairAssetProvider/GeneratedRoots/StrandParameters (UnityUpgradable) -> GeneratedRoots.RootParameters", true)]
 			public struct StrandParameters { };
 		};
 	}

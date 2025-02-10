@@ -1,3 +1,5 @@
+[![candidates](https://badges-general.ds.unity3d.com/badge/repo/com.unity.demoteam.hair?badge=candidates)]
+[![tests](https://badges-general.ds.unity3d.com/badge/repo/com.unity.demoteam.hair?badge=tests)]
 
 # Package: com.unity.demoteam.hair
 
@@ -50,7 +52,7 @@
 		- Local shape
 		- Global position
 		- Global rotation
-	+ Level of detail support
+	+ Seamless level of detail
 
 * Rendering
 	+ Supports all current rendering pipelines
@@ -68,7 +70,7 @@
 		- Render strands as (view facing, for now) tube geometry w/ object space normals
 		- Render high quality strands using the upcoming compute-based HDRP line renderer
 		[ *depends on **Unity >= 2023.1.0a21*** ]
-	+ Level of detail support
+	+ Seamless level of detail
 
 * Level of detail
 	+ Seamless level of detail for both simulation and rendering
@@ -98,8 +100,9 @@ Use [*Add package from git URL*](https://docs.unity3d.com/Manual/upm-ui-giturl.h
 
 ## Related links
 
-- Video: [Enemies – real-time cinematic teaser](https://www.youtube.com/watch?v=eXYUNrgqWUU)
-- Video: [Lion: A glimpse of the future with Unity Art Tools](https://www.youtube.com/watch?v=KpPx_lvthBQ)
+- Video: [Enemies – real-time cinematic teaser | Unity](https://www.youtube.com/watch?v=eXYUNrgqWUU)
+- Video: [Lion: A glimpse of the future with Unity Art Tools | Unity](https://www.youtube.com/watch?v=KpPx_lvthBQ)
+- Video: [Time Ghost | Unity 6](https://www.youtube.com/watch?v=o1JIK5W3DRU)
 
 
 ## References

@@ -1,0 +1,25 @@
+{
+    "name": "Unity.DemoTeam.Hair.Tests.Editor",
+    "rootNamespace": "",
+    "references": [
+        "Unity.DemoTeam.Hair.Runtime",
+        "Unity.DemoTeam.Hair.Editor",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

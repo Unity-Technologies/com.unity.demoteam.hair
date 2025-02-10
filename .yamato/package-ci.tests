@@ -1,0 +1,207 @@
+test_combos_editor:
+  - mac_2021.3
+  - mac_2022.3
+  - mac_6000.0
+
+# - win10_2020.2.0f1
+  - win10_2021.3
+  - win10_2022.3
+  - win10_6000.0
+
+test_combos_player:
+  - android_2021.3
+  - android_2022.3
+  - android_6000.0
+  
+  - ios_2021.3
+  - ios_2022.3
+  - ios_6000.0
+
+  - mac_2020.3
+  - mac_2021.3
+  - mac_2022.3
+  - mac_6000.0
+
+  - ps4_2021.3
+  - ps4_2022.3
+  - ps4_6000.0
+
+  - ps5_2021.3
+  - ps5_2022.3
+  - ps5_6000.0
+
+  - switch_2021.3
+  - switch_2022.3
+  - switch_6000.0
+
+  - xboxone_2021.3
+  - xboxone_2022.3
+  - xboxone_6000.0
+  
+# - xboxseries_2021.3
+# - xboxseries_2022.3
+# - xboxseries_6000.0
+
+# - win10_2020.2.0f1
+  - win10_2020.3
+  - win10_2021.3
+  - win10_2022.3
+  - win10_6000.0
+
+test_platforms:
+  android-linux:
+    name: Android
+    build_target: Android
+    build_agent: '{ type: Unity::VM, flavor: b1.large, image: package-ci/ubuntu-22.04:v4 }'
+    run_agent: '{ type: Unity::mobile::shield, flavor: b1.large, image: package-ci/ubuntu-22.04:v4 }'
+    run_utr_prefix: >
+      ANDROID_SDK_ROOT=$PWD/.Editor/Data/PlaybackEngines/AndroidPlayer/SDK
+      ANDROID_DEVICE_CONNECTION=$BOKKEN_DEVICE_IP
+    run_utr_suffix: >
+      --scripting-backend=Il2Cpp
+      --androidtargetarchitecture=arm64
+      --player-connection-ip=$BOKKEN_HOST_IP
+
+  android:
+    name: Android
+    build_target: Android
+    build_agent: '{ type: Unity::VM, flavor: b1.large, image: package-ci/win10:v4 }'
+    # For legacy reasons, win10:v4 includes a Java SDK and Android NDK/SDK. However,
+    # they're outdated and we must use the ones provided by Unity Downloader instead.
+    # Clear JAVA_HOME and ANDROID_NDK_ROOT env vars (Unity then autodetects these),
+    # and point ANDROID_SDK_ROOT to the SDK that Unity Downloader fetches.
+    # Each 'set' command must be immediately followed by '&&' (for Windows reasons).
+    build_utr_prefix: >
+      set JAVA_HOME=&&
+      set ANDROID_NDK_ROOT=&&
+      set ANDROID_SDK_ROOT=%CD%\.Editor\Data\PlaybackEngines\AndroidPlayer\SDK&&
+      set ANDROID_DEVICE_CONNECTION=%BOKKEN_DEVICE_IP%&&
+    build_utr_suffix: >
+      --scripting-backend=Il2Cpp
+      --androidtargetarchitecture=arm64
+      --playergraphicsapi=Vulkan
+    run_agent: '{ type: Unity::mobile::shield, flavor: b1.large, image: package-ci/win10:v4 }'
+    run_utr_prefix: >
+      gsudo NetSh Advfirewall set allprofiles state off &&
+    run_utr_suffix: >
+      --player-connection-ip=%BOKKEN_HOST_IP%
+    windows: true
+
+  ios:
+    name: iOS
+    build_target: iOS
+    build_agent: '{ type: Unity::VM::osx, flavor: m1.mac, image: package-ci/macos-13:v4 }'
+    run_agent: '{ type: Unity::mobile::iPhone, flavor: m1.mac, image: package-ci/macos-13:v4 }'
+    run_utr_suffix: >
+      --player-connection-ip=$BOKKEN_HOST_IP
+
+  mac:
+    name: macOS
+    build_target: macOS
+    build_agent: '{ type: Unity::VM::osx, flavor: m1.mac, image: package-ci/macos-13:v4 }'
+    run_target: StandaloneOSX
+
+  ps4:
+    name: PS4
+    build_target: PS4
+    build_agent: '{ type: Unity::console::ps4, flavor: b1.large, image: package-ci/win10-ps4:v4 }'
+    build_deps:
+      - pkg_name: '%PS4_PKG_NAME%'
+        pkg_path: '%PS4_PKG_PATH%'
+    build_vars:
+      - sdk_path_id: '%PS4_VAR_1%'
+        sdk_path_prefix: '%PS4_VAR_1_BEG%'
+        sdk_path_suffix: '%PS4_VAR_1_END%'
+        sdk_ver_resolve: PS4_SDK_
+    run_utr_prefix: >
+      gsudo NetSh Advfirewall set allprofiles state off &&
+      %PS4_ADD_DEVICE% %BOKKEN_DEVICE_IP% &&
+    run_utr_suffix: >
+      --player-connection-ip=%BOKKEN_HOST_IP%
+    windows: true
+
+  ps5:
+    name: PS5
+    build_target: PS5
+    build_agent: '{ type: Unity::VM, flavor: b1.large, image: package-ci/win10-ps5:v4 }'
+    build_deps:
+      - pkg_name: '%PS5_PKG_NAME%'
+        pkg_path: '%PS5_PKG_PATH%'
+    build_vars:
+      - sdk_path_id: '%PS5_VAR_1%'
+        sdk_path_prefix: '%PS5_VAR_1_BEG%'
+        sdk_path_suffix: '%PS5_VAR_1_END%'
+        sdk_ver_resolve: PS5_SDK_
+    run_agent: '{ type: Unity::console::ps5, flavor: b1.medium, image: package-ci/win10-ps5:v4 }'
+    run_utr_prefix: >
+      gsudo NetSh Advfirewall set allprofiles state off &&
+      %PS5_ADD_DEVICE% %BOKKEN_DEVICE_IP% &&
+    run_utr_suffix: >
+      --player-connection-ip=%BOKKEN_HOST_IP%
+    windows: true
+
+  switch:
+    name: Switch
+    build_target: Switch
+    build_agent: '{ type: Unity::console::switch, flavor: b1.large, image: package-ci/win10-switch:v4 }'
+    build_vars:
+      - sdk_path_id: '%SWITCH_VAR_1%'
+        sdk_path_prefix: '%SWITCH_VAR_1_BEG%'
+        sdk_path_suffix: '%SWITCH_VAR_1_END%'
+        sdk_ver_resolve: SWITCH_SDK_
+      - sdk_path_id: '%SWITCH_VAR_2%'
+        sdk_path_prefix: '%SWITCH_VAR_2_BEG%'
+        sdk_path_suffix: '%SWITCH_VAR_2_END%'
+        sdk_ver_resolve: SWITCH_SDK_
+    run_utr_prefix: >
+      gsudo NetSh Advfirewall set allprofiles state off &&
+      %SWITCH_ADD_DEVICE% %BOKKEN_DEVICE_IP% &&
+    run_utr_suffix: >
+      --player-connection-ip=%BOKKEN_HOST_IP%
+    windows: true
+
+  win10:
+    name: Windows 10
+    build_target: Windows
+    build_agent: '{ type: Unity::VM, flavor: b1.large, image: package-ci/win10:v4 }'
+    run_target: StandaloneWindows64
+    windows: true
+
+  win11:
+    name: Windows 11
+    build_target: Windows
+    build_agent: '{ type: Unity::VM, flavor: b1.large, image: package-ci/win11:v4 }'
+    run_target: StandaloneWindows64
+    windows: true
+
+  xboxone:
+    name: Xbox One
+    build_target: GameCoreXboxOne
+    build_agent: '{ type: Unity::VM, flavor: b1.large, image: package-ci/win10-xbox:v4 }'
+    build_deps:
+      - pkg_name: '%GAMECORE_PKG_NAME%'
+        pkg_path: '%GAMECORE_PKG_PATH%'
+    run_agent: '{ type: Unity::console::xbox, flavor: b1.medium, image: package-ci/win10-xbox:v4 }'
+    run_utr_prefix: >
+      gsudo NetSh Advfirewall firewall add rule name="Xbox Transport Link Service (inbound)" dir=in action=allow protocol=tcp localport=4201 &&
+      gsudo NetSh Advfirewall set allprofiles state off &&
+      %GAMECORE_ADD_DEVICE% %BOKKEN_DEVICE_IP% &&
+    run_utr_suffix: >
+      --player-connection-ip=%BOKKEN_HOST_IP%
+    windows: true
+
+  xboxseries:
+    name: Xbox Series
+    build_target: GameCoreScarlett
+    build_agent: '{ type: Unity::VM, flavor: b1.large, image: package-ci/win10-xbox:v4 }'
+    build_deps:
+      - pkg_name: '%GAMECORE_PKG_NAME%'
+        pkg_path: '%GAMECORE_PKG_PATH%'
+    run_agent: '{ type: Unity::console::scarlett, flavor: b1.medium, image: package-ci/win10-xbox:v4 }'
+    run_utr_prefix: >
+      gsudo NetSh Advfirewall firewall add rule name="Xbox Transport Link Service (inbound)" dir=in action=allow protocol=tcp localport=4201 &&
+      gsudo NetSh Advfirewall set allprofiles state off &&
+      %GAMECORE_ADD_DEVICE% %BOKKEN_DEVICE_IP% &&
+    run_utr_suffix: >
+      --player-connection-ip=%BOKKEN_HOST_IP%
+    windows: true
