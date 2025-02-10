@@ -1,6 +1,3 @@
-[![candidates](https://badges-general.ds.unity3d.com/badge/repo/com.unity.demoteam.hair?badge=candidates)]
-[![tests](https://badges-general.ds.unity3d.com/badge/repo/com.unity.demoteam.hair?badge=tests)]
-
 # Package: com.unity.demoteam.hair
 
 ![Header](Documentation~/Images/header_crop.png)
